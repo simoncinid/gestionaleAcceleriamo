@@ -1,0 +1,14 @@
+DEPLOY GRATUITO — ACCELERIAMO OS
+
+Il gestionale è già online qui:
+https://acceleriamo-os.diegosimoncini.chatgpt.site
+
+Non devi comprare dominio o server: il sottodominio chatgpt.site, il database e l’archivio documenti sono già configurati.
+
+Per pubblicare modifiche future:
+1. Apri questo progetto in Codex.
+2. Chiedi: “Pubblica online le modifiche di Acceleriamo OS”.
+3. Codex eseguirà build, aggiornamento database e deploy sullo stesso indirizzo.
+
+Il sito al momento è privato. Per far accedere il team, chiedi a Codex:
+“Condividi Acceleriamo OS con [email dei collaboratori]”.
