@@ -15,10 +15,14 @@ type DashboardData = {
   stages: Row[]; members: Row[]; leads: Row[]; clients: Row[]; documents: Row[];
   tasks: Row[]; payments: Row[]; templates: Row[]; jobs: Row[]; activities: Row[];
 };
+type BlueprintTask = {
+  id: string; title: string; description: string; priority: string;
+  offsetDays: number; kind: "oneoff" | "recurring"; recurrence: string; scheduleDay: number;
+};
 type Section = "dashboard" | "leads" | "clients" | "tasks" | "finance" | "jobs" | "team";
 type Modal =
   | "lead" | "task" | "payment" | "template" | "job" | "document" | "member"
-  | "convert" | "call" | "meeting" | "proposal" | "editJob" | "editLead" | "editClient" | "editMember" | "note"
+  | "convert" | "call" | "meeting" | "proposal" | "editJob" | "editTask" | "editTemplate" | "editLead" | "editClient" | "editMember" | "note"
   | null;
 
 const pipeline = [
@@ -91,6 +95,8 @@ export default function Home() {
       setLoaded(true);
     }
   }
+  // Il caricamento iniziale sincronizza lo stato React con il database remoto.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void refresh(); }, []);
 
   const currentUser = data.members.find((m) => m.id === currentUserId) || data.members[0];
@@ -159,7 +165,7 @@ export default function Home() {
   const filteredTasks = data.tasks.filter((task) => match(task, ["title", "description", "assigneeName", "clientName", "jobTitle"]));
   const filteredJobs = data.jobs.filter((job) => match(job, ["title", "clientName", "ownerName", "status", "notes"]));
   const activeLeads = data.leads.filter((lead) => !["chiuso", "non-chiuso", "fuori-target", "fake"].includes(String(lead.statusId)));
-  const openTasks = data.tasks.filter((task) => task.status !== "done");
+  const openTasks = data.tasks.filter((task) => task.status !== "done" && Number(task.isUpcoming || 0) !== 1);
   const dueTotal = data.payments.filter((payment) => payment.status === "due").reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const receivedTotal = data.payments.filter((payment) => payment.status === "received").reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   const selectedLead = data.leads.find((l) => l.id === selectedLeadId) || null;
@@ -273,16 +279,17 @@ export default function Home() {
           />
         )}
         {section === "tasks" && can(perms, "tasks") && (
-          <Tasks data={data} tasks={filteredTasks} act={act} setModal={setModal} canWrite={can(perms, "tasks", "write")} />
+          <Tasks tasks={filteredTasks} act={act} setModal={setModal} canWrite={can(perms, "tasks", "write")} onEdit={(task) => { setEditing(task); setModal("editTask"); }} />
         )}
         {section === "finance" && can(perms, "finance") && (
-          <Finance data={data} act={act} setModal={setModal} dueTotal={dueTotal} receivedTotal={receivedTotal} canWrite={can(perms, "finance", "write")} />
+          <Finance data={data} act={act} setModal={setModal} canWrite={can(perms, "finance", "write")} />
         )}
         {section === "jobs" && can(perms, "jobs") && (
           <Jobs
             data={data} jobs={filteredJobs} setModal={setModal} act={act}
             canWrite={can(perms, "jobs", "write")}
             onEdit={(job) => { setEditing(job); setModal("editJob"); }}
+            onEditTemplate={(template) => { setEditing(template); setModal("editTemplate"); }}
           />
         )}
         {section === "team" && can(perms, "team") && (
@@ -375,15 +382,19 @@ export default function Home() {
             void act({ action: "convertLead", id: editing.id, createJob: values.createJob === "1", ...values }, "Lead trasformato in cliente");
             setSelectedLeadId(null);
           }} className="form-grid">
-            <p className="form-hint field--wide">Converti <strong>{editing.company}</strong> in cliente. Opzionalmente crea subito il lavoro con i task automatici (onboarding → collaudo + fattura ricorrente).</p>
+            <p className="form-hint field--wide">Converti <strong>{editing.company}</strong> in cliente. Puoi creare subito un lavoro usando uno dei tuoi modelli e le task che hai configurato.</p>
             <label className="field check-field field--wide">
               <input type="checkbox" name="createJob" value="1" defaultChecked />
               <span>Crea anche un lavoro con task automatici</span>
             </label>
-            <FormSelect label="Modello lavoro" name="templateId" rows={data.templates.filter((t) => t.active !== 0 && t.active !== false).map((r) => ({ ...r, label: r.title }))} />
+            <FormSelect label="Modello lavoro" name="templateId" rows={[{ id: "_none", label: "Nessun modello" }, ...data.templates.filter((t) => t.active !== 0 && t.active !== false).map((r) => ({ ...r, label: r.title }))]} defaultValue="_none" />
             <Field label="Titolo personalizzato" name="title" placeholder={String(editing.company)} />
             <Field label="Prezzo concordato" name="price" type="number" />
+            <Field label="Canone mensile" name="recurringPrice" type="number" />
             <FormSelect label="Responsabile" name="ownerId" rows={data.members} defaultValue={String(editing.ownerId || currentUserId)} />
+            <MemberPicker members={data.members} defaultIds={[String(editing.ownerId || currentUserId)]} />
+            <FormSelect label="Ricorrenza" name="isRecurring" rows={[{ id: "0", label: "Dal modello / una tantum" }, { id: "1", label: "Mensile" }]} defaultValue="0" />
+            <Field label="Giorno ricorrenza (1–31)" name="recurrenceDay" type="number" defaultValue={String(new Date().getDate())} />
             <Field label="Inizio" name="startDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} />
             <Field label="Consegna" name="dueDate" type="date" />
             <Submit pending={pending} label="Trasforma in cliente" />
@@ -417,12 +428,29 @@ export default function Home() {
             <Field label="Scadenza" name="dueDate" type="date" />
             <FormSelect label="Priorità" name="priority" rows={[{ id: "bassa", label: "Bassa" }, { id: "media", label: "Media" }, { id: "alta", label: "Alta" }]} defaultValue="media" />
             <FormSelect label="Tipo" name="kind" rows={[{ id: "oneoff", label: "Una tantum" }, { id: "recurring", label: "Ricorrente" }]} defaultValue="oneoff" />
-            <FormSelect label="Ricorrenza" name="recurrence" rows={[{ id: "mensile", label: "Mensile" }, { id: "trimestrale", label: "Trimestrale" }, { id: "annuale", label: "Annuale" }]} />
+            <FormSelect label="Ricorrenza" name="recurrence" rows={[{ id: "giornaliera", label: "Giornaliera" }, { id: "settimanale", label: "Settimanale" }, { id: "mensile", label: "Mensile" }, { id: "trimestrale", label: "Trimestrale" }, { id: "annuale", label: "Annuale" }]} defaultValue="mensile" />
             <FormSelect label="Cliente" name="clientId" rows={[{ id: "_none", label: "Nessuno" }, ...data.clients.map((r) => ({ ...r, label: r.company }))]} defaultValue="_none" />
             <FormSelect label="Lavoro" name="jobId" rows={[{ id: "_none", label: "Nessuno" }, ...data.jobs.map((r) => ({ ...r, label: `${r.clientName} — ${r.title}` }))]} defaultValue="_none" />
             <FormSelect label="Lead" name="leadId" rows={[{ id: "_none", label: "Nessuno" }, ...data.leads.map((r) => ({ ...r, label: r.company }))]} defaultValue="_none" />
             <Area label="Descrizione" name="description" />
             <Submit pending={pending} label="Assegna task" />
+          </form>
+        )}
+
+        {modal === "editTask" && editing && (
+          <form onSubmit={(e) => submit(e, "updateTask", "Task aggiornato", { id: editing.id })} className="form-grid">
+            <Field label="Task *" name="title" autoFocus wide defaultValue={String(editing.title || "")} />
+            <FormSelect label="Assegnatario" name="assigneeId" rows={data.members.filter((m) => m.active !== 0 && m.active !== false)} defaultValue={String(editing.assigneeId || currentUserId)} />
+            <Field label="Scadenza" name="dueDate" type="date" defaultValue={String(editing.dueDate || "")} />
+            <FormSelect label="Priorità" name="priority" rows={[{ id: "bassa", label: "Bassa" }, { id: "media", label: "Media" }, { id: "alta", label: "Alta" }]} defaultValue={String(editing.priority || "media")} />
+            <FormSelect label="Stato" name="status" rows={[{ id: "todo", label: "Da fare" }, { id: "done", label: "Completato" }]} defaultValue={String(editing.status || "todo")} />
+            <FormSelect label="Tipo" name="kind" rows={[{ id: "oneoff", label: "Una tantum" }, { id: "recurring", label: "Ricorrente" }]} defaultValue={String(editing.kind || "oneoff")} />
+            <FormSelect label="Ricorrenza" name="recurrence" rows={[{ id: "settimanale", label: "Settimanale" }, { id: "mensile", label: "Mensile" }, { id: "trimestrale", label: "Trimestrale" }, { id: "annuale", label: "Annuale" }]} defaultValue={String(editing.recurrence || "mensile")} />
+            <FormSelect label="Cliente" name="clientId" rows={[{ id: "_none", label: "Nessuno" }, ...data.clients.map((r) => ({ ...r, label: r.company }))]} defaultValue={String(editing.clientId || "_none")} />
+            <FormSelect label="Lavoro" name="jobId" rows={[{ id: "_none", label: "Nessuno" }, ...data.jobs.map((r) => ({ ...r, label: `${r.clientName} — ${r.title}` }))]} defaultValue={String(editing.jobId || "_none")} />
+            <FormSelect label="Lead" name="leadId" rows={[{ id: "_none", label: "Nessuno" }, ...data.leads.map((r) => ({ ...r, label: r.company }))]} defaultValue={String(editing.leadId || "_none")} />
+            <Area label="Descrizione" name="description" defaultValue={String(editing.description || "")} />
+            <Submit pending={pending} label="Salva task" />
           </form>
         )}
 
@@ -440,24 +468,37 @@ export default function Home() {
         )}
 
         {modal === "template" && (
-          <form onSubmit={(e) => submit(e, "createTemplate", "Lavoro standard creato")} className="form-grid">
-            <Field label="Nome lavoro *" name="title" autoFocus />
-            <Field label="Prezzo base" name="defaultPrice" type="number" />
-            <Field label="Durata in giorni" name="defaultDays" type="number" defaultValue="30" />
-            <Area label="Descrizione" name="description" />
-            <p className="form-hint field--wide">I task automatici di default (onboarding → collaudo + fattura) verranno applicati a ogni nuovo lavoro da questo modello.</p>
-            <Submit pending={pending} label="Crea modello" />
+          <CreateTemplateForm pending={pending} onSubmit={(event) => submit(event, "createTemplate", "Lavoro standard creato")} />
+        )}
+
+        {modal === "editTemplate" && editing && (
+          <form onSubmit={(e) => submit(e, "updateTemplate", "Modello aggiornato", { id: editing.id })} className="form-grid">
+            <Field label="Nome lavoro *" name="title" autoFocus defaultValue={String(editing.title || "")} />
+            <Field label="Prezzo una tantum" name="defaultPrice" type="number" defaultValue={String(editing.defaultPrice || 0)} />
+            <Field label="Canone mensile" name="recurringPrice" type="number" defaultValue={String(editing.recurringPrice || 0)} />
+            <Field label="Durata in giorni" name="defaultDays" type="number" defaultValue={String(editing.defaultDays || 30)} />
+            <FormSelect label="Lavoro ricorrente" name="recurrenceEnabled" rows={[{ id: "0", label: "No" }, { id: "1", label: "Sì, mensile" }]} defaultValue={Number(editing.recurrenceEnabled || 0) === 1 ? "1" : "0"} />
+            <FormSelect label="Genera pagamenti" name="paymentEnabled" rows={[{ id: "0", label: "No" }, { id: "1", label: "Sì" }]} defaultValue={Number(editing.paymentEnabled || 0) === 1 ? "1" : "0"} />
+            <FormSelect label="Piano pagamenti" name="paymentRecurrence" rows={[{ id: "oneoff", label: "Solo una tantum" }, { id: "monthly", label: "Solo canone mensile" }, { id: "both", label: "Una tantum + mensile" }]} defaultValue={String(editing.paymentRecurrence || "oneoff")} />
+            <Area label="Descrizione" name="description" defaultValue={String(editing.description || "")} />
+            <TaskBlueprintEditor initialValue={editing.taskBlueprint} title="Task iniziali" help="Create una sola volta quando il lavoro viene assegnato al cliente." />
+            <TaskBlueprintEditor name="recurringTaskBlueprint" initialValue={editing.recurringTaskBlueprint} title="Task di ricorrenza" help="Scegli il giorno preciso della settimana o del mese in cui devono comparire." recurringSchedule />
+            <Submit pending={pending} label="Salva modello" />
           </form>
         )}
 
         {modal === "job" && (
           <form onSubmit={(e) => submit(e, "createJob", "Lavoro creato con task automatici")} className="form-grid">
             <FormSelect label="Cliente *" name="clientId" rows={data.clients.map((row) => ({ ...row, label: row.company }))} defaultValue={selectedClientId || undefined} />
-            <FormSelect label="Lavoro standard" name="templateId" rows={data.templates.filter((t) => t.active !== 0 && t.active !== false).map((row) => ({ ...row, label: row.title }))} />
+            <FormSelect label="Lavoro standard" name="templateId" rows={[{ id: "_none", label: "Nessun modello (senza task automatiche)" }, ...data.templates.filter((t) => t.active !== 0 && t.active !== false).map((row) => ({ ...row, label: row.title }))]} defaultValue="_none" />
             <Field label="Titolo personalizzato" name="title" />
             <Field label="Prezzo concordato" name="price" type="number" />
+            <Field label="Canone mensile" name="recurringPrice" type="number" />
             <FormSelect label="Responsabile" name="ownerId" rows={data.members} defaultValue={currentUserId} />
+            <MemberPicker members={data.members} defaultIds={[currentUserId]} />
             <FormSelect label="Stato" name="status" rows={JOB_STATUSES.map((s) => ({ id: s.id, label: s.label }))} defaultValue="pianificato" />
+            <FormSelect label="Ricorrenza" name="isRecurring" rows={[{ id: "0", label: "Una tantum" }, { id: "1", label: "Mensile" }]} defaultValue="0" />
+            <Field label="Giorno ricorrenza (1–31)" name="recurrenceDay" type="number" defaultValue={String(new Date().getDate())} />
             <Field label="Inizio" name="startDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} />
             <Field label="Consegna" name="dueDate" type="date" />
             <Area label="Note" name="notes" />
@@ -470,8 +511,12 @@ export default function Home() {
             <FormSelect label="Cliente *" name="clientId" rows={data.clients.map((row) => ({ ...row, label: row.company }))} defaultValue={String(editing.clientId)} />
             <Field label="Titolo *" name="title" defaultValue={String(editing.title || "")} autoFocus />
             <Field label="Prezzo" name="price" type="number" defaultValue={String(editing.price || 0)} />
+            <Field label="Canone mensile" name="recurringPrice" type="number" defaultValue={String(editing.recurringPrice || 0)} />
             <FormSelect label="Responsabile" name="ownerId" rows={data.members} defaultValue={String(editing.ownerId)} />
+            <MemberPicker members={data.members} defaultIds={String(editing.assignedMemberIds || editing.ownerId || "").split(",").filter(Boolean)} />
             <FormSelect label="Stato" name="status" rows={JOB_STATUSES.map((s) => ({ id: s.id, label: s.label }))} defaultValue={String(editing.status)} />
+            <FormSelect label="Ricorrenza" name="isRecurring" rows={[{ id: "0", label: "Una tantum" }, { id: "1", label: "Mensile" }]} defaultValue={Number(editing.isRecurring || 0) === 1 ? "1" : "0"} />
+            <Field label="Giorno ricorrenza (1–31)" name="recurrenceDay" type="number" defaultValue={String(editing.recurrenceDay || 1)} />
             <Field label="Inizio" name="startDate" type="date" defaultValue={String(editing.startDate || "")} />
             <Field label="Consegna" name="dueDate" type="date" defaultValue={String(editing.dueDate || "")} />
             <Area label="Note" name="notes" defaultValue={String(editing.notes || "")} />
@@ -547,7 +592,7 @@ function Dashboard({ data, activeLeads, openTasks, dueTotal, receivedTotal, stag
     <section className="welcome">
       <div>
         <span>Buongiorno, {userName}</span>
-        <h2>Dal lead Meta<br /><em>al collaudo.</em></h2>
+        <h2>Dal lead Meta <em>al collaudo.</em></h2>
       </div>
       <div className="quick-actions">
         <button onClick={() => setModal("lead")}>＋ Lead</button>
@@ -821,10 +866,11 @@ function Clients({ data, clients, selectedClient, setSelectedClientId, canWrite,
   </div>;
 }
 
-function Tasks({ data, tasks, act, setModal, canWrite }: {
-  data: DashboardData; tasks: Row[]; act: (p: Record<string, unknown>, s?: string) => Promise<unknown>; setModal: (m: Modal) => void; canWrite: boolean;
+function Tasks({ tasks, act, setModal, canWrite, onEdit }: {
+  tasks: Row[]; act: (p: Record<string, unknown>, s?: string) => Promise<unknown>; setModal: (m: Modal) => void; canWrite: boolean; onEdit: (task: Row) => void;
 }) {
-  const open = tasks.filter((t) => t.status !== "done");
+  const open = tasks.filter((t) => t.status !== "done" && Number(t.isUpcoming || 0) !== 1);
+  const upcoming = tasks.filter((t) => t.status !== "done" && Number(t.isUpcoming || 0) === 1);
   const done = tasks.filter((t) => t.status === "done");
   return <div className="page-stack">
     <div className="section-intro">
@@ -847,7 +893,26 @@ function Tasks({ data, tasks, act, setModal, canWrite }: {
                 {task.kind === "recurring" ? ` · ${task.recurrence}` : ""}
               </small>
             </div>
-            {canWrite && <button className="ghost-mini" onClick={() => act({ action: "deleteTask", id: task.id }, "Task eliminato")}>✕</button>}
+            {canWrite && <div className="task-actions"><button onClick={() => onEdit(task)}>Modifica</button><button className="ghost-mini" onClick={() => act({ action: "deleteTask", id: task.id }, "Task eliminato")}>✕</button></div>}
+          </div>
+        ))}
+      </section>
+      <section>
+        <h3>Programmati <b>{upcoming.length}</b></h3>
+        {upcoming.map((task) => (
+          <div className="task-card is-upcoming" key={String(task.id)}>
+            <button className={`check priority-${task.priority}`} onClick={() => canWrite && act({ action: "toggleTask", id: task.id }, task.kind === "recurring" ? "Completato · prossima ricorrenza creata" : "Task completato in anticipo")} aria-label="Completa in anticipo" />
+            <div>
+              <strong>{task.title}</strong>
+              <p>{task.description || "Nessuna nota"}</p>
+              <small>
+                Compare il {date(task.dueDate)} · {task.assigneeName}
+                {task.clientName ? ` · ${task.clientName}` : ""}
+                {task.jobTitle ? ` · ${task.jobTitle}` : ""}
+                {task.kind === "recurring" ? ` · ${task.recurrence}` : ""}
+              </small>
+            </div>
+            {canWrite && <div className="task-actions"><button onClick={() => onEdit(task)}>Modifica</button><button className="ghost-mini" onClick={() => act({ action: "deleteTask", id: task.id }, "Task eliminato")}>✕</button></div>}
           </div>
         ))}
       </section>
@@ -863,28 +928,41 @@ function Tasks({ data, tasks, act, setModal, canWrite }: {
   </div>;
 }
 
-function Finance({ data, act, setModal, dueTotal, receivedTotal, canWrite }: {
+function Finance({ data, act, setModal, canWrite }: {
   data: DashboardData; act: (p: Record<string, unknown>, s?: string) => Promise<unknown>; setModal: (m: Modal) => void;
-  dueTotal: number; receivedTotal: number; canWrite: boolean;
+  canWrite: boolean;
 }) {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const availableMonths = [...new Set(data.payments.map((payment) => String(payment.dueDate || payment.receivedAt || payment.createdAt || "").slice(0, 7)).filter((value) => /^\d{4}-\d{2}$/.test(value)))].sort().reverse();
+  const [month, setMonth] = useState(() => availableMonths.includes(currentMonth) ? currentMonth : (availableMonths[0] || currentMonth));
+  const visible = month === "all" ? data.payments : data.payments.filter((payment) => String(payment.dueDate || payment.receivedAt || payment.createdAt || "").slice(0, 7) === month);
+  const periodDue = visible.filter((payment) => payment.status === "due").reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+  const periodReceived = visible.filter((payment) => payment.status === "received").reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
   return <div className="page-stack">
     <div className="metric-grid finance-metrics">
-      <Metric label="Incassato" value={money.format(receivedTotal)} note="Pagamenti ricevuti" tone="green" />
-      <Metric label="Da incassare" value={money.format(dueTotal)} note="Pagamenti aperti" tone="orange" />
-      <Metric label="Ricorrenti" value={data.payments.filter((p) => p.kind === "recurring").length} note="Fatture programmate" tone="ink" />
+      <Metric label="Incassato" value={money.format(periodReceived)} note={month === "all" ? "Tutti i pagamenti ricevuti" : `Nel mese ${month}`} tone="green" />
+      <Metric label="Da incassare" value={money.format(periodDue)} note={month === "all" ? "Tutti i pagamenti aperti" : `Nel mese ${month}`} tone="orange" />
+      <Metric label="Scadenze" value={visible.length} note={`${visible.filter((p) => p.kind === "recurring").length} da lavori ricorrenti`} tone="ink" />
     </div>
     <div className="section-intro">
       <p>Pagamenti ricevuti e fatture ricorrenti: segnando “ricevuto” si genera la prossima scadenza.</p>
-      {canWrite && <Button className="primary-button" onClick={() => setModal("payment")}>＋ Registra</Button>}
+      <div className="button-pair month-filter">
+        <label><span>Mese</span><select value={month} onChange={(event) => setMonth(event.target.value)}>
+          <option value="all">Tutti i mesi</option>
+          {!availableMonths.includes(currentMonth) && <option value={currentMonth}>{currentMonth}</option>}
+          {availableMonths.map((value) => <option key={value} value={value}>{new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}-01T00:00:00Z`))}</option>)}
+        </select></label>
+        {canWrite && <Button className="primary-button" onClick={() => setModal("payment")}>＋ Registra</Button>}
+      </div>
     </div>
     <div className="panel table-panel">
-      {data.payments.length ? <Table>
-        <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Voce</TableHead><TableHead>Tipo</TableHead><TableHead>Scadenza</TableHead><TableHead>Importo</TableHead><TableHead>Stato</TableHead></TableRow></TableHeader>
-        <TableBody>{data.payments.map((payment) => (
+      {visible.length ? <Table>
+        <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Voce</TableHead><TableHead>Origine</TableHead><TableHead>Scadenza</TableHead><TableHead>Importo</TableHead><TableHead>Stato</TableHead><TableHead></TableHead></TableRow></TableHeader>
+        <TableBody>{visible.map((payment) => (
           <TableRow key={String(payment.id)}>
             <TableCell><strong>{payment.clientName}</strong></TableCell>
             <TableCell>{payment.description}</TableCell>
-            <TableCell>{payment.kind === "recurring" ? <Badge tone="violet">{payment.recurrence || "Ricorrente"}</Badge> : "Una tantum"}</TableCell>
+            <TableCell>{payment.jobId ? <Badge tone="violet">Lavoro</Badge> : payment.kind === "recurring" ? <Badge tone="violet">{payment.recurrence || "Ricorrente"}</Badge> : "Manuale"}</TableCell>
             <TableCell>{date(payment.dueDate || payment.nextIssueAt)}</TableCell>
             <TableCell>{money.format(Number(payment.amount))}</TableCell>
             <TableCell>
@@ -892,57 +970,77 @@ function Finance({ data, act, setModal, dueTotal, receivedTotal, canWrite }: {
                 ? <Badge tone="green">Ricevuto</Badge>
                 : canWrite ? <button className="mark-paid" onClick={() => act({ action: "markPaymentReceived", id: payment.id }, "Pagamento ricevuto")}>Segna ricevuto</button> : <Badge>Due</Badge>}
             </TableCell>
+            <TableCell>{canWrite && <button className="ghost-mini" onClick={() => { if (confirm("Eliminare questo pagamento?")) void act({ action: "deletePayment", id: payment.id }, "Pagamento eliminato"); }}>✕</button>}</TableCell>
           </TableRow>
         ))}</TableBody>
-      </Table> : <Empty title="Nessun movimento" copy="Registra un pagamento o una fattura ricorrente." />}
+      </Table> : <Empty title="Nessun movimento nel mese" copy="Cambia mese oppure registra un pagamento." />}
     </div>
   </div>;
 }
 
-function Jobs({ data, jobs, setModal, act, canWrite, onEdit }: {
+function Jobs({ data, jobs, setModal, act, canWrite, onEdit, onEditTemplate }: {
   data: DashboardData; jobs: Row[]; setModal: (m: Modal) => void; act: (p: Record<string, unknown>, s?: string) => Promise<unknown>;
-  canWrite: boolean; onEdit: (j: Row) => void;
+  canWrite: boolean; onEdit: (j: Row) => void; onEditTemplate: (template: Row) => void;
 }) {
+  async function pauseRecurrence(job: Row) {
+    await act({ action: "pauseJobRecurrence", id: job.id }, "Ricorrenza in pausa");
+    const period = new Date().toISOString().slice(0, 7);
+    const currentInstance = data.jobs.find((candidate) => candidate.parentJobId === job.id && candidate.recurrencePeriod === period);
+    if (currentInstance && confirm(`È già stata generata l'istanza di ${period}. Vuoi eliminare anche le sue task e il pagamento?`)) {
+      await act({ action: "deleteJob", id: currentInstance.id }, "Istanza del mese eliminata");
+    }
+  }
   return <div className="page-stack">
     <div className="section-intro">
-      <p>Modelli con checklist automatica: onboarding, allineamento, revisioni, consegna, fattura.</p>
+      <p>Crea i tuoi modelli e decidi quali task compaiono una volta o si ripetono nel tempo.</p>
       <div className="button-pair">
         {canWrite && <Button variant="outline" onClick={() => setModal("template")}>＋ Nuovo modello</Button>}
         {canWrite && <Button className="primary-button" onClick={() => setModal("job")}>＋ Crea lavoro</Button>}
       </div>
     </div>
-    <div className="template-grid">{data.templates.filter((t) => t.active !== 0 && t.active !== false).map((template) => {
+    {data.templates.some((t) => t.active !== 0 && t.active !== false) ? <div className="template-grid">{data.templates.filter((t) => t.active !== 0 && t.active !== false).map((template) => {
       let steps = 0;
       try { steps = JSON.parse(String(template.taskBlueprint || "[]")).length; } catch { steps = 0; }
       return <article className="template-card" key={String(template.id)}>
         <img src="/icons/jobs.png" alt="" />
-        <span>MODELLO · {steps || 7} TASK</span>
+        <span>MODELLO · {steps} TASK INIZIALI{Number(template.recurrenceEnabled || 0) === 1 ? " · RICORRENTE" : ""}</span>
         <h3>{template.title}</h3>
         <p>{template.description}</p>
-        <div><b>{money.format(Number(template.defaultPrice))}</b><small>{template.defaultDays} giorni</small></div>
+        <div><b>{money.format(Number(template.defaultPrice))}{Number(template.recurringPrice || 0) > 0 ? ` + ${money.format(Number(template.recurringPrice))}/mese` : ""}</b><small>{template.defaultDays} giorni{Number(template.paymentEnabled || 0) === 1 ? " · pagamenti automatici" : ""}</small></div>
+        {canWrite && <div className="template-actions">
+          <button onClick={() => onEditTemplate(template)}>Configura task</button>
+          <button className="danger" onClick={() => { if (confirm("Eliminare questo modello? I lavori già creati resteranno invariati.")) void act({ action: "deleteTemplate", id: template.id }, "Modello eliminato"); }}>Elimina</button>
+        </div>}
       </article>;
-    })}</div>
+    })}</div> : <div className="panel"><Empty title="Nessun modello predefinito" copy="Crea il primo modello di lavoro e aggiungi soltanto le task che ti servono." /></div>}
     <div className="panel">
       <PanelHead eyebrow="Produzione" title="Lavori" action="Crea lavoro" onAction={() => setModal("job")} />
       {jobs.length ? <Table>
-        <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Lavoro</TableHead><TableHead>Responsabile</TableHead><TableHead>Consegna</TableHead><TableHead>Prezzo</TableHead><TableHead>Stato</TableHead><TableHead></TableHead></TableRow></TableHeader>
-        <TableBody>{jobs.map((job) => (
-          <TableRow key={String(job.id)}>
+        <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Lavoro</TableHead><TableHead>Team</TableHead><TableHead>Consegna</TableHead><TableHead>Prezzo</TableHead><TableHead>Stato</TableHead><TableHead></TableHead></TableRow></TableHeader>
+        <TableBody>{jobs.map((job) => {
+          const overdue = Boolean(job.dueDate) && !job.recurrenceStartedAt && String(job.dueDate).slice(0, 10) < new Date().toISOString().slice(0, 10) && job.status !== "completato";
+          return <TableRow key={String(job.id)} className={overdue ? "job-overdue" : ""}>
             <TableCell><strong>{job.clientName}</strong></TableCell>
-            <TableCell>{job.title}<div className="muted">{data.tasks.filter((t) => t.jobId === job.id && t.status !== "done").length} task aperti</div></TableCell>
-            <TableCell>{job.ownerName}</TableCell>
+            <TableCell>{job.title}<div className="muted">
+              {data.tasks.filter((t) => t.jobId === job.id && t.status !== "done").length} task aperti
+              {job.parentJobId ? ` · istanza ${job.recurrencePeriod}` : Number(job.isRecurring || 0) === 1 ? ` · ricorrente il giorno ${job.recurrenceDay}` : ""}
+            </div></TableCell>
+            <TableCell>{job.assignedMemberNames || job.ownerName}</TableCell>
             <TableCell>{date(job.dueDate)}</TableCell>
-            <TableCell>{money.format(Number(job.price || 0))}</TableCell>
-            <TableCell><Badge tone={jobTone(job.status)}>{jobLabel(job.status)}</Badge></TableCell>
+            <TableCell>{money.format(Number(job.price || 0))}{!job.parentJobId && Number(job.recurringPrice || 0) > 0 && <div className="muted">+ {money.format(Number(job.recurringPrice))}/mese</div>}</TableCell>
+            <TableCell>{overdue ? <Badge tone="red">In ritardo</Badge> : <Badge tone={Number(job.recurrencePaused || 0) === 1 ? "orange" : jobTone(job.status)}>{Number(job.recurrencePaused || 0) === 1 ? "In pausa" : jobLabel(job.status)}</Badge>}</TableCell>
             <TableCell>
               {canWrite && <div className="row-actions">
                 <button onClick={() => onEdit(job)}>Modifica</button>
-                <button onClick={() => { if (confirm("Eliminare lavoro e relativi task?")) void act({ action: "deleteJob", id: job.id }, "Lavoro eliminato"); }}>Elimina</button>
+                {Number(job.isRecurring || 0) === 1 && !job.parentJobId && (Number(job.recurrencePaused || 0) === 1
+                  ? <button onClick={() => { const from = prompt("Da quale data deve riprendere? (AAAA-MM-GG)", new Date().toISOString().slice(0, 10)); if (from) void act({ action: "resumeJobRecurrence", id: job.id, recurrenceResumeFrom: from }, "Ricorrenza riattivata"); }}>Riprendi</button>
+                  : <button onClick={() => void pauseRecurrence(job)}>Pausa</button>)}
+                <button onClick={() => { if (confirm(job.parentJobId ? "Eliminare questa istanza, le relative task e il pagamento? Non verrà rigenerata." : "Eliminare lavoro, istanze mensili, task e pagamenti collegati?")) void act({ action: "deleteJob", id: job.id }, "Lavoro eliminato"); }}>Elimina</button>
               </div>}
             </TableCell>
-          </TableRow>
-        ))}</TableBody>
-      </Table> : <Empty title="Nessun lavoro" copy="Crea un lavoro da modello: i task si generano da soli." />}
+          </TableRow>;
+        })}</TableBody>
+      </Table> : <Empty title="Nessun lavoro" copy="Crea un lavoro libero oppure usa uno dei tuoi modelli." />}
     </div>
   </div>;
 }
@@ -979,6 +1077,126 @@ function Team({ data, setModal, act, onEdit }: {
       </article>
     ))}</div>
   </div>;
+}
+
+function MemberPicker({ members, defaultIds = [] }: { members: Row[]; defaultIds?: string[] }) {
+  const [selected, setSelected] = useState(() => [...new Set(defaultIds)]);
+  return <fieldset className="member-picker field--wide">
+    <legend>Team sul lavoro</legend>
+    <input type="hidden" name="assignedMemberIds" value={selected.join(",")} />
+    <div>{members.filter((member) => member.active !== 0 && member.active !== false).map((member) => {
+      const id = String(member.id);
+      const checked = selected.includes(id);
+      return <label key={id} className={checked ? "is-checked" : ""}>
+        <input type="checkbox" checked={checked} onChange={() => setSelected((current) => checked ? current.filter((value) => value !== id) : [...current, id])} />
+        <span className="avatar tiny" style={{ background: String(member.color || "#397ba8") }}>{String(member.initials || "")}</span>
+        <b>{member.name}</b>
+      </label>;
+    })}</div>
+    <small>Il responsabile viene sempre mantenuto come riferimento principale; qui puoi aggiungere tutto il team operativo.</small>
+  </fieldset>;
+}
+
+const AUTOMATION_BASE_DEMO = {
+  title: "Automazione custom — livello base",
+  defaultPrice: "1500",
+  recurringPrice: "250",
+  defaultDays: "30",
+  description: "Automazione personalizzata di livello base con avvio del progetto, sviluppo e consegna, più manutenzione e ottimizzazione mensile.",
+  recurrenceEnabled: "1",
+  paymentEnabled: "1",
+  paymentRecurrence: "both",
+  tasks: [
+    { title: "Kickoff e analisi del processo", description: "Raccogliere obiettivi, processo attuale, criticità e risultato atteso.", priority: "alta", offsetDays: 0, kind: "oneoff", recurrence: null },
+    { title: "Raccolta accessi e materiali", description: "Recuperare account, API, documentazione e dati necessari.", priority: "alta", offsetDays: 2, kind: "oneoff", recurrence: null },
+    { title: "Progettazione del flusso", description: "Definire trigger, passaggi, condizioni, output e gestione degli errori.", priority: "alta", offsetDays: 3, kind: "oneoff", recurrence: null },
+    { title: "Sviluppo automazione", description: "Configurare e integrare gli strumenti previsti dal progetto.", priority: "alta", offsetDays: 4, kind: "oneoff", recurrence: null },
+    { title: "Test e correzioni", description: "Eseguire i test end-to-end e correggere anomalie o casi limite.", priority: "alta", offsetDays: 23, kind: "oneoff", recurrence: null },
+    { title: "Consegna e formazione", description: "Consegna finale, documentazione essenziale e formazione del cliente.", priority: "alta", offsetDays: 28, kind: "oneoff", recurrence: null },
+  ],
+  recurringTasks: [
+    { title: "Controllo funzionamento automazione", description: "Verificare esecuzioni, errori e continuità operativa del flusso.", priority: "alta", offsetDays: 0, kind: "recurring", recurrence: "settimanale", scheduleDay: 1 },
+    { title: "Report e ottimizzazioni mensili", description: "Analizzare i risultati e applicare le ottimizzazioni concordate.", priority: "media", offsetDays: 0, kind: "recurring", recurrence: "mensile", scheduleDay: 5 },
+  ],
+} as const;
+
+function CreateTemplateForm({ pending, onSubmit }: { pending: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+  const [demo, setDemo] = useState(false);
+  const values = demo ? AUTOMATION_BASE_DEMO : null;
+  return <form key={demo ? "automation-demo" : "empty-template"} onSubmit={onSubmit} className="form-grid">
+    <div className="demo-json-bar field--wide">
+      <div><strong>Compilazione rapida</strong><small>Carica un esempio completo, poi personalizzalo liberamente.</small></div>
+      <button type="button" onClick={() => setDemo(true)}>⌁ Demo JSON</button>
+    </div>
+    <Field label="Nome lavoro *" name="title" autoFocus defaultValue={values?.title} />
+    <Field label="Prezzo una tantum" name="defaultPrice" type="number" defaultValue={values?.defaultPrice} />
+    <Field label="Canone mensile" name="recurringPrice" type="number" defaultValue={values?.recurringPrice} />
+    <Field label="Durata in giorni" name="defaultDays" type="number" defaultValue={values?.defaultDays || "30"} />
+    <FormSelect label="Lavoro ricorrente" name="recurrenceEnabled" rows={[{ id: "0", label: "No" }, { id: "1", label: "Sì, mensile" }]} defaultValue={values?.recurrenceEnabled || "0"} />
+    <FormSelect label="Genera pagamenti" name="paymentEnabled" rows={[{ id: "0", label: "No" }, { id: "1", label: "Sì" }]} defaultValue={values?.paymentEnabled || "0"} />
+    <FormSelect label="Piano pagamenti" name="paymentRecurrence" rows={[{ id: "oneoff", label: "Solo una tantum" }, { id: "monthly", label: "Solo canone mensile" }, { id: "both", label: "Una tantum + mensile" }]} defaultValue={values?.paymentRecurrence || "oneoff"} />
+    <Area label="Descrizione" name="description" defaultValue={values?.description} />
+    <TaskBlueprintEditor initialValue={values ? JSON.stringify(values.tasks) : undefined} title="Task iniziali" help="Create una sola volta quando il lavoro viene assegnato al cliente." />
+    <TaskBlueprintEditor name="recurringTaskBlueprint" initialValue={values ? JSON.stringify(values.recurringTasks) : undefined} title="Task di ricorrenza" help="Scegli il giorno preciso della settimana o del mese in cui devono comparire." recurringSchedule />
+    <Submit pending={pending} label="Crea modello" />
+  </form>;
+}
+
+function TaskBlueprintEditor({ initialValue, name = "taskBlueprint", title = "Task del lavoro", help = "Scegli quando compaiono rispetto alla data di inizio.", recurringSchedule = false }: {
+  initialValue?: unknown; name?: string; title?: string; help?: string; recurringSchedule?: boolean;
+}) {
+  const [items, setItems] = useState<BlueprintTask[]>(() => {
+    try {
+      const parsed = JSON.parse(String(initialValue || "[]")) as Partial<BlueprintTask>[];
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((item) => item.title).map((item, index) => ({
+        id: `task-${index}-${Math.random().toString(36).slice(2)}`,
+        title: String(item.title || ""), description: String(item.description || ""),
+        priority: String(item.priority || "media"), offsetDays: Math.max(0, Number(item.offsetDays) || 0),
+        kind: item.kind === "recurring" ? "recurring" : "oneoff", recurrence: String(item.recurrence || "mensile"),
+        scheduleDay: Math.max(1, Number(item.scheduleDay) || 1),
+      }));
+    } catch { return []; }
+  });
+  const update = (id: string, values: Partial<BlueprintTask>) => {
+    setItems((current) => current.map((item) => item.id === id ? { ...item, ...values } : item));
+  };
+  const serialized = JSON.stringify(items.map((item) => ({
+    title: item.title, description: item.description, priority: item.priority, offsetDays: item.offsetDays,
+    kind: recurringSchedule ? "recurring" : "oneoff",
+    recurrence: recurringSchedule ? item.recurrence : null,
+    scheduleDay: recurringSchedule ? item.scheduleDay : undefined,
+  })));
+
+  return <section className="blueprint-editor field--wide">
+    <input type="hidden" name={name} value={serialized} />
+    <div className="blueprint-head">
+      <div><strong>{title}</strong><small>{help}</small></div>
+      <button type="button" onClick={() => setItems((current) => [...current, {
+        id: `task-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        title: "", description: "", priority: "media", offsetDays: 0, kind: recurringSchedule ? "recurring" : "oneoff", recurrence: "mensile", scheduleDay: 1,
+      }])}>＋ Aggiungi task</button>
+    </div>
+    {items.length === 0 && <p className="blueprint-empty">Nessuna task automatica. Puoi aggiungerne quante vuoi.</p>}
+    <div className="blueprint-list">{items.map((item, index) => <div className={`blueprint-row ${recurringSchedule ? "blueprint-row--scheduled" : ""}`} key={item.id}>
+      <div className="blueprint-row__title"><b>{index + 1}</b><Input required value={item.title} onChange={(event) => update(item.id, { title: event.target.value })} placeholder="Nome task" /></div>
+      {recurringSchedule ? <>
+        <label><span>Si ripete</span><select value={item.recurrence} onChange={(event) => update(item.id, { recurrence: event.target.value, scheduleDay: 1 })}>
+          <option value="settimanale">Ogni settimana</option><option value="mensile">Ogni mese</option>
+        </select></label>
+        <label><span>{item.recurrence === "settimanale" ? "Giorno della settimana" : "Giorno del mese"}</span>
+          {item.recurrence === "settimanale" ? <select value={String(item.scheduleDay)} onChange={(event) => update(item.id, { scheduleDay: Number(event.target.value) })}>
+            <option value="1">Lunedì</option><option value="2">Martedì</option><option value="3">Mercoledì</option><option value="4">Giovedì</option><option value="5">Venerdì</option><option value="6">Sabato</option><option value="7">Domenica</option>
+          </select> : <Input type="number" min="1" max="31" value={item.scheduleDay} onChange={(event) => update(item.id, { scheduleDay: Math.min(31, Math.max(1, Number(event.target.value) || 1)) })} />}
+        </label>
+      </> : <label><span>Compare dopo</span><div className="days-input"><Input type="number" min="0" value={item.offsetDays} onChange={(event) => update(item.id, { offsetDays: Math.max(0, Number(event.target.value) || 0) })} /><small>giorni</small></div></label>}
+      <label><span>Priorità</span><select value={item.priority} onChange={(event) => update(item.id, { priority: event.target.value })}>
+        <option value="bassa">Bassa</option><option value="media">Media</option><option value="alta">Alta</option>
+      </select></label>
+      <Input className="blueprint-description" value={item.description} onChange={(event) => update(item.id, { description: event.target.value })} placeholder="Descrizione (facoltativa)" />
+      <button type="button" className="blueprint-remove" onClick={() => setItems((current) => current.filter((candidate) => candidate.id !== item.id))} aria-label={`Rimuovi ${item.title || "task"}`}>✕</button>
+    </div>)}</div>
+  </section>;
 }
 
 function Metric({ label, value, note, tone }: { label: string; value: string | number; note: string; tone: string }) {
@@ -1053,7 +1271,7 @@ function modalTitle(modal: Modal) {
     lead: "Nuovo lead", task: "Nuovo task", payment: "Nuovo movimento", template: "Nuovo lavoro standard",
     job: "Crea lavoro", document: "Salva documento", member: "Nuovo membro", convert: "Trasforma in cliente",
     call: "Registra chiamata", meeting: "Fissa videocall", proposal: "Salva proposta Figma",
-    editJob: "Modifica lavoro", editLead: "Modifica lead", editClient: "Modifica cliente", editMember: "Modifica membro", note: "Nota interna",
+    editJob: "Modifica lavoro", editTask: "Modifica task", editTemplate: "Configura modello", editLead: "Modifica lead", editClient: "Modifica cliente", editMember: "Modifica membro", note: "Nota interna",
   } as Record<string, string>)[modal || ""] || "";
 }
 function modalCopy(modal: Modal) {
@@ -1061,8 +1279,8 @@ function modalCopy(modal: Modal) {
     lead: "Inserisci un contatto da Meta Ads o altra fonte.",
     task: "Una tantum o ricorrente, collegabile a cliente/lavoro.",
     payment: "Incasso oppure fattura ricorrente da emettere.",
-    template: "Servizio riutilizzabile con checklist task automatici.",
-    job: "Parte dal modello e genera onboarding → collaudo.",
+    template: "Crea un servizio riutilizzabile e configura le sue task.",
+    job: "Crea un lavoro libero oppure usa un modello configurato da te.",
     document: "File o link Figma, tipizzato (riassunto, proposta…).",
     member: "Aggiungi qualcuno al team con ruolo e permessi.",
     convert: "Chiude il lead e apre la scheda cliente (+ lavoro opzionale).",
@@ -1070,6 +1288,8 @@ function modalCopy(modal: Modal) {
     meeting: "Data, ora e link della videocall gratuita.",
     proposal: "Salva il link Figma nella scheda e in archivio.",
     editJob: "Aggiorna stato, prezzo, scadenze e note.",
+    editTask: "Modifica contenuto, assegnatario, scadenza, priorità e collegamenti.",
+    editTemplate: "Modifica dati, task singole, ricorrenze e data di comparsa.",
     editLead: "Anagrafica, fonte, appuntamento e note commerciali.",
     editClient: "Anagrafica e stato del cliente.",
     editMember: "Ruolo, colore, attivazione e permessi.",

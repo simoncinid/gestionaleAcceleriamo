@@ -22,6 +22,41 @@
       "when": 1790980400000,
       "tag": "0002_commercial_flow",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790980500000,
+      "tag": "0003_remove_default_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790980600000,
+      "tag": "0004_task_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1790980700000,
+      "tag": "0005_webbitz_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790980800000,
+      "tag": "0006_mixed_job_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790980900000,
+      "tag": "0007_dynamic_consistency",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,15 @@
 import {
   completeRecurringTask,
+  createJobPayment,
   getRawDb,
   logActivity,
   parseBlueprint,
+  parseMemberIds,
   readDashboard,
+  replaceJobAssignments,
   spawnJobTasks,
+  syncJobAfterTaskChange,
   uid,
-  DEFAULT_TASK_BLUEPRINT,
 } from "@/lib/data";
 import { permissionsForRole, ROLE_PRESETS } from "@/lib/permissions";
 
@@ -28,6 +31,7 @@ const nullable = (value: unknown) => {
   if (!v || v === "_none") return null;
   return v;
 };
+const truthy = (value: unknown) => value === true || value === 1 || value === "1" || value === "true" || value === "on";
 
 export async function POST(request: Request) {
   const db = getRawDb();
@@ -164,36 +168,54 @@ export async function POST(request: Request) {
       await logActivity(db, { entityType: "lead", entityId: String(lead.id), type: "converted", title: "Trasformato in cliente", actorId });
 
       if (body.createJob) {
-        const template = text(body.templateId)
-          ? await db.prepare("SELECT * FROM job_templates WHERE id=?").bind(text(body.templateId)).first<Record<string, unknown>>()
+        const templateId = nullable(body.templateId);
+        const template = templateId
+          ? await db.prepare("SELECT * FROM job_templates WHERE id=?").bind(templateId).first<Record<string, unknown>>()
           : null;
         const title = text(body.title) || text(template?.title) || `Lavoro ${lead.company}`;
         const jobId = uid();
         const startDate = text(body.startDate) || new Date().toISOString().slice(0, 10);
-        const dueDate = text(body.dueDate) || null;
+        const dueDate = text(body.dueDate) || (() => {
+          const value = new Date(`${startDate}T00:00:00Z`);
+          value.setUTCDate(value.getUTCDate() + Math.max(1, number(template?.default_days) || 30));
+          return value.toISOString().slice(0, 10);
+        })();
+        const recurring = truthy(body.isRecurring) || Number(template?.recurrence_enabled || 0) === 1;
+        const recurrenceDay = recurring ? Math.min(31, Math.max(1, number(body.recurrenceDay) || new Date(`${startDate}T00:00:00Z`).getUTCDate())) : null;
         await db.prepare(
-          "INSERT INTO jobs (id,client_id,template_id,lead_id,title,status,price,owner_id,notes,start_date,due_date) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+          `INSERT INTO jobs (id,client_id,template_id,lead_id,title,status,price,recurring_price,owner_id,notes,start_date,due_date,is_recurring,recurrence_day)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         ).bind(
           jobId,
           clientId,
-          text(body.templateId) || null,
+          templateId,
           lead.id,
           title,
           "pianificato",
           number(body.price) || number(template?.default_price),
+          number(body.recurringPrice) || number(template?.recurring_price),
           ownerId,
           text(body.notes),
           startDate,
           dueDate,
+          recurring ? 1 : 0,
+          recurrenceDay,
         ).run();
+        await replaceJobAssignments(db, jobId, parseMemberIds(body.assignedMemberIds, ownerId));
         await spawnJobTasks(db, {
           jobId,
           clientId,
           leadId: String(lead.id),
           ownerId,
           startDate,
-          blueprintRaw: template?.task_blueprint || JSON.stringify(DEFAULT_TASK_BLUEPRINT),
+          blueprintRaw: template?.task_blueprint || "[]",
         });
+        const paymentMode = String(template?.payment_recurrence || "oneoff");
+        if (Number(template?.payment_enabled || 0) === 1 && (!recurring || ["oneoff", "both"].includes(paymentMode))) {
+          await createJobPayment(db, {
+            jobId, clientId, title, amount: number(body.price) || number(template?.default_price), dueDate, recurring: false,
+          });
+        }
         await logActivity(db, { entityType: "job", entityId: jobId, type: "created", title: "Lavoro creato da conversione", body: title, actorId });
         await logActivity(db, { entityType: "client", entityId: clientId, type: "job", title: `Lavoro: ${title}`, actorId });
       }
@@ -225,7 +247,10 @@ export async function POST(request: Request) {
         db.prepare("DELETE FROM activities WHERE entity_type='client' AND entity_id=?").bind(id),
         db.prepare("DELETE FROM clients WHERE id=?").bind(id),
       ];
-      for (const jobId of jobIds) batch.push(db.prepare("DELETE FROM activities WHERE entity_type='job' AND entity_id=?").bind(jobId));
+      for (const jobId of jobIds) {
+        batch.push(db.prepare("DELETE FROM job_assignments WHERE job_id=?").bind(jobId));
+        batch.push(db.prepare("DELETE FROM activities WHERE entity_type='job' AND entity_id=?").bind(jobId));
+      }
       await db.batch(batch);
     } else if (action === "createTask") {
       if (!text(body.title)) return Response.json({ error: "Inserisci il task." }, { status: 400 });
@@ -252,7 +277,7 @@ export async function POST(request: Request) {
       if (!id || !text(body.title)) return Response.json({ error: "Task non valido." }, { status: 400 });
       const kind = text(body.kind) || "oneoff";
       await db.prepare(
-        "UPDATE tasks SET title=?, description=?, assignee_id=?, lead_id=?, client_id=?, job_id=?, priority=?, kind=?, recurrence=?, next_due_at=?, due_date=?, status=? WHERE id=?",
+        "UPDATE tasks SET title=?, description=?, assignee_id=?, lead_id=?, client_id=?, job_id=?, priority=?, kind=?, recurrence=?, next_due_at=?, visible_from=?, due_date=?, status=? WHERE id=?",
       ).bind(
         text(body.title),
         text(body.description),
@@ -265,23 +290,29 @@ export async function POST(request: Request) {
         kind === "recurring" ? text(body.recurrence) || "mensile" : null,
         kind === "recurring" ? nullable(body.dueDate) : null,
         nullable(body.dueDate),
+        nullable(body.dueDate),
         text(body.status) || "todo",
         id,
       ).run();
+      if (nullable(body.jobId)) await syncJobAfterTaskChange(db, String(nullable(body.jobId)));
     } else if (action === "toggleTask") {
       await completeRecurringTask(db, text(body.id));
     } else if (action === "deleteTask") {
+      const task = await db.prepare("SELECT job_id FROM tasks WHERE id=?").bind(text(body.id)).first<{ job_id: string | null }>();
       await db.prepare("DELETE FROM tasks WHERE id=?").bind(text(body.id)).run();
+      if (task?.job_id) await syncJobAfterTaskChange(db, task.job_id, true);
     } else if (action === "createPayment") {
       if (!text(body.clientId) || !text(body.description)) return Response.json({ error: "Cliente e descrizione sono obbligatori." }, { status: 400 });
+      const paymentId = uid();
+      const recurring = text(body.kind) === "recurring";
       await db.prepare(
-        "INSERT INTO payments (id,client_id,description,amount,status,kind,recurrence,due_date,next_issue_at) VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO payments (id,client_id,series_id,description,amount,status,kind,recurrence,due_date,next_issue_at) VALUES (?,?,?,?,?,'due',?,?,?,?)",
       ).bind(
-        uid(),
+        paymentId,
         text(body.clientId),
+        recurring ? paymentId : null,
         text(body.description),
         number(body.amount),
-        "due",
         text(body.kind) || "oneoff",
         text(body.recurrence) || null,
         nullable(body.dueDate),
@@ -291,69 +322,113 @@ export async function POST(request: Request) {
       const payment = await db.prepare("SELECT * FROM payments WHERE id=?").bind(text(body.id)).first<Record<string, unknown>>();
       if (!payment) return Response.json({ error: "Pagamento non trovato." }, { status: 404 });
       await db.prepare("UPDATE payments SET status='received', received_at=CURRENT_TIMESTAMP WHERE id=?").bind(text(body.id)).run();
-      if (payment.kind === "recurring") {
+      if (payment.kind === "recurring" && !payment.job_id) {
         const recurrence = String(payment.recurrence || "mensile");
         const base = payment.next_issue_at || payment.due_date || new Date().toISOString().slice(0, 10);
         const next = new Date(String(base));
-        if (recurrence === "trimestrale") next.setMonth(next.getMonth() + 3);
+        if (recurrence === "giornaliera") next.setDate(next.getDate() + 1);
+        else if (recurrence === "settimanale") next.setDate(next.getDate() + 7);
+        else if (recurrence === "trimestrale") next.setMonth(next.getMonth() + 3);
         else if (recurrence === "annuale") next.setFullYear(next.getFullYear() + 1);
         else next.setMonth(next.getMonth() + 1);
         const nextIso = next.toISOString().slice(0, 10);
         await db.prepare(
-          "INSERT INTO payments (id,client_id,description,amount,status,kind,recurrence,due_date,next_issue_at) VALUES (?,?,?,?,?,?,?,?,?)",
-        ).bind(uid(), payment.client_id, payment.description, payment.amount, "due", "recurring", recurrence, nextIso, nextIso).run();
+          "INSERT INTO payments (id,client_id,series_id,description,amount,status,kind,recurrence,due_date,next_issue_at) VALUES (?,?,?,?,?,'due','recurring',?,?,?)",
+        ).bind(uid(), payment.client_id, payment.series_id || payment.id, payment.description, payment.amount, recurrence, nextIso, nextIso).run();
       }
       await logActivity(db, { entityType: "client", entityId: String(payment.client_id), type: "payment", title: "Pagamento ricevuto", body: String(payment.description), actorId });
     } else if (action === "deletePayment") {
-      await db.prepare("DELETE FROM payments WHERE id=?").bind(text(body.id)).run();
+      const payment = await db.prepare("SELECT * FROM payments WHERE id=?").bind(text(body.id)).first<Record<string, unknown>>();
+      if (payment?.kind === "recurring") {
+        if (payment.series_id) {
+          await db.prepare("DELETE FROM payments WHERE series_id=? AND status='due'").bind(payment.series_id).run();
+        } else {
+          // Compatibilità per le ricorrenze create prima dell'introduzione dell'id serie.
+          await db.prepare(`DELETE FROM payments WHERE client_id=? AND description=? AND kind='recurring' AND status='due'`)
+            .bind(payment.client_id, payment.description).run();
+        }
+        await db.prepare("DELETE FROM payments WHERE id=?").bind(text(body.id)).run();
+      } else {
+        await db.prepare("DELETE FROM payments WHERE id=?").bind(text(body.id)).run();
+      }
     } else if (action === "createTemplate") {
       if (!text(body.title)) return Response.json({ error: "Inserisci il nome del lavoro." }, { status: 400 });
-      const blueprint = text(body.taskBlueprint) || JSON.stringify(DEFAULT_TASK_BLUEPRINT);
-      parseBlueprint(blueprint);
+      const blueprint = JSON.stringify(parseBlueprint(text(body.taskBlueprint) || "[]"));
+      const recurringBlueprint = JSON.stringify(parseBlueprint(text(body.recurringTaskBlueprint) || "[]"));
       await db.prepare(
-        "INSERT INTO job_templates (id,title,description,default_price,default_days,task_blueprint,active) VALUES (?,?,?,?,?,?,1)",
-      ).bind(uid(), text(body.title), text(body.description), number(body.defaultPrice), Math.max(1, number(body.defaultDays) || 30), blueprint).run();
+        `INSERT INTO job_templates
+        (id,title,description,default_price,recurring_price,default_days,task_blueprint,recurring_task_blueprint,recurrence_enabled,payment_enabled,payment_recurrence,active)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,1)`,
+      ).bind(
+        uid(), text(body.title), text(body.description), number(body.defaultPrice), number(body.recurringPrice), Math.max(1, number(body.defaultDays) || 30),
+        blueprint, recurringBlueprint, truthy(body.recurrenceEnabled) ? 1 : 0, truthy(body.paymentEnabled) ? 1 : 0,
+        text(body.paymentRecurrence) || "oneoff",
+      ).run();
     } else if (action === "updateTemplate") {
       const id = text(body.id);
       if (!id || !text(body.title)) return Response.json({ error: "Modello non valido." }, { status: 400 });
-      const blueprint = text(body.taskBlueprint) || JSON.stringify(DEFAULT_TASK_BLUEPRINT);
+      const blueprint = JSON.stringify(parseBlueprint(text(body.taskBlueprint) || "[]"));
+      const recurringBlueprint = JSON.stringify(parseBlueprint(text(body.recurringTaskBlueprint) || "[]"));
       await db.prepare(
-        "UPDATE job_templates SET title=?, description=?, default_price=?, default_days=?, task_blueprint=?, active=? WHERE id=?",
+        `UPDATE job_templates SET title=?,description=?,default_price=?,recurring_price=?,default_days=?,task_blueprint=?,recurring_task_blueprint=?,
+         recurrence_enabled=?,payment_enabled=?,payment_recurrence=?,active=? WHERE id=?`,
       ).bind(
         text(body.title),
         text(body.description),
         number(body.defaultPrice),
+        number(body.recurringPrice),
         Math.max(1, number(body.defaultDays) || 30),
         blueprint,
+        recurringBlueprint,
+        truthy(body.recurrenceEnabled) ? 1 : 0,
+        truthy(body.paymentEnabled) ? 1 : 0,
+        text(body.paymentRecurrence) || "oneoff",
         body.active === false || body.active === 0 || body.active === "0" ? 0 : 1,
         id,
       ).run();
     } else if (action === "deleteTemplate") {
-      await db.prepare("DELETE FROM job_templates WHERE id=?").bind(text(body.id)).run();
+      const id = text(body.id);
+      const inUse = await db.prepare("SELECT COUNT(*) AS total FROM jobs WHERE template_id=?").bind(id).first<{ total: number }>();
+      if ((inUse?.total || 0) > 0) return Response.json({ error: "Il modello è usato da uno o più lavori e non può essere eliminato." }, { status: 400 });
+      await db.prepare("DELETE FROM job_templates WHERE id=?").bind(id).run();
     } else if (action === "assignJob" || action === "createJob") {
-      const template = text(body.templateId)
-        ? await db.prepare("SELECT * FROM job_templates WHERE id=?").bind(text(body.templateId)).first<Record<string, unknown>>()
+      const templateId = nullable(body.templateId);
+      const template = templateId
+        ? await db.prepare("SELECT * FROM job_templates WHERE id=?").bind(templateId).first<Record<string, unknown>>()
         : null;
       const title = text(body.title) || text(template?.title);
       if (!text(body.clientId) || !title) return Response.json({ error: "Cliente e lavoro sono obbligatori." }, { status: 400 });
       const jobId = uid();
       const ownerId = text(body.ownerId) || "diego";
       const startDate = nullable(body.startDate) || new Date().toISOString().slice(0, 10);
+      const recurrenceEnabled = truthy(body.isRecurring) || Number(template?.recurrence_enabled || 0) === 1;
+      const recurrenceDay = recurrenceEnabled ? Math.min(31, Math.max(1, number(body.recurrenceDay) || new Date(`${startDate}T00:00:00Z`).getUTCDate() || 1)) : null;
+      const memberIds = parseMemberIds(body.assignedMemberIds, ownerId);
+      const dueDate = nullable(body.dueDate) || (() => {
+        const value = new Date(`${startDate}T00:00:00Z`);
+        value.setUTCDate(value.getUTCDate() + Math.max(1, number(template?.default_days) || 30));
+        return value.toISOString().slice(0, 10);
+      })();
       await db.prepare(
-        "INSERT INTO jobs (id,client_id,template_id,lead_id,title,status,price,owner_id,notes,start_date,due_date) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        `INSERT INTO jobs (id,client_id,template_id,lead_id,title,status,price,recurring_price,owner_id,notes,start_date,due_date,is_recurring,recurrence_day)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       ).bind(
         jobId,
         text(body.clientId),
-        text(body.templateId) || null,
+        templateId,
         nullable(body.leadId),
         title,
         text(body.status) || "pianificato",
         number(body.price) || number(template?.default_price),
+        number(body.recurringPrice) || number(template?.recurring_price),
         ownerId,
         text(body.notes),
         startDate,
-        nullable(body.dueDate),
+        dueDate,
+        recurrenceEnabled ? 1 : 0,
+        recurrenceDay,
       ).run();
+      await replaceJobAssignments(db, jobId, memberIds);
       if (body.spawnTasks !== false) {
         await spawnJobTasks(db, {
           jobId,
@@ -361,7 +436,18 @@ export async function POST(request: Request) {
           leadId: nullable(body.leadId),
           ownerId,
           startDate,
-          blueprintRaw: template?.task_blueprint || JSON.stringify(DEFAULT_TASK_BLUEPRINT),
+          blueprintRaw: template?.task_blueprint || "[]",
+        });
+      }
+      const paymentMode = String(template?.payment_recurrence || "oneoff");
+      if (Number(template?.payment_enabled || 0) === 1 && (!recurrenceEnabled || ["oneoff", "both"].includes(paymentMode))) {
+        await createJobPayment(db, {
+          jobId,
+          clientId: text(body.clientId),
+          title,
+          amount: number(body.price) || number(template?.default_price),
+          dueDate,
+          recurring: false,
         });
       }
       await logActivity(db, { entityType: "job", entityId: jobId, type: "created", title: "Lavoro creato", body: title, actorId });
@@ -370,23 +456,50 @@ export async function POST(request: Request) {
       const id = text(body.id);
       if (!id || !text(body.title)) return Response.json({ error: "Lavoro non valido." }, { status: 400 });
       await db.prepare(
-        "UPDATE jobs SET client_id=?, title=?, status=?, price=?, owner_id=?, notes=?, start_date=?, due_date=? WHERE id=?",
+        `UPDATE jobs SET client_id=?,title=?,status=?,price=?,recurring_price=?,owner_id=?,notes=?,start_date=?,due_date=?,
+         is_recurring=?,recurrence_day=? WHERE id=?`,
       ).bind(
         text(body.clientId),
         text(body.title),
         text(body.status) || "pianificato",
         number(body.price),
+        number(body.recurringPrice),
         text(body.ownerId) || "diego",
         text(body.notes),
         nullable(body.startDate),
         nullable(body.dueDate),
+        truthy(body.isRecurring) ? 1 : 0,
+        truthy(body.isRecurring) ? Math.min(31, Math.max(1, number(body.recurrenceDay) || 1)) : null,
         id,
       ).run();
+      await replaceJobAssignments(db, id, parseMemberIds(body.assignedMemberIds, text(body.ownerId) || "diego"));
+      await db.prepare("UPDATE payments SET client_id=?,description=?,amount=?,due_date=? WHERE job_id=? AND status='due'")
+        .bind(text(body.clientId), text(body.title), number(body.price), nullable(body.dueDate), id).run();
       await logActivity(db, { entityType: "job", entityId: id, type: "updated", title: `Lavoro aggiornato (${text(body.status) || "—"})`, actorId });
+    } else if (action === "pauseJobRecurrence") {
+      const id = text(body.id);
+      const job = await db.prepare("SELECT is_recurring,parent_job_id FROM jobs WHERE id=?").bind(id).first<Record<string, unknown>>();
+      if (!job || Number(job.is_recurring || 0) !== 1 || job.parent_job_id) return Response.json({ error: "Puoi mettere in pausa solo un lavoro ricorrente principale." }, { status: 400 });
+      await db.prepare("UPDATE jobs SET recurrence_paused=1,recurrence_resume_from=NULL WHERE id=?").bind(id).run();
+      await logActivity(db, { entityType: "job", entityId: id, type: "paused", title: "Ricorrenza messa in pausa", actorId });
+    } else if (action === "resumeJobRecurrence") {
+      const id = text(body.id);
+      if (!nullable(body.recurrenceResumeFrom)) return Response.json({ error: "Indica da quale data riprendere." }, { status: 400 });
+      await db.prepare("UPDATE jobs SET recurrence_paused=0,recurrence_resume_from=? WHERE id=?").bind(nullable(body.recurrenceResumeFrom), id).run();
+      await logActivity(db, { entityType: "job", entityId: id, type: "resumed", title: `Ricorrenza ripresa dal ${text(body.recurrenceResumeFrom)}`, actorId });
     } else if (action === "deleteJob") {
       const id = text(body.id);
+      const children = await db.prepare("SELECT id FROM jobs WHERE parent_job_id=?").bind(id).all<{ id: string }>();
+      const ids = [id, ...(children.results || []).map((row) => row.id)];
+      const deletions = ids.flatMap((jobId) => [
+        db.prepare("DELETE FROM payments WHERE job_id=?").bind(jobId),
+        db.prepare("DELETE FROM tasks WHERE job_id=?").bind(jobId),
+        db.prepare("DELETE FROM job_assignments WHERE job_id=?").bind(jobId),
+        db.prepare("DELETE FROM activities WHERE entity_type='job' AND entity_id=?").bind(jobId),
+      ]);
       await db.batch([
-        db.prepare("DELETE FROM tasks WHERE job_id=?").bind(id),
+        ...deletions,
+        db.prepare("DELETE FROM jobs WHERE parent_job_id=?").bind(id),
         db.prepare("DELETE FROM activities WHERE entity_type='job' AND entity_id=?").bind(id),
         db.prepare("DELETE FROM jobs WHERE id=?").bind(id),
       ]);
@@ -419,7 +532,10 @@ export async function POST(request: Request) {
     } else if (action === "deleteMember") {
       const id = text(body.id);
       if (id === "diego") return Response.json({ error: "Non puoi rimuovere l'account principale." }, { status: 400 });
-      const inUse = await db.prepare("SELECT COUNT(*) AS total FROM tasks WHERE assignee_id=?").bind(id).first<{ total: number }>();
+      const inUse = await db.prepare(`SELECT
+        (SELECT COUNT(*) FROM tasks WHERE assignee_id=?) +
+        (SELECT COUNT(*) FROM jobs WHERE owner_id=?) +
+        (SELECT COUNT(*) FROM job_assignments WHERE member_id=?) AS total`).bind(id, id, id).first<{ total: number }>();
       if ((inUse?.total ?? 0) > 0) {
         await db.prepare("UPDATE team_members SET active=0 WHERE id=?").bind(id).run();
       } else {

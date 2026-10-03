@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const pipelineStages = sqliteTable("pipeline_stages", {
   id: text("id").primaryKey(),
@@ -81,6 +81,7 @@ export const tasks = sqliteTable("tasks", {
   kind: text("kind").notNull().default("oneoff"),
   recurrence: text("recurrence"),
   nextDueAt: text("next_due_at"),
+  visibleFrom: text("visible_from"),
   dueDate: text("due_date"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
@@ -91,6 +92,8 @@ export const tasks = sqliteTable("tasks", {
 export const payments = sqliteTable("payments", {
   id: text("id").primaryKey(),
   clientId: text("client_id").notNull(),
+  jobId: text("job_id"),
+  seriesId: text("series_id"),
   description: text("description").notNull(),
   amount: real("amount").notNull(),
   status: text("status").notNull().default("due"),
@@ -102,6 +105,8 @@ export const payments = sqliteTable("payments", {
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_payments_client_id").on(table.clientId),
+  index("idx_payments_job_id").on(table.jobId),
+  index("idx_payments_series_id").on(table.seriesId),
   index("idx_payments_status_due_date").on(table.status, table.dueDate),
 ]);
 
@@ -110,8 +115,13 @@ export const jobTemplates = sqliteTable("job_templates", {
   title: text("title").notNull(),
   description: text("description").notNull().default(""),
   defaultPrice: real("default_price").notNull().default(0),
+  recurringPrice: real("recurring_price").notNull().default(0),
   defaultDays: integer("default_days").notNull().default(30),
   taskBlueprint: text("task_blueprint").notNull().default("[]"),
+  recurringTaskBlueprint: text("recurring_task_blueprint").notNull().default("[]"),
+  recurrenceEnabled: integer("recurrence_enabled", { mode: "boolean" }).notNull().default(false),
+  paymentEnabled: integer("payment_enabled", { mode: "boolean" }).notNull().default(false),
+  paymentRecurrence: text("payment_recurrence").notNull().default("oneoff"),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
@@ -124,14 +134,33 @@ export const jobs = sqliteTable("jobs", {
   title: text("title").notNull(),
   status: text("status").notNull().default("pianificato"),
   price: real("price").notNull().default(0),
+  recurringPrice: real("recurring_price").notNull().default(0),
   ownerId: text("owner_id").notNull(),
   notes: text("notes").notNull().default(""),
   startDate: text("start_date"),
   dueDate: text("due_date"),
+  isRecurring: integer("is_recurring", { mode: "boolean" }).notNull().default(false),
+  recurrenceDay: integer("recurrence_day"),
+  parentJobId: text("parent_job_id"),
+  recurrencePeriod: text("recurrence_period"),
+  recurrencePaused: integer("recurrence_paused", { mode: "boolean" }).notNull().default(false),
+  recurrenceResumeFrom: text("recurrence_resume_from"),
+  lastGeneratedPeriod: text("last_generated_period"),
+  recurrenceStartedAt: text("recurrence_started_at"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 }, (table) => [
   index("idx_jobs_client_id").on(table.clientId),
   index("idx_jobs_status").on(table.status),
+  index("idx_jobs_parent_period").on(table.parentJobId, table.recurrencePeriod),
+]);
+
+export const jobAssignments = sqliteTable("job_assignments", {
+  jobId: text("job_id").notNull(),
+  memberId: text("member_id").notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.jobId, table.memberId] }),
+  index("idx_job_assignments_job_id").on(table.jobId),
+  index("idx_job_assignments_member_id").on(table.memberId),
 ]);
 
 export const activities = sqliteTable("activities", {
