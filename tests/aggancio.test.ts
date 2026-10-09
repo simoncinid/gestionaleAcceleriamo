@@ -84,15 +84,49 @@ describe("aggancio dal wiki", () => {
     expect((await aggancio({ ...base, numero: "ACC-2026-099" })).status).toBe(429);
   });
 
-  it("ogni tentativo finisce nel registro; la chiave sbagliata non consuma il limite e non dice cosa non va", async () => {
-    for (let i = 0; i < 29; i++) await env.DB.prepare("INSERT INTO hook_log (id, at, status) VALUES (?, ?, 401)").bind(`x${i}`, NOW - 1000).run();
+  it("la chiave sbagliata non scrive nel registro, non consuma il limite e non dice cosa non va", async () => {
+    for (let i = 0; i < 31; i++) expect((await aggancio(base, "chiave-aggancio-tesx")).status).toBe(401);
     const r = await aggancio(base, "chiave-aggancio-tesx");
-    expect(r.status).toBe(401);
     expect(await r.json()).toEqual({ error: "Chiave non valida" });
     expect((await call("/api/hooks/proposals", { method: "POST", json: base, headers: { authorization: "chiave-aggancio-test" } })).status).toBe(401);
-    expect((await env.DB.prepare("SELECT count(*) n FROM hook_log WHERE status = 401").first<{ n: number }>())!.n).toBe(31);
+    expect((await env.DB.prepare("SELECT count(*) n FROM hook_log").first<{ n: number }>())!.n).toBe(0);
     expect((await aggancio(base)).status).toBe(201);
-    expect(await env.DB.prepare("SELECT status, number, outcome FROM hook_log WHERE status = 201").first()).toEqual({ status: 201, number: "ACC-2026-014", outcome: "da abbinare" });
+    expect(await env.DB.prepare("SELECT status, number, outcome FROM hook_log").all().then((x) => x.results)).toEqual([{ status: 201, number: "ACC-2026-014", outcome: "da abbinare" }]);
+  });
+
+  it("stesso corpo mandato due volte: una sola proposta, la seconda risponde 200", async () => {
+    await insertLead("doppio", "Officina Meccanica Bertini");
+    expect((await aggancio(base)).status).toBe(201);
+    expect((await aggancio(base)).status).toBe(200);
+    expect((await env.DB.prepare("SELECT count(*) n FROM proposals").first<{ n: number }>())!.n).toBe(1);
+    expect(await proposta("ACC-2026-014")).toMatchObject({ lead_id: "doppio", status: "registrata" });
+  });
+
+  it("lead: che punta a un lead cestinato: la proposta resta da abbinare", async () => {
+    await insertLead("cestinato", "Officina Meccanica Bertini", { deleted_at: NOW });
+    const r = await aggancio({ ...base, lead: "cestinato" });
+    expect(r.ok).toBe(true);
+    expect(await r.json()).toMatchObject({ stato: "da_abbinare" });
+    expect((await proposta("ACC-2026-014"))?.lead_id).toBeNull();
+    expect(await lead("cestinato")).toMatchObject({ setup_cents: null, next_action: null });
+  });
+
+  it("proposta senza lead rimandata con lead: valido: abbinata con prezzo e prossima azione come da Abbina", async () => {
+    await insertLead("dopo", "Nome che non combacia");
+    expect(await (await aggancio(base)).json()).toMatchObject({ stato: "da_abbinare" });
+    const r = await aggancio({ ...base, lead: "dopo" });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ stato: "abbinata", versione: 2 });
+    expect(await proposta("ACC-2026-014")).toMatchObject({ lead_id: "dopo", status: "registrata" });
+    expect(await lead("dopo")).toMatchObject({ setup_cents: 200_000, fee_cents: 15_000, next_action: "Fissare la call di presentazione" });
+  });
+
+  it("link al PDF che non inizia con https:// rifiutato", async () => {
+    const r = await aggancio({ ...base, link_pdf: "javascript:alert(1)" });
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: "Il link deve iniziare con https://" });
+    expect((await aggancio({ ...base, link_pdf: "http://esempio.it/p.pdf" })).status).toBe(400);
+    expect((await aggancio({ ...base, link_pdf: "https://esempio.it/p.pdf" })).status).toBe(201);
   });
 
   it("stato dell'integrazione: ok dopo una registrazione, errore con un corpo non valido", async () => {

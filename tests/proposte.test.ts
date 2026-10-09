@@ -50,4 +50,27 @@ describe("API delle proposte", () => {
     expect(d.ricontatti[0]).toBeGreaterThan(NOW + 2 * 86_400_000);
     expect(d.ricontatti[2]).toBeGreaterThan(NOW + 13 * 86_400_000);
   });
+
+  it("link al PDF solo con https://, a mano e in modifica", async () => {
+    const cookie = await authed();
+    await insertLead("d");
+    const r = await call("/api/proposals", { method: "POST", json: { leadId: "d", number: "ACC-2026-050", status: "bozza", pdfUrl: "javascript:alert(1)" } }, cookie);
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: "Il link deve iniziare con https://" });
+    const ok = await call("/api/proposals", { method: "POST", json: { leadId: "d", number: "ACC-2026-050", status: "bozza", pdfUrl: "https://esempio.it/p.pdf" } }, cookie);
+    const { proposta } = (await ok.json()) as { proposta: { id: string } };
+    const patch = await call(`/api/proposals/${proposta.id}`, { method: "PATCH", json: { pdfUrl: "javascript:alert(1)" } }, cookie);
+    expect(patch.status).toBe(400);
+    expect(await patch.json()).toEqual({ error: "Il link deve iniziare con https://" });
+    expect((await call(`/api/proposals/${proposta.id}`, { method: "PATCH", json: { pdfUrl: null } }, cookie)).status).toBe(200);
+  });
+
+  it("la lista non mostra le proposte dei lead cestinati", async () => {
+    const cookie = await authed();
+    await insertLead("vivo");
+    await insertLead("via", { deleted_at: NOW });
+    await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('v', 'vivo', 'ACC-2026-060', 'registrata', 'manuale', ?, ?), ('x', 'via', 'ACC-2026-061', 'registrata', 'manuale', ?, ?), ('s', NULL, 'ACC-2026-062', 'registrata', 'aggancio', ?, ?)").bind(NOW, NOW, NOW, NOW, NOW, NOW).run();
+    const { proposte } = (await (await call("/api/proposals", {}, cookie)).json()) as { proposte: { number: string }[] };
+    expect(proposte.map((p) => p.number).sort()).toEqual(["ACC-2026-060", "ACC-2026-062"]);
+  });
 });

@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt, ne } from "drizzle-orm";
+import { and, eq, gte, isNull, lt } from "drizzle-orm";
 import { Hono } from "hono";
 import { getDb, type Db } from "../db/client";
 import { activities, hookLog, leads, proposals, stages } from "../db/schema";
@@ -63,11 +63,13 @@ async function salva(db: Db, b: z.infer<typeof hookSchema>, now: number) {
       avviso = `Il numero ${b.numero} è già della proposta di ${di?.company ?? "un altro lead"}: lead non cambiato`;
     }
     const diventaRegistrata = b.stato === "sent" && esistente.status === "bozza";
+    // Una registrata che arriva qui senza lead e ora ne trova uno fa gli stessi passi di abbina(): prezzo sul lead e regola.
+    const abbinataOra = !esistente.leadId && Boolean(leadId) && esistente.status === "registrata";
     const versione = esistente.version + 1;
     const passi = [
       db.update(proposals).set({ ...campi, leadId, version: versione, ...(diventaRegistrata ? { status: "registrata" as const, sentAt: now } : {}) }).where(eq(proposals.id, esistente.id)),
-      ...(leadId ? [db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "proposta" as const, body: diventaRegistrata ? `Preventivo ${b.numero} registrato dal wiki` : `Preventivo ${b.numero} aggiornato dal wiki (versione ${versione})`, authorId: null, createdAt: now })] : []),
-      ...(leadId && diventaRegistrata ? await passiRegistrata(db, leadId, campi, null, now) : []),
+      ...(leadId ? [db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "proposta" as const, body: diventaRegistrata ? `Preventivo ${b.numero} registrato dal wiki` : abbinataOra ? `Preventivo ${b.numero} abbinato a questo lead dal wiki` : `Preventivo ${b.numero} aggiornato dal wiki (versione ${versione})`, authorId: null, createdAt: now })] : []),
+      ...(leadId && (diventaRegistrata || abbinataOra) ? await passiRegistrata(db, leadId, campi, null, now) : []),
     ];
     await db.batch(passi as [typeof passi[number], ...typeof passi]);
     return { http: 200 as const, esito: avviso ? "aggiornata, lead non cambiato" : "aggiornata", corpo: { id: esistente.id, numero: b.numero, versione, stato: leadId ? "abbinata" : "da_abbinare", ...(avviso ? { avviso } : {}) } };
@@ -89,12 +91,9 @@ agganciRoutes.post("/proposals", async (c) => {
   const now = Date.now();
   // Senza il prefisso Bearer la chiave non vale. La risposta è sempre la stessa: non dice cosa non va.
   const chiave = /^Bearer\s+(.+)$/i.exec(c.req.header("authorization") ?? "")?.[1];
-  if (!(await chiaveGiusta(chiave, c.env.PROPOSAL_HOOK_KEY))) {
-    await registra(db, now, 401, null, "chiave non valida");
-    return c.json({ error: "Chiave non valida" }, 401);
-  }
-  // Le chiamate senza chiave finiscono nel registro ma non consumano le 30 dell'ora.
-  const recenti = await db.select({ id: hookLog.id }).from(hookLog).where(and(gte(hookLog.at, now - ORA), ne(hookLog.status, 401)));
+  // Senza chiave giusta non si scrive nulla, nemmeno nel registro: chi non ha la chiave non consuma scritture né il limite.
+  if (!(await chiaveGiusta(chiave, c.env.PROPOSAL_HOOK_KEY))) return c.json({ error: "Chiave non valida" }, 401);
+  const recenti = await db.select({ id: hookLog.id }).from(hookLog).where(gte(hookLog.at, now - ORA));
   if (recenti.length >= 30) {
     await registra(db, now, 429, null, "limite");
     return c.json({ error: "Troppe chiamate in un'ora: riprova più tardi" }, 429);

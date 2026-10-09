@@ -47,6 +47,18 @@ describe("GET /today", () => {
     expect(o.numeri.leadNuovi).toBe(1);
   });
 
+  it("proposta registrata con il lead ancora in attesa del preventivo: una volta sola, nel blocco proposte con Segna presentata", async () => {
+    const cookie = await authed();
+    await insertLead("attesa", { stage_id: "in-attesa-preventivo", next_action: "Fissare la call di presentazione", next_action_at: NOW - 1000, stage_changed_at: NOW - 9 * GIORNO });
+    await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('p1', 'attesa', 'ACC-2026-070', 'registrata', 'aggancio', ?, ?)").bind(NOW, NOW).run();
+    const o = await oggi(cookie);
+    expect(o.proposte.map((p) => [p.leadId, p.status])).toEqual([["attesa", "registrata"]]);
+    expect(o.daFare).toEqual([]);
+    expect(o.fermi).toEqual([]);
+    expect(o.adesso).toBeNull();
+    expect(o.totale).toBe(1);
+  });
+
   it("Mie mostra i miei e quelli senza responsabile", async () => {
     const cookie = await authed();
     await createUser("diego", "password-lunga-2", "Diego");

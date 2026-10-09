@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import type { z } from "zod";
@@ -26,7 +26,8 @@ const COLONNE = {
 
 const righe = (db: Db) => db.select(COLONNE).from(proposals).leftJoin(leads, eq(leads.id, proposals.leadId));
 
-export const elencoProposte = (db: Db): Promise<PropostaRiga[]> => righe(db).where(isNull(proposals.deletedAt)).orderBy(desc(proposals.updatedAt));
+// Le proposte dei lead cestinati spariscono con il lead; quelle senza lead restano (da abbinare).
+export const elencoProposte = (db: Db): Promise<PropostaRiga[]> => righe(db).where(and(isNull(proposals.deletedAt), or(isNull(proposals.leadId), isNull(leads.deletedAt)))).orderBy(desc(proposals.updatedAt));
 export const proposteDelLead = (db: Db, leadId: string): Promise<PropostaRiga[]> => righe(db).where(and(eq(proposals.leadId, leadId), isNull(proposals.deletedAt))).orderBy(desc(proposals.updatedAt));
 
 export async function unaProposta(db: Db, id: string): Promise<PropostaRiga> {

@@ -72,8 +72,9 @@ todayRoutes.get("/today", async (c) => {
     tutti<PropostaOggi>(`SELECT p.id, p.number, p.status, l.id AS leadId, l.company, l.contact_name AS contactName, l.email, l.phone,
         p.setup_cents AS setupCents, p.fee_cents AS feeCents, l.next_action_at AS nextActionAt
       FROM proposals p JOIN leads l ON l.id = p.lead_id JOIN stages s ON s.id = l.stage_id
-      WHERE ${APERTI} ${chi} AND p.deleted_at IS NULL AND p.status IN ('registrata', 'presentata')
-        AND l.stage_id = 'in-attesa-decisione' AND l.next_action_at < ?2 ORDER BY l.next_action_at`, fine),
+      WHERE ${APERTI} ${chi} AND p.deleted_at IS NULL
+        AND (p.status = 'registrata' OR (p.status = 'presentata' AND l.stage_id = 'in-attesa-decisione' AND l.next_action_at < ?2))
+      ORDER BY l.next_action_at`, fine),
     // I nuovi hanno già il loro gruppo, i bloccati sono in pausa: nessuno dei due è "fermo".
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM}
       WHERE ${APERTI} ${chi} AND l.stage_id NOT IN ('probabilmente-bloccato', 'da-chiamare-prima-volta')
@@ -94,7 +95,8 @@ todayRoutes.get("/today", async (c) => {
   const daFare = dovuti
     .filter((l) => !idNuovi.has(l.id) && !idProposte.has(l.id) && l.stageId !== "probabilmente-bloccato")
     .map((l) => ({ ...l, slaScadenza: null }));
-  const fermi = fermiGrezzi.map((l) => ({ ...l, slaScadenza: null }));
+  // Un lead con proposta compare una volta sola: nel blocco proposte (con "Segna presentata" se registrata).
+  const fermi = fermiGrezzi.filter((l) => !idProposte.has(l.id)).map((l) => ({ ...l, slaScadenza: null }));
 
   const m = primaRisposta?.m ?? null;
   const corpo: Oggi = {
