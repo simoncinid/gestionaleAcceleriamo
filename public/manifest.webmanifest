@@ -1,0 +1,15 @@
+{
+  "name": "Acceleriamo OS",
+  "short_name": "Acceleriamo",
+  "lang": "it",
+  "display": "standalone",
+  "start_url": "/commerciale/oggi",
+  "scope": "/",
+  "theme_color": "#1C1915",
+  "background_color": "#F7F2EC",
+  "icons": [
+    { "src": "/app/icona-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/app/icona-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/app/icona-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
