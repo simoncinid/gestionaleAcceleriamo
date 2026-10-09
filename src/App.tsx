@@ -13,6 +13,7 @@ import { DettaglioProposta } from "./pagine/commerciale/DettaglioProposta";
 import { Proposte } from "./pagine/commerciale/Proposte";
 import { FogliCreazione } from "./pagine/FogliCreazione";
 import { Numeri } from "./pagine/commerciale/Numeri";
+import { Avvisi } from "./pagine/avvisi/Avvisi";
 import { Cestino } from "./pagine/impostazioni/Cestino";
 import { Fasi } from "./pagine/impostazioni/Fasi";
 import { Integrazioni } from "./pagine/impostazioni/Integrazioni";
@@ -95,6 +96,7 @@ export function App() {
         <Route path="/automazioni/:id" element={<SchedaAutomazioneRotta />} />
         <Route path="/impostazioni/dati/cestino" element={<Cestino />} />
         <Route path="/impostazioni" element={<Stato onEsci={esci} />} />
+        <Route path="/impostazioni/avvisi" element={<Avvisi />} />
         <Route path="/impostazioni/fasi" element={<Fasi />} />
         <Route path="/impostazioni/modelli" element={<Modelli />} />
         <Route path="/impostazioni/integrazioni" element={<Integrazioni />} />

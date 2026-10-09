@@ -11,12 +11,15 @@ badgeRoutes.get("/", async (c) => {
   const db = c.env.DB;
   const ora = Date.now();
   const io = c.get("user").id;
-  const [commerciale, economia, rotta] = await Promise.all([
+  const [commerciale, economia, rotta, avvisi] = await Promise.all([
     calcolaOggi(db, io, "mie", ora),
     // Come statoFattura: in ritardo solo dal giorno dopo la scadenza, a giorno di Roma.
     db.prepare(`SELECT count(*) n FROM invoices i JOIN clients c ON c.id = i.client_id
       WHERE i.deleted_at IS NULL AND i.paid_at IS NULL AND i.due_at < ? AND c.scope = 'acceleriamo'`).bind(inizioGiornoRoma(ora)).first<{ n: number }>(),
     db.prepare("SELECT count(*) n FROM integration_status WHERE ok = 0").first<{ n: number }>(),
+    // Spec 8: avvisi aperti e non letti della persona; il punto sull'avatar li segnala.
+    db.prepare("SELECT count(*) n FROM notifications WHERE user_id = ?1 AND closed_at IS NULL AND read_at IS NULL").bind(io).first<{ n: number }>(),
   ]);
-  return c.json({ commerciale: commerciale.totale, economia: economia?.n ?? 0, avatar: (rotta?.n ?? 0) > 0 });
+  const nonLetti = avvisi?.n ?? 0;
+  return c.json({ commerciale: commerciale.totale, economia: economia?.n ?? 0, avvisi: nonLetti, avatar: (rotta?.n ?? 0) > 0 || nonLetti > 0 });
 });

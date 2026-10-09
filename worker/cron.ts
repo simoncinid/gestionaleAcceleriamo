@@ -1,4 +1,5 @@
 import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { COSTO_AVVISI, controllaAvvisi, controllaMeta48 } from "./avvisi/controlli";
 import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
 import { mandaInvitiInCoda } from "./calls/service";
@@ -15,7 +16,8 @@ export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "c
 
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
-// gli statement dentro le batch: foglio 5 fisse più 19 per lead nuovo, Meta 1 più 15 per lead,
+// gli statement dentro le batch: foglio 5 fisse più 20 per lead nuovo, Meta 1 più 16 per lead (l'avviso
+// "Lead nuovo" della catena aggiunge una query a lead), avvisi 8 fisse più una per avviso,
 // conferma 1 più 6, invito circa 6,5. Le sottorichieste fisse (la lettura del foglio) stanno dentro la stima
 // per unità, che è larga: foglio 2 per lead (CSV più email di conferma), Meta 2 (Graph più email).
 export type DefLavoro = {
@@ -41,9 +43,13 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // Criterio 1 della spec: un lead del foglio in Scaletta entro 10 minuti. Il foglio gira a ogni giro
   // (tranne alle 6:00, che è delle proposte) e prende quanti lead il budget consente, al massimo 2.
   // Con un arretrato grande (prima lettura del foglio) il foglio non deve affamare Meta e conferme: se nel
-  // giro è in programma un altro lavoro prende al massimo 1 lead (24 query), da solo fino a 2.
-  foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 19, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, altriInProgramma("foglio", n) ? Math.min(1, l) : l) },
-  meta: { quando: ogni15, fisse: 2, perUnita: 15, sottoPerUnita: 2, max: 2, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
+  // giro è in programma un altro lavoro prende al massimo 1 lead (25 query), da solo fino a 2 se il budget li copre.
+  foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 20, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, altriInProgramma("foglio", n) ? Math.min(1, l) : l) },
+  meta: { quando: ogni15, fisse: 2, perUnita: 16, sottoPerUnita: 2, max: 2, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
+  // Avvisi in app (spec 8): a ogni giro, dopo l'ingresso dei lead. Un lead che non è ancora entrato non si può
+  // chiamare, quindi foglio e Meta passano prima; con un arretrato nel foglio alle :15 gli avvisi aspettano
+  // il giro dopo (5 minuti, dentro i 30 del preavviso). Fisse 8 (letture e chiusure), una query per unità.
+  avvisi: { quando: sempre, ...COSTO_AVVISI, sottoPerUnita: 0, esegui: (e, n, l) => controllaAvvisi(e, n, l) },
   // Conferme e inviti si dividono lo stesso limite: ogni unità (una conferma o un invito) costa al massimo
   // 7 query e una sottorichiesta, così il budget conta anche gli inviti.
   conferme: {
@@ -54,6 +60,8 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
       if (inviti > 0) await mandaInvitiInCoda(e, n, inviti);
     },
   },
+  // Spec 8: Meta senza lead da 48 ore, una volta l'ora (giro delle :00). 3 query misurate.
+  meta_48h: { quando: (p) => p.minuti < 5, fisse: 3, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => controllaMeta48(e, n) },
 };
 
 // Vero se nel giro di questo istante c'è in programma almeno un altro lavoro oltre a quello indicato.

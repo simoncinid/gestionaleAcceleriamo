@@ -187,7 +187,7 @@ describe("proposte scadute", () => {
 
 describe("giro programmato", () => {
   it("registra la sua ora in integration_status", async () => {
-    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["foglio", "conferme"], saltati: [], errori: [] });
+    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["foglio", "avvisi", "conferme"], saltati: [], errori: [] });
     expect(await env.DB.prepare("SELECT ok, last_ok_at FROM integration_status WHERE key = 'giro'").first()).toEqual({ ok: 1, last_ok_at: r(10, 5) });
   });
 
@@ -272,10 +272,11 @@ describe("giro programmato", () => {
     setEmailFetch(async () => { inviate++; return Response.json({ id: `re_${inviate}` }); });
     const c = contaQuery();
     const esito = await giro(c.env, r(10, 5));
-    expect(esito).toMatchObject({ fatti: ["foglio", "conferme"], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "avvisi", "conferme"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
-    // Foglio spento (1 query): alle conferme restano 43 query, cioè 5 unità: 3 conferme e 2 inviti.
-    expect(inviate).toBe(5);
+    // Foglio spento (1 query), avvisi senza niente da dire (8): alle conferme restano 35 query, cioè 4 unità:
+    // 2 conferme e 2 inviti.
+    expect(inviate).toBe(4);
     const svuotata = await env.DB.prepare("SELECT COUNT(*) AS n FROM calls WHERE invite_sent_at IS NOT NULL").first<{ n: number }>();
     expect(svuotata?.n).toBe(2);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
@@ -288,9 +289,9 @@ describe("giro programmato", () => {
     setMetaFetch(async () => { chiamate++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`anna${chiamate}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
     setEmailFetch(async () => Response.json({ id: "re_1" }));
     const c = contaQuery();
-    // Foglio spento (1 query), due lead da Meta (31): alle conferme resta il residuo per una, il resto al giro dopo.
+    // Foglio spento (1 query), due lead da Meta (33), avvisi (8): le conferme non entrano e aspettano il giro dopo.
     const esito = await giro(c.env, r(10, 15));
-    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "conferme"], saltati: [], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi"], saltati: ["conferme"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
     expect(chiamate).toBe(MAX.meta);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
@@ -348,6 +349,32 @@ describe("giro con i lavori veri insieme", () => {
       expect(s.sotto()).toBeLessThanOrEqual(15);
     });
   }
+
+  // Con gli avvisi pieni di lavoro: 12 lead con lo SLA scaduto, 3 pause finite, il foglio rotto da avvisare.
+  async function conAvvisi() {
+    for (let i = 0; i < 12; i++) await insertLead(`s${i}`, { stage_id: "da-chiamare-prima-volta", created_at: r(8, 0) - i, owner_id: "tommaso" });
+    for (let i = 0; i < 3; i++) await insertLead(`pz${i}`, { stage_id: "probabilmente-bloccato", paused_until: r(8, 0), owner_id: "tommaso" });
+    await env.DB.prepare("INSERT INTO integration_status (key, ok, last_error, error_id) VALUES ('resend', 0, 'giù', 'ab12cd34')").run();
+  }
+  const casiAvvisi: [string, number, number, string[]][] = [
+    ["11:05, foglio, avvisi pieni e conferme", r(11, 5), 2, ["foglio", "avvisi"]],
+    ["11:15, foglio, Meta, avvisi pieni e conferme", r(11, 15), 2, ["foglio", "meta"]],
+    ["12:00, tutto più Meta 48 ore", r(12, 0), 1, ["foglio", "meta"]],
+    ["11:10, foglio vuoto, avvisi pieni e conferme", r(11, 10), 0, ["foglio", "avvisi", "conferme"]],
+  ];
+  for (const [nome, quando, righe, devono] of casiAvvisi) {
+    it(`${nome}: al massimo 45 query e 15 sottorichieste, riga giro compresa`, async () => {
+      const s = await prepara(righe);
+      await conAvvisi();
+      const c = contaQuery();
+      const esito = await giro(c.env, quando);
+      expect(esito.errori).toEqual([]);
+      expect(esito.fatti).toEqual(expect.arrayContaining(devono));
+      expect(c.n()).toBeLessThanOrEqual(45);
+      expect(esito.query).toBeLessThanOrEqual(45);
+      expect(s.sotto()).toBeLessThanOrEqual(15);
+    });
+  }
 });
 
 describe("arretrato nel foglio", () => {
@@ -377,7 +404,7 @@ describe("arretrato nel foglio", () => {
     setEmailFetch(async () => { email++; return Response.json({ id: `re_${email}` }); });
     const c = contaQuery();
     const esito = await giro(c.env, r(10, 5));
-    expect(esito.fatti).toEqual(["foglio", "conferme"]);
+    expect(esito.fatti).toEqual(["foglio", "avvisi", "conferme"]);
     expect(esito.errori).toEqual([]);
     const ritentate = await env.DB.prepare("SELECT count(*) n FROM leads WHERE id LIKE 'c%' AND confirmation_sent_at IS NOT NULL").first<{ n: number }>();
     expect(ritentate?.n).toBeGreaterThanOrEqual(1);

@@ -3,6 +3,7 @@ import { momento } from "../../format";
 import { COLORE, ETICHETTA_STATO, Sezione, conGiroInRitardo, testoUltima, useStatoSistema } from "./parti";
 
 const VOCI = [
+  { titolo: "Avvisi", href: "/impostazioni/avvisi" },
   { titolo: "Fasi e regole", href: "/impostazioni/fasi" },
   { titolo: "Modelli", href: "/impostazioni/modelli" },
   { titolo: "Integrazioni", href: "/impostazioni/integrazioni" },

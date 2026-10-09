@@ -42,7 +42,7 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
         <BarraLaterale nome={nome} badge={badge} onCrea={setCrea} onEsci={onEsci} />
         <div className="min-w-0 flex-1">
           <div className="sticky top-0 z-10">
-            <Testata nome={nome} puntoAvatar={badge?.avatar ?? false} onCerca={() => vai("/commerciale/scaletta?cerca=1")} onPiu={piu} />
+            <Testata nome={nome} puntoAvatar={badge?.avatar ?? false} avvisi={badge?.avvisi ?? 0} onCerca={() => vai("/commerciale/scaletta?cerca=1")} onPiu={piu} />
           </div>
           <main className="mx-auto w-full max-w-[1100px] px-4 pt-4 md:px-8 md:pt-8"><Outlet /></main>
         </div>

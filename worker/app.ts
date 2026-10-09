@@ -6,6 +6,7 @@ import { requireAuth } from "./auth/session";
 import { authRoutes } from "./auth/routes";
 import { documentRoutes, leadRoutes } from "./leads/routes";
 import { todayRoutes } from "./today/routes";
+import { avvisiRoutes } from "./avvisi/routes";
 import { badgeRoutes } from "./badge/routes";
 import { callRoutes } from "./calls/routes";
 import { agganciRoutes } from "./proposte/aggancio";
@@ -52,6 +53,7 @@ app.route("/api/hooks", agganciRoutes);
 app.route("/api/economia", economiaRoutes);
 app.route("/api/clients", clientiRoutes);
 app.route("/api/automations", automazioniRoutes);
+app.route("/api/notifications", avvisiRoutes);
 app.route("/api", todayRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));

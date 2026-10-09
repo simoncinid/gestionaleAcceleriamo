@@ -17,7 +17,7 @@ describe("GET /badge", () => {
     await env.DB.prepare("INSERT INTO invoices (id, client_id, kind, amount_cents, due_at) VALUES ('f1', 'c1', 'canone', 30000, ?), ('f2', 'c2', 'canone', 10000, ?), ('f3', 'c1', 'canone', 30000, ?)").bind(NOW - 86_400_000, NOW - 86_400_000, NOW + 1_000_000).run();
     await env.DB.prepare("INSERT INTO integration_status (key, ok) VALUES ('foglio', 0)").run();
     const b = await (await call("/api/badge", {}, cookie)).json();
-    expect(b).toEqual({ commerciale: 2, economia: 1, avatar: true });
+    expect(b).toEqual({ commerciale: 2, economia: 1, avvisi: 0, avatar: true });
   });
 
   it("economia: la fattura che scade oggi non accende il badge, quella scaduta ieri sì (giorno di Roma)", async () => {

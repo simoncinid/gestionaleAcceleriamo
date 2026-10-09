@@ -1,7 +1,7 @@
 import { CaretDown, GearSix, Plus, SignOut } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
-import { Avatar, Badge, cx } from "../ds";
+import { Avatar, Badge, Punto, cx } from "../ds";
 import { AREE, SOTTOMENU, areaDi, creazioneDellaBarra, type Creazione } from "./aree";
 import type { BadgeDati } from "./BarraBasso";
 import { Icona3D } from "./Icona3D";
@@ -13,6 +13,7 @@ import { Icona3D } from "./Icona3D";
 export function BarraLaterale({ nome, badge, onCrea, onEsci }: { nome: string; badge: BadgeDati | undefined; onCrea: (c: Creazione) => void; onEsci: () => void }) {
   const { pathname } = useLocation();
   const corrente = areaDi(pathname);
+  const avvisi = badge?.avvisi ?? 0;
   const prima = creazioneDellaBarra(pathname);
   const [aperte, setAperte] = useState<Record<string, boolean>>({});
   return (
@@ -45,7 +46,11 @@ export function BarraLaterale({ nome, badge, onCrea, onEsci }: { nome: string; b
         })}
       </nav>
       <div className="flex items-center gap-2 border-t border-chrome-3 p-3">
-        <Avatar nome={nome} />
+        {/* Stesso punto della testata del telefono (rilievo del Piano A); con avvisi non letti l'avatar porta agli Avvisi. */}
+        <Link to={avvisi > 0 ? "/impostazioni/avvisi" : "/impostazioni"} aria-label={avvisi > 0 ? "Avvisi da leggere" : "Profilo e impostazioni"} className="relative flex shrink-0 items-center rounded-controllo">
+          <Avatar nome={nome} />
+          {badge?.avatar && <span className="absolute -top-0.5 -right-0.5"><Punto colore="accento" etichetta={avvisi > 0 ? "Avvisi da leggere" : "Un'integrazione chiede attenzione"} /></span>}
+        </Link>
         <span className="flex-1 truncate text-secondaria">{nome}</span>
         <Link to="/impostazioni" aria-label="Impostazioni" className="flex size-10 items-center justify-center rounded-controllo hover:bg-chrome-2"><GearSix size={20} weight="bold" aria-hidden /></Link>
         <button type="button" aria-label="Esci" onClick={onEsci} className="flex size-10 items-center justify-center rounded-controllo hover:bg-chrome-2"><SignOut size={20} weight="bold" aria-hidden /></button>
