@@ -21,7 +21,13 @@ export function LeadPage() {
   const [formVersion, setFormVersion] = useState(0);
   const stages = useStages();
   const users = useUsers();
-  const detail = useQuery({ queryKey: ["lead", id], queryFn: () => api<LeadDetail>(`/leads/${id}`) });
+  // Lead appena cestinato o unito: la sua scheda non va più richiesta.
+  const [goneId, setGoneId] = useState<string | null>(null);
+  const detail = useQuery({
+    queryKey: ["lead", id],
+    queryFn: () => api<LeadDetail>(`/leads/${id}`),
+    enabled: goneId !== id,
+  });
   const onError = (e: Error) => toast.error(e.message);
   const patch = useMutation({
     mutationFn: (json: Record<string, unknown>) => api(`/leads/${id}`, { method: "PATCH", json }),
@@ -42,6 +48,7 @@ export function LeadPage() {
     );
   // Il lead di questa pagina non esiste più: lo tolgo dalla cache senza rifare la richiesta (darebbe 404).
   function leaveLead() {
+    setGoneId(id);
     qc.removeQueries({ queryKey: ["lead", id] });
     for (const key of ["leads", "today", "stats", "trash"]) void qc.invalidateQueries({ queryKey: [key] });
   }
