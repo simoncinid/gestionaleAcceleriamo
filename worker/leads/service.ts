@@ -130,7 +130,8 @@ export async function updateLead(db: Db, id: string, patch: LeadPatch, actorId: 
     const phoneNorm = "phone" in patch ? normalizePhone(patch.phone) : current.phoneNorm;
     next.emailNorm = emailNorm;
     next.phoneNorm = phoneNorm;
-    next.duplicateOfId = await findDuplicate(db, emailNorm, phoneNorm, id);    // Telefono in E.164 (DS 2.2); la chiave dei doppioni resta phoneNorm.
+    next.duplicateOfId = await findDuplicate(db, emailNorm, phoneNorm, id);
+    // Telefono in E.164 (DS 2.2); la chiave dei doppioni resta phoneNorm.
     if ("phone" in patch) next.phone = aE164(patch.phone) ?? patch.phone ?? null;
   }
 

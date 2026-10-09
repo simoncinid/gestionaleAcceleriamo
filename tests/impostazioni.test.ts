@@ -61,6 +61,13 @@ describe("impostazioni", () => {
     expect(templates).toHaveLength(8);
   });
 
+  it("modelli: patch vuota 400, canale di un modello di sistema bloccato", async () => {
+    const cookie = await authed();
+    expect((await call("/api/templates/mod-primo-contatto", { method: "PATCH", json: {} }, cookie)).status).toBe(400);
+    expect((await call("/api/templates/mod-conferma", { method: "PATCH", json: { channel: "whatsapp" } }, cookie)).status).toBe(422);
+    expect((await call("/api/templates/mod-conferma", { method: "PATCH", json: { channel: "email", body: "Ciao {referente}, grazie" } }, cookie)).status).toBe(200);
+  });
+
   it("un valore salvato rovinato o non valido torna al default", async () => {
     const ins = "INSERT INTO settings (key, value, updated_by, updated_at) VALUES (?, ?, NULL, 0)";
     await env.DB.prepare(ins).bind("orario", JSON.stringify({ giorni: [], inizio: "8", fine: "19:30" })).run();

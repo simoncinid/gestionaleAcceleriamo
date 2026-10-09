@@ -41,4 +41,18 @@ describe("catena del lead nuovo", () => {
     expect(dopo.phone).toBe("+393331112222");
     expect(dopo.duplicateOfId).toBe(a.lead.id);
   });
+
+  it("con tre utenti, se chi chiama è via va a chi fa la presentazione, poi al primo per nome", async () => {
+    const cookie = await authed();
+    await createUser("zeno", "password-lunga-3", "Zeno");
+    await createUser("diego", "password-lunga-2", "Diego");
+    await createUser("anna", "password-lunga-4", "Anna");
+    const via = { utente: "tommaso", fino: Date.now() + 86_400_000 };
+    await call("/api/settings", { method: "PUT", json: { key: "assegnazione", value: { primaChiamata: "tommaso", presentazione: "diego", proposta: "diego", via } } }, cookie);
+    const uno = (await (await call("/api/leads", { method: "POST", json: { company: "Uno Prova" } }, cookie)).json()) as { lead: { id: string } };
+    expect((await lead(uno.lead.id))?.owner_id).toBe("diego");
+    await env.DB.prepare("UPDATE users SET active = 0 WHERE id = 'diego'").run();
+    const due = (await (await call("/api/leads", { method: "POST", json: { company: "Due Prova" } }, cookie)).json()) as { lead: { id: string } };
+    expect((await lead(due.lead.id))?.owner_id).toBe("anna");
+  });
 });

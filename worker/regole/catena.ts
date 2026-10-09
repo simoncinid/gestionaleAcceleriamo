@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { getDb, type Db } from "../db/client";
 import { leads, users } from "../db/schema";
 import type { Env } from "../env";
@@ -8,12 +8,17 @@ import { calcolaPunteggio, datiPerPunteggio } from "./punteggio";
 
 // Prima chiamata a chi dice Impostazioni; se è via, all'altro (spec 6.3, Assegnazione).
 export async function assegnaResponsabile(db: Db, imp: Impostazioni, ora: number): Promise<string | null> {
-  const { primaChiamata, via } = imp.assegnazione;
+  const { primaChiamata, presentazione, via } = imp.assegnazione;
+  const attivo = (username: string) => db.select({ id: users.id }).from(users).where(and(eq(users.active, true), eq(users.username, username))).get();
   const assente = via.utente === primaChiamata && via.fino != null && via.fino > ora;
-  const scelto = assente
-    ? await db.select({ id: users.id }).from(users).where(and(eq(users.active, true), ne(users.username, primaChiamata))).get()
-    : await db.select({ id: users.id }).from(users).where(and(eq(users.active, true), eq(users.username, primaChiamata))).get();
-  return scelto?.id ?? null;
+  if (!assente) return (await attivo(primaChiamata))?.id ?? null;
+  // Prima chi fa la presentazione, poi gli altri attivi in ordine di nome: scelta sempre uguale.
+  if (presentazione !== primaChiamata) {
+    const p = await attivo(presentazione);
+    if (p) return p.id;
+  }
+  const altro = await db.select({ id: users.id }).from(users).where(and(eq(users.active, true), ne(users.username, primaChiamata))).orderBy(asc(users.name)).get();
+  return altro?.id ?? null;
 }
 
 // Catena del lead nuovo (spec 6.1). Passi 1 e 2; il 3 arriva nel Task 15.

@@ -77,10 +77,13 @@ templateRoutes.post("/", async (c) => {
 
 templateRoutes.patch("/:id", async (c) => {
   const db = getDb(c.env.DB);
-  const patch = modelloSchema.partial().parse(await c.req.json());
+  const patch = modelloSchema.partial().refine((p) => Object.keys(p).length > 0, { message: "Niente da modificare" }).parse(await c.req.json());
   const id = c.req.param("id");
   const prima = await db.select().from(messageTemplates).where(eq(messageTemplates.id, id)).get();
   if (!prima) throw new HTTPException(404, { message: "Modello inesistente" });
+  if (prima.key !== null && patch.channel !== undefined && patch.channel !== prima.channel) {
+    throw new HTTPException(422, { message: "Il canale di un modello di sistema non si cambia" });
+  }
   await db.update(messageTemplates).set(patch).where(eq(messageTemplates.id, id));
   await audit(db, c.get("user").id, "template", id, "update", patch);
   return c.json({ ok: true });
