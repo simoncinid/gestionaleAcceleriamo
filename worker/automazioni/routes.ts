@@ -92,7 +92,11 @@ automazioniRoutes.post("/:id/attiva", async (c) => {
   const now = Date.now();
   const r = await db.update(automations).set({ status: "attiva", activatedAt: now, updatedAt: now })
     .where(and(eq(automations.id, c.req.param("id")), eq(automations.status, "in_costruzione"), isNull(automations.deletedAt))).returning({ id: automations.id });
-  if (!r.length) return c.json({ error: "L'automazione non è in costruzione" }, 409);
+  if (!r.length) {
+    const esiste = await db.select({ id: automations.id }).from(automations).where(and(eq(automations.id, c.req.param("id")), isNull(automations.deletedAt))).get();
+    if (!esiste) return c.json({ error: "Automazione non trovata" }, 404);
+    return c.json({ error: "L'automazione non è in costruzione" }, 409);
+  }
   await audit(db, c.get("user").id, "automations", c.req.param("id"), "attiva", { activatedAt: now });
   return c.json({ ok: true });
 });

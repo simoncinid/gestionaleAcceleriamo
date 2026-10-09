@@ -15,7 +15,7 @@ async function semina() {
   await q("INSERT INTO fees (id, client_id, amount_cents, billing_day, status, start_at) VALUES ('f1', 'c1', 30000, 1, 'attivo', ?1)", now - 60 * G);
   await q("INSERT INTO fees (id, client_id, amount_cents, billing_day, status, start_at) VALUES ('f2', 'c2', 50000, 1, 'attivo', ?1)", now - 60 * G);
   await q("INSERT INTO invoices (id, client_id, kind, number, amount_cents, issued_at, due_at) VALUES ('i1', 'c1', 'canone', '7/2026', 30000, ?1, ?2)", now - 20 * G, now - 5 * G);
-  await q("INSERT INTO invoices (id, client_id, kind, number, amount_cents, issued_at, due_at, paid_at) VALUES ('i2', 'c1', 'saldo', '8/2026', 150000, ?1, ?2, ?3)", now - 2 * G, now + 13 * G, now - 60_000);
+  await q("INSERT INTO invoices (id, client_id, kind, number, amount_cents, issued_at, due_at, paid_at) VALUES ('i2', 'c1', 'saldo', '8/2026', 150000, ?1, ?2, ?3)", now - 2 * G, now + 13 * G, now);
   await q("INSERT INTO invoices (id, client_id, kind, amount_cents, issued_at, due_at) VALUES ('i3', 'c2', 'canone', 50000, ?1, ?2)", now - 20 * G, now - 5 * G);
   await q("INSERT INTO invoices (id, client_id, kind, amount_cents) VALUES ('i4', 'c1', 'extra', 10000)");
   return now;
@@ -61,6 +61,44 @@ describe("Economia", () => {
     expect((await call("/api/economia/fatture/i1/incassata", { method: "POST", json: { paidAt: now - G } }, cookie)).status).toBe(200);
     const d = await json<{ inRitardo: unknown[] }>(await call("/api/economia/cruscotto", {}, cookie));
     expect(d.inRitardo).toEqual([]);
+  });
+
+  it("Segna incassata: stessa data non riscrive, data diversa 409, prima dell'emissione 422", async () => {
+    const cookie = await authed();
+    const now = await semina();
+    const incassa = (id: string, paidAt: number) => call(`/api/economia/fatture/${id}/incassata`, { method: "POST", json: { paidAt } }, cookie);
+    expect((await incassa("i2", now)).status).toBe(200);
+    expect(await env.DB.prepare("SELECT paid_at FROM invoices WHERE id = 'i2'").first()).toEqual({ paid_at: now });
+    const diversa = await incassa("i2", now - 3 * G);
+    expect(diversa.status).toBe(409);
+    expect((await json<{ error: string }>(diversa)).error).toMatch(/^Fattura già incassata il \d{2}\/\d{2}\/\d{4}$/);
+    const prima = await incassa("i1", now - 25 * G);
+    expect(prima.status).toBe(422);
+    expect((await json<{ error: string }>(prima)).error).toBe("La data di incasso precede l'emissione");
+  });
+
+  it("riferimenti verificati: cliente, automazione e canone devono esistere ed essere dello stesso cliente", async () => {
+    const cookie = await authed();
+    const now = await semina();
+    await env.DB.prepare("INSERT INTO clients (id, name, scope, created_at) VALUES ('c3', 'Bar Prova', 'acceleriamo', ?1)").bind(now).run();
+    await env.DB.prepare("INSERT INTO automations (id, client_id, name, status, created_at, updated_at) VALUES ('a1', 'c1', 'Ordini', 'attiva', ?1, ?1), ('a3', 'c3', 'Cassa', 'attiva', ?1, ?1)").bind(now).run();
+    const post = (p: string, json: unknown) => call(p, { method: "POST", json }, cookie);
+    const errore = async (r: Response) => [r.status, (await json<{ error: string }>(r)).error];
+    const costo = { date: now, category: "strumenti", amountCents: 5000 };
+    expect(await errore(await post("/api/economia/costi", { ...costo, clientId: "nessuno" }))).toEqual([404, "Cliente non trovato"]);
+    expect(await errore(await post("/api/economia/costi", { ...costo, automationId: "nessuna" }))).toEqual([404, "Automazione non trovata"]);
+    expect(await errore(await post("/api/economia/costi", { ...costo, clientId: "c1", automationId: "a3" }))).toEqual([422, "L'automazione non è di questo cliente"]);
+    expect((await post("/api/economia/costi", { ...costo, clientId: "c1", automationId: "a1" })).status).toBe(201);
+    expect((await post("/api/economia/costi", { ...costo, automationId: "a3" })).status).toBe(201);
+    const fattura = { clientId: "c1", kind: "canone", amountCents: 30000 };
+    expect(await errore(await post("/api/economia/fatture", { ...fattura, feeId: "nessuno" }))).toEqual([404, "Canone non trovato"]);
+    expect(await errore(await post("/api/economia/fatture", { ...fattura, feeId: "f2" }))).toEqual([422, "Il canone non è di questo cliente"]);
+    expect((await post("/api/economia/fatture", { ...fattura, feeId: "f1" })).status).toBe(201);
+    expect(await errore(await post("/api/economia/fatture", { ...fattura, clientId: "nessuno" }))).toEqual([404, "Cliente non trovato"]);
+    const canone = { clientId: "c1", amountCents: 20000, billingDay: 1 };
+    expect(await errore(await post("/api/economia/canoni", { ...canone, automationId: "nessuna" }))).toEqual([404, "Automazione non trovata"]);
+    expect(await errore(await post("/api/economia/canoni", { ...canone, automationId: "a3" }))).toEqual([422, "L'automazione non è di questo cliente"]);
+    expect((await post("/api/economia/canoni", { ...canone, automationId: "a1" })).status).toBe(201);
   });
 
   it("canoni: pausa, seconda pausa rifiutata, ripresa, cessazione; mai per un cliente fuori perimetro", async () => {
@@ -126,6 +164,9 @@ describe("Automazioni", () => {
     expect(automazione.status).toBe("in_costruzione");
     expect((await call(`/api/automations/${automazione.id}/attiva`, { method: "POST" }, cookie)).status).toBe(200);
     expect((await call(`/api/automations/${automazione.id}/attiva`, { method: "POST" }, cookie)).status).toBe(409);
+    const assente = await call("/api/automations/nessuna/attiva", { method: "POST" }, cookie);
+    expect(assente.status).toBe(404);
+    expect((await json<{ error: string }>(assente)).error).toBe("Automazione non trovata");
     const p = await json<{ automazioni: { cliente: string; scope: string }[]; totali: { attive: number; inCostruzione: number; costiViviCents: number } }>(await call("/api/automations", {}, cookie));
     expect(p.totali).toEqual({ attive: 1, inCostruzione: 0, costiViviCents: 2000 });
     expect(p.automazioni[0]).toMatchObject({ cliente: "Officina Prova", scope: "acceleriamo" });

@@ -11,6 +11,23 @@ describe("stato della fattura", () => {
     expect(statoFattura({ issuedAt: null, dueAt: null, paidAt: null }, NOW)).toBe("da_emettere");
     expect(statoFattura({ issuedAt: NOW - 20 * G, dueAt: NOW - G, paidAt: NOW - 2 * G }, NOW)).toBe("incassata");
   });
+  it("il giorno della scadenza non è ancora ritardo, il giorno dopo sì (giorno di Roma)", () => {
+    const pomeriggio = Date.UTC(2026, 10, 20, 15, 0); // 16:00 a Roma
+    const emessa = (dueAt: number, ora: number) => statoFattura({ issuedAt: dueAt - 15 * G, dueAt, paidAt: null }, ora);
+    expect(emessa(Date.UTC(2026, 10, 20, 11, 0), pomeriggio)).toBe("emessa"); // scade oggi a mezzogiorno
+    expect(emessa(Date.UTC(2026, 10, 19, 11, 0), pomeriggio)).toBe("in_ritardo"); // scaduta ieri
+    expect(emessa(Date.UTC(2026, 10, 20, 11, 0), Date.UTC(2026, 10, 20, 22, 59))).toBe("emessa"); // 23:59 a Roma
+    expect(emessa(Date.UTC(2026, 10, 20, 11, 0), Date.UTC(2026, 10, 20, 23, 0))).toBe("in_ritardo"); // mezzanotte a Roma
+  });
+  it("a cavallo del cambio d'ora i 15 giorni in millisecondi non anticipano il ritardo", () => {
+    // Emessa il 20 ottobre a mezzogiorno (ora legale): scade il 4 novembre alle 11:00 di Roma.
+    const dueOtt = Date.UTC(2026, 9, 20, 10, 0) + 15 * G;
+    expect(statoFattura({ issuedAt: dueOtt - 15 * G, dueAt: dueOtt, paidAt: null }, Date.UTC(2026, 10, 4, 17, 0))).toBe("emessa");
+    expect(statoFattura({ issuedAt: dueOtt - 15 * G, dueAt: dueOtt, paidAt: null }, Date.UTC(2026, 10, 5, 7, 0))).toBe("in_ritardo");
+    // Emessa il 20 marzo a mezzogiorno (ora solare): scade il 4 aprile alle 13:00 di Roma.
+    const dueMar = Date.UTC(2026, 2, 20, 11, 0) + 15 * G;
+    expect(statoFattura({ issuedAt: dueMar - 15 * G, dueAt: dueMar, paidAt: null }, Date.UTC(2026, 3, 4, 20, 0))).toBe("emessa");
+  });
 });
 
 describe("stato del cliente", () => {
@@ -25,7 +42,11 @@ describe("stato del cliente", () => {
   });
   it("cessato quando resta solo roba chiusa", () => {
     expect(statoCliente([{ status: "cessato" }], [{ status: "dismessa" }])).toBe("cessato");
-    expect(statoCliente([{ status: "in_pausa" }], [])).toBe("cessato");
+  });
+  it("in pausa con un canone in pausa, nessun attivo e niente in costruzione", () => {
+    expect(statoCliente([{ status: "in_pausa" }], [])).toBe("in_pausa");
+    expect(statoCliente([{ status: "in_pausa" }, { status: "cessato" }], [{ status: "dismessa" }])).toBe("in_pausa");
+    expect(statoCliente([{ status: "in_pausa" }], [{ status: "in_costruzione" }])).toBe("in_costruzione");
   });
 });
 
