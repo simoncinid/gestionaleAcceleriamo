@@ -52,7 +52,7 @@ describe("lead", () => {
   it("cambio di fase: storico e, se chiuso, niente prossima azione", async () => {
     const cookie = await authed();
     const { body } = await create(cookie, { company: "B" });
-    const res = await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "chiuso" } }, cookie);
+    const res = await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "chiuso", setupCents: 200_000, feeCents: 15_000, wonStartAt: 1_900_000_000_000 } }, cookie);
     const lead = ((await res.json()) as LeadBody).lead;
     expect(lead.stageId).toBe("chiuso");
     expect(lead.nextAction).toBeNull();
@@ -64,7 +64,7 @@ describe("lead", () => {
   it("riaprire un lead chiuso senza prossima azione dà 422, con la prossima azione funziona", async () => {
     const cookie = await authed();
     const { body } = await create(cookie, { company: "C" });
-    await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "non-chiuso" } }, cookie);
+    await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "non-chiuso", lostReason: "non_interessato" } }, cookie);
     const bad = await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "da-richiamare" } }, cookie);
     expect(bad.status).toBe(422);
     expect(await bad.json()).toEqual({ error: "Serve una prossima azione con data per i lead aperti" });

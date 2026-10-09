@@ -28,6 +28,11 @@ const fields = {
   meetLink: text(500),
   proposalUrl: text(500),
   notes: text(20000),
+  setupCents: z.number().int().min(0).nullish(),
+  feeCents: z.number().int().min(0).nullish(),
+  // Stringa libera: i motivi validi stanno in Impostazioni (chiave "motivi") e si controllano nel servizio.
+  lostReason: z.string().min(1).max(40).nullish(),
+  wonStartAt: z.number().int().nullish(),
 };
 
 export const leadCreateSchema = z

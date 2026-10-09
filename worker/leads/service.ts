@@ -5,6 +5,7 @@ import { activities, documents, leads, stages, users, type Activity, type Lead, 
 import { audit } from "../lib/audit";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
+import { leggiImpostazioni } from "../impostazioni/service";
 
 export const DEFAULT_NEXT_ACTION = "Prima chiamata";
 
@@ -25,6 +26,10 @@ export type LeadInput = {
   meetLink?: string | null;
   proposalUrl?: string | null;
   notes?: string | null;
+  setupCents?: number | null;
+  feeCents?: number | null;
+  lostReason?: string | null;
+  wonStartAt?: number | null;
 };
 export type LeadPatch = Partial<Omit<LeadInput, "source">>;
 
@@ -32,6 +37,13 @@ export async function getStage(db: Db, id: string): Promise<Stage> {
   const stage = await db.select().from(stages).where(eq(stages.id, id)).get();
   if (!stage) throw new HTTPException(400, { message: "Fase inesistente" });
   return stage;
+}
+
+// I motivi di perdita validi sono quelli in Impostazioni, non l'elenco fisso dello schema.
+export async function assertMotivo(db: Db, motivo: string | null | undefined) {
+  if (!motivo) return;
+  const { motivi } = await leggiImpostazioni(db);
+  if (!motivi.some((m) => m.id === motivo)) throw new HTTPException(422, { message: "Motivo non valido" });
 }
 
 export async function firstOpenStage(db: Db): Promise<Stage> {
@@ -113,6 +125,18 @@ export async function updateLead(db: Db, id: string, patch: LeadPatch, actorId: 
   if ("ownerId" in patch) await assertOwner(db, patch.ownerId);
   const stage = await getStage(db, patch.stageId ?? current.stageId);
   const stageChanged = patch.stageId !== undefined && patch.stageId !== current.stageId;
+  await assertMotivo(db, patch.lostReason);
+  // Motivo e dati del vinto si chiedono solo quando la fase cambia davvero:
+  // un lead 1A già perso o già chiuso senza questi dati resta modificabile.
+  if (stageChanged) {
+    if (stage.requiresReason && !(patch.lostReason ?? current.lostReason)) throw new HTTPException(422, { message: "Scegli il motivo" });
+    if (stage.kind === "won") {
+      const setup = patch.setupCents !== undefined ? patch.setupCents : current.setupCents;
+      const canone = patch.feeCents !== undefined ? patch.feeCents : current.feeCents;
+      const inizio = patch.wonStartAt !== undefined ? patch.wonStartAt : current.wonStartAt;
+      if (setup == null || canone == null || inizio == null) throw new HTTPException(422, { message: "Per Chiuso servono setup, canone e data di inizio" });
+    }
+  }
   const next: Partial<Lead> = { ...patch, updatedAt: now };
   if (stageChanged) next.stageChangedAt = now;
 

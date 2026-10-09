@@ -7,6 +7,10 @@ import { addActivity, createLead, getLead, listLeads, mergeLeads, restoreLead, s
 import { activitySchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
 import { audit } from "../lib/audit";
 import { catenaLeadNuovo } from "../regole/catena";
+import { z } from "zod";
+import { ESITI, propostaEsito } from "../regole/motore";
+import { contestoRegole } from "../impostazioni/service";
+import { esitoSchema, primoTentativoAt, registraContatto, salvaEsito } from "./esito";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -51,6 +55,31 @@ leadRoutes.patch("/:id", async (c) => {
   const patch = leadPatchSchema.parse(await c.req.json());
   const lead = await updateLead(getDb(c.env.DB), c.req.param("id"), patch, c.get("user").id);
   return c.json({ lead });
+});
+
+leadRoutes.patch("/:id/esito", async (c) => {
+  const input = esitoSchema.parse(await c.req.json());
+  const r = await salvaEsito(getDb(c.env.DB), c.req.param("id"), input, c.get("user").id, Date.now());
+  return c.json(r);
+});
+
+const contattoSchema = z.object({ canale: z.enum(["chiamata", "whatsapp", "email"]), modello: z.string().optional() }).strict();
+
+leadRoutes.post("/:id/contatti", async (c) => {
+  const input = contattoSchema.parse(await c.req.json());
+  await registraContatto(getDb(c.env.DB), c.req.param("id"), input, c.get("user").id, Date.now());
+  return c.json({ ok: true }, 201);
+});
+
+// Le regole propongono, le persone salvano: questa rotta calcola soltanto, non scrive nulla.
+leadRoutes.get("/:id/proposta", async (c) => {
+  const db = getDb(c.env.DB);
+  const lead = await getLead(db, c.req.param("id"));
+  const esito = z.enum(ESITI).parse(c.req.query("esito"));
+  const callAt = c.req.query("callAt");
+  const ctx = await contestoRegole(db, Date.now());
+  const p = propostaEsito(esito, { stageId: lead.stageId, attemptCount: lead.attemptCount, primoTentativoAt: await primoTentativoAt(db, lead.id) }, ctx, callAt ? { scheduledAt: z.coerce.number().int().parse(callAt) } : undefined);
+  return c.json(p);
 });
 
 leadRoutes.delete("/:id", async (c) => {
