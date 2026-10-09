@@ -4,7 +4,7 @@ import { useId, useState, type ReactNode } from "react";
 import { api } from "../../api";
 import { Chip, Contatto, Errore, Intestazione, Skeleton, StatoVuoto } from "../../ds";
 import { momento } from "../../format";
-import { useMe } from "../../hooks";
+import { useMe, useOra } from "../../hooks";
 import type { Lead, Oggi as DatiOggi, RigaOggi as Riga } from "../../types";
 import { BloccoAdesso } from "./BloccoAdesso";
 import { useRitornoChiamata } from "./chiamata";
@@ -52,7 +52,7 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   const [rimanda, setRimanda] = useState<string | null>(null);
   const me = useMe();
   const q = useQuery({ queryKey: ["today", chi], queryFn: () => api<DatiOggi>(`/today?chi=${chi}`), refetchInterval: 60_000 });
-  const ora = oraFissa ?? Date.now();
+  const ora = useOra(30_000, oraFissa);
 
   // Tornando dalla chiamata si apre il Foglio Esito del lead chiamato (spec 6.4, passo 2).
   useRitornoChiamata((id) => {

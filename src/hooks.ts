@@ -38,3 +38,17 @@ export const useMe = () => useQueryClient().getQueryData<User | null>(["me"]) ??
 // Modelli dei messaggi (WhatsApp ed email), da compilare con riempiModello.
 export const useModelli = () =>
   useQuery({ queryKey: ["templates"], queryFn: () => api<{ templates: MessageTemplate[] }>("/templates").then((r) => r.templates), staleTime: 300_000 });
+
+// Un solo orologio per pagina: chiama onOra con l'istante corrente ogni `ogni` millisecondi. Restituisce lo stop.
+export function avviaOrologio(onOra: (ora: number) => void, ogni: number) {
+  const id = setInterval(() => onOra(Date.now()), ogni);
+  return () => clearInterval(id);
+}
+
+// L'istante "adesso" che avanza da solo: timer delle 2 ore e scadenze non restano fermi
+// quando i dati non cambiano. Con `fissa` (i test) l'orologio non parte.
+export function useOra(ogni: number, fissa?: number) {
+  const [ora, setOra] = useState(() => fissa ?? Date.now());
+  useEffect(() => (fissa == null ? avviaOrologio(setOra, ogni) : undefined), [ogni, fissa]);
+  return fissa ?? ora;
+}

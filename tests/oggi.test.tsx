@@ -1,4 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { CLASSI_AVVISI } from "../src/avvisi";
+import { testoSla } from "../src/format";
+import { avviaOrologio } from "../src/hooks";
+import { BloccoAdesso } from "../src/pagine/commerciale/BloccoAdesso";
 import { Oggi } from "../src/pagine/commerciale/Oggi";
 import type { Oggi as DatiOggi, RigaOggi } from "../src/types";
 import { contaPrimari, render } from "./render";
@@ -53,5 +57,39 @@ describe("pagina Oggi", () => {
     const html = pagina({ ...base, fermi: [riga("f", { stageChangedAt: ORA - 9 * 86_400_000 })], finePausa: [riga("p")] });
     expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>[^<]*Fermi da 7 giorni/);
     expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>[^<]*Fine pausa/);
+  });
+});
+
+describe("orologio della pagina e blocco Adesso", () => {
+  it("il timer delle 2 ore va avanti da solo: dopo 31 secondi il testo cambia", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(ORA);
+    const scadenza = ORA + 50_000;
+    let ora = Date.now();
+    const ferma = avviaOrologio((t) => { ora = t; }, 30_000);
+    const prima = testoSla(scadenza, ora);
+    vi.advanceTimersByTime(31_000);
+    ferma();
+    vi.useRealTimers();
+    expect(prima).toBe("mancano 1 min");
+    expect(testoSla(scadenza, ora)).toBe("mancano 0 min");
+    expect(ora).toBe(ORA + 30_000);
+  });
+
+  it("un nome lungo non esce dal blocco arancione: l'etichetta si tronca", () => {
+    const html = render(<BloccoAdesso voce={{ tipo: "lead", ...riga("a", { contactName: "Massimiliano Rossi" }) }} ora={ORA} onEsito={() => {}} onRimanda={() => {}} />);
+    expect(html).toMatch(/<span class="[^"]*truncate[^"]*">Chiama Massimiliano<\/span>/);
+    expect(html).toMatch(/<a [^>]*class="[^"]*min-w-0/);
+  });
+});
+
+describe("avvisi", () => {
+  it("successo in accento, avvisi semplici in sabbia, nessun colore scritto a mano", () => {
+    expect(CLASSI_AVVISI.success).toContain("bg-accento!");
+    expect(CLASSI_AVVISI.success).toContain("text-accento-inchiostro!");
+    expect(CLASSI_AVVISI.toast).toContain("bg-sabbia!");
+    expect(CLASSI_AVVISI.toast).toContain("text-ink!");
+    expect(CLASSI_AVVISI.error).toContain("bg-avorio!");
+    expect(JSON.stringify(CLASSI_AVVISI)).not.toMatch(/#[0-9a-f]{3,8}/i);
   });
 });

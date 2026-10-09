@@ -21,14 +21,14 @@ export function Contatto({ tipo, lead, testo, oggetto, variante = "secondario", 
     : null;
   if (!href) {
     const motivo = tipo === "email" ? "Manca l'email" : tipo === "meet" ? "Manca il link Meet" : "Manca il telefono";
-    return <Pulsante variante={variante} misura={misura} motivoSpento={motivo} aria-label={tipo === "whatsapp" ? "Scrivi su WhatsApp" : undefined} icona={<Icona size={20} weight="bold" aria-hidden />}>{etichetta}</Pulsante>;
+    return <Pulsante variante={variante} misura={misura} motivoSpento={motivo} aria-label={tipo === "whatsapp" ? "Scrivi su WhatsApp" : undefined} icona={<Icona size={20} weight="bold" aria-hidden />}><span className="truncate">{etichetta}</span></Pulsante>;
   }
   const esterno = tipo === "meet" || tipo === "whatsapp";
   return (
     <a href={href} aria-label={tipo === "whatsapp" ? "Scrivi su WhatsApp" : undefined} data-variante={variante} onClick={onAvvio} target={esterno ? "_blank" : undefined} rel={esterno ? "noreferrer" : undefined}
-      className={cx(classiPulsante(variante, misura), "flex-1")}>
-      <Icona size={20} weight="bold" aria-hidden />
-      {etichetta}
+      className={cx(classiPulsante(variante, misura), "min-w-0 flex-1")}>
+      <Icona size={20} weight="bold" aria-hidden className="shrink-0" />
+      <span className="truncate">{etichetta}</span>
     </a>
   );
 }
