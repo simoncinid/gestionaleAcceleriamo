@@ -24,6 +24,7 @@ import { Timeline } from "./lead/Timeline";
 import { idPerPreventivo, provenienza } from "./scheda";
 import { StepperFasi } from "./StepperFasi";
 import { SezioneCall } from "./SezioneCall";
+import { SezioneProposta } from "./SezioneProposta";
 
 const PUNTEGGIO = { verde: "Verde", giallo: "Giallo", grigio: "Grigio" } as const;
 
@@ -148,7 +149,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
 
       <div className="flex min-w-0 flex-col gap-3">
         <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} /></div>
-        <section data-sezione="proposta" aria-label="Proposta" />
+        <div data-sezione="proposta"><SezioneProposta leadId={lead.id} /></div>
 
         <Piega titolo="Storico" aperta riassunto={activities[0] ? `ultima voce ${momento(activities[0].createdAt, ora)}` : "nessuna voce"}>
           <Timeline leadId={lead.id} activities={activities} ora={ora} />

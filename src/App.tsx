@@ -9,6 +9,8 @@ import { resetSession } from "./session";
 import { SchedaLeadRotta } from "./pagine/commerciale/SchedaLead";
 import { Oggi } from "./pagine/commerciale/Oggi";
 import { Call } from "./pagine/commerciale/Call";
+import { DettaglioProposta } from "./pagine/commerciale/DettaglioProposta";
+import { Proposte } from "./pagine/commerciale/Proposte";
 import { FogliCreazione } from "./pagine/FogliCreazione";
 import { Numeri } from "./pagine/commerciale/Numeri";
 import { Cestino } from "./pagine/impostazioni/Cestino";
@@ -56,6 +58,8 @@ export function App() {
         <Route path="/commerciale/oggi" element={<Oggi />} />
         <Route path="/commerciale/scaletta" element={<Scaletta />} />
         <Route path="/commerciale/call" element={<Call />} />
+        <Route path="/commerciale/proposte" element={<Proposte />} />
+        <Route path="/commerciale/proposte/:id" element={<DettaglioProposta />} />
         <Route path="/commerciale/lead/:id" element={<SchedaLeadRotta />} />
         <Route path="/commerciale/numeri" element={<Numeri />} />
         <Route path="/impostazioni/dati/cestino" element={<Cestino />} />

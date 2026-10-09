@@ -1,5 +1,8 @@
 import { Clock, Hourglass } from "@phosphor-icons/react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
+import { toast } from "sonner";
+import { api } from "../../api";
 import { Contatto, Pulsante, Punto, cx } from "../../ds";
 import { euro, quando, testoSla, trascorso } from "../../format";
 import { useModelli } from "../../hooks";
@@ -72,7 +75,16 @@ export function RigaLead({ l, ora, onEsito, onRimanda }: { l: Riga; ora: number;
 }
 
 export function RigaProposta({ p, ora }: { p: PropostaOggi; ora: number }) {
+  const qc = useQueryClient();
   const fu = modelloPer(useModelli().data, "email", null, "follow_up_preventivo");
+  const presentata = useMutation({
+    mutationFn: () => api(`/proposals/${p.id}`, { method: "PATCH", json: { status: "presentata" } }),
+    onSuccess: () => {
+      toast.success(`Proposta ${p.number} segnata presentata`);
+      for (const k of [["today"], ["proposte"], ["proposta", p.id], ["lead", p.leadId]]) void qc.invalidateQueries({ queryKey: k });
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const v = { contactName: p.contactName, company: p.company, numero: p.number };
   const prezzo = soldi(p.setupCents, p.feeCents);
   return (
@@ -88,6 +100,9 @@ export function RigaProposta({ p, ora }: { p: PropostaOggi; ora: number }) {
           <Contatto tipo="email" lead={p} variante="icona" oggetto={compila(fu?.subject, v)} testo={compila(fu?.body, v)} onAvvio={() => avviaContatto(p.leadId, "email", fu?.id)} />
         ) : (
           <Contatto tipo="chiama" lead={p} variante="icona" onAvvio={() => avviaContatto(p.leadId, "chiamata")} />
+        )}
+        {p.status === "registrata" && (
+          <Pulsante variante="fantasma" misura="md" className="px-3!" inCorso={presentata.isPending} onClick={() => presentata.mutate()}>Segna presentata</Pulsante>
         )}
       </div>
     </li>
