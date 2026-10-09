@@ -57,7 +57,7 @@ export function LeadPage() {
     onSuccess: () => {
       leaveLead();
       toast.success("Spostato nel cestino");
-      navigate("/scaletta");
+      navigate("/commerciale/scaletta");
     },
     onError,
   });
@@ -66,7 +66,7 @@ export function LeadPage() {
     onSuccess: ({ lead }) => {
       leaveLead();
       toast.success("Lead uniti");
-      navigate(`/lead/${lead.id}`);
+      navigate(`/commerciale/lead/${lead.id}`);
     },
     onError,
   });
@@ -90,7 +90,7 @@ export function LeadPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link to="/scaletta" className="text-sm text-ink/50 hover:text-brand">‹ Scaletta</Link>
+          <Link to="/commerciale/scaletta" className="text-sm text-ink/50 hover:text-brand">‹ Scaletta</Link>
           <h1 className="break-words text-4xl">{lead.company}</h1>
           <p className="text-ink/60">{[lead.contactName, SOURCE_LABELS[lead.source] ?? lead.source, lead.metaCampaign].filter(Boolean).join(" · ")}</p>
         </div>
@@ -104,7 +104,7 @@ export function LeadPage() {
 
       {duplicateOf && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-          <span>Sembra un doppione di <Link className="underline" to={`/lead/${duplicateOf.id}`}>{duplicateOf.company}</Link>.</span>
+          <span>Sembra un doppione di <Link className="underline" to={`/commerciale/lead/${duplicateOf.id}`}>{duplicateOf.company}</Link>.</span>
           <Button variant="ghost" onClick={() => confirm(`Unire questo lead in "${duplicateOf.company}"? Storico e documenti passano di là.`) && merge.mutate(duplicateOf.id)}>
             Unisci
           </Button>

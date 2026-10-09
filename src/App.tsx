@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { Navigate, Route, Routes } from "react-router";
+import { Navigate, Route, Routes, useParams } from "react-router";
 import { ApiError, api } from "./api";
-import { Layout } from "./pages/Layout";
+import { REDIRECT_1A } from "./guscio/aree";
+import { Guscio } from "./guscio/Guscio";
 import { Login } from "./pages/Login";
 import { resetSession } from "./session";
 import { LeadPage } from "./pages/LeadPage";
@@ -12,6 +13,12 @@ import { Cestino } from "./pages/Cestino";
 import { Fasi } from "./pages/Fasi";
 import { Scaletta } from "./pages/Scaletta";
 import type { User } from "./types";
+
+// Indirizzi della 1A: portano alle rotte nuove, conservando l'id del lead.
+function Redirect({ a }: { a: string }) {
+  const { id } = useParams();
+  return <Navigate to={a.replace(":id", id ?? "")} replace />;
+}
 
 export function App() {
   const qc = useQueryClient();
@@ -33,21 +40,24 @@ export function App() {
     return () => window.removeEventListener("acc:logout", onLogout);
   }, [qc]);
 
+  const esci = () => api("/auth/logout", { method: "POST" }).catch(() => null).finally(() => resetSession(qc));
+
   if (me.isLoading) return <p className="p-10 text-ink/60">Caricamento…</p>;
   if (me.error) return <p className="p-10 text-red-700">{me.error.message}</p>;
   if (!me.data) return <Login />;
 
   return (
     <Routes>
-      <Route element={<Layout user={me.data} />}>
-        <Route index element={<Navigate to="/oggi" replace />} />
-        <Route path="oggi" element={<Oggi />} />
-        <Route path="scaletta" element={<Scaletta />} />
-        <Route path="lead/:id" element={<LeadPage />} />
-        <Route path="numeri" element={<Numeri />} />
-        <Route path="cestino" element={<Cestino />} />
-        <Route path="fasi" element={<Fasi />} />
-        <Route path="*" element={<Navigate to="/oggi" replace />} />
+      {REDIRECT_1A.map((r) => <Route key={r.da} path={r.da} element={<Redirect a={r.a} />} />)}
+      <Route element={<Guscio nome={me.data.name} onEsci={esci} fogli={() => null} />}>
+        <Route index element={<Navigate to="/commerciale/oggi" replace />} />
+        <Route path="/commerciale/oggi" element={<Oggi />} />
+        <Route path="/commerciale/scaletta" element={<Scaletta />} />
+        <Route path="/commerciale/lead/:id" element={<LeadPage />} />
+        <Route path="/commerciale/numeri" element={<Numeri />} />
+        <Route path="/impostazioni/dati/cestino" element={<Cestino />} />
+        <Route path="/impostazioni/fasi" element={<Fasi />} />
+        <Route path="*" element={<Navigate to="/commerciale/oggi" replace />} />
       </Route>
     </Routes>
   );

@@ -52,7 +52,7 @@ export function Oggi() {
                   const late = s.key === "due" && i.nextActionAt != null && i.nextActionAt < bounds.from;
                   return (
                     <li key={i.id}>
-                      <Link to={`/lead/${i.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-cream">
+                      <Link to={`/commerciale/lead/${i.id}`} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 hover:bg-cream">
                         <span>
                           <span className="font-medium">{i.company}</span>
                           {i.contactName && <span className="text-ink/50"> · {i.contactName}</span>}

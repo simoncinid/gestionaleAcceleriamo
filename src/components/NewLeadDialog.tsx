@@ -18,7 +18,7 @@ export function NewLeadDialog({ onClose }: { onClose: () => void }) {
       refresh();
       toast.success(lead.duplicateOfId ? "Lead creato: sembra un doppione, controlla la scheda" : "Lead creato");
       onClose();
-      navigate(`/lead/${lead.id}`);
+      navigate(`/commerciale/lead/${lead.id}`);
     },
     onError: (e) => toast.error(e.message),
   });

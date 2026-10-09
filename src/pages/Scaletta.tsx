@@ -99,7 +99,7 @@ function LeadCard({ lead, ownerName }: { lead: LeadListItem; ownerName?: string 
   const overdue = lead.nextActionAt != null && lead.nextActionAt < Date.now();
   return (
     <Link
-      to={`/lead/${lead.id}`}
+      to={`/commerciale/lead/${lead.id}`}
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/lead", lead.id)}
       className="block rounded-lg bg-white p-3 shadow-sm ring-1 ring-ink/5 hover:ring-brand/40"
