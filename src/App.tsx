@@ -11,7 +11,7 @@ import { Oggi } from "./pagine/commerciale/Oggi";
 import { FogliCreazione } from "./pagine/FogliCreazione";
 import { Numeri } from "./pages/Numeri";
 import { Cestino } from "./pages/Cestino";
-import { Fasi } from "./pages/Fasi";
+import { Fasi } from "./pagine/impostazioni/Fasi";
 import { Scaletta } from "./pagine/commerciale/Scaletta";
 import type { User } from "./types";
 

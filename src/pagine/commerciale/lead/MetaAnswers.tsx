@@ -1,5 +1,5 @@
-import { Card } from "../../components/ui";
-import type { Lead } from "../../types";
+import { Card } from "../../../components/ui";
+import type { Lead } from "../../../types";
 
 export function MetaAnswers({ lead }: { lead: Lead }) {
   if (!lead.metaAnswers) return null;

@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
-import { Button, Card, Field, Input, Select, Textarea } from "../../components/ui";
-import { fromInput, toInput } from "../../format";
-import type { Lead } from "../../types";
+import { Button, Card, Field, Input, Select, Textarea } from "../../../components/ui";
+import { fromInput, toInput } from "../../../format";
+import type { Lead } from "../../../types";
 
 const TEXT_FIELDS: { key: "company" | "contactName" | "phone" | "email" | "website" | "meetLink" | "proposalUrl"; label: string; type?: string }[] = [
   { key: "company", label: "Azienda" },

@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRef, type FormEvent } from "react";
 import { toast } from "sonner";
-import { api } from "../../api";
-import { Button, Card, Input } from "../../components/ui";
-import { useRefreshLeads } from "../../hooks";
-import type { DocumentRow } from "../../types";
+import { api } from "../../../api";
+import { Button, Card, Input } from "../../../components/ui";
+import { useRefreshLeads } from "../../../hooks";
+import type { DocumentRow } from "../../../types";
 
 export function Documents({ leadId, documents }: { leadId: string; documents: DocumentRow[] }) {
   const refresh = useRefreshLeads();

@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
-import { Button, Card, Field, Input } from "../../components/ui";
-import { fromInput, toInput } from "../../format";
-import type { Lead, Stage } from "../../types";
+import { Button, Card, Field, Input } from "../../../components/ui";
+import { fromInput, toInput } from "../../../format";
+import type { Lead, Stage } from "../../../types";
 
 export function NextActionCard({ lead, kind, onSave, pending }: { lead: Lead; kind?: Stage["kind"]; onSave: (p: Record<string, unknown>) => void; pending: boolean }) {
   if (kind && kind !== "open") {

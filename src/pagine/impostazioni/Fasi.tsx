@@ -1,9 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { api } from "../api";
-import { Button, Input, StageBadge } from "../components/ui";
-import { useRefreshLeads, useStages } from "../hooks";
+import { api } from "../../api";
+import { Button, Input, StageBadge } from "../../components/ui";
+import { useRefreshLeads, useStages } from "../../hooks";
 
 const KIND_LABELS = { open: "aperta", won: "vinta", lost: "persa" } as const;
 

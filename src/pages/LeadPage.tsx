@@ -7,11 +7,11 @@ import { Button, Empty, Select } from "../components/ui";
 import { SOURCE_LABELS } from "../format";
 import { useRefreshLeads, useStages, useUsers } from "../hooks";
 import type { Lead, LeadDetail } from "../types";
-import { Documents } from "./lead/Documents";
-import { LeadForm } from "./lead/LeadForm";
-import { MetaAnswers } from "./lead/MetaAnswers";
-import { NextActionCard } from "./lead/NextActionCard";
-import { Timeline } from "./lead/Timeline";
+import { Documents } from "../pagine/commerciale/lead/Documents";
+import { LeadForm } from "../pagine/commerciale/lead/LeadForm";
+import { MetaAnswers } from "../pagine/commerciale/lead/MetaAnswers";
+import { NextActionCard } from "../pagine/commerciale/lead/NextActionCard";
+import { Timeline } from "../pagine/commerciale/lead/Timeline";
 
 export function LeadPage() {
   const { id = "" } = useParams();

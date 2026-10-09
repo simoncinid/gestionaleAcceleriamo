@@ -1,11 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRef, type FormEvent } from "react";
 import { toast } from "sonner";
-import { api } from "../../api";
-import { Button, Card, Select, Textarea } from "../../components/ui";
-import { fmtDateTime } from "../../format";
-import { useRefreshLeads } from "../../hooks";
-import type { Activity } from "../../types";
+import { api } from "../../../api";
+import { Button, Card, Select, Textarea } from "../../../components/ui";
+import { fmtDateTime } from "../../../format";
+import { useRefreshLeads } from "../../../hooks";
+import type { Activity } from "../../../types";
 
 const TYPE_LABELS: Record<string, string> = {
   creazione: "Creato", nota: "Nota", chiamata: "Chiamata", email: "Email", cambio_fase: "Fase", meta: "Meta", documento: "Documento",
