@@ -14,7 +14,7 @@ export function Riga({ titolo, secondaria, meta, href, onClick, destra }: { tito
       {destra}
     </>
   );
-  const classi = "flex min-h-[60px] items-center gap-3 rounded-card bg-avorio px-4 py-3";
+  const classi = "flex min-h-[60px] items-center gap-3 rounded-blocco bg-avorio px-4 py-3";
   if (href) return <Link to={href} className={`${classi} hover:bg-crema`}>{corpo}</Link>;
   if (onClick) return <button type="button" onClick={onClick} className={`${classi} w-full text-left hover:bg-crema`}>{corpo}</button>;
   return <div className={classi}>{corpo}</div>;
@@ -30,7 +30,7 @@ export function CardLead({ lead, ora = Date.now() }: { lead: CardLeadDati; ora?:
   const fermo = fermoDa(lead.stageChangedAt, ora);
   const scaduta = lead.nextActionAt != null && lead.nextActionAt < ora;
   return (
-    <Link to={`/commerciale/lead/${lead.id}`} className="flex flex-col gap-0.5 rounded-card bg-avorio p-4 shadow-card hover:bg-crema">
+    <Link to={`/commerciale/lead/${lead.id}`} className="flex flex-col gap-0.5 rounded-blocco bg-avorio p-4 hover:bg-crema">
       <p className="flex items-center gap-2 text-corpo font-semibold">
         {lead.score && <Punto colore={lead.score} etichetta={`Punteggio ${lead.score}`} />}
         <span className="truncate">{lead.company}</span>

@@ -1,5 +1,5 @@
 import { CaretDown, Check } from "@phosphor-icons/react";
-import { useId, useState } from "react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { cx } from "./cx";
 import { Foglio } from "./Foglio";
 
@@ -14,6 +14,19 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
 }) {
   const [aperto, setAperto] = useState(apertoAllInizio);
   const id = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const chiudi = () => { setAperto(false); trigger.current?.focus(); };
+  // Frecce, Home e Fine spostano il fuoco tra le opzioni; Esc chiude e riporta il fuoco sulla riga.
+  const tasti = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Escape" && aperto) { e.stopPropagation(); return chiudi(); }
+    const voci = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
+    const i = voci.indexOf(document.activeElement as HTMLButtonElement);
+    if (i < 0) return;
+    const verso = e.key === "ArrowDown" ? (i + 1) % voci.length : e.key === "ArrowUp" ? (i - 1 + voci.length) % voci.length : e.key === "Home" ? 0 : e.key === "End" ? voci.length - 1 : null;
+    if (verso == null) return;
+    e.preventDefault();
+    voci[verso].focus();
+  };
   const scelta = opzioni.find((o) => o.valore === valore);
   const nelFoglio = opzioni.length > OLTRE_IL_FOGLIO;
   const mostrato = testoValore ?? scelta?.etichetta;
@@ -21,7 +34,7 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
     <ul id={id} role="listbox" aria-label={etichetta} className="flex flex-col">
       {opzioni.map((o) => (
         <li key={o.valore} role="none">
-          <button type="button" role="option" aria-selected={o.valore === valore} onClick={() => { onCambia(o.valore); setAperto(false); }}
+          <button type="button" role="option" aria-selected={o.valore === valore} onClick={() => { onCambia(o.valore); chiudi(); }}
             className="flex h-11 w-full items-center gap-3 rounded-controllo px-3 text-left text-corpo hover:bg-crema focus-visible:bg-crema">
             <span className="flex-1 truncate">{o.etichetta}</span>
             {o.meta && <span className="text-meta text-grigio tabular-nums">{o.meta}</span>}
@@ -32,8 +45,8 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
     </ul>
   );
   return (
-    <div data-selettore={etichetta} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
-      <button type="button" aria-expanded={aperto} aria-controls={id} onClick={() => setAperto((a) => !a)}
+    <div data-selettore={etichetta} onKeyDown={tasti} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
+      <button ref={trigger} type="button" aria-expanded={aperto} aria-controls={id} onClick={() => setAperto((a) => !a)}
         className="flex h-12 w-full items-center gap-3 px-3 text-left">
         <span className="text-secondaria font-medium">{etichetta}</span>
         <span className={cx("flex-1 truncate text-right text-corpo", !mostrato && "text-grigio")}>{mostrato ?? segnaposto}</span>

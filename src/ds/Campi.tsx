@@ -1,4 +1,4 @@
-import { useId, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useId, useMemo, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { presetQuando, quando } from "../format";
 import { cx } from "./cx";
 import { Selettore } from "./Selettore";
@@ -32,17 +32,22 @@ const perInput = (ms: number) => {
 };
 
 // "Quando" è un selettore: i preset di presetQuando (senza quelli già passati), poi "Altro giorno e ora" che apre il campo data e ora.
-export function CampoQuando({ etichetta, valore, onCambia, ora = Date.now(), apertoAllInizio = false }: { etichetta: string; valore: number | null; onCambia: (ms: number | null) => void; ora?: number; apertoAllInizio?: boolean }) {
-  const preset = presetQuando(ora).filter((p) => p.ms > ora);
-  const indice = preset.findIndex((p) => p.ms === valore);
-  const [altra, setAltra] = useState(valore != null && indice < 0);
+// L'istante di riferimento si congela al primo rendering: i preset relativi ("Tra 1 ora") non devono scivolare a ogni render.
+export function CampoQuando({ etichetta, valore, onCambia, ora, apertoAllInizio = false }: { etichetta: string; valore: number | null; onCambia: (ms: number | null) => void; ora?: number; apertoAllInizio?: boolean }) {
+  const [base] = useState(() => ora ?? Date.now());
+  const preset = useMemo(() => presetQuando(base).filter((p) => p.ms > base), [base]);
+  const [scelta, setScelta] = useState<string | null>(() => {
+    if (valore == null) return null;
+    const i = preset.findIndex((p) => p.ms === valore);
+    return i >= 0 ? String(i) : "altra";
+  });
   const opzioni = [...preset.map((p, i) => ({ valore: String(i), etichetta: p.etichetta })), { valore: "altra", etichetta: "Altro giorno e ora" }];
-  const scelta = altra ? "altra" : indice >= 0 ? String(indice) : null;
+  const altra = scelta === "altra";
   return (
     <div className="flex flex-col gap-2">
       <Selettore etichetta={etichetta} opzioni={opzioni} valore={scelta} apertoAllInizio={apertoAllInizio}
-        testoValore={valore != null ? quando(valore, ora) : altra ? "Scegli giorno e ora" : undefined}
-        onCambia={(v) => { if (v === "altra") return setAltra(true); setAltra(false); onCambia(preset[Number(v)].ms); }} />
+        testoValore={valore != null ? quando(valore, base) : altra ? "Scegli giorno e ora" : undefined}
+        onCambia={(v) => { setScelta(v); if (v !== "altra") onCambia(preset[Number(v)].ms); }} />
       {altra && (
         <input aria-label={`${etichetta}: giorno e ora`} type="datetime-local" className={campo} value={valore ? perInput(valore) : ""}
           onChange={(e) => onCambia(e.target.value ? new Date(e.target.value).getTime() : null)} />

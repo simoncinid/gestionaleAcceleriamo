@@ -38,6 +38,10 @@ describe("Contatto", () => {
     expect(html).toContain('aria-disabled="true"');
     expect(html).toContain(">Chiama<");
   });
+  it("WhatsApp ha il nome accessibile e l'email dice Scrivi", () => {
+    expect(render(<Contatto tipo="whatsapp" lead={lead} />)).toContain('aria-label="Scrivi su WhatsApp"');
+    expect(render(<Contatto tipo="email" lead={lead} />)).toContain(">Scrivi<");
+  });
   it("Meet apre in una scheda nuova", () => {
     const html = render(<Contatto tipo="meet" lead={lead} />);
     expect(html).toContain('target="_blank"');
@@ -95,6 +99,23 @@ describe("segni, chip e intestazione", () => {
     expect(html).toContain("Domani 10:00");
     expect(html).toContain("Altro giorno e ora");
     expect(html).not.toContain('type="datetime-local"');
+  });
+  it("quando: il preset scelto resta marcato anche se l'orologio è andato avanti", () => {
+    // valore = "Tra 1 ora" calcolato su ORA; il componente congela ORA e confronta con quello
+    const html = render(<CampoQuando etichetta="Quando" valore={ORA + 3_600_000} onCambia={() => {}} ora={ORA} apertoAllInizio />);
+    expect(html.match(/aria-selected="true"/g)?.length).toBe(1);
+    expect(html).toMatch(/aria-selected="true"[^>]*>.*?Tra 1 ora/);
+    expect(html).not.toContain('type="datetime-local"');
+  });
+  it("quando: un valore fuori dai preset apre il campo data e ora", () => {
+    const html = render(<CampoQuando etichetta="Quando" valore={ORA + 5 * 86_400_000} onCambia={() => {}} ora={ORA} />);
+    expect(html).toContain('type="datetime-local"');
+  });
+  it("selettore: l'elenco ha le etichette e la riga resta raggiungibile da tastiera", () => {
+    const html = render(<Selettore etichetta="Esito" valore="a" apertoAllInizio onCambia={() => {}} opzioni={[{ valore: "a", etichetta: "Uno" }, { valore: "b", etichetta: "Due" }]} />);
+    expect(html).toContain('role="listbox"');
+    expect(html).toContain('aria-label="Esito"');
+    expect(html).toMatch(/<button[^>]*aria-expanded="true"/);
   });
   it("stato vuoto senza pulsante pieno se non serve", () => {
     expect(contaPrimari(render(<StatoVuoto titolo="Tutto fatto" testo="Niente in scadenza." />))).toBe(0);
