@@ -21,7 +21,7 @@ export function Testata({ nome, puntoAvatar, onCerca, onPiu }: { nome: string; p
             <MagnifyingGlass size={22} weight="bold" aria-hidden />
           </button>
           <button type="button" aria-label={`Crea in ${area ? titolo : "Commerciale"}`} onClick={onPiu} className={cx("flex size-11 items-center justify-center", tocco)}>
-            <span className="flex size-9 items-center justify-center rounded-full bg-accento text-accento-inchiostro"><Plus size={20} weight="bold" aria-hidden /></span>
+            <span className="flex size-10 items-center justify-center rounded-controllo border border-chrome-testo/60 text-chrome-testo"><Plus size={22} weight="bold" aria-hidden /></span>
           </button>
           <Link to="/impostazioni" aria-label="Profilo e impostazioni" className={cx("relative flex size-11 items-center justify-center", tocco)}>
             <Avatar nome={nome} />
@@ -33,7 +33,7 @@ export function Testata({ nome, puntoAvatar, onCerca, onPiu }: { nome: string; p
         <nav aria-label="Sottomenu" className="flex gap-4 overflow-x-auto border-b border-sabbia bg-avorio px-4 [scrollbar-width:none]">
           {SOTTOMENU[area].map((s) => (
             <Link key={s.percorso} to={s.percorso} aria-current={attivo(s.percorso) ? "page" : undefined}
-              className={cx("flex h-11 shrink-0 items-center border-b-2 px-1 text-secondaria font-medium transition-colors duration-(--durata-veloce)", attivo(s.percorso) ? "border-ink text-ink" : "border-transparent text-grigio")}>
+              className={cx("flex h-11 shrink-0 items-center border-b-2 px-1 text-secondaria font-medium transition-colors duration-(--durata-veloce)", attivo(s.percorso) ? "border-accento text-ink" : "border-transparent text-grigio")}>
               {s.etichetta}
             </Link>
           ))}

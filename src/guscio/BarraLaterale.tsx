@@ -2,21 +2,23 @@ import { CaretDown, GearSix, Plus, SignOut } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { Avatar, Badge, cx } from "../ds";
-import { AREE, SOTTOMENU, areaDi } from "./aree";
+import { AREE, SOTTOMENU, areaDi, creazioniDelPercorso } from "./aree";
 import type { BadgeDati } from "./BarraBasso";
 import { Icona3D } from "./Icona3D";
 
-// Computer: logo, "Crea" (il "+" del computer, apre lo stesso foglio della testata), aree a gruppi, profilo.
-// "Crea" sta nel chrome, non è un primario della pagina: niente data-variante.
+// Computer: logo, pulsante di creazione (il "+" del computer, apre lo stesso foglio della testata), aree a gruppi, profilo.
+// L'etichetta segue l'area: la prima creazione del suo foglio (Nuovo lead, Nuova automazione, Nuova fattura).
+// Il pulsante sta nel chrome, non è un primario della pagina: niente data-variante.
 export function BarraLaterale({ nome, badge, onPiu, onEsci }: { nome: string; badge: BadgeDati | undefined; onPiu: () => void; onEsci: () => void }) {
   const { pathname } = useLocation();
   const corrente = areaDi(pathname);
+  const etichettaCrea = creazioniDelPercorso(pathname)[0].etichetta;
   const [aperte, setAperte] = useState<Record<string, boolean>>({});
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-chrome-3 bg-chrome text-chrome-testo md:flex">
       <img src="/brand/logo-negativo.svg" alt="Acceleriamo" className="mx-5 mt-6 mb-2 h-6 w-auto self-start" />
       <button type="button" onClick={onPiu} className="m-4 flex h-11 items-center justify-center gap-2 rounded-controllo bg-accento font-semibold text-accento-inchiostro transition-[background-color,transform] duration-(--durata-veloce) hover:bg-accento-premuto active:scale-98">
-        <Plus size={20} weight="bold" aria-hidden />Crea
+        <Plus size={20} weight="bold" aria-hidden />{etichettaCrea}
       </button>
       <nav aria-label="Aree" className="flex-1 overflow-y-auto px-2">
         {AREE.map((a) => {

@@ -95,7 +95,27 @@ describe("Testata", () => {
   });
 });
 
+describe("il + della testata e il sottomenu", () => {
+  it("il + è un quadrato con il bordo, senza fondo arancione", () => {
+    const html = render(<Testata nome="Tommaso" puntoAvatar={false} onCerca={() => {}} onPiu={() => {}} />, { percorso: "/commerciale/oggi" });
+    const piu = html.match(/<button [^>]*aria-label="Crea in Commerciale"[^>]*>.*?<\/button>/)![0];
+    expect(piu).not.toContain("bg-accento");
+    expect(piu).toContain("border-chrome-testo/60");
+  });
+  it("la scheda attiva del sottomenu è sottolineata in arancione", () => {
+    const html = render(<Testata nome="Tommaso" puntoAvatar={false} onCerca={() => {}} onPiu={() => {}} />, { percorso: "/commerciale/oggi" });
+    expect(html).toMatch(/<a [^>]*aria-current="page"[^>]*border-accento[^>]*>Oggi<|<a [^>]*border-accento[^>]*aria-current="page"[^>]*>Oggi</);
+  });
+});
+
 describe("BarraLaterale", () => {
+  it.each([
+    ["/commerciale/oggi", "Nuovo lead"], ["/automazioni", "Nuova automazione"], ["/economia/canoni", "Nuova fattura"], ["/impostazioni", "Nuovo lead"],
+  ])("in %s il pulsante dice %s", (percorso, etichetta) => {
+    const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onPiu={() => {}} onEsci={() => {}} />, { percorso });
+    expect(html).toContain(`</svg>${etichetta}</button>`);
+    expect(html).not.toContain("</svg>Crea</button>");
+  });
   it("stesso ordine delle aree, area corrente aperta con il suo sottomenu", () => {
     const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onPiu={() => {}} onEsci={() => {}} />, { percorso: "/commerciale/oggi" });
     const aree = [...html.matchAll(/data-area="([^"]+)"/g)].map((m) => m[1]);
