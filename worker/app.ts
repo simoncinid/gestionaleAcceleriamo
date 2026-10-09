@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 import type { AppEnv } from "./env";
+import { requireAuth } from "./auth/session";
+import { authRoutes } from "./auth/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -12,6 +14,15 @@ app.onError((err, c) => {
   console.error("errore_server", errorId, err);
   return c.json({ error: "Errore del server", errorId }, 500);
 });
+
+const PUBLIC_PATHS = ["/api/health", "/api/_boom", "/api/auth/login"];
+
+app.use("/api/*", async (c, next) => {
+  if (PUBLIC_PATHS.includes(c.req.path) || c.req.path.startsWith("/api/webhooks/")) return next();
+  return requireAuth(c, next);
+});
+
+app.route("/api/auth", authRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 
