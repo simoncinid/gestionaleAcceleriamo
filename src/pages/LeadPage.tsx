@@ -52,6 +52,16 @@ export function LeadPage() {
   const { lead, activities, documents, duplicateOf } = detail.data;
   const stage = stages.data?.find((s) => s.id === lead.stageId);
 
+  // Un lead chiuso ha perso la prossima azione: per riaprirlo ne serve una nuova.
+  function changeStage(stageId: string) {
+    const target = stages.data?.find((s) => s.id === stageId);
+    if (target?.kind === "open" && (!lead.nextAction || !lead.nextActionAt)) {
+      patch.mutate({ stageId, nextAction: "Ricontattare", nextActionAt: Date.now() });
+    } else {
+      patch.mutate({ stageId });
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -61,7 +71,7 @@ export function LeadPage() {
           <p className="text-ink/60">{[lead.contactName, SOURCE_LABELS[lead.source] ?? lead.source, lead.metaCampaign].filter(Boolean).join(" · ")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Select aria-label="Fase" value={lead.stageId} onChange={(e) => patch.mutate({ stageId: e.target.value })} className="w-auto">
+          <Select aria-label="Fase" value={lead.stageId} disabled={patch.isPending} onChange={(e) => changeStage(e.target.value)} className="w-auto">
             {stages.data?.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
           </Select>
           <Button variant="danger" onClick={() => confirm("Spostare il lead nel cestino? Potrai ripristinarlo.") && remove.mutate()}>Cestino</Button>
