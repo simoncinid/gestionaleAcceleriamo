@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
-import { daRoma, partiRoma } from "../lib/roma";
+import { daRoma, inizioGiornoRoma, partiRoma } from "../lib/roma";
 
 export const badgeRoutes = new Hono<AppEnv>();
 
@@ -17,8 +17,9 @@ badgeRoutes.get("/", async (c) => {
         (l.stage_id = 'da-chiamare-prima-volta' AND l.attempt_count = 0)
         OR (l.next_action_at IS NOT NULL AND l.next_action_at < ?2)
         OR (l.stage_id = 'in-attesa-decisione' AND l.next_action_at < ?3))`).bind(io, ora, fine).first<{ n: number }>(),
+    // Come statoFattura: in ritardo solo dal giorno dopo la scadenza, a giorno di Roma.
     db.prepare(`SELECT count(*) n FROM invoices i JOIN clients c ON c.id = i.client_id
-      WHERE i.deleted_at IS NULL AND i.paid_at IS NULL AND i.due_at < ? AND c.scope = 'acceleriamo'`).bind(ora).first<{ n: number }>(),
+      WHERE i.deleted_at IS NULL AND i.paid_at IS NULL AND i.due_at < ? AND c.scope = 'acceleriamo'`).bind(inizioGiornoRoma(ora)).first<{ n: number }>(),
     db.prepare("SELECT count(*) n FROM integration_status WHERE ok = 0").first<{ n: number }>(),
   ]);
   return c.json({ commerciale: commerciale?.n ?? 0, economia: economia?.n ?? 0, avatar: (rotta?.n ?? 0) > 0 });
