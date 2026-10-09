@@ -6,6 +6,7 @@ import { Layout } from "./pages/Layout";
 import { Login } from "./pages/Login";
 import { resetSession } from "./session";
 import { Placeholder } from "./pages/Placeholder";
+import { Scaletta } from "./pages/Scaletta";
 import type { User } from "./types";
 
 export function App() {
@@ -37,7 +38,7 @@ export function App() {
       <Route element={<Layout user={me.data} />}>
         <Route index element={<Navigate to="/oggi" replace />} />
         <Route path="oggi" element={<Placeholder title="oggi" />} />
-        <Route path="scaletta" element={<Placeholder title="scaletta" />} />
+        <Route path="scaletta" element={<Scaletta />} />
         <Route path="lead/:id" element={<Placeholder title="lead" />} />
         <Route path="numeri" element={<Placeholder title="numeri" />} />
         <Route path="cestino" element={<Placeholder title="cestino" />} />
