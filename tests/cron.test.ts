@@ -191,7 +191,7 @@ describe("giro programmato", () => {
     expect(await env.DB.prepare("SELECT ok, last_ok_at FROM integration_status WHERE key = 'giro'").first()).toEqual({ ok: 1, last_ok_at: r(10, 5) });
   });
 
-  it("giro del foglio: al massimo 2 lead nuovi e sotto il tetto di query D1; il giro dopo riprende da dove era", async () => {
+  it("giro del foglio: 1 lead per giro quando le conferme sono in programma, sotto il tetto di query D1; il giro dopo riprende da dove era", async () => {
     await createUser();
     const testata = "Data di creazione,Azienda,Nome e Cognome,Telefono,Email,Campagna";
     const righe = Array.from({ length: 6 }, (_, i) => `2026-10-12 09:1${i},Officina Prova ${i},Luca Prova,+39 333 000 00${10 + i},luca${i}@esempio.it,Autunno`);
@@ -205,11 +205,11 @@ describe("giro programmato", () => {
     expect(primo.fatti[0]).toBe("foglio");
     expect(primo.errori).toEqual([]);
     expect(primo.query).toBeLessThanOrEqual(45);
-    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: MAX.foglio });
+    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 1 });
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
-    await giro(env, r(10, 10));
-    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 2 * MAX.foglio });
-    await giro(env, r(10, 20));
+    await giro(env, r(10, 5));
+    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 2 });
+    for (const m of [10, 15, 20, 25]) await giro(env, r(10, m));
     expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 6 });
   });
 
@@ -348,4 +348,40 @@ describe("giro con i lavori veri insieme", () => {
       expect(s.sotto()).toBeLessThanOrEqual(15);
     });
   }
+});
+
+describe("arretrato nel foglio", () => {
+  // Prima lettura del foglio di Andrea: tante righe nuove. Il foglio prende 1 lead e lascia il resto
+  // del budget a Meta e alle conferme, che hanno scadenze più strette.
+  it("10:15 con 10 righe nuove e 3 lead Meta in coda: Meta gira e il totale resta sotto 45", async () => {
+    await createUser();
+    await foglioFinto(Array.from({ length: 10 }, (_, i) => rigaFoglio(i)));
+    for (let i = 0; i < 3; i++) await insertLead(`m${i}`, { source: "meta", meta_lead_id: `lg-${i}`, meta_status: "pending", meta_attempts: 0, stage_id: "da-chiamare-prima-volta" });
+    let meta = 0;
+    setMetaFetch(async () => { meta++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`meta${meta}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
+    const c = contaQuery();
+    const esito = await giro(c.env, r(10, 15));
+    expect(esito.fatti).toEqual(expect.arrayContaining(["foglio", "meta"]));
+    expect(esito.errori).toEqual([]);
+    expect(meta).toBeGreaterThanOrEqual(1);
+    expect(await env.DB.prepare("SELECT count(*) n FROM leads WHERE source = 'foglio_andrea'").first()).toEqual({ n: 1 });
+    expect(c.n()).toBeLessThanOrEqual(45);
+    expect(esito.query).toBeLessThanOrEqual(45);
+  });
+
+  it("10:05 con 10 righe nuove e 6 conferme in errore: le conferme girano e il totale resta sotto 45", async () => {
+    await createUser();
+    await foglioFinto(Array.from({ length: 10 }, (_, i) => rigaFoglio(i)));
+    for (let i = 0; i < 6; i++) await insertLead(`c${i}`, { source: "meta", email: `conf${i}@esempio.it`, confirmation_error: "Resend non raggiungibile, si riprova", confirmation_attempts: 1, created_at: r(10, 0) - i });
+    let email = 0;
+    setEmailFetch(async () => { email++; return Response.json({ id: `re_${email}` }); });
+    const c = contaQuery();
+    const esito = await giro(c.env, r(10, 5));
+    expect(esito.fatti).toEqual(["foglio", "conferme"]);
+    expect(esito.errori).toEqual([]);
+    const ritentate = await env.DB.prepare("SELECT count(*) n FROM leads WHERE id LIKE 'c%' AND confirmation_sent_at IS NOT NULL").first<{ n: number }>();
+    expect(ritentate?.n).toBeGreaterThanOrEqual(1);
+    expect(c.n()).toBeLessThanOrEqual(45);
+    expect(esito.query).toBeLessThanOrEqual(45);
+  });
 });

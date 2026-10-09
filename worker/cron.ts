@@ -40,7 +40,9 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   proposte_scadute: { quando: alle6, fisse: 42, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => scadiProposte(getDb(e.DB), n) },
   // Criterio 1 della spec: un lead del foglio in Scaletta entro 10 minuti. Il foglio gira a ogni giro
   // (tranne alle 6:00, che è delle proposte) e prende quanti lead il budget consente, al massimo 2.
-  foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 19, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, l) },
+  // Con un arretrato grande (prima lettura del foglio) il foglio non deve affamare Meta e conferme: se nel
+  // giro è in programma un altro lavoro prende al massimo 1 lead (24 query), da solo fino a 2.
+  foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 19, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, altriInProgramma("foglio", n) ? Math.min(1, l) : l) },
   meta: { quando: ogni15, fisse: 2, perUnita: 15, sottoPerUnita: 2, max: 2, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
   // Conferme e inviti si dividono lo stesso limite: ogni unità (una conferma o un invito) costa al massimo
   // 7 query e una sottorichiesta, così il budget conta anche gli inviti.
@@ -53,6 +55,12 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
     },
   },
 };
+
+// Vero se nel giro di questo istante c'è in programma almeno un altro lavoro oltre a quello indicato.
+function altriInProgramma(nome: Lavoro, now: number): boolean {
+  const p = partiRoma(now);
+  return Object.entries(LAVORI).some(([k, d]) => k !== nome && d!.quando(p));
+}
 
 export function registraLavoro(nome: Lavoro, def: DefLavoro) {
   LAVORI[nome] = def;
