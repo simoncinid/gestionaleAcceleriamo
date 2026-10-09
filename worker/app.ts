@@ -8,6 +8,7 @@ import { documentRoutes, leadRoutes } from "./leads/routes";
 import { todayRoutes } from "./today/routes";
 import { metaRoutes } from "./meta/routes";
 import { stageRoutes, userRoutes } from "./stages/routes";
+import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -32,6 +33,9 @@ app.route("/api/leads", leadRoutes);
 app.route("/api/documents", documentRoutes);
 app.route("/api/stages", stageRoutes);
 app.route("/api/users", userRoutes);
+app.route("/api/settings", settingsRoutes);
+app.route("/api/stage-rules", stageRuleRoutes);
+app.route("/api/templates", templateRoutes);
 app.route("/api", todayRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));

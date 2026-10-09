@@ -67,6 +67,13 @@ describe("webhook Meta", () => {
     expect(JSON.parse(String(lead?.meta_answers))["quanti_dipendenti_hai?"]).toBe("10-20");
   });
 
+  it("dopo il riempimento la catena dà responsabile, punteggio e telefono in E.164", async () => {
+    await authed();
+    graphOk({ full_name: "Sara Verdi", email: "sara@verdi-prova.it", phone_number: "333 765 4321", company_name: "Verdi Prova" });
+    await postWebhook("L-catena");
+    expect(await leadByMeta("L-catena")).toMatchObject({ owner_id: "tommaso", score: "giallo", phone: "+393337654321", phone_norm: "3337654321" });
+  });
+
   it("modulo senza campo azienda: usa il nome del contatto", async () => {
     graphOk({ first_name: "Anna", last_name: "Neri", email: "anna@neri.it" });
     await postWebhook("L3");

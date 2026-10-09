@@ -6,6 +6,7 @@ import type { AppEnv } from "../env";
 import { addActivity, createLead, getLead, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead } from "./service";
 import { activitySchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
 import { audit } from "../lib/audit";
+import { catenaLeadNuovo } from "../regole/catena";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -19,8 +20,11 @@ leadRoutes.get("/trash", async (c) => c.json({ leads: await listLeads(getDb(c.en
 
 leadRoutes.post("/", async (c) => {
   const input = leadCreateSchema.parse(await c.req.json());
-  const lead = await createLead(getDb(c.env.DB), input, c.get("user").id);
-  return c.json({ lead }, 201);
+  const db = getDb(c.env.DB);
+  const now = Date.now();
+  const creato = await createLead(db, input, c.get("user").id, now);
+  await catenaLeadNuovo(c.env, creato.id, "manuale", now);
+  return c.json({ lead: await getLead(db, creato.id) }, 201);
 });
 
 leadRoutes.get("/:id", async (c) => {

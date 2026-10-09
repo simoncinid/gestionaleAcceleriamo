@@ -3,6 +3,8 @@ import { getDb, type Db } from "../db/client";
 import { leads } from "../db/schema";
 import type { Env } from "../env";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
+import { aE164 } from "../lib/telefono";
+import { catenaLeadNuovo } from "../regole/catena";
 import { DEFAULT_NEXT_ACTION, addActivity, findDuplicate, firstOpenStage } from "../leads/service";
 import { metaFetch } from "./fetcher";
 
@@ -91,7 +93,7 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
         contactName: m.contactName,
         email: m.email,
         emailNorm,
-        phone: m.phone,
+        phone: aE164(m.phone) ?? m.phone,
         phoneNorm,
         website: m.website,
         metaAnswers: JSON.stringify(data.fields),
@@ -104,7 +106,6 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
         updatedAt: now,
       })
       .where(eq(leads.id, leadId));
-    return true;
   } catch (err) {
     console.error("meta_fill_failed", leadId, err);
     await db
@@ -113,6 +114,13 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
       .where(eq(leads.id, leadId));
     return false;
   }
+  // Fuori dal try: se la catena fallisce il lead resta riempito ("ok") e non torna tra quelli da riprovare.
+  try {
+    await catenaLeadNuovo(env, leadId, "meta", now);
+  } catch (err) {
+    console.error("catena_lead_nuovo_fallita", leadId, err);
+  }
+  return true;
 }
 
 export async function retryPendingMetaLeads(env: Env) {
