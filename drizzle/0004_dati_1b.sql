@@ -46,8 +46,8 @@ INSERT INTO calls (id, lead_id, kind, scheduled_at, meet_link, created_by, creat
 SELECT lower(hex(randomblob(16))), l.id,
   CASE WHEN (SELECT sort_order FROM stages WHERE id = l.stage_id) >= (SELECT sort_order FROM stages WHERE id = 'presentazione-confermata') THEN 'presentazione' ELSE 'conoscenza' END,
   l.appointment_at, l.meet_link, 'migrazione', l.updated_at, l.updated_at
-FROM leads l WHERE l.appointment_at IS NOT NULL;
+FROM leads l WHERE l.appointment_at IS NOT NULL AND l.deleted_at IS NULL;
 --> statement-breakpoint
 INSERT INTO proposals (id, lead_id, number, company, option, status, pdf_url, registered_via, version, created_at, updated_at)
-SELECT lower(hex(randomblob(16))), l.id, '1A-' || substr(l.id, 1, 8), l.company, 'standard', 'registrata', l.proposal_url, 'migrazione', 1, l.updated_at, l.updated_at
-FROM leads l WHERE l.proposal_url IS NOT NULL;
+SELECT lower(hex(randomblob(16))), l.id, '1A-' || l.id, l.company, 'standard', 'registrata', l.proposal_url, 'migrazione', 1, l.updated_at, l.updated_at
+FROM leads l WHERE l.proposal_url IS NOT NULL AND l.deleted_at IS NULL;

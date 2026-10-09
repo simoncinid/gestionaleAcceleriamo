@@ -14,7 +14,7 @@ export default defineWorkersConfig(async () => {
           miniflare: {
             compatibilityDate: "2026-09-15",
             compatibilityFlags: ["nodejs_compat"],
-            d1Databases: ["DB"],
+            d1Databases: ["DB", "DB_PRE"],
             bindings: {
               TEST_MIGRATIONS: migrations,
               META_APP_SECRET: "segreto-test",

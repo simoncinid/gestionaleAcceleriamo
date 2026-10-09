@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { env } from "cloudflare:test";
+import { applyD1Migrations, env } from "cloudflare:test";
 
 const NOW = 1_800_000_000_000;
 
@@ -43,6 +43,7 @@ describe("migrazioni del Piano A", () => {
     await insertLead("present", { appointment_at: NOW + 2000, stage_id: "presentazione-confermata" });
     await insertLead("propo", { proposal_url: "https://drive.google.com/x", stage_id: "in-attesa-decisione" });
     await insertLead("nulla");
+    await insertLead("cestinato", { appointment_at: NOW + 3000, proposal_url: "https://drive.google.com/y", deleted_at: NOW });
     const mig = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0004"))!;
     for (const q of mig.queries.filter((q) => /INSERT INTO (calls|proposals)/.test(q))) await env.DB.prepare(q).run();
 
@@ -60,5 +61,63 @@ describe("migrazioni del Piano A", () => {
     const ins = "INSERT INTO activities (id, lead_id, type, body, created_at, request_id) VALUES (?, 'x', 'esito', '', 1, 'r1')";
     await env.DB.prepare(ins).bind("a1").run();
     await expect(env.DB.prepare(ins).bind("a2").run()).rejects.toThrow(/UNIQUE/);
+  });
+
+  it("il numero della proposta portata usa l'id intero, anche con prefissi uguali", async () => {
+    await insertLead("stesso-prefisso-a", { proposal_url: "https://drive.google.com/a" });
+    await insertLead("stesso-prefisso-b", { proposal_url: "https://drive.google.com/b" });
+    const mig = env.TEST_MIGRATIONS.find((m) => m.name.startsWith("0004"))!;
+    for (const q of mig.queries.filter((q) => /INSERT INTO proposals/.test(q))) await env.DB.prepare(q).run();
+    const { results } = await env.DB.prepare("SELECT number FROM proposals ORDER BY number").all<{ number: string }>();
+    expect(results.map((r) => r.number)).toEqual(["1A-stesso-prefisso-a", "1A-stesso-prefisso-b"]);
+  });
+
+  it("le migrazioni solo aggiungono: nessun DROP né ricostruzione di tabelle", () => {
+    for (const m of env.TEST_MIGRATIONS.filter((m) => /^000[34]/.test(m.name))) {
+      const sql = m.queries.join("\n");
+      expect(sql).not.toMatch(/\bDROP\b/i);
+      expect(sql).not.toMatch(/__new_/);
+    }
+  });
+
+  it("i modelli di partenza usano il nome del referente", async () => {
+    const { results } = await env.DB.prepare("SELECT key, body FROM message_templates").all<{ key: string; body: string }>();
+    for (const t of results) expect(t.body, t.key).toContain("{referente}");
+  });
+
+  it("ogni aggiornamento delle fasi ha colpito la sua riga", async () => {
+    const { results } = await env.DB.prepare("SELECT id, probability, suggested_next_action AS azione, suggested_delay_hours AS ore FROM stages").all<{ id: string; probability: number; azione: string | null; ore: number | null }>();
+    const attese: Record<string, [number, string | null, number | null]> = {
+      "da-chiamare-prima-volta": [10, "Prima chiamata", 0],
+      "non-chiamato": [10, "Richiamare", 24],
+      "da-richiamare": [15, "Richiamare", 24],
+      "appuntamento-confermato": [30, "Call di conoscenza", null],
+      "presentazione-confermata": [45, "Call di presentazione", null],
+      "in-attesa-preventivo": [55, "Preparare il preventivo", 48],
+      "in-attesa-decisione": [80, "Follow-up preventivo", 72],
+      "probabilmente-bloccato": [20, "Richiamare dopo la pausa", 1440],
+      chiuso: [100, null, null],
+    };
+    for (const [id, [prob, azione, ore]] of Object.entries(attese)) {
+      expect(results.find((s) => s.id === id), id).toMatchObject({ probability: prob, azione, ore });
+    }
+  });
+
+  it("le righe della 1A restano intatte e prendono i valori di partenza", async () => {
+    const all = env.TEST_MIGRATIONS;
+    const prima = all.filter((m) => /^000[012]/.test(m.name));
+    const db = (env as unknown as { DB_PRE: D1Database }).DB_PRE;
+    await applyD1Migrations(db, prima);
+    await db.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at, notes) VALUES ('vecchio', 'Vecchia Srl', 'meta', 'da-richiamare', 5, 6, 7, 'nota 1A')").run();
+    await db.prepare("INSERT INTO activities (id, lead_id, type, body, created_at) VALUES ('att1', 'vecchio', 'nota', 'testo 1A', 8)").run();
+
+    await applyD1Migrations(db, all);
+
+    const lead = await db.prepare("SELECT company, source, stage_id, stage_changed_at, created_at, updated_at, notes, attempt_count, confirmation_attempts, sequence_step, lost_reason FROM leads WHERE id = 'vecchio'").first();
+    expect(lead).toEqual({ company: "Vecchia Srl", source: "meta", stage_id: "da-richiamare", stage_changed_at: 5, created_at: 6, updated_at: 7, notes: "nota 1A", attempt_count: 0, confirmation_attempts: 0, sequence_step: 0, lost_reason: null });
+    const att = await db.prepare("SELECT type, body, created_at, request_id, outcome FROM activities WHERE id = 'att1'").first();
+    expect(att).toEqual({ type: "nota", body: "testo 1A", created_at: 8, request_id: null, outcome: null });
+    const stages = await db.prepare("SELECT COUNT(*) AS n, SUM(requires_reason) AS motivo FROM stages").first<{ n: number; motivo: number }>();
+    expect(stages).toEqual({ n: 12, motivo: 3 });
   });
 });
