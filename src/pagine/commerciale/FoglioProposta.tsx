@@ -52,6 +52,9 @@ export function FoglioAbbina({ proposta, onChiudi }: { proposta: PropostaRiga; o
   );
 }
 
+// Come il server: solo link https:// (niente javascript: o http://). Vuoto non è un errore.
+export const motivoLinkPdf = (testo: string) => (testo.trim() && !/^https:\/\/\S+$/.test(testo.trim()) ? "Il link deve iniziare con https://" : undefined);
+
 const OPZIONI = [{ valore: "standard" as const, etichetta: "Standard" }, { valore: "proprieta" as const, etichetta: "Proprietà del codice" }];
 
 // Proposta inserita a mano dal "+" (quando il preventivo non passa dal wiki).
@@ -72,7 +75,7 @@ export function FoglioPropostaManuale({ leadIniziale, onChiudi }: { leadIniziale
     onError: (e) => toast.error(e.message),
   });
   const campo = (k: keyof typeof v) => ({ value: v[k], onChange: (e: ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value })) });
-  const manca = !lead ? "Scegli il lead" : !corpo.number ? "Serve il numero" : corpo.hoursEstimate != null && !Number.isInteger(corpo.hoursEstimate) ? "Ore in numero intero" : undefined;
+  const manca = !lead ? "Scegli il lead" : !corpo.number ? "Serve il numero" : corpo.hoursEstimate != null && !Number.isInteger(corpo.hoursEstimate) ? "Ore in numero intero" : motivoLinkPdf(v.pdfUrl);
   return (
     <Foglio aperto titolo="Proposta a mano" onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Salva proposta</Pulsante>}>
@@ -127,7 +130,7 @@ export function FoglioLinkPdf({ proposta: p, onChiudi }: { proposta: PropostaRig
     onSuccess: () => { toast.success("Link al PDF salvato"); aggiornaDopoProposta(qc, p.id, p.leadId); onChiudi(); },
     onError: (e) => toast.error(e.message),
   });
-  const manca = pulito && !/^https?:\/\/\S+$/.test(pulito) ? "Serve un link che inizia con https://" : !pulito && !p.pdfUrl ? "Incolla il link" : undefined;
+  const manca = motivoLinkPdf(pulito) ?? (!pulito && !p.pdfUrl ? "Incolla il link" : undefined);
   return (
     <Foglio aperto titolo="Link al PDF" onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Salva il link</Pulsante>}>

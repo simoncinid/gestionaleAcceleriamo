@@ -67,7 +67,7 @@ export function Proposte({ ora: oraFissa }: { ora?: number } = {}) {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-corpo font-semibold">{p.company ? `${p.number}, ${p.company}` : p.number}</p>
                 <p className="truncate text-secondaria text-grigio tabular-nums">{prezzo(p)}</p>
-                <p className="text-meta text-grigio">Nessun lead con questo nome</p>
+                <p className="text-meta text-grigio">Lead non riconosciuto</p>
               </div>
               <Pulsante variante="secondario" className="shrink-0" onClick={() => setAbbina(p)}>Abbina a un lead</Pulsante>
             </li>

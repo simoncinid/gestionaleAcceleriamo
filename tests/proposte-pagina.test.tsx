@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Route, Routes } from "react-router";
 import { DettaglioProposta } from "../src/pagine/commerciale/DettaglioProposta";
-import { FoglioAccettazione } from "../src/pagine/commerciale/FoglioProposta";
+import { FoglioAccettazione, motivoLinkPdf } from "../src/pagine/commerciale/FoglioProposta";
 import { Proposte } from "../src/pagine/commerciale/Proposte";
 import { SezioneProposta } from "../src/pagine/commerciale/SezioneProposta";
 import type { PropostaRiga } from "../src/types";
@@ -27,6 +27,8 @@ describe("schermata Proposte", () => {
     expect(html).toMatch(/Proposte[^<]*<strong[^>]*>3<\/strong> aperte/);
     expect(html).toContain("Da abbinare");
     expect(html).toContain("Abbina a un lead");
+    expect(html).toContain("Lead non riconosciuto");
+    expect(html).not.toContain("Nessun lead con questo nome");
     expect(html).toContain("Setup € 2.000, canone € 150");
     expect(html).toMatch(/<details[^>]*>\s*<summary[^>]*>[^<]*Chiuse/);
     expect(contaPrimari(html)).toBe(0);
@@ -73,5 +75,14 @@ describe("sezione proposta nella scheda lead", () => {
     expect(html).toContain("ACC-2026-009");
     expect(html).toContain("Setup € 2.000, canone € 150");
     expect(html).toContain("PDF nel wiki");
+  });
+});
+
+describe("link al PDF", () => {
+  it("solo https://, vuoto ammesso dove è facoltativo", () => {
+    expect(motivoLinkPdf("javascript:alert(1)")).toBe("Il link deve iniziare con https://");
+    expect(motivoLinkPdf("http://esempio.it/p.pdf")).toBe("Il link deve iniziare con https://");
+    expect(motivoLinkPdf("https://esempio.it/p.pdf")).toBeUndefined();
+    expect(motivoLinkPdf("  ")).toBeUndefined();
   });
 });
