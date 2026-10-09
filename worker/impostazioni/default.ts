@@ -15,6 +15,8 @@ export const SCHEMI = {
   conferma: z.object({ attiva: z.boolean(), mittente: z.string().min(3).max(200), rispondiA: z.string().email(), piede: z.string().max(600) }).strict(),
   foglio: z.object({
     attivo: z.boolean(), spreadsheetId: z.string().max(200), scheda: z.string().max(100),
+    // Scheda per la via CSV: il numero dopo "gid=" nel link del foglio. "0" è la prima scheda creata.
+    gid: z.string().regex(/^\d{0,20}$/, "Il gid è un numero").default("0"),
     mappa: z.object({ data: z.string(), azienda: z.string(), referente: z.string(), telefono: z.string(), email: z.string(), campagna: z.string(), inserzione: z.string(), metaId: z.string() }).strict(),
   }).strict(),
   prezzi: z.object({ setupCents: z.number().int().min(0), ore: z.number().int().min(0), moltiplicatore: z.number().min(5).max(10) }).strict(),
@@ -50,7 +52,7 @@ export const IMPOSTAZIONI_DEFAULT: Impostazioni = {
     piede: "Acceleriamo è un progetto di Diego Simoncini, P.IVA 02524780505. Informativa privacy: https://acceleriamo.it/privacy",
   },
   foglio: {
-    attivo: false, spreadsheetId: "", scheda: "",
+    attivo: false, spreadsheetId: "", scheda: "", gid: "0",
     mappa: { data: "Data di creazione", azienda: "Azienda", referente: "Nome e Cognome", telefono: "Telefono", email: "Email", campagna: "Campagna", inserzione: "", metaId: "" },
   },
   prezzi: { setupCents: 200_000, ore: 40, moltiplicatore: 7 },

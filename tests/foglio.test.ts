@@ -124,6 +124,61 @@ describe("Foglio Andrea con l'account di servizio", () => {
     expect((await stato())?.last_row).toBe(1);
   });
 
+  it("lead cestinato e foglio riordinato: nessun lead nuovo, nessuna email", async () => {
+    const SOLO_NOME = ["2026-10-12 11:00", "Pizzeria Solo Nome Finta", "Gino Finto", "", "", "Autunno", ""];
+    foglio = [TESTATA, ROSSI, BIANCHI, SOLO_NOME];
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ create: 3 });
+    expect(email).toBe(2);
+    await env.DB.prepare("UPDATE leads SET deleted_at = ? WHERE company = 'Officina Rossi Finta'").bind(NOW).run();
+    foglio = [TESTATA, SOLO_NOME, BIANCHI, ROSSI];
+    expect(await giroFoglio(envFoglio, NOW + 600_000)).toEqual({ lette: 3, create: 0, agganciate: 3, scartate: 0, riletto: true });
+    expect((await lead("SELECT id FROM leads")).length).toBe(3);
+    expect((await lead("SELECT id FROM activities WHERE type = 'foglio'")).length).toBe(0);
+    expect(email).toBe(2);
+  });
+
+  it("al massimo 10 lead nuovi per giro: ultima riga sulla decima, il giro dopo crea gli altri 2", async () => {
+    const riga = (n: number) => [`2026-10-12 12:${String(n).padStart(2, "0")}`, `Officina Prova ${n}`, `Referente ${n}`, `+39 333 000 00${String(n).padStart(2, "0")}`, `prova${n}@esempio.it`, "Autunno", ""];
+    foglio = [TESTATA, ...Array.from({ length: 12 }, (_, i) => riga(i + 1))];
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ lette: 10, create: 10 });
+    expect((await stato())?.last_row).toBe(11);
+    expect(await giroFoglio(envFoglio, NOW + 600_000)).toMatchObject({ lette: 2, create: 2, riletto: false });
+    expect((await stato())?.last_row).toBe(13);
+    expect((await lead("SELECT id FROM leads")).length).toBe(12);
+  });
+
+  it("al massimo 50 righe guardate per giro", async () => {
+    foglio = [TESTATA, ...Array.from({ length: 60 }, (_, i) => [`2026-10-12 13:${String(i).padStart(2, "0")}`, "Test lead", "Test lead", "", `test${i}@esempio.it`, "Autunno", ""])];
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ lette: 50, scartate: 50, create: 0 });
+    expect((await stato())?.last_row).toBe(51);
+    expect(await giroFoglio(envFoglio, NOW + 600_000)).toMatchObject({ lette: 10, riletto: false });
+  });
+
+  it("errori dell'account di servizio in italiano: 403, 401, rete", async () => {
+    setGoogleFetch(async (url) => url.startsWith("https://oauth2") ? Response.json({ access_token: "tok-prova" }) : Response.json({ error: { message: "The caller does not have permission" } }, { status: 403 }));
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ errore: "Foglio non condiviso con l'email dell'account di servizio" });
+    setGoogleFetch(async (url) => url.startsWith("https://oauth2") ? Response.json({ access_token: "tok-prova" }) : Response.json({ error: { message: "Request had invalid authentication credentials" } }, { status: 401 }));
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ errore: "Credenziali dell'account di servizio non valide" });
+    await env.DB.prepare("UPDATE sheet_sync_state SET token_cache = NULL").run();
+    setGoogleFetch(async () => Response.json({ error: "invalid_grant", error_description: "Invalid JWT Signature." }, { status: 400 }));
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ errore: "Credenziali dell'account di servizio non valide" });
+    setGoogleFetch(async () => { throw new TypeError("Network connection lost"); });
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ errore: "Google non raggiungibile, si riprova" });
+    expect((await lead("SELECT id FROM leads")).length).toBe(0);
+  });
+
+  it("la catena che fallisce su un lead non ferma gli altri", async () => {
+    // Un trigger finto fa fallire la catena (assegnazione e punteggio) solo per il primo lead.
+    await env.DB.prepare("CREATE TRIGGER catena_rotta BEFORE UPDATE OF score ON leads WHEN NEW.company = 'Officina Rossi Finta' BEGIN SELECT RAISE(ABORT, 'catena rotta'); END").run();
+    try {
+      expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ create: 2 });
+      expect((await lead("SELECT owner_id FROM leads WHERE company = 'Bar Bianchi Finto'"))[0].owner_id).toBe("tommaso");
+      expect((await stato())?.last_row).toBe(5);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER catena_rotta").run();
+    }
+  });
+
   it("lettura spenta: niente chiamate a Google", async () => {
     await env.DB.prepare("UPDATE settings SET value = json_set(value, '$.attivo', json('false')) WHERE key = 'foglio'").run();
     expect(await giroFoglio(envFoglio, NOW)).toBeNull();
@@ -149,14 +204,14 @@ const CSV_ROSSI = `"2026-10-12 09:10","Officina Rossi Finta, S.r.l.","Mario Ross
 const CSV_PROVA = `"2026-10-12 09:20","Test lead","Test lead","","test@prova.it","Autunno",""`;
 const CSV_BIANCHI = `"2026-10-12 10:00","Bar Bianchi Finto","Anna Bianchi","+39 347 555 6666","anna@bar-bianchi-finto.it","Autunno",""`;
 const CSV_VERDI = `"2026-10-13 07:40","Forno Verdi Finto","Luca Verdi","348 777 8888","luca@forno-verdi-finto.it","Autunno",""`;
-const URL_CSV = "https://docs.google.com/spreadsheets/d/foglio-finto/gviz/tq?tqx=out:csv&headers=1&sheet=Lead%20Autunno";
+const URL_CSV = "https://docs.google.com/spreadsheets/d/foglio-finto/export?format=csv&gid=123456";
 
 describe("Foglio Andrea letto come CSV (foglio condiviso con il link)", () => {
   let csv = "";
   let risposta: () => Response;
   beforeEach(async () => {
     await createUser();
-    await scriviImpostazioni({ attivo: true, spreadsheetId: "foglio-finto", scheda: "Lead Autunno", mappa: MAPPA });
+    await scriviImpostazioni({ attivo: true, spreadsheetId: "foglio-finto", scheda: "Lead Autunno", gid: "123456", mappa: MAPPA });
     csv = [CSV_TESTATA, CSV_ROSSI, CSV_PROVA, CSV_BIANCHI].join("\r\n") + "\r\n";
     risposta = () => new Response(csv, { headers: { "content-type": "text/csv; charset=utf-8" } });
     chiamate = []; email = 0;
@@ -202,11 +257,25 @@ describe("Foglio Andrea letto come CSV (foglio condiviso con il link)", () => {
     expect((await stato())?.last_row).toBe(1);
   });
 
-  it("codice diverso da 200: stesso errore leggibile, mai un crash", async () => {
-    risposta = () => new Response("Forbidden", { status: 403 });
-    expect(await giroFoglio(env, NOW)).toMatchObject({ errore: "Il foglio non è condiviso con chiunque abbia il link" });
+  it("gid sbagliato (codice diverso da 200): errore leggibile, mai un crash", async () => {
+    risposta = () => new Response("Bad request", { status: 400 });
+    expect(await giroFoglio(env, NOW)).toMatchObject({ errore: "Scheda non trovata: controlla il gid nel link del foglio" });
     risposta = () => new Response("Not found", { status: 404 });
-    expect(await giroFoglio(env, NOW)).toMatchObject({ errore: "Foglio non trovato: controlla l'id del foglio" });
+    expect(await giroFoglio(env, NOW)).toMatchObject({ errore: "Scheda non trovata: controlla il gid nel link del foglio" });
+    expect((await lead("SELECT id FROM leads")).length).toBe(0);
+  });
+
+  it("Google non raggiungibile (il fetch lancia): errore leggibile, il testo tecnico solo nel log", async () => {
+    setGoogleFetch(async () => { throw new TypeError("Network connection lost"); });
+    expect(await giroFoglio(env, NOW)).toMatchObject({ create: 0, errore: "Google non raggiungibile, si riprova" });
+    expect(await statoIntegrazione()).toEqual({ ok: 0, last_error: "Google non raggiungibile, si riprova" });
+    expect((await stato())?.last_row).toBe(1);
+  });
+
+  it("senza gid nelle impostazioni usa la prima scheda (gid 0)", async () => {
+    await scriviImpostazioni({ attivo: true, spreadsheetId: "foglio-finto", scheda: "", mappa: MAPPA });
+    await giroFoglio(env, NOW);
+    expect(chiamate).toEqual(["https://docs.google.com/spreadsheets/d/foglio-finto/export?format=csv&gid=0"]);
   });
 
   it("senza id del foglio: nessuna chiamata, nessun errore, integrazione non collegata", async () => {
@@ -230,7 +299,7 @@ describe("Foglio Andrea letto come CSV (foglio condiviso con il link)", () => {
 
   it("leggiCsv toglie il BOM iniziale", async () => {
     csv = "﻿" + csv;
-    expect((await leggiCsv("foglio-finto", "Lead Autunno"))[0][0]).toBe("Data di creazione");
+    expect((await leggiCsv("foglio-finto", "123456"))[0][0]).toBe("Data di creazione");
   });
 });
 

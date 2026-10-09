@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { sheetSyncState } from "../db/schema";
 import type { Env } from "../env";
-import { googleFetch } from "./fetcher";
+import { chiamaGoogle, SA_CREDENZIALI } from "./leggi";
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const testo = (s: string) => b64url(new TextEncoder().encode(s));
@@ -31,13 +31,16 @@ export async function tokenGoogle(env: Env, db: Db, now: number): Promise<string
   const cache = riga?.cache ? (JSON.parse(riga.cache) as { token: string; scade: number }) : null;
   if (cache && cache.scade > now) return cache.token;
   const assertion = await firmaJwt(env.GOOGLE_SA_EMAIL, env.GOOGLE_SA_PRIVATE_KEY, now);
-  const r = await googleFetch("https://oauth2.googleapis.com/token", {
+  const r = await chiamaGoogle("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }).toString(),
   });
   const j = (await r.json().catch(() => ({}))) as { access_token?: string; error_description?: string };
-  if (!r.ok || !j.access_token) throw new Error(`Token Google ${r.status}: ${j.error_description ?? "risposta senza token"}`);
+  if (!r.ok || !j.access_token) {
+    console.error("google_token", r.status, j.error_description ?? "risposta senza token");
+    throw new Error(r.status >= 500 || r.status === 429 ? `Token Google ${r.status}: si riprova` : SA_CREDENZIALI);
+  }
   await db.update(sheetSyncState).set({ tokenCache: JSON.stringify({ token: j.access_token, scade: now + CACHE_MS }) }).where(eq(sheetSyncState.id, "foglio-andrea"));
   return j.access_token;
 }

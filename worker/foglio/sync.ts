@@ -30,8 +30,8 @@ export async function impronta(data: string, email: string) {
 
 const conAccountDiServizio = (env: Env) => Boolean(env.GOOGLE_SA_EMAIL && env.GOOGLE_SA_PRIVATE_KEY);
 
-// Due vie, stessa forma: con l'account di servizio si chiedono a Google solo gli intervalli;
-// senza, si scarica il CSV del link una volta per giro e gli intervalli si ritagliano da lì.
+// Due vie, stessa forma: con l'account di servizio si chiedono a Google solo gli intervalli della scheda;
+// senza, si scarica il CSV del link (scheda indicata dal gid) una volta per giro e gli intervalli si ritagliano da lì.
 async function lettore(env: Env, db: Db, foglio: ImpFoglio, now: number): Promise<Lettore> {
   if (conAccountDiServizio(env)) {
     const token = await tokenGoogle(env, db, now);
@@ -39,7 +39,7 @@ async function lettore(env: Env, db: Db, foglio: ImpFoglio, now: number): Promis
   }
   let tutte: Promise<string[][]> | null = null;
   return async (intervalli) => {
-    tutte ??= leggiCsv(foglio.spreadsheetId, foglio.scheda);
+    tutte ??= leggiCsv(foglio.spreadsheetId, foglio.gid || "0");
     const righe = await tutte;
     return intervalli.map(([da, a]) => righe.slice(da - 1, a));
   };
@@ -72,17 +72,23 @@ async function salvaStato(db: Db, set: Partial<typeof sheetSyncState.$inferInser
   await db.update(sheetSyncState).set(set).where(eq(sheetSyncState.id, "foglio-andrea"));
 }
 
-async function candidati(db: Db, righe: Mappata[]) {
+// Un lead già legato a una riga (anche cestinato) si riconosce dall'impronta: la riga non fa rinascere niente.
+// Telefono, email e id Meta cercano solo tra i lead non cestinati.
+async function candidati(db: Db, righe: Mappata[], impronte: (string | null)[]) {
   const telefoni = righe.map((r) => normalizePhone(r.telefono)).filter((v): v is string => !!v);
   const email = righe.map((r) => normalizeEmail(r.email)).filter((v): v is string => !!v);
   const meta = righe.map((r) => r.metaId).filter(Boolean);
+  const chiavi = impronte.filter((v): v is string => !!v);
   const cond: SQL[] = [];
   if (telefoni.length) cond.push(inArray(leads.phoneNorm, telefoni));
   if (email.length) cond.push(inArray(leads.emailNorm, email));
   if (meta.length) cond.push(inArray(leads.metaLeadId, meta));
-  if (!cond.length) return [];
-  return db.select({ id: leads.id, phoneNorm: leads.phoneNorm, emailNorm: leads.emailNorm, metaLeadId: leads.metaLeadId, sheetRowKey: leads.sheetRowKey })
-    .from(leads).where(and(isNull(leads.deletedAt), or(...cond)));
+  const dove: SQL[] = [];
+  if (chiavi.length) dove.push(inArray(leads.sheetRowKey, chiavi));
+  if (cond.length) dove.push(and(isNull(leads.deletedAt), or(...cond))!);
+  if (!dove.length) return [];
+  return db.select({ id: leads.id, phoneNorm: leads.phoneNorm, emailNorm: leads.emailNorm, metaLeadId: leads.metaLeadId, sheetRowKey: leads.sheetRowKey, deletedAt: leads.deletedAt })
+    .from(leads).where(or(...dove));
 }
 
 // Spec 6.1, Foglio Andrea: senso unico, solo righe nuove, rilettura una volta se il foglio cambia forma.
@@ -117,7 +123,9 @@ export async function giroFoglio(env: Env, now: number): Promise<GiroFoglio | nu
     }
 
     const mappate = righe.map(mappaRiga);
-    const esistenti = await candidati(db, mappate);
+    // Impronta solo se c'è almeno data o email: due righe senza nessuna delle due non devono sembrare la stessa.
+    const impronte = await Promise.all(mappate.map((r) => (r.data || r.email ? impronta(r.data, r.email) : null)));
+    const esistenti = await candidati(db, mappate, impronte);
     let fine = da - 1;
     let ultimaImpronta = st?.lastRowHash ?? null;
     for (const [i, r] of mappate.entries()) {
@@ -126,9 +134,11 @@ export async function giroFoglio(env: Env, now: number): Promise<GiroFoglio | nu
       ultimaImpronta = await impronta(r.data, r.email);
       esito.lette++;
       if (r.vuota || r.prova) { esito.scartate++; continue; }
+      const chiave = impronte[i];
+      if (chiave && esistenti.some((l) => l.sheetRowKey === chiave)) { esito.agganciate++; continue; }
       const tel = normalizePhone(r.telefono);
       const mail = normalizeEmail(r.email);
-      const trovato = esistenti.find((l) => (r.metaId && l.metaLeadId === r.metaId) || (tel && l.phoneNorm === tel) || (mail && l.emailNorm === mail));
+      const trovato = esistenti.find((l) => l.deletedAt == null && ((r.metaId && l.metaLeadId === r.metaId) || (tel && l.phoneNorm === tel) || (mail && l.emailNorm === mail)));
       if (trovato) {
         esito.agganciate++;
         if (trovato.sheetRowKey == null) {
@@ -154,8 +164,13 @@ export async function giroFoglio(env: Env, now: number): Promise<GiroFoglio | nu
           await db.update(leads).set({ duplicateOfId: primo?.id ?? null }).where(eq(leads.id, creato.id));
         }
       }
-      esistenti.push({ id: creato.id, phoneNorm: tel, emailNorm: mail, metaLeadId: r.metaId || null, sheetRowKey: ultimaImpronta });
-      await catenaLeadNuovo(env, creato.id, "foglio", now);
+      esistenti.push({ id: creato.id, phoneNorm: tel, emailNorm: mail, metaLeadId: r.metaId || null, sheetRowKey: ultimaImpronta, deletedAt: null });
+      // Come in meta/ingest.ts: se la catena fallisce su un lead, il lead resta e il giro continua con gli altri.
+      try {
+        await catenaLeadNuovo(env, creato.id, "foglio", now);
+      } catch (err) {
+        console.error("catena_lead_nuovo_fallita", creato.id, err);
+      }
       esito.create++;
     }
     await salvaStato(db, { lastRow: Math.max(fine, esito.riletto ? 1 : ultima), lastRowHash: ultimaImpronta, lastRunAt: now, lastRun: JSON.stringify(esito) });
