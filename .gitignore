@@ -1,0 +1,7 @@
+node_modules
+dist
+.wrangler
+.dev.vars
+*.local.sql
+old-dashboard.json
+migration-old.sql
