@@ -29,3 +29,4 @@ export type Stats = {
   byStage: { stageId: string; label: string; count: number }[];
   firstResponse: { avgMs: number | null; count: number };
 };
+export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";

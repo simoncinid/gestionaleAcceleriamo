@@ -95,8 +95,9 @@ describe("webhook Meta", () => {
     await postWebhook("L5");
     expect(await leadByMeta("L5")).toMatchObject({ meta_status: "error", meta_attempts: 1, company: "Lead Meta in arrivo" });
     const cookie = await authed();
-    const t = (await (await call(`/api/today?from=0&until=${Date.now() + 1000}`, {}, cookie)).json()) as { metaIncomplete: { company: string }[] };
-    expect(t.metaIncomplete.map((l) => l.company)).toContain("Lead Meta in arrivo");
+    // Nella 1B il gruppo "Meta incompleti" non c'è più: il lead resta visibile tra i nuovi di Oggi.
+    const t = (await (await call("/api/today?chi=tutte", {}, cookie)).json()) as { nuovi: { company: string }[] };
+    expect(t.nuovi.map((l) => l.company)).toContain("Lead Meta in arrivo");
     graphOk({ full_name: "Recuperato", company_name: "Recuperato Spa" });
     expect(await retryPendingMetaLeads(env)).toBe(1);
     expect(await leadByMeta("L5")).toMatchObject({ meta_status: "ok", company: "Recuperato Spa" });
