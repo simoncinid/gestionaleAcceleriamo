@@ -10,6 +10,10 @@ describe("le regole sanno quale call c'è stata (spec 6.3)", () => {
     expect(propostaEvento({ tipo: "call_fissata", kind: "conoscenza", scheduledAt: r(15, 11) }, ctx()))
       .toMatchObject({ stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: r(15, 11) });
   });
+  it("call di presentazione fissata", () => {
+    expect(propostaEvento({ tipo: "call_fissata", kind: "presentazione", scheduledAt: r(20, 11) }, ctx()))
+      .toMatchObject({ stageId: "presentazione-confermata", nextAction: "Call di presentazione", nextActionAt: r(20, 11) });
+  });
   it("call di conoscenza fatta con la presentazione fissata", () => {
     expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: r(20, 11) }, ctx()))
       .toMatchObject({ stageId: "presentazione-confermata", nextAction: "Preparare il preventivo", nextActionAt: ORA + 48 * 3_600_000 });
