@@ -12,6 +12,12 @@ export const linkHttp = (messaggio: string) =>
 const text = (max = 2000) =>
   z.string().trim().max(max).nullish().transform((v) => (v === undefined ? undefined : v || null));
 
+// Link Meet del lead: come text() la stringa vuota diventa null, ma solo http o https (lo si rende come href).
+const meet = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+  linkHttp("Link Meet non valido").pipe(z.string().max(500)).nullish(),
+);
+
 const email = z
   .string()
   .trim()
@@ -33,7 +39,7 @@ const fields = {
   nextAction: text(300),
   nextActionAt: z.number().int().nullish(),
   appointmentAt: z.number().int().nullish(),
-  meetLink: text(500),
+  meetLink: meet,
   proposalUrl: text(500),
   notes: text(20000),
 };

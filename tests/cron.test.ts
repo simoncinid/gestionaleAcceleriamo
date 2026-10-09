@@ -206,13 +206,21 @@ describe("giro programmato", () => {
     expect(await scadiProposte(getDb(env.DB), NOW)).toBe(5);
   });
 
-  it("giro delle conferme: cinque email ritentate restano sotto il tetto di query D1", async () => {
+  it("giro delle conferme: cinque email ritentate e due inviti in coda restano sotto il tetto di query D1", async () => {
     for (let i = 0; i < 6; i++) await insertLead(`c${i}`, { source: "meta", email: `luca${i}@esempio.it`, confirmation_error: "Resend non raggiungibile, si riprova", confirmation_attempts: 1, created_at: r(10, 0) - i });
+    // Due inviti rimasti in coda: lead con email (già confermati) e call future non ancora mandate.
+    for (let i = 0; i < 2; i++) {
+      await insertLead(`inv${i}`, { email: `anna${i}@esempio.it`, contact_name: "Anna Prova" });
+      await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, invite_queued_at, created_at, updated_at) VALUES (?, ?, 'conoscenza', ?, ?, ?, ?)")
+        .bind(`kq${i}`, `inv${i}`, r(10, 5) + 2 * GIORNO, NOW, NOW, NOW).run();
+    }
     let inviate = 0;
     setEmailFetch(async () => { inviate++; return Response.json({ id: `re_${inviate}` }); });
     const c = contaQuery();
     expect(await giro(c.env, r(10, 5))).toEqual({ fatti: ["conferme"], errori: [] });
-    expect(inviate).toBe(LIMITI.conferme);
+    expect(inviate).toBe(LIMITI.conferme + LIMITI.inviti);
+    const svuotata = await env.DB.prepare("SELECT COUNT(*) AS n FROM calls WHERE invite_sent_at IS NOT NULL").first<{ n: number }>();
+    expect(svuotata?.n).toBe(2);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
   });
 

@@ -56,9 +56,10 @@ const quandoTesto = (ms: number) => {
 };
 
 // Il .ics è identico a ogni tentativo: DTSTAMP è la creazione della call, così la chiave di idempotenza di Resend vale davvero.
-export async function icsDellaCall(db: Db, k: CallAgenda): Promise<string> {
+// imp: le impostazioni già lette da chi chiama (mandaInvito), per non rileggerle a ogni invito del giro.
+export async function icsDellaCall(db: Db, k: CallAgenda, letto?: Awaited<ReturnType<typeof leggiImpostazioni>>): Promise<string> {
   const [riga] = await db.select({ createdAt: calls.createdAt }).from(calls).where(eq(calls.id, k.id));
-  const imp = await leggiImpostazioni(db);
+  const imp = letto ?? (await leggiImpostazioni(db));
   return creaIcs({
     uid: k.id, inizio: k.scheduledAt, titolo: `Call di ${k.kind} con Acceleriamo`, descrizione: k.meetLink ? `Link: ${k.meetLink}` : undefined, luogo: k.meetLink,
     ora: riga?.createdAt, organizer: indirizzoDi(imp.conferma.mittente), attendee: k.email,
@@ -94,7 +95,7 @@ export async function mandaInvito(env: Env, db: Db, id: string, actorId: string 
       "Trovi l'invito in allegato, da aggiungere al calendario.",
       ...(imp.conferma.piede.trim() ? ["", imp.conferma.piede.trim()] : []),
     ].join("\n"),
-    allegati: [{ filename: "invito.ics", content: base64Utf8(await icsDellaCall(db, k)) }],
+    allegati: [{ filename: "invito.ics", content: base64Utf8(await icsDellaCall(db, k, imp)) }],
     chiave: `invito-${k.id}-${k.scheduledAt}`,
   });
   if (!r.ok) {
