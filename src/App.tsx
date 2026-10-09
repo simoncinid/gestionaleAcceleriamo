@@ -12,7 +12,7 @@ import { FogliCreazione } from "./pagine/FogliCreazione";
 import { Numeri } from "./pages/Numeri";
 import { Cestino } from "./pages/Cestino";
 import { Fasi } from "./pages/Fasi";
-import { Scaletta } from "./pages/Scaletta";
+import { Scaletta } from "./pagine/commerciale/Scaletta";
 import type { User } from "./types";
 
 // Indirizzi della 1A: portano alle rotte nuove, conservando l'id del lead.

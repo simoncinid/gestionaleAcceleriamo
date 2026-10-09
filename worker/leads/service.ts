@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, isNotNull, isNull, like, ne, or, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, lte, ne, or, type SQL } from "drizzle-orm";
+import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import type { Db } from "../db/client";
-import { activities, documents, leads, stages, users, type Activity, type Lead, type LeadSource, type Stage } from "../db/schema";
+import { activities, auditLog, documents, leads, stages, users, type Activity, type Lead, type LeadSource, type Stage } from "../db/schema";
 import { audit } from "../lib/audit";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
@@ -216,7 +217,20 @@ export async function mergeLeads(db: Db, sourceId: string, targetId: string, act
   return getLead(db, targetId);
 }
 
-export type LeadFilters = { q?: string; stageId?: string; source?: string; campaign?: string; ownerId?: string; deleted?: boolean };
+// Viste fisse della vista elenco (spec 6.5): le fasi di ciascuna.
+export type Vista = "nuovi" | "da-richiamare" | "in-attesa" | "in-pausa" | "scartati";
+export const VISTE: Record<Vista, string[]> = {
+  nuovi: ["da-chiamare-prima-volta"],
+  "da-richiamare": ["non-chiamato", "da-richiamare"],
+  "in-attesa": ["in-attesa-preventivo", "in-attesa-decisione"],
+  "in-pausa": ["probabilmente-bloccato"],
+  scartati: ["non-chiuso", "fuori-target", "fake"],
+};
+
+export type LeadFilters = {
+  q?: string; stageId?: string; source?: string; campaign?: string; ownerId?: string; deleted?: boolean;
+  score?: "verde" | "giallo" | "grigio"; vista?: Vista; da?: number; a?: number;
+};
 
 export async function listLeads(db: Db, f: LeadFilters) {
   const conds: (SQL | undefined)[] = [f.deleted ? isNotNull(leads.deletedAt) : isNull(leads.deletedAt)];
@@ -228,6 +242,10 @@ export async function listLeads(db: Db, f: LeadFilters) {
     const p = `%${f.q.trim()}%`;
     conds.push(or(like(leads.company, p), like(leads.contactName, p), like(leads.email, p), like(leads.phone, p), like(leads.notes, p)));
   }
+  if (f.score) conds.push(eq(leads.score, f.score));
+  if (f.vista && Object.hasOwn(VISTE, f.vista)) conds.push(inArray(leads.stageId, VISTE[f.vista]));
+  if (f.da) conds.push(gte(leads.createdAt, f.da));
+  if (f.a) conds.push(lte(leads.createdAt, f.a));
   return db
     .select({
       id: leads.id,
@@ -259,4 +277,56 @@ export async function listLeads(db: Db, f: LeadFilters) {
     .where(and(...conds))
     .orderBy(desc(leads.updatedAt))
     .limit(2000);
+}
+
+export type AzioneMultipla = { ids: string[]; azione: "responsabile" | "fase" | "cestino"; valore?: string | null };
+
+// Spec 6.5: tre azioni sulla selezione. Le fasi che chiedono un motivo o i dati del vinto si scelgono lead per lead.
+// Le letture stanno prima, le scritture in un solo db.batch (tutto o niente). I lead nel cestino o sconosciuti si saltano.
+export async function azioniMultiple(db: Db, input: AzioneMultipla, actorId: string, now = Date.now()): Promise<{ fatti: number }> {
+  const fase = input.azione === "fase" ? await db.select().from(stages).where(eq(stages.id, input.valore ?? "")).get() : undefined;
+  if (input.azione === "fase") {
+    if (!fase) throw new HTTPException(422, { message: "Fase inesistente" });
+    if (fase.requiresReason || fase.kind === "won") throw new HTTPException(422, { message: "Questa fase va scelta lead per lead" });
+  }
+  if (input.azione === "responsabile") await assertOwner(db, input.valore);
+  const trovati = await db.select().from(leads).where(and(inArray(leads.id, [...new Set(input.ids)]), isNull(leads.deletedAt)));
+  if (trovati.length === 0) return { fatti: 0 };
+
+  const passi: BatchItem<"sqlite">[] = [];
+  const voce = (leadId: string, action: string, changes?: unknown) =>
+    db.insert(auditLog).values({ id: crypto.randomUUID(), userId: actorId, entity: "lead", entityId: leadId, action, changes: changes === undefined ? null : JSON.stringify(changes), createdAt: now });
+  const attivita = (leadId: string, type: Activity["type"], body: string) =>
+    db.insert(activities).values({ id: crypto.randomUUID(), leadId, type, body, authorId: actorId, createdAt: now });
+
+  if (input.azione === "cestino") {
+    for (const l of trovati) {
+      passi.push(db.update(leads).set({ deletedAt: now, updatedAt: now }).where(eq(leads.id, l.id)));
+      passi.push(attivita(l.id, "cestino", "Spostato nel cestino"), voce(l.id, "delete"));
+    }
+  } else if (input.azione === "responsabile") {
+    const ownerId = input.valore ?? null;
+    for (const l of trovati) {
+      passi.push(db.update(leads).set({ ownerId, updatedAt: now }).where(eq(leads.id, l.id)));
+      passi.push(voce(l.id, "update", l.ownerId === ownerId ? {} : { ownerId: { from: l.ownerId, to: ownerId } }));
+    }
+  } else {
+    const nuova = fase!;
+    const etichette = new Map((await db.select({ id: stages.id, label: stages.label }).from(stages)).map((s) => [s.id, s.label]));
+    for (const l of trovati) {
+      if (l.stageId === nuova.id) continue;
+      // Un lead aperto ha sempre una prossima azione: chi arriva da una fase chiusa prende quella proposta dalla fase.
+      const aperta = nuova.kind === "open";
+      const nextAction = aperta ? (l.nextAction ?? nuova.suggestedNextAction ?? DEFAULT_NEXT_ACTION) : null;
+      const nextActionAt = aperta ? (l.nextActionAt ?? now + (nuova.suggestedDelayHours ?? 0) * 3_600_000) : null;
+      passi.push(db.update(leads).set({ stageId: nuova.id, stageChangedAt: now, nextAction, nextActionAt, updatedAt: now }).where(eq(leads.id, l.id)));
+      passi.push(attivita(l.id, "cambio_fase", `Da "${etichette.get(l.stageId) ?? l.stageId}" a "${nuova.label}"`));
+      const changes: Record<string, { from: unknown; to: unknown }> = { stageId: { from: l.stageId, to: nuova.id } };
+      if (nextAction !== l.nextAction) changes.nextAction = { from: l.nextAction, to: nextAction };
+      if (nextActionAt !== l.nextActionAt) changes.nextActionAt = { from: l.nextActionAt, to: nextActionAt };
+      passi.push(voce(l.id, "update", changes));
+    }
+  }
+  if (passi.length) await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+  return { fatti: trovati.length };
 }

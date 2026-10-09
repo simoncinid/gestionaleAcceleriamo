@@ -3,8 +3,8 @@ import { Hono } from "hono";
 import { getDb } from "../db/client";
 import { activities, documents, leads, users } from "../db/schema";
 import type { AppEnv } from "../env";
-import { addActivity, createLead, getLead, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead } from "./service";
-import { activitySchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
+import { VISTE, addActivity, azioniMultiple, createLead, getLead, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead, type Vista } from "./service";
+import { activitySchema, bulkSchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
 import { audit } from "../lib/audit";
 import { catenaLeadNuovo } from "../regole/catena";
 import { z } from "zod";
@@ -16,8 +16,17 @@ export const leadRoutes = new Hono<AppEnv>();
 
 leadRoutes.get("/", async (c) => {
   const q = c.req.query();
-  const rows = await listLeads(getDb(c.env.DB), { q: q.q, stageId: q.stageId, source: q.source, campaign: q.campaign, ownerId: q.ownerId });
+  const num = (v?: string) => (v && /^\d+$/.test(v) ? Number(v) : undefined);
+  const score = ["verde", "giallo", "grigio"].includes(q.score ?? "") ? (q.score as "verde" | "giallo" | "grigio") : undefined;
+  const vista = q.vista && Object.hasOwn(VISTE, q.vista) ? (q.vista as Vista) : undefined;
+  const rows = await listLeads(getDb(c.env.DB), { q: q.q, stageId: q.stageId, source: q.source, campaign: q.campaign, ownerId: q.ownerId, score, vista, da: num(q.da), a: num(q.a) });
   return c.json({ leads: rows });
+});
+
+// Prima delle rotte con /:id.
+leadRoutes.post("/bulk", async (c) => {
+  const input = bulkSchema.parse(await c.req.json());
+  return c.json(await azioniMultiple(getDb(c.env.DB), input, c.get("user").id));
 });
 
 leadRoutes.get("/trash", async (c) => c.json({ leads: await listLeads(getDb(c.env.DB), { deleted: true }) }));

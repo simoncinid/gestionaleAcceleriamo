@@ -64,3 +64,8 @@ export const documentSchema = z
       .refine((u) => /^https?:\/\//i.test(u), "Il link deve iniziare con http o https"),
   })
   .strict();
+
+// Azioni multiple della Scaletta: da 1 a 100 lead per volta.
+export const bulkSchema = z
+  .object({ ids: z.array(z.string().min(1)).min(1).max(100), azione: z.enum(["responsabile", "fase", "cestino"]), valore: z.string().nullish() })
+  .strict();
