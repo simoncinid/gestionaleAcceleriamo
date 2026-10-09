@@ -11,6 +11,7 @@ import { daRoma, partiRoma as partiDi } from "../worker/lib/roma";
 import { setMetaFetch } from "../worker/meta/fetcher";
 import { b64u } from "../worker/push/cifra";
 import { setPushFetch } from "../worker/push/fetcher";
+import { setTelegramFetch } from "../worker/telegram/fetcher";
 import { createUser } from "./helpers";
 
 const r = (ore: number, minuti: number) => daRoma(2026, 10, 13, ore, minuti);
@@ -85,7 +86,7 @@ const rigaFoglio = (i: number) => `2026-10-12 09:${String(i % 60).padStart(2, "0
 const ultimaRiga = async () => (await env.DB.prepare("SELECT last_row FROM sheet_sync_state WHERE id = 'foglio-andrea'").first<{ last_row: number }>())?.last_row;
 const agganciati = async () => (await env.DB.prepare("SELECT count(*) n FROM leads WHERE sheet_row_key IS NOT NULL").first<{ n: number }>())?.n;
 
-afterEach(() => { setEmailFetch(null); setGoogleFetch(null); setMetaFetch(null); setPushFetch(null); });
+afterEach(() => { setEmailFetch(null); setGoogleFetch(null); setMetaFetch(null); setPushFetch(null); setTelegramFetch(null); });
 
 describe("limiteDi", () => {
   const def: DefLavoro = { quando: () => true, fisse: 4, perUnita: 6, sottoPerUnita: 1, max: 5, esegui: async () => 0 };
@@ -111,6 +112,9 @@ describe("calendario del giro", () => {
     expect(quali(lun1015)).toContain("foglio");
     expect(quali(mar0600)).toContain("proposte_scadute");
     expect(quali(mar0600)).not.toContain("foglio");
+  });
+  it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme", () => {
+    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "consegna", "telegram", "conferme", "meta_48h"]);
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");
@@ -190,7 +194,7 @@ describe("proposte scadute", () => {
 
 describe("giro programmato", () => {
   it("registra la sua ora in integration_status", async () => {
-    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["foglio", "avvisi", "consegna", "conferme"], saltati: [], errori: [] });
+    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["foglio", "avvisi", "consegna", "telegram", "conferme"], saltati: [], errori: [] });
     expect(await env.DB.prepare("SELECT ok, last_ok_at FROM integration_status WHERE key = 'giro'").first()).toEqual({ ok: 1, last_ok_at: r(10, 5) });
   });
 
@@ -275,7 +279,7 @@ describe("giro programmato", () => {
     setEmailFetch(async () => { inviate++; return Response.json({ id: `re_${inviate}` }); });
     const c = contaQuery();
     const esito = await giro(c.env, r(10, 5));
-    expect(esito).toMatchObject({ fatti: ["foglio", "avvisi", "consegna", "conferme"], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "avvisi", "consegna", "telegram", "conferme"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
     // Foglio spento (1 query), avvisi senza niente da dire (8): alle conferme restano 35 query, cioè 4 unità:
     // 2 conferme e 2 inviti.
@@ -292,9 +296,10 @@ describe("giro programmato", () => {
     setMetaFetch(async () => { chiamate++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`anna${chiamate}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
     setEmailFetch(async () => Response.json({ id: "re_1" }));
     const c = contaQuery();
-    // Foglio spento (1 query), due lead da Meta (33), avvisi (8): consegna delle push e conferme non entrano e aspettano il giro dopo.
+    // Foglio spento (1 query), due lead da Meta (33), avvisi (8): consegna delle push, Telegram (2 fisse più 1) e
+    // conferme non entrano e aspettano il giro dopo.
     const esito = await giro(c.env, r(10, 15));
-    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi"], saltati: ["consegna", "conferme"], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi"], saltati: ["consegna", "telegram", "conferme"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
     expect(chiamate).toBe(MAX.meta);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
@@ -455,6 +460,54 @@ describe("giro con i lavori veri insieme", () => {
     }
   });
 
+  // Telegram collegato: la chat di tommaso, 8 avvisi "SLA scaduto" in attesa e un codice di collegamento di diego.
+  // Telegram passa dopo la consegna delle push; conta nelle stesse sottorichieste del giro.
+  async function conTelegram(quando: number, conta: { sotto: number; messaggi: number }) {
+    await createUser("diego", "password-lunga-2", "Diego");
+    await env.DB.prepare("UPDATE users SET telegram_chat_id = '4242' WHERE id = 'tommaso'").run();
+    await env.DB.prepare("UPDATE users SET telegram_codice = 'codice-di-diego', telegram_codice_at = ?1 WHERE id = 'diego'").bind(quando - 60_000).run();
+    for (let i = 0; i < 8; i++) {
+      await env.DB.prepare("INSERT INTO notifications (id, chiave, user_id, evento, entity_id, titolo, created_at) VALUES (?, ?, 'tommaso', 'sla_scaduto', ?, 'Prima chiamata scaduta', ?)")
+        .bind(`nt${i}`, `sla_scaduto:T${i}:tommaso`, `T${i}`, quando - 60_000 - i).run();
+    }
+    setTelegramFetch(async (url) => {
+      conta.sotto++;
+      if (url.includes("sendMessage")) conta.messaggi++;
+      if (url.includes("getUpdates") && !url.includes("offset=")) return Response.json({ ok: true, result: [{ update_id: 5, message: { chat: { id: 99 }, text: "/start codice-di-diego" } }] });
+      return Response.json({ ok: true, result: {} });
+    });
+  }
+  const casiTelegram: [string, number, number, boolean, boolean, string[]][] = [
+    ["10:00, 2 righe nel foglio, Meta, 12 push e Telegram", r(10, 0), 2, false, true, ["foglio"]],
+    ["10:05, foglio, 12 push e Telegram", r(10, 5), 2, false, true, ["foglio", "avvisi"]],
+    ["10:10, 1 riga nel foglio, 12 push e Telegram", r(10, 10), 1, false, true, ["foglio", "avvisi", "consegna"]],
+    ["10:15, foglio, Meta, 12 push e Telegram", r(10, 15), 2, false, true, ["foglio", "consegna"]],
+    ["11:05, foglio, avvisi pieni, 12 push e Telegram", r(11, 5), 2, true, true, ["foglio", "avvisi"]],
+    ["11:10, foglio vuoto, avvisi pieni, 12 push e Telegram", r(11, 10), 0, true, true, ["foglio", "avvisi", "consegna", "telegram"]],
+    ["11:10, foglio vuoto, avvisi pieni e Telegram senza push", r(11, 10), 0, true, false, ["foglio", "avvisi", "telegram", "conferme"]],
+    ["10:05, arretrato di 10 righe, 12 push e Telegram", r(10, 5), 10, false, true, ["foglio", "consegna"]],
+    ["6:00, proposte scadute e Telegram", r(6, 0), 2, false, true, ["proposte_scadute"]],
+  ];
+  for (const [nome, quando, righe, avvisiPieni, conPushAttive, devono] of casiTelegram) {
+    it(`${nome}: al massimo 45 query, 15 sottorichieste, 10 push e 5 unità di Telegram, riga giro compresa`, async () => {
+      const s = await prepara(righe, quando === r(6, 0));
+      if (avvisiPieni) await conAvvisi();
+      const chiavi = conPushAttive ? await conPush(quando) : {};
+      const tg = { sotto: 0, messaggi: 0 };
+      await conTelegram(quando, tg);
+      const c = contaQuery();
+      const esito = await giro({ ...c.env, ...chiavi }, quando);
+      expect(esito.errori).toEqual([]);
+      expect(esito.fatti).toEqual(expect.arrayContaining(devono));
+      expect(c.n()).toBeLessThanOrEqual(45);
+      expect(esito.query).toBeLessThanOrEqual(45);
+      expect(s.sotto() + tg.sotto).toBeLessThanOrEqual(15);
+      expect(s.push()).toBeLessThanOrEqual(10);
+      expect(tg.sotto).toBeLessThanOrEqual(5);
+      if (esito.fatti.includes("telegram")) expect(tg.messaggi).toBeGreaterThan(0);
+    });
+  }
+
   // Riserva per la consegna: con un arretrato nel foglio (10 righe nuove) ogni giro manda almeno 2 push.
   for (const [nome, quando] of [["10:05", r(10, 5)], ["10:10", r(10, 10)], ["10:15 con Meta", r(10, 15)], ["11:05 con avvisi pieni", r(11, 5)]] as const) {
     it(`arretrato nel foglio e 12 push alle ${nome}: almeno 2 push partono, totale entro 45`, async () => {
@@ -488,7 +541,7 @@ describe("arretrato nel foglio", () => {
     const c = contaQuery();
     const esito = await giro(c.env, r(11, 10));
     expect(esito.errori).toEqual([]);
-    expect(esito.fatti).toEqual(["foglio", "avvisi", "consegna", "conferme"]);
+    expect(esito.fatti).toEqual(["foglio", "avvisi", "consegna", "telegram", "conferme"]);
     expect((await env.DB.prepare("SELECT count(*) n FROM calls WHERE invite_sent_at IS NOT NULL").first<{ n: number }>())?.n).toBe(1);
     expect(c.n()).toBeLessThanOrEqual(45);
     expect(esito.query).toBeLessThanOrEqual(45);
@@ -520,7 +573,7 @@ describe("arretrato nel foglio", () => {
     setEmailFetch(async () => { email++; return Response.json({ id: `re_${email}` }); });
     const c = contaQuery();
     const esito = await giro(c.env, r(10, 5));
-    expect(esito.fatti).toEqual(["foglio", "avvisi", "consegna", "conferme"]);
+    expect(esito.fatti).toEqual(["foglio", "avvisi", "consegna", "telegram", "conferme"]);
     expect(esito.errori).toEqual([]);
     const ritentate = await env.DB.prepare("SELECT count(*) n FROM leads WHERE id LIKE 'c%' AND confirmation_sent_at IS NOT NULL").first<{ n: number }>();
     expect(ritentate?.n).toBeGreaterThanOrEqual(1);

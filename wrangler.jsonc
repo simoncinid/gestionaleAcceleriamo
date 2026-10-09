@@ -12,7 +12,11 @@
     "META_GRAPH_VERSION": "v23.0",
     // Chiave pubblica VAPID: vuota finché Tommaso non genera la coppia (README, Task 16). La privata è un segreto.
     "VAPID_PUBLIC_KEY": "",
-    "VAPID_SOGGETTO": "https://acceleriamo-os.acceleriamo-os.workers.dev"
+    "VAPID_SOGGETTO": "https://acceleriamo-os.acceleriamo-os.workers.dev",
+    // Nome utente del bot di Telegram (senza @): vuoto finché Tommaso non crea il bot. Il token è un segreto.
+    "TELEGRAM_BOT": "",
+    // Indirizzo dell'app per i link nei messaggi di Telegram.
+    "APP_URL": "https://acceleriamo-os.acceleriamo-os.workers.dev"
   },
   "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true }

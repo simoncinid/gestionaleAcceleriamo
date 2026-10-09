@@ -21,6 +21,7 @@ export type Env = {
   VAPID_PUBLIC_KEY?: string;
   VAPID_SOGGETTO?: string; // "mailto:" o indirizzo dell'app, richiesto da VAPID
   TELEGRAM_BOT?: string; // nome utente del bot, senza @
+  APP_URL?: string; // indirizzo dell'app, per i link nei messaggi di Telegram
   // "demo" nello spazio demo (Task 13): niente cron, niente segreti, integrazioni "Spazio demo".
   SPAZIO?: string;
 };

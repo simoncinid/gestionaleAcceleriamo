@@ -29,6 +29,7 @@ export default defineWorkersConfig(async () => {
               TELEGRAM_BOT_TOKEN: "123:test",
               TELEGRAM_BOT: "acceleriamo_test_bot",
               VAPID_SOGGETTO: "https://os.esempio.it",
+              APP_URL: "https://os.esempio.it",
             },
           },
         },

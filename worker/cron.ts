@@ -13,6 +13,7 @@ import { segnaErrore, segnaOk } from "./integrazioni/stato";
 import { contaD1, QUERY_GIRO, SOTTORICHIESTE_GIRO } from "./lib/bilancio";
 import { partiRoma, type PartiRoma } from "./lib/roma";
 import { retryPendingMetaLeads } from "./meta/ingest";
+import { giroTelegram } from "./telegram/bot";
 
 export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lunedi";
 
@@ -20,7 +21,7 @@ export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "c
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
 // gli statement dentro le batch: foglio 5 fisse più 20 per lead nuovo, Meta 1 più 16 per lead (l'avviso
 // "Lead nuovo" della catena aggiunge una query a lead), avvisi 8 fisse più una per avviso, consegna delle push
-// 3 fisse più 2 a push (una sottorichiesta a push), conferma 1 più 6, invito circa 6,5. Le sottorichieste fisse (la lettura del foglio) stanno dentro la stima
+// 3 fisse più 2 a push (una sottorichiesta a push), Telegram 2 fisse più 1 a unità, conferma 1 più 6, invito circa 6,5. Le sottorichieste fisse (la lettura del foglio) stanno dentro la stima
 // per unità, che è larga: foglio 2 per lead (CSV più email di conferma), Meta 2 (Graph più email).
 export type DefLavoro = {
   quando: (p: PartiRoma) => boolean;
@@ -71,6 +72,15 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
     quando: sempre, fisse: 3, perUnita: 2, sottoPerUnita: 1, max: 10,
     // Le sottorichieste prenotate e non usate (meno push del limite) tornano al giro per i lavori dopo.
     esegui: async (e, n, l) => ({ sottorichieste: (await consegnaPush(e, n, l)).inviate }),
+  },
+  // Telegram (spec 8.4): solo "Lead nuovo", "SLA scaduto" e "Claude al tetto", subito dopo le push per lo stesso
+  // motivo. Misura con contaD1: una lettura (codici, avvisi e coda in una query) più una batch con una scrittura
+  // a unità e una di pulizia, quindi 2 fisse e una a unità; una sottorichiesta a unità (un messaggio, oppure
+  // getUpdates e la sua conferma come 2 unità quando qualcuno sta collegando la chat). Al massimo 5 per giro.
+  // Senza token del bot costa zero e restituisce tutte le sottorichieste prenotate.
+  telegram: {
+    quando: sempre, fisse: 2, perUnita: 1, sottoPerUnita: 1, max: 5,
+    esegui: async (e, n, l) => ({ sottorichieste: (await giroTelegram(e, n, l)).sottorichieste }),
   },
   // Conferme e inviti si dividono lo stesso limite: ogni unità (una conferma o un invito) costa al massimo
   // 7 query e una sottorichiesta, così il budget conta anche gli inviti.

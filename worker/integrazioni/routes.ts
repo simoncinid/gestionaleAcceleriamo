@@ -11,6 +11,7 @@ import { MAX_META_ATTEMPTS } from "../meta/ingest";
 import { pushCollegate } from "../push/invio";
 import { provaPush } from "../push/routes";
 import { hookSchema } from "../proposte/schema";
+import { mandaTelegram, nuovoCodice, telegramCollegato } from "../telegram/bot";
 import { segnaErrore, segnaOk } from "./stato";
 
 // "spento" vale anche per "non collegato": un segreto o un link che manca non è mai un errore rosso.
@@ -34,6 +35,8 @@ export const SENZA_CHIAVE_AGGANCIO = "Non collegato: manca la chiave dell'agganc
 const SENZA_SEGRETI_META = "Non collegato: mancano i segreti di Meta";
 const SENZA_LINK_FOGLIO = "Non collegato: manca il link del foglio";
 export const SENZA_CHIAVI_PUSH = "Non collegato: mancano le chiavi VAPID";
+export const SENZA_BOT_TELEGRAM = "Non collegato: manca il token del bot";
+const SENZA_NOME_BOT = "Non collegato: manca il nome del bot";
 
 // I segreti risultano solo presenti o mancanti: il valore non esce mai dal Worker.
 const segretiDi = (env: Env) => ({
@@ -50,7 +53,7 @@ integrazioniRoutes.get("/status", async (c) => {
   const db = getDb(c.env.DB);
   const da = Date.now() - SETTIMANA;
   const conta = async (q: string, ...b: unknown[]) => (await c.env.DB.prepare(q).bind(...b).first<{ n: number }>())?.n ?? 0;
-  const [righe, imp, st, ultimoMetaRiga, metaFermi, sMeta, sFoglio, sAggancio, dispositivi] = await Promise.all([
+  const [righe, imp, st, ultimoMetaRiga, metaFermi, sMeta, sFoglio, sAggancio, dispositivi, chat] = await Promise.all([
     db.select().from(integrationStatus),
     leggiImpostazioni(db),
     db.select().from(sheetSyncState).where(eq(sheetSyncState.id, "foglio-andrea")).get(),
@@ -60,6 +63,7 @@ integrazioniRoutes.get("/status", async (c) => {
     conta("SELECT count(*) n FROM leads WHERE source = 'foglio_andrea' AND created_at >= ?", da),
     conta("SELECT count(*) n FROM hook_log WHERE status IN (200, 201) AND outcome <> 'prova' AND at >= ?", da),
     pushCollegate(c.env) ? conta("SELECT count(*) n FROM push_subscriptions WHERE rotta = 0") : Promise.resolve(0),
+    telegramCollegato(c.env) ? conta("SELECT count(*) n FROM users WHERE telegram_chat_id IS NOT NULL AND active = 1") : Promise.resolve(0),
   ]);
   const segreti = segretiDi(c.env);
   const collegato = (key: string) => (key === "resend" ? segreti.resend : key === "aggancio" ? segreti.aggancio : true);
@@ -82,6 +86,10 @@ integrazioniRoutes.get("/status", async (c) => {
   const push: Integrazione = pushCollegate(c.env)
     ? { key: "push", etichetta: "Push", stato: "ok", ultimaOk: null, nota: dispositivi === 1 ? "1 dispositivo" : `${dispositivi} dispositivi` }
     : { key: "push", etichetta: "Push", stato: "spento", ultimaOk: null, nota: SENZA_CHIAVI_PUSH };
+  // Telegram: senza token del bot "Non collegato"; con il token il numero delle chat collegate.
+  const telegram: Integrazione = telegramCollegato(c.env)
+    ? { key: "telegram", etichetta: "Telegram", stato: "ok", ultimaOk: null, nota: chat === 1 ? "1 chat collegata" : `${chat} chat collegate` }
+    : { key: "telegram", etichetta: "Telegram", stato: "spento", ultimaOk: null, nota: c.env.TELEGRAM_BOT_TOKEN ? SENZA_NOME_BOT : SENZA_BOT_TELEGRAM };
   const foglioSpento = !imp.foglio.spreadsheetId.trim() ? SENZA_LINK_FOGLIO : !imp.foglio.attivo ? "Lettura spenta" : null;
   const out: StatoSistema = {
     integrazioni: [
@@ -89,7 +97,7 @@ integrazioniRoutes.get("/status", async (c) => {
       daRiga("foglio", foglioSpento),
       daRiga("aggancio", segreti.aggancio ? null : SENZA_CHIAVE_AGGANCIO),
       daRiga("resend", segreti.resend ? null : SENZA_CHIAVE_RESEND),
-      push, futura("telegram"), futura("claude"),
+      push, telegram, futura("claude"),
       daRiga("giro", null),
     ],
     settimana: { meta: sMeta, foglio: sFoglio, aggancio: sAggancio },
@@ -159,4 +167,25 @@ integrazioniRoutes.post("/resend/prova", async (c) => {
 integrazioniRoutes.post("/push/prova", async (c) => {
   const r = await provaPush({ env: c.env, userId: c.get("user").id });
   return c.json(r.corpo, r.stato);
+});
+
+// Spec 8.4: il link apre il bot con il codice; il giro legge /start e salva la chat. Il codice vale 15 minuti.
+integrazioniRoutes.post("/telegram/collega", async (c) => {
+  if (!telegramCollegato(c.env)) return c.json({ error: `${SENZA_BOT_TELEGRAM}.` }, 409);
+  const codice = await nuovoCodice(c.env.DB, c.get("user").id, Date.now());
+  return c.json({ link: `https://t.me/${c.env.TELEGRAM_BOT}?start=${codice}` });
+});
+
+integrazioniRoutes.post("/telegram/prova", async (c) => {
+  if (!telegramCollegato(c.env)) return c.json({ error: `${SENZA_BOT_TELEGRAM}.` }, 409);
+  const u = await c.env.DB.prepare("SELECT telegram_chat_id AS chat FROM users WHERE id = ?1").bind(c.get("user").id).first<{ chat: string | null }>();
+  if (!u?.chat) return c.json({ error: "Collega prima Telegram dal tuo profilo." }, 409);
+  const ok = await mandaTelegram(c.env, u.chat, "Messaggio di prova da Acceleriamo OS.");
+  return ok ? c.json({ ok: true }) : c.json({ error: "Telegram non ha accettato il messaggio." }, 502);
+});
+
+// Scollega la mia chat (e un codice ancora in attesa): le altre persone restano collegate.
+integrazioniRoutes.delete("/telegram", async (c) => {
+  await c.env.DB.prepare("UPDATE users SET telegram_chat_id = NULL, telegram_codice = NULL, telegram_codice_at = NULL WHERE id = ?1").bind(c.get("user").id).run();
+  return c.json({ ok: true });
 });

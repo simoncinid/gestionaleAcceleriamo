@@ -17,7 +17,7 @@ export async function mandaPush(env: Env, sub: { endpoint: string; p256dh: strin
   let firma: string;
   try {
     corpo = await cifra(new TextEncoder().encode(JSON.stringify(dati)), sub.p256dh, sub.auth);
-    firma = await intestazioneVapid(sub.endpoint, env.VAPID_PUBLIC_KEY!, env.VAPID_PRIVATE_KEY!, env.VAPID_SOGGETTO || "https://acceleriamo-os.acceleriamo-os.workers.dev", now);
+    firma = await intestazioneVapid(sub.endpoint, env.VAPID_PUBLIC_KEY!, env.VAPID_PRIVATE_KEY!, env.VAPID_SOGGETTO || env.APP_URL || "https://acceleriamo-os.acceleriamo-os.workers.dev", now);
   } catch {
     return "errore";
   }
