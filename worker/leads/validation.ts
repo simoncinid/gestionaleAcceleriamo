@@ -37,3 +37,21 @@ export const leadCreateSchema = z
 export const leadPatchSchema = z.object({ company: company.optional(), ...fields }).strict();
 
 export const mergeSchema = z.object({ intoId: z.string().min(1) }).strict();
+
+export const activitySchema = z
+  .object({
+    type: z.enum(["nota", "chiamata", "email"]),
+    body: z.string().trim().min(1, "Scrivi qualcosa").max(20000),
+  })
+  .strict();
+
+export const documentSchema = z
+  .object({
+    name: z.string().trim().min(1, "Serve un nome").max(200),
+    url: z
+      .string()
+      .trim()
+      .url("Link non valido")
+      .refine((u) => /^https?:\/\//i.test(u), "Il link deve iniziare con http o https"),
+  })
+  .strict();
