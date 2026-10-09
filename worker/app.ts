@@ -5,6 +5,7 @@ import type { AppEnv } from "./env";
 import { requireAuth } from "./auth/session";
 import { authRoutes } from "./auth/routes";
 import { documentRoutes, leadRoutes } from "./leads/routes";
+import { todayRoutes } from "./today/routes";
 import { stageRoutes, userRoutes } from "./stages/routes";
 
 export const app = new Hono<AppEnv>();
@@ -29,6 +30,7 @@ app.route("/api/leads", leadRoutes);
 app.route("/api/documents", documentRoutes);
 app.route("/api/stages", stageRoutes);
 app.route("/api/users", userRoutes);
+app.route("/api", todayRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 
