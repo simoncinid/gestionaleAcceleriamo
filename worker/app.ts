@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import type { AppEnv } from "./env";
 import { requireAuth } from "./auth/session";
 import { authRoutes } from "./auth/routes";
+import { leadRoutes } from "./leads/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -23,6 +24,7 @@ app.use("/api/*", async (c, next) => {
 });
 
 app.route("/api/auth", authRoutes);
+app.route("/api/leads", leadRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));
 
