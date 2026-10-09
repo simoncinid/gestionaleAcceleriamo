@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "not_found_handling": "single-page-application", "run_worker_first": ["/api/*"] },
   "d1_databases": [
-    { "binding": "DB", "database_name": "acceleriamo-os", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "drizzle" }
+    { "binding": "DB", "database_name": "acceleriamo-os", "database_id": "6fe0f895-cbe5-4feb-9987-f4346f700343", "migrations_dir": "drizzle" }
   ],
   "vars": { "META_GRAPH_VERSION": "v23.0" },
   "triggers": { "crons": ["*/15 * * * *"] },
