@@ -1,0 +1,1 @@
+CREATE INDEX `idx_leads_conferma` ON `leads` (`confirmation_attempts`) WHERE confirmation_sent_at IS NULL AND confirmation_error IS NOT NULL;

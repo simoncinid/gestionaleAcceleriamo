@@ -1,5 +1,6 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import { getDb, type Db } from "../db/client";
+import { mandaConferma } from "../email/conferma";
 import { leads, users } from "../db/schema";
 import type { Env } from "../env";
 import type { Impostazioni } from "../impostazioni/default";
@@ -21,8 +22,8 @@ export async function assegnaResponsabile(db: Db, imp: Impostazioni, ora: number
   return altro?.id ?? null;
 }
 
-// Catena del lead nuovo (spec 6.1). Passi 1 e 2; il 3 arriva nel Task 15.
-export async function catenaLeadNuovo(env: Env, leadId: string, _origine: "meta" | "foglio" | "manuale", now: number): Promise<void> {
+// Catena del lead nuovo (spec 6.1): responsabile, punteggio, email di conferma.
+export async function catenaLeadNuovo(env: Env, leadId: string, origine: "meta" | "foglio" | "manuale", now: number): Promise<void> {
   const db = getDb(env.DB);
   const lead = await db.select().from(leads).where(eq(leads.id, leadId)).get();
   if (!lead) return;
@@ -30,4 +31,6 @@ export async function catenaLeadNuovo(env: Env, leadId: string, _origine: "meta"
   const ownerId = lead.ownerId ?? (await assegnaResponsabile(db, imp, now));
   const score = calcolaPunteggio(datiPerPunteggio(lead), imp.punteggio);
   await db.update(leads).set({ ownerId, score }).where(eq(leads.id, leadId));
+  // Passo 3 (spec 6.1): solo per i lead dalle porte automatiche. Se fallisce, lo riprende il giro.
+  if (origine !== "manuale") await mandaConferma(env, leadId, now);
 }

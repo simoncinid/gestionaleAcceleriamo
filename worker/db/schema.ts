@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const LEAD_SOURCES = ["meta", "manuale", "sito", "passaparola", "altro", "migrazione", "foglio_andrea"] as const;
@@ -97,6 +98,8 @@ export const leads = sqliteTable(
     index("idx_leads_meta_status").on(t.metaStatus),
     index("idx_leads_created").on(t.createdAt),
     index("idx_leads_paused").on(t.pausedUntil),
+    // Coda delle email di conferma da ritentare: errore registrato e non ancora partita (anche "chiave mancante", che non conta tentativi).
+    index("idx_leads_conferma").on(t.confirmationAttempts).where(sql`confirmation_sent_at IS NULL AND confirmation_error IS NOT NULL`),
   ],
 );
 

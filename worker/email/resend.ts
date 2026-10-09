@@ -12,7 +12,7 @@ export const conPiede = (testo: string) => (testo.includes(PIEDE_LEGALE) ? testo
 
 export async function inviaEmail(
   env: Env,
-  m: { from: string; to: string; replyTo?: string; subject: string; text: string; allegati?: { filename: string; content: string }[]; chiave?: string },
+  m: { from: string; to: string; replyTo?: string; subject: string; text: string; html?: string; allegati?: { filename: string; content: string }[]; chiave?: string },
 ): Promise<Esito> {
   if (!env.RESEND_API_KEY) return { ok: false, errore: CHIAVE_MANCANTE, ritentabile: false };
   const headers: Record<string, string> = { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" };
@@ -21,7 +21,7 @@ export async function inviaEmail(
     const r = await emailFetch("https://api.resend.com/emails", {
       method: "POST",
       headers,
-      body: JSON.stringify({ from: m.from, to: [m.to], reply_to: m.replyTo, subject: m.subject, text: conPiede(m.text), attachments: m.allegati }),
+      body: JSON.stringify({ from: m.from, to: [m.to], reply_to: m.replyTo, subject: m.subject, text: conPiede(m.text), html: m.html, attachments: m.allegati }),
     });
     const corpo = (await r.json().catch(() => ({}))) as { id?: string; message?: string; name?: string };
     if (r.ok && corpo.id) return { ok: true, id: corpo.id };
