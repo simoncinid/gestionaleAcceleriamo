@@ -5,7 +5,7 @@ export default defineWorkersConfig(async () => {
   const migrations = await readD1Migrations(path.resolve("drizzle"));
   return {
     test: {
-      include: ["tests/**/*.test.ts"],
+      include: ["tests/**/*.test.{ts,tsx}"],
       setupFiles: ["./tests/apply-migrations.ts"],
       poolOptions: {
         workers: {

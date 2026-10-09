@@ -1,25 +1,120 @@
 @import "tailwindcss";
+@import "./temi/acceleriamo.css"; /* i colori del brand, uguali in ogni app, vedi 4.9 */
 
 @font-face { font-family: "Degular Display"; src: url("/fonts/DegularDisplay-Medium.otf") format("opentype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Degular Display"; src: url("/fonts/DegularDisplay-Semibold.otf") format("opentype"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Degular Display"; src: url("/fonts/DegularDisplay-Bold.otf") format("opentype"); font-weight: 700; font-display: swap; }
 @font-face { font-family: "Inter"; src: url("/fonts/Inter-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Inter"; src: url("/fonts/Inter-Medium.ttf") format("truetype"); font-weight: 500; font-display: swap; }
-@font-face { font-family: "Inter"; src: url("/fonts/Inter-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
 
-@theme {
-  --color-brand: #ec5e2d;
-  --color-cream: #f7f2ec;
-  --color-ink: #1c1915;
-  --font-sans: "Inter", system-ui, sans-serif;
+/* Strato 1: le quattro variabili di base (--accento, --accento-inchiostro, --chrome, --chrome-testo)
+   vivono SOLO nel file importato sopra, che fa parte del kit: nessuna app le ridefinisce. */
+
+/* Strato 2: derivati, calcolati dall'accento e dal chrome (sintassi dei colori relativi, OKLCH).
+   Con i valori Acceleriamo riproducono gli hex del brand book entro 1 punto di luminosità. */
+:root {
+  --accento-premuto: oklch(from var(--accento) calc(l - 0.06) c h);                 /* #D14F22 */
+  --accento-testo:   oklch(from var(--accento) calc(l - 0.12) calc(c - 0.026) h);   /* #B8431C */
+  --accento-tinta:   oklch(from var(--accento) 0.939 0.027 h);                       /* #FBE6DC */
+  --accento-tinta-2: oklch(from var(--accento) 0.978 0.010 h);                       /* #FEF6F2 */
+  --chrome-2:        oklch(from var(--chrome) calc(l + 0.057) c h);                  /* #2A2622 */
+  --chrome-3:        oklch(from var(--chrome) calc(l + 0.11) c h);                   /* #3A352F */
+  --chrome-testo-2:  oklch(from var(--chrome) 0.755 0.013 h);                        /* #B8AFA5 */
+}
+
+@theme inline {
+  /* Solo il kit: le palette, i raggi e le ombre di default di Tailwind non esistono */
+  --color-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --text-*: initial;
+
+  /* Carta e testo: fissi in ogni app */
+  --color-crema: #F7F2EC;
+  --color-avorio: #FEFDF9;
+  --color-sabbia: #E3DCD2;
+  --color-sabbia-2: #CFC6B9;
+  --color-grigio: #6B645C;
+  --color-grigio-2: #8F867C;
+  --color-ink: #1C1915;
+  --color-errore: #9B3D22;
+  --color-errore-fondo: #F6E3DC;
+
+  /* Ruoli che leggono le variabili di base */
+  --color-accento: var(--accento);
+  --color-accento-inchiostro: var(--accento-inchiostro);
+  --color-accento-premuto: var(--accento-premuto);
+  --color-accento-testo: var(--accento-testo);
+  --color-tinta: var(--accento-tinta);
+  --color-tinta-2: var(--accento-tinta-2);
+  --color-chrome: var(--chrome);
+  --color-chrome-2: var(--chrome-2);
+  --color-chrome-3: var(--chrome-3);
+  --color-chrome-testo: var(--chrome-testo);
+  --color-chrome-testo-2: var(--chrome-testo-2);
+
   --font-display: "Degular Display", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+
+  --text-titolo-pagina: 2.5rem;   --text-titolo-pagina--line-height: 0.95; --text-titolo-pagina--letter-spacing: -0.02em; --text-titolo-pagina--font-weight: 600;
+  --text-titolo-blocco: 1.75rem;  --text-titolo-blocco--line-height: 1.07; --text-titolo-blocco--letter-spacing: -0.015em; --text-titolo-blocco--font-weight: 600;
+  --text-titolo-card: 1.375rem;   --text-titolo-card--line-height: 1.09;   --text-titolo-card--letter-spacing: -0.01em;  --text-titolo-card--font-weight: 600;
+  --text-numero: 1.25rem;         --text-numero--line-height: 1.1;         --text-numero--font-weight: 600;
+  --text-eyebrow: 0.75rem;        --text-eyebrow--line-height: 1.33;       --text-eyebrow--letter-spacing: 0.09em;      --text-eyebrow--font-weight: 600;
+  --text-corpo: 1rem;             --text-corpo--line-height: 1.5;
+  --text-riga: 0.9375rem;         --text-riga--line-height: 1.33;          --text-riga--letter-spacing: -0.005em;       --text-riga--font-weight: 600;
+  --text-secondaria: 0.875rem;    --text-secondaria--line-height: 1.43;
+  --text-meta: 0.8125rem;         --text-meta--line-height: 1.38;
+  --text-etichetta: 0.6875rem;    --text-etichetta--line-height: 1.27;     --text-etichetta--letter-spacing: 0.06em;    --text-etichetta--font-weight: 600;
+
+  --radius-tag: 8px;
+  --radius-controllo: 12px;
+  --radius-blocco: 20px;
+
+  --shadow-galleggiante: 0 -1px 0 #E3DCD2, 0 12px 32px rgb(28 25 21 / 0.14);
+  --shadow-barra: 0 -8px 24px rgb(28 25 21 / 0.18);
+
+  --ease-uscita: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-foglio: cubic-bezier(0.16, 1, 0.3, 1);
+  --durata-veloce: 150ms;
+  --durata-base: 180ms;
+  --durata-foglio: 220ms;
 }
 
-body {
-  background: var(--color-cream);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+/* Alias semantici: il CSS scritto a mano usa questi, non gli hex */
+:root {
+  --superficie-pagina: var(--color-crema);
+  --superficie-blocco: var(--color-avorio);
+  --superficie-chrome: var(--color-chrome);
+  --superficie-chrome-attiva: var(--color-chrome-2);
+  --superficie-selezione: var(--color-accento);
+  --superficie-scaduta: var(--color-tinta-2);
+  --superficie-spenta: var(--color-sabbia);
+  --bordo: var(--color-sabbia);
+  --bordo-campo: var(--color-grigio-2);
+  --bordo-chrome: var(--color-chrome-3);
+  --testo: var(--color-ink);
+  --testo-2: var(--color-grigio);
+  --testo-su-chrome: var(--color-chrome-testo);
+  --testo-2-su-chrome: var(--color-chrome-testo-2);
+  --testo-accento: var(--color-accento-testo);
+  --anello-focus: var(--color-accento);
+  --barra-altezza: 56px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-h1, h2, h3 {
-  font-family: var(--font-display);
-  font-weight: 500;
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body { background: var(--superficie-pagina); color: var(--testo); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 600; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--anello-focus); outline-offset: 2px; }
+  [data-superficie="accento"] :focus-visible, [data-superficie="accento"]:focus-visible { outline-color: var(--color-accento-inchiostro); }
+  main { padding-bottom: calc(var(--barra-altezza) + var(--safe-bottom) + 24px); }
+  @media (min-width: 48rem) { main { padding-bottom: 32px; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+    .spinner { animation-duration: 1s !important; animation-iteration-count: infinite !important; } /* unico moto che resta: dice "sto lavorando" */
+  }
 }
