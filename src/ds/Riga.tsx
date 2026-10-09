@@ -26,12 +26,13 @@ export type CardLeadDati = {
 };
 
 // Sei righe in ordine fisso (DS 6.4): azienda, referente, azione, quando, prezzo, fermo.
-export function CardLead({ lead, ora = Date.now() }: { lead: CardLeadDati; ora?: number }) {
+// spazioAzioni: lascia libero l'angolo in alto a destra per il pulsante DotsThree del menu rapido.
+export function CardLead({ lead, ora = Date.now(), spazioAzioni = false }: { lead: CardLeadDati; ora?: number; spazioAzioni?: boolean }) {
   const fermo = fermoDa(lead.stageChangedAt, ora);
   const scaduta = lead.nextActionAt != null && lead.nextActionAt < ora;
   return (
     <Link to={`/commerciale/lead/${lead.id}`} className="flex flex-col gap-0.5 rounded-blocco border border-sabbia bg-avorio p-4 hover:bg-crema">
-      <p className="flex items-center gap-2 text-corpo font-semibold">
+      <p className={spazioAzioni ? "flex items-center gap-2 text-corpo font-semibold md:pr-10" : "flex items-center gap-2 text-corpo font-semibold"}>
         {lead.score && <Punto colore={lead.score} etichetta={`Punteggio ${lead.score}`} />}
         <span className="truncate">{lead.company}</span>
       </p>

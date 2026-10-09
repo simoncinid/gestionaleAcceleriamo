@@ -1,7 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { api } from "../../api";
 import { Foglio, Pulsante, Selettore, campo } from "../../ds";
 import { useUsers } from "../../hooks";
-import { FILTRI_VUOTI, type Filtri } from "./filtriScaletta";
+import type { LeadListItem } from "../../types";
+import { FILTRI_VUOTI, campagneDi, type Filtri } from "./filtriScaletta";
 
 const FONTI = [["", "Tutte"], ["meta", "Meta"], ["foglio_andrea", "Foglio Andrea"], ["manuale", "A mano"], ["sito", "Sito"], ["passaparola", "Passaparola"], ["altro", "Altro"]] as const;
 const PUNTEGGI = [["", "Tutti"], ["verde", "Verde"], ["giallo", "Giallo"], ["grigio", "Grigio"]] as const;
@@ -21,8 +24,11 @@ const daGiorno = (v: string, fine = false) => {
 };
 
 // Spec 6.5: un selettore a espansione per ciascun filtro. Il foglio è una schermata sovrapposta, con il suo primario.
-export function FoglioFiltri({ filtri, campagne, onApplica, onChiudi }: { filtri: Filtri; campagne: string[]; onApplica: (f: Filtri) => void; onChiudi: () => void }) {
+export function FoglioFiltri({ filtri, onApplica, onChiudi }: { filtri: Filtri; onApplica: (f: Filtri) => void; onChiudi: () => void }) {
   const utenti = useUsers();
+  // Le campagne vengono dall'elenco senza filtri (stessa chiave delle colonne): con una campagna scelta l'elenco non si restringe.
+  const tutti = useQuery({ queryKey: ["leads", ""], queryFn: () => api<{ leads: LeadListItem[] }>("/leads").then((r) => r.leads) });
+  const campagne = campagneDi(tutti.data ?? []);
   const [f, setF] = useState(filtri);
   const [periodo, setPeriodo] = useState<string>(filtri.da == null && filtri.a == null ? "tutti" : "altro");
   // "" vale "tutti": è la prima opzione di ogni filtro. Il selettore non accetta "" come valore, quindi passa per "tutti".

@@ -32,6 +32,15 @@ export const totali = (leads: LeadListItem[]) =>
   leads.reduce((t, l) => ({ setupCents: t.setupCents + (l.setupCents ?? 0), feeCents: t.feeCents + (l.feeCents ?? 0) }), { setupCents: 0, feeCents: 0 });
 
 export const TUTTE = "tutte";
+
+// Campagne distinte dei lead, per il foglio Filtri.
+export const campagneDi = (leads: LeadListItem[]) => [...new Set(leads.map((l) => l.metaCampaign).filter((c): c is string => !!c))];
+
+// Sopratitolo della Scaletta: con una fase scelta sul telefono "N in questa fase" (prototipo 11), altrimenti i lead aperti.
+export function sopratitolo(modo: "colonne" | "elenco", fase: string, n: { aperti: number; fase: number; vista: number }) {
+  if (modo === "elenco") return `${n.vista} lead in questa vista`;
+  return fase === TUTTE ? `${n.aperti} lead aperti` : `${n.fase} in questa fase`;
+}
 export const ordinate = (fasi: Stage[]) => [...fasi].sort((a, b) => a.sortOrder - b.sortOrder);
 const aperte = (fasi: Stage[]) => ordinate(fasi).filter((f) => f.kind === "open");
 

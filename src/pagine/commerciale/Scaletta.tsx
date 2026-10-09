@@ -12,7 +12,7 @@ import type { Vista } from "../../../worker/leads/service";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFiltri } from "./FoglioFiltri";
 import { MenuRapido } from "./MenuRapido";
-import { ETICHETTE_VISTE, FILTRI_VUOTI, TUTTE, applicaCerca, filtriAttivi, listaTelefono, opzioniFase, ordinate, parametri, perFase, totali, type Filtri } from "./filtriScaletta";
+import { ETICHETTE_VISTE, sopratitolo, FILTRI_VUOTI, TUTTE, applicaCerca, filtriAttivi, listaTelefono, opzioniFase, ordinate, parametri, perFase, totali, type Filtri } from "./filtriScaletta";
 
 type Corpo = { ids: string[]; azione: "responsabile" | "fase" | "cestino"; valore?: string | null };
 const cella = "px-3 py-3 align-top";
@@ -39,7 +39,6 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const aperte = useMemo(() => tutte.filter((f) => f.kind === "open"), [tutte]);
   const etichetta = useMemo(() => new Map(tutte.map((f) => [f.id, f.label])), [tutte]);
   const gruppi = useMemo(() => perFase(leads.data ?? []), [leads.data]);
-  const campagne = useMemo(() => [...new Set((leads.data ?? []).map((l) => l.metaCampaign).filter((c): c is string => !!c))], [leads.data]);
 
   // PV6: la lente della testata porta qui con ?cerca=1: campo aperto, fuoco, parametro tolto.
   useEffect(() => {
@@ -54,8 +53,8 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const multipla = useMutation({
     mutationFn: (corpo: Corpo) => api<{ fatti: number }>("/leads/bulk", { method: "POST", json: corpo }),
     onSuccess: (r, corpo) => {
-      const n = r.fatti === 1 ? "1 lead" : `${r.fatti} lead`;
-      toast.success(corpo.azione === "cestino" ? `${n} nel cestino` : corpo.azione === "fase" ? `${n} spostati di fase` : `Responsabile cambiato a ${n}`);
+      const n = `${r.fatti} lead`;
+      toast.success(corpo.azione === "cestino" ? `${n} nel cestino` : corpo.azione === "fase" ? `${n} ${r.fatti === 1 ? "spostato" : "spostati"} di fase` : `Responsabile cambiato a ${n}`);
       setScelti(new Set());
       for (const k of ["leads", "today", "badge"]) void qc.invalidateQueries({ queryKey: [k] });
     },
@@ -72,7 +71,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const vuoto = <StatoVuoto titolo="Nessun lead con questi filtri" testo={conFiltri || filtri.q ? "Togli qualche filtro o cambia la ricerca." : "I lead nuovi arrivano da Meta, dal Foglio Andrea o dal +."} />;
   const card = (l: LeadListItem) => (
     <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: [l.id] })}>
-      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} />
+      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni />
     </MenuRapido>
   );
   const listaTel = listaTelefono(faseTelefono, tutte, gruppi);
@@ -82,7 +81,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   return (
     <div className="flex flex-col gap-4 pb-8">
       <div className="flex items-start justify-between gap-3">
-        <Intestazione titolo="Scaletta" eyebrow={modo === "colonne" ? `${nAperti} lead aperti` : `${righe.length} lead in questa vista`} />
+        <Intestazione titolo="Scaletta" eyebrow={sopratitolo(modo, faseTelefono, { aperti: nAperti, fase: listaTel.length, vista: righe.length })} />
         <div className="flex shrink-0 items-center gap-2 pt-5">
           <Pulsante variante="icona" aria-label="Cerca" aria-expanded={cercaAperta} className="w-11 px-0!" icona={<MagnifyingGlass size={20} weight="bold" aria-hidden />}
             onClick={() => { if (cercaAperta && filtri.q) return ricerca.current?.focus(); setCercaAperta((a) => !a); }} />
@@ -180,7 +179,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
         </>
       )}
 
-      {aperti.filtri && <FoglioFiltri filtri={filtri} campagne={campagne} onApplica={setFiltri} onChiudi={() => setAperti({})} />}
+      {aperti.filtri && <FoglioFiltri filtri={filtri} onApplica={setFiltri} onChiudi={() => setAperti({})} />}
       {aperti.esito && <FoglioEsito lead={aperti.esito} onChiudi={() => setAperti({})} />}
       {aperti.sposta && (
         <Foglio aperto titolo={aperti.sposta.length === 1 ? "Sposta in fase" : `Sposta ${aperti.sposta.length} lead`} onChiudi={() => setAperti({})}>

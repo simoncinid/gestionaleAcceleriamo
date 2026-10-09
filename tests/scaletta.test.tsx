@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { FoglioFiltri } from "../src/pagine/commerciale/FoglioFiltri";
 import { Scaletta } from "../src/pagine/commerciale/Scaletta";
-import { FILTRI_VUOTI, TUTTE, applicaCerca, filtriAttivi, listaTelefono, opzioniFase, parametri, perFase, totali } from "../src/pagine/commerciale/filtriScaletta";
+import { FILTRI_VUOTI, TUTTE, applicaCerca, sopratitolo, filtriAttivi, listaTelefono, opzioniFase, parametri, perFase, totali } from "../src/pagine/commerciale/filtriScaletta";
 import type { LeadListItem, Stage } from "../src/types";
 import { contaPrimari, render } from "./render";
 
@@ -33,6 +34,12 @@ describe("Scaletta, logica", () => {
     const g = perFase(LEADS);
     expect(listaTelefono(TUTTE, FASI, g).map((l) => l.id)).toEqual(["c", "a", "b"]);
     expect(listaTelefono("chiuso", FASI, g).map((l) => l.id)).toEqual(["z"]);
+  });
+  it("sopratitolo: lead aperti con Tutte, N in questa fase con una fase scelta", () => {
+    const n = { aperti: 14, fase: 4, vista: 7 };
+    expect(sopratitolo("colonne", TUTTE, n)).toBe("14 lead aperti");
+    expect(sopratitolo("colonne", "da-richiamare", n)).toBe("4 in questa fase");
+    expect(sopratitolo("elenco", "da-richiamare", n)).toBe("7 lead in questa vista");
   });
   it("filtri attivi senza contare la ricerca", () => {
     expect(filtriAttivi({ ...FILTRI_VUOTI, q: "bertini" })).toBe(false);
@@ -75,6 +82,14 @@ describe("Scaletta, pagina", () => {
     const dati: [unknown[], unknown][] = [[["stages"], FASI], [["leads", ""], LEADS]];
     expect(render(<Scaletta ora={ORA} />, { percorso: "/commerciale/scaletta?cerca=1", dati })).toContain('type="search"');
     expect(render(<Scaletta ora={ORA} />, { percorso: "/commerciale/scaletta", dati })).not.toContain('type="search"');
+  });
+
+  it("le campagne dei Filtri vengono dall'elenco senza filtri", () => {
+    const conCampagna = (id: string, c: string) => ({ ...lead(id, "da-richiamare", null, null), metaCampaign: c });
+    const html = render(<FoglioFiltri filtri={{ ...FILTRI_VUOTI, campaign: "Agenda online" }} onApplica={() => {}} onChiudi={() => {}} />,
+      { dati: [[["leads", ""], [conCampagna("x", "Automazione preventivi"), conCampagna("y", "Agenda online")]], [["leads", "campaign=Agenda+online"], [conCampagna("y", "Agenda online")]]] });
+    // Il selettore chiuso mostra la campagna scelta solo se è tra le opzioni, che arrivano dalla chiave senza filtri.
+    expect(html).toMatch(/data-selettore="Campagna"(?:(?!<\/button>).)*>Agenda online</s);
   });
 
   it("stato vuoto senza lead", () => {

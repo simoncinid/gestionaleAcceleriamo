@@ -37,7 +37,12 @@ export function MenuRapido({ lead, onEsito, onSposta, children }: { lead: LeadLi
   useEffect(() => {
     if (!aperto) return;
     const fuori = (e: PointerEvent) => { if (!radice.current?.contains(e.target as Node)) setAperto(false); };
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setAperto(false); };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setAperto(false);
+      // Il fuoco torna sul pulsante che apre il menu.
+      radice.current?.querySelector<HTMLButtonElement>("[data-apri-menu]")?.focus();
+    };
     document.addEventListener("pointerdown", fuori);
     document.addEventListener("keydown", esc);
     return () => { document.removeEventListener("pointerdown", fuori); document.removeEventListener("keydown", esc); };
@@ -56,7 +61,7 @@ export function MenuRapido({ lead, onEsito, onSposta, children }: { lead: LeadLi
       // Dopo un tocco lungo il rilascio non deve aprire la scheda del lead.
       onClickCapture={(e) => { if (lungo.current) { e.preventDefault(); e.stopPropagation(); lungo.current = false; } }}>
       {children}
-      <Pulsante variante="fantasma" aria-label={`Azioni rapide su ${lead.company}`} aria-expanded={aperto} onClick={() => setAperto((a) => !a)}
+      <Pulsante data-apri-menu variante="fantasma" aria-label={`Azioni rapide su ${lead.company}`} aria-expanded={aperto} onClick={() => setAperto((a) => !a)}
         icona={<DotsThree size={22} weight="bold" aria-hidden />} className="absolute right-2 top-2 hidden w-11 px-0! md:inline-flex" />
       {aperto && <Voci lead={lead} chiudi={() => setAperto(false)} onEsito={onEsito} onSposta={onSposta} />}
     </li>

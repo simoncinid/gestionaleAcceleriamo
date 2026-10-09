@@ -128,6 +128,11 @@ describe("segni, chip e intestazione", () => {
 });
 
 describe("CardLead", () => {
+  it("spazioAzioni lascia libero l'angolo del menu rapido sul computer", () => {
+    const dati = { id: "l1", company: "Officina", stageLabel: "Nuovo", stageChangedAt: ORA };
+    expect(render(<CardLead ora={ORA} lead={dati} spazioAzioni />)).toContain("md:pr-10");
+    expect(render(<CardLead ora={ORA} lead={dati} />)).not.toContain("md:pr-10");
+  });
   it("una riga per fatto, nell'ordine del DS", () => {
     const html = render(
       <CardLead ora={ORA} lead={{ id: "l1", company: "Officina Prova", contactName: "Luca Prova", nextAction: "Richiamare", nextActionAt: ORA - 3_600_000, stageLabel: "Da richiamare", stageChangedAt: ORA - 9 * 86_400_000, score: "verde", setupCents: 200_000, feeCents: 15_000 }} />,
