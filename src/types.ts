@@ -29,3 +29,5 @@ export type Stats = {
   firstResponse: { avgMs: number | null; count: number };
 };
 export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";
+
+export type { CallAgenda } from "../worker/calls/service";

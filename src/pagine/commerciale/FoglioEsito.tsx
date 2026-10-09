@@ -5,9 +5,11 @@ import { api } from "../../api";
 import { AreaTesto, Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
+import { CasellaInvito } from "./CasellaInvito";
 import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type StatoEsito } from "./esito";
 
-type LeadEsito = { id: string; company: string; contactName: string | null; stageId: string; attemptCount: number };
+// email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
+type LeadEsito = { id: string; company: string; contactName: string | null; stageId: string; attemptCount: number; email?: string | null };
 
 // Foglio "Com'è andata?": l'esito propone fase e prossima azione (le regole propongono, la persona salva).
 export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () => void }) {
@@ -17,6 +19,9 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
   const [s, setS] = useState<StatoEsito>(() => statoIniziale(crypto.randomUUID(), lead));
   // Solo l'ultima proposta chiesta vale: un esito cambiato in fretta non viene sovrascritto da una risposta vecchia.
   const ultimaRichiesta = useRef(0);
+  const senzaEmail = lead.email === null;
+  const [invito, setInvito] = useState(!senzaEmail);
+  const mandaInvito = s.esito === "appuntamento" && invito && !senzaEmail;
   const fase = fasi.data?.find((f) => f.id === s.stageId);
   const cambiaFase = s.stageId !== lead.stageId;
   // PV2: il motivo serve solo se la fase cambia davvero verso una fase che lo chiede.
@@ -44,10 +49,16 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
   };
 
   const salva = useMutation({
-    mutationFn: () => api(`/leads/${lead.id}/esito`, { method: "PATCH", json: corpoEsito(s) }),
-    onSuccess: () => {
-      toast.success("Esito salvato");
-      for (const k of [["today"], ["badge"], ["lead", lead.id], ["leads"]]) void qc.invalidateQueries({ queryKey: k });
+    mutationFn: () => api<{ callId: string | null }>(`/leads/${lead.id}/esito`, { method: "PATCH", json: corpoEsito(s) }),
+    onSuccess: (r) => {
+      // L'esito resta salvato anche se l'invito non parte: in quel caso un avviso sabbia, mai un errore rosso.
+      if (mandaInvito && r.callId) {
+        void api(`/calls/${r.callId}/invito`, { method: "POST" })
+          .then(() => toast.success("Esito salvato, invito mandato"))
+          .catch((e: Error) => toast.warning(`Esito salvato. ${e.message}`))
+          .finally(() => void qc.invalidateQueries({ queryKey: ["calls"] }));
+      } else toast.success("Esito salvato");
+      for (const k of [["today"], ["badge"], ["lead", lead.id], ["leads"], ["calls"]]) void qc.invalidateQueries({ queryKey: k });
       onChiudi();
     },
     onError: (e) => toast.error(e.message),
@@ -69,7 +80,7 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
       onChiudi={onChiudi}
       principale={
         <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={errore ?? undefined} onClick={() => salva.mutate()}>
-          Salva esito
+          {mandaInvito ? "Salva esito e manda l'invito" : "Salva esito"}
         </Pulsante>
       }
     >
@@ -90,6 +101,7 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
               onCambia={(ms) => { setS((p) => ({ ...p, callAt: ms })); if (ms != null) void scegli("appuntamento", ms); }} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={s.meetLink} onChange={(e) => setS((p) => ({ ...p, meetLink: e.target.value }))} />
             <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
+            <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} />
           </div>
         )}
         {s.esito && (motivoObbligatorio || s.lostReason) && (

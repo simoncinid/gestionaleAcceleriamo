@@ -12,6 +12,7 @@ import type { LeadDetail, Stage } from "../../types";
 import { avviaContatto } from "./chiamata";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioEsito } from "./FoglioEsito";
+import { FoglioFissaCall } from "./FoglioFissaCall";
 import { FoglioScrivi } from "./FoglioScrivi";
 import { Documents } from "./lead/Documents";
 import { LeadForm } from "./lead/LeadForm";
@@ -22,6 +23,7 @@ import { poiSeRiesce } from "./lead/salvataggi";
 import { Timeline } from "./lead/Timeline";
 import { idPerPreventivo, provenienza } from "./scheda";
 import { StepperFasi } from "./StepperFasi";
+import { SezioneCall } from "./SezioneCall";
 
 const PUNTEGGIO = { verde: "Verde", giallo: "Giallo", grigio: "Grigio" } as const;
 
@@ -50,7 +52,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const ora = useOra(60_000, oraFissa);
   const fasi = useStages();
   const utenti = useUsers();
-  const [foglio, setFoglio] = useState<null | "esito" | "altro" | "whatsapp" | "email" | { fase: Stage }>(null);
+  const [foglio, setFoglio] = useState<null | "esito" | "altro" | "fissa" | "whatsapp" | "email" | { fase: Stage }>(null);
   // Le azioni che non si annullano chiedono un secondo tocco sullo stesso pulsante: niente confirm() del browser.
   const [chiede, setChiede] = useState<null | "unisci" | "cestino">(null);
   const [uscito, setUscito] = useState(false);
@@ -145,7 +147,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       </div>
 
       <div className="flex min-w-0 flex-col gap-3">
-        <section data-sezione="call" aria-label="Call" />
+        <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} /></div>
         <section data-sezione="proposta" aria-label="Proposta" />
 
         <Piega titolo="Storico" aperta riassunto={activities[0] ? `ultima voce ${momento(activities[0].createdAt, ora)}` : "nessuna voce"}>
@@ -175,11 +177,13 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       </div>
 
       {foglio === "esito" && <FoglioEsito lead={lead} onChiudi={chiudi} />}
+      {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} />}
       {(foglio === "whatsapp" || foglio === "email") && <FoglioScrivi lead={lead} canale={foglio} onChiudi={chiudi} />}
       {foglio && typeof foglio === "object" && <FoglioChiusura lead={lead} fase={foglio.fase} onChiudi={chiudi} />}
       {foglio === "altro" && (
         <Foglio aperto titolo="Altre azioni" onChiudi={chiudi}>
           <ul className="flex flex-col gap-2">
+            <li><Riga titolo="Fissa call" secondaria="Conoscenza o presentazione, con l'invito" onClick={() => { setChiede(null); setFoglio("fissa"); }} /></li>
             <li><Riga titolo="Copia l'id per il preventivo" secondaria={idPerPreventivo(lead.id)}
               onClick={() => { void navigator.clipboard.writeText(idPerPreventivo(lead.id)).then(() => toast.success("Copiato: incollalo nel preventivo"), () => toast.error("Non riesco a copiare: seleziona il testo a mano")); chiudi(); }} /></li>
             {duplicateOf && (
