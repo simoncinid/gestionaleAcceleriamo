@@ -17,7 +17,7 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     credentials: "same-origin",
   });
   const data = (await res.json().catch(() => ({}))) as { error?: string; errorId?: string };
-  if (res.status === 401 && path !== "/auth/login" && path !== "/auth/me") {
+  if (res.status === 401 && !["/auth/login", "/auth/me", "/auth/logout"].includes(path)) {
     sessionStorage.setItem(LOGOUT_REASON_KEY, "La sessione è scaduta: rientra per continuare. Le modifiche non salvate vanno rifatte.");
     window.dispatchEvent(new Event("acc:logout"));
   }

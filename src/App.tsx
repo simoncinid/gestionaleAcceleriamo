@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router";
 import { ApiError, api } from "./api";
 import { Layout } from "./pages/Layout";
 import { Login } from "./pages/Login";
+import { resetSession } from "./session";
 import { Placeholder } from "./pages/Placeholder";
 import type { User } from "./types";
 
@@ -22,10 +23,7 @@ export function App() {
   });
 
   useEffect(() => {
-    const onLogout = () => {
-      qc.clear();
-      qc.setQueryData(["me"], null);
-    };
+    const onLogout = () => resetSession(qc);
     window.addEventListener("acc:logout", onLogout);
     return () => window.removeEventListener("acc:logout", onLogout);
   }, [qc]);

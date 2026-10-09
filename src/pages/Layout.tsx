@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { NavLink, Outlet } from "react-router";
 import { api } from "../api";
 import { cx } from "../components/ui";
+import { resetSession } from "../session";
 import type { User } from "../types";
 
 const NAV = [
@@ -16,8 +17,7 @@ export function Layout({ user }: { user: User }) {
   const qc = useQueryClient();
   async function logout() {
     await api("/auth/logout", { method: "POST" }).catch(() => null);
-    qc.clear();
-    qc.setQueryData(["me"], null);
+    resetSession(qc);
   }
   return (
     <div className="min-h-screen md:flex">
