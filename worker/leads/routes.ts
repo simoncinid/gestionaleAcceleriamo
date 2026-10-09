@@ -81,7 +81,6 @@ leadRoutes.post("/:id/contatti", async (c) => {
   return c.json({ ok: true }, 201);
 });
 
-// Le regole propongono, le persone salvano: questa rotta calcola soltanto, non scrive nulla.
 leadRoutes.get("/:id/calls", async (c) => c.json({ calls: await callDelLead(getDb(c.env.DB), c.req.param("id")) }));
 
 leadRoutes.post("/:id/calls", async (c) => {
@@ -91,6 +90,7 @@ leadRoutes.post("/:id/calls", async (c) => {
   return c.json(await fissaCall(c.env, db, c.req.param("id"), input, c.get("user").id, Date.now()), 201);
 });
 
+// Le regole propongono, le persone salvano: questa rotta calcola soltanto, non scrive nulla.
 leadRoutes.get("/:id/proposta", async (c) => {
   const db = getDb(c.env.DB);
   const lead = await getLead(db, c.req.param("id"));

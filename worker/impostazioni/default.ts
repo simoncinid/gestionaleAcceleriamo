@@ -47,7 +47,7 @@ export const IMPOSTAZIONI_DEFAULT: Impostazioni = {
     attiva: true,
     mittente: "Tommaso di Acceleriamo <tommaso@mail.acceleriamo.it>",
     rispondiA: "tommaso@acceleriamo.it",
-    piede: "Acceleriamo, ragione sociale e indirizzo da completare. Informativa privacy: https://acceleriamo.it/privacy",
+    piede: "Acceleriamo è un progetto di Diego Simoncini, P.IVA 02524780505. Informativa privacy: https://acceleriamo.it/privacy",
   },
   foglio: {
     attivo: false, spreadsheetId: "", scheda: "",

@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { Db } from "../db/client";
 import { activities, calls, leads, proposals } from "../db/schema";
 import type { Env } from "../env";
-import { CHIAVE_MANCANTE, base64Utf8, inviaEmail } from "../email/resend";
+import { CHIAVE_MANCANTE, base64Utf8, indirizzoDi, inviaEmail } from "../email/resend";
 import { contestoRegole, leggiImpostazioni } from "../impostazioni/service";
 import { segnaErrore, segnaOk } from "../integrazioni/stato";
 import { partiRoma } from "../lib/roma";
@@ -54,8 +54,15 @@ const quandoTesto = (ms: number) => {
   return `${GIORNI[p.settimana]} ${p.giorno}/${p.mese} alle ${String(p.ore).padStart(2, "0")}:${String(p.minuti).padStart(2, "0")}`;
 };
 
-export const icsDellaCall = (k: CallAgenda, ora?: number) =>
-  creaIcs({ uid: k.id, inizio: k.scheduledAt, titolo: `Call di ${k.kind} con Acceleriamo`, descrizione: k.meetLink ? `Link: ${k.meetLink}` : undefined, luogo: k.meetLink, ora });
+// Il .ics è identico a ogni tentativo: DTSTAMP è la creazione della call, così la chiave di idempotenza di Resend vale davvero.
+export async function icsDellaCall(db: Db, k: CallAgenda): Promise<string> {
+  const [riga] = await db.select({ createdAt: calls.createdAt }).from(calls).where(eq(calls.id, k.id));
+  const imp = await leggiImpostazioni(db);
+  return creaIcs({
+    uid: k.id, inizio: k.scheduledAt, titolo: `Call di ${k.kind} con Acceleriamo`, descrizione: k.meetLink ? `Link: ${k.meetLink}` : undefined, luogo: k.meetLink,
+    ora: riga?.createdAt, organizer: indirizzoDi(imp.conferma.mittente), attendee: k.email,
+  });
+}
 
 export const ERRORE_SENZA_EMAIL = "Manca l'email del referente";
 export const ERRORE_NON_COLLEGATO = "Resend non collegato: l'invito non è partito";
@@ -78,7 +85,7 @@ export async function mandaInvito(env: Env, db: Db, id: string, actorId: string 
       "Trovi l'invito in allegato, da aggiungere al calendario.",
       ...(imp.conferma.piede.trim() ? ["", imp.conferma.piede.trim()] : []),
     ].join("\n"),
-    allegati: [{ filename: "invito.ics", content: base64Utf8(icsDellaCall(k, now)) }],
+    allegati: [{ filename: "invito.ics", content: base64Utf8(await icsDellaCall(db, k)) }],
     chiave: `invito-${k.id}-${k.scheduledAt}`,
   });
   if (!r.ok) {

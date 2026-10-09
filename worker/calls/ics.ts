@@ -18,7 +18,8 @@ function piega(riga: string): string {
   return out.join("\r\n ");
 }
 
-export function creaIcs(e: { uid: string; inizio: number; minuti?: number; titolo: string; descrizione?: string; luogo?: string | null; ora?: number }): string {
+// ora = DTSTAMP: chi chiama passa un valore stabile (la creazione della call), così i tentativi ripetuti producono lo stesso file.
+export function creaIcs(e: { uid: string; inizio: number; minuti?: number; titolo: string; descrizione?: string; luogo?: string | null; ora?: number; organizer?: string; attendee?: string | null }): string {
   const righe = [
     "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Acceleriamo//Acceleriamo OS//IT", "CALSCALE:GREGORIAN", "METHOD:REQUEST",
     "BEGIN:VEVENT",
@@ -26,6 +27,8 @@ export function creaIcs(e: { uid: string; inizio: number; minuti?: number; titol
     `DTSTAMP:${utc(e.ora ?? Date.now())}`,
     `DTSTART:${utc(e.inizio)}`,
     `DTEND:${utc(e.inizio + (e.minuti ?? 30) * 60_000)}`,
+    ...(e.organizer ? [`ORGANIZER:mailto:${e.organizer}`] : []),
+    ...(e.attendee ? [`ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${e.attendee}`] : []),
     `SUMMARY:${protetto(e.titolo)}`,
     ...(e.descrizione ? [`DESCRIPTION:${protetto(e.descrizione)}`] : []),
     ...(e.luogo ? [`LOCATION:${protetto(e.luogo)}`] : []),

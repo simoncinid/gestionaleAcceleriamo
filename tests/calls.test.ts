@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { app } from "../worker/app";
 import { setEmailFetch } from "../worker/email/fetcher";
-import { PIEDE_LEGALE } from "../worker/email/resend";
+import { PIEDE_LEGALE, conPiede, indirizzoDi, inviaEmail } from "../worker/email/resend";
+import type { Env } from "../worker/env";
 import { authed, call } from "./helpers";
 
 const NOW = Date.now();
@@ -39,8 +40,8 @@ describe("API delle call", () => {
     expect(inviate[0].headers.get("idempotency-key")).toBe(`invito-${corpo.call.id}-${DOMANI}`);
     expect(inviate[0].body).toMatchObject({ to: ["luca@esempio.it"], reply_to: "tommaso@acceleriamo.it" });
     expect((inviate[0].body.attachments as { filename: string }[])[0].filename).toBe("invito.ics");
-    // Ogni email in uscita chiude con la riga legale.
-    expect(String(inviate[0].body.text).trimEnd().endsWith(PIEDE_LEGALE)).toBe(true);
+    // Ogni email in uscita porta la riga legale, una volta sola (qui arriva dal piede delle Impostazioni).
+    expect(String(inviate[0].body.text).split(PIEDE_LEGALE).length - 1).toBe(1);
     expect(PIEDE_LEGALE).toBe("Acceleriamo è un progetto di Diego Simoncini, P.IVA 02524780505");
     const k = await env.DB.prepare("SELECT invite_sent_at FROM calls WHERE id = ?").bind(corpo.call.id).first<{ invite_sent_at: number | null }>();
     expect(k?.invite_sent_at).not.toBeNull();
@@ -139,5 +140,55 @@ describe("API delle call", () => {
     expect(await ics.text()).toContain("BEGIN:VEVENT");
     const delLead = (await (await call("/api/leads/l7/calls", {}, cookie)).json()) as { calls: { id: string }[] };
     expect(delLead.calls.map((k) => k.id)).toEqual(["dentro", "fuori"]);
+  });
+
+  it("due inviti della stessa call: stesso .ics e stessa chiave; il 409 di idempotenza vale come già mandato", async () => {
+    const cookie = await authed();
+    await insertLead("l8");
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k8', 'l8', 'conoscenza', ?, ?, ?)").bind(DOMANI, NOW, NOW).run();
+    const inviate: { body: Record<string, unknown>; chiave: string | null }[] = [];
+    setEmailFetch(async (_url, init) => {
+      inviate.push({ body: JSON.parse(String(init?.body)), chiave: new Headers(init?.headers).get("idempotency-key") });
+      return inviate.length === 1
+        ? Response.json({ id: "email-8" })
+        : Response.json({ name: "invalid_idempotent_request", message: "Same idempotency key used with a different request payload." }, { status: 409 });
+    });
+    expect((await call("/api/calls/k8/invito", { method: "POST" }, cookie)).status).toBe(200);
+    expect((await call("/api/calls/k8/invito", { method: "POST" }, cookie)).status).toBe(200);
+    expect(inviate).toHaveLength(2);
+    expect(inviate[0].chiave).toBe(inviate[1].chiave);
+    const allegato = (i: number) => (inviate[i].body.attachments as { content: string }[])[0].content;
+    expect(allegato(0)).toBe(allegato(1));
+    const ics = new TextDecoder().decode(Uint8Array.from(atob(allegato(0)), (c) => c.charCodeAt(0))).replace(/\r\n /g, "");
+    expect(ics).toContain("DTSTAMP:" + new Date(NOW).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "") + "\r\n");
+    expect(ics).toContain("ORGANIZER:mailto:tommaso@mail.acceleriamo.it\r\n");
+    expect(ics).toContain("RSVP=TRUE:mailto:luca@esempio.it\r\n");
+    expect(await env.DB.prepare("SELECT ok FROM integration_status WHERE key = 'resend'").first()).toEqual({ ok: 1 });
+  });
+
+  it("un 409 senza chiave di idempotenza resta un errore", async () => {
+    setEmailFetch(async () => Response.json({ name: "invalid_idempotent_request", message: "conflict" }, { status: 409 }));
+    const r = await inviaEmail({ ...env, RESEND_API_KEY: "re_test" } as Env, { from: "a@b.it", to: "c@d.it", subject: "s", text: "t" });
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("piede e mittente", () => {
+  it("la riga legale non si ripete", () => {
+    const gia = `Ciao,\n${PIEDE_LEGALE}. Informativa privacy: https://acceleriamo.it/privacy\nSaluti`;
+    expect(conPiede(gia)).toBe(gia);
+    expect(conPiede("Ciao")).toBe(`Ciao\n\n${PIEDE_LEGALE}`);
+  });
+  it("il piede predefinito contiene già la riga legale: una volta sola nell'invito", async () => {
+    const cookie = await authed();
+    await insertLead("l9");
+    let testo = "";
+    setEmailFetch(async (_url, init) => { testo = String(JSON.parse(String(init?.body)).text); return Response.json({ id: "e9" }); });
+    await call("/api/leads/l9/calls", { method: "POST", json: { kind: "conoscenza", scheduledAt: DOMANI, meetLink: null, invito: true } }, cookie);
+    expect(testo.split(PIEDE_LEGALE).length - 1).toBe(1);
+  });
+  it("indirizzo dal mittente", () => {
+    expect(indirizzoDi("Tommaso di Acceleriamo <tommaso@mail.acceleriamo.it>")).toBe("tommaso@mail.acceleriamo.it");
+    expect(indirizzoDi("tommaso@mail.acceleriamo.it")).toBe("tommaso@mail.acceleriamo.it");
   });
 });

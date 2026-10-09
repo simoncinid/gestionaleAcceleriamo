@@ -25,6 +25,7 @@ callRoutes.post("/:id/invito", async (c) => {
 });
 
 callRoutes.get("/:id/ics", async (c) => {
-  const k = await unaCall(getDb(c.env.DB), c.req.param("id"));
-  return c.body(icsDellaCall(k), 200, { "content-type": "text/calendar; charset=utf-8", "content-disposition": 'attachment; filename="invito.ics"' });
+  const db = getDb(c.env.DB);
+  const k = await unaCall(db, c.req.param("id"));
+  return c.body(await icsDellaCall(db, k), 200, { "content-type": "text/calendar; charset=utf-8", "content-disposition": 'attachment; filename="invito.ics"' });
 });

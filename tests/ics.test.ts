@@ -23,4 +23,21 @@ describe("file .ics", () => {
     const ics = creaIcs({ uid: "x", inizio: 0, titolo: "a".repeat(200), ora: 0 });
     expect(ics).toMatch(/\r\n a/);
   });
+  it("organizzatore e invitato, con il testo ancora protetto", () => {
+    const ics = creaIcs({ uid: "x", inizio: 0, titolo: "a; b, c", organizer: "tommaso@mail.acceleriamo.it", attendee: "luca@esempio.it", ora: 0 });
+    // La riga ATTENDEE supera i 75 byte e viene piegata: si controlla il testo spiegato.
+    const spiegato = ics.replace(/\r\n /g, "");
+    expect(ics).toMatch(/\r\nATTENDEE;[^\r]*\r\n /);
+    expect(spiegato).toContain("ORGANIZER:mailto:tommaso@mail.acceleriamo.it\r\n");
+    expect(spiegato).toContain("ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:luca@esempio.it\r\n");
+    expect(spiegato).toContain("SUMMARY:a\\; b\\, c\r\n");
+    expect(ics.split("\r\n").every((r) => new TextEncoder().encode(r).length <= 75)).toBe(true);
+  });
+  it("senza invitato niente riga ATTENDEE", () => {
+    expect(creaIcs({ uid: "x", inizio: 0, titolo: "t", attendee: null, ora: 0 })).not.toContain("ATTENDEE");
+  });
+  it("stesso DTSTAMP, stesso file", () => {
+    const e = { uid: "x", inizio: 1000, titolo: "t", ora: 500 };
+    expect(creaIcs(e)).toBe(creaIcs(e));
+  });
 });
