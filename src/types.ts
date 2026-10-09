@@ -32,3 +32,7 @@ export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../work
 
 export type { CallAgenda } from "../worker/calls/service";
 export type { PropostaRiga } from "../worker/proposte/service";
+export type { MessageTemplate, StageRule } from "../worker/db/schema";
+export type { Impostazioni } from "../worker/impostazioni/default";
+export type { Integrazione, StatoSistema, VoceRegistro } from "../worker/integrazioni/routes";
+export type { GiroFoglio, RigaAnteprima } from "../worker/foglio/sync";

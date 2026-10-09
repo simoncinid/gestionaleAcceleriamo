@@ -93,7 +93,8 @@ async function candidati(db: Db, righe: Mappata[], impronte: (string | null)[]) 
 
 // Spec 6.1, Foglio Andrea: senso unico, solo righe nuove, rilettura una volta se il foglio cambia forma.
 // Senza id del foglio la lettura non è collegata: nessuna chiamata e nessun errore.
-export async function giroFoglio(env: Env, now: number): Promise<GiroFoglio | null> {
+// `massimoCreati`: il cron ne passa meno del default per restare sotto le 50 query D1 di una invocazione.
+export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_CREATI): Promise<GiroFoglio | null> {
   const db = getDb(env.DB);
   const { foglio } = await leggiImpostazioni(db);
   if (!foglio.attivo || !foglio.spreadsheetId.trim()) return null;
@@ -129,7 +130,7 @@ export async function giroFoglio(env: Env, now: number): Promise<GiroFoglio | nu
     let fine = da - 1;
     let ultimaImpronta = st?.lastRowHash ?? null;
     for (const [i, r] of mappate.entries()) {
-      if (esito.create >= MASSIMO_CREATI) break;
+      if (esito.create >= massimoCreati) break;
       fine = da + i;
       ultimaImpronta = await impronta(r.data, r.email);
       esito.lette++;

@@ -123,13 +123,14 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
   return true;
 }
 
-export async function retryPendingMetaLeads(env: Env) {
+// `limite`: il cron ne completa pochi per giro (ogni lead costa una chiamata a Meta e la sua catena).
+export async function retryPendingMetaLeads(env: Env, limite = 20) {
   const db = getDb(env.DB);
   const rows = await db
     .select({ id: leads.id })
     .from(leads)
     .where(and(inArray(leads.metaStatus, ["pending", "error"]), lt(leads.metaAttempts, MAX_META_ATTEMPTS), isNull(leads.deletedAt)))
-    .limit(20);
+    .limit(limite);
   let ok = 0;
   for (const row of rows) if (await fillMetaLead(env, row.id)) ok++;
   return ok;

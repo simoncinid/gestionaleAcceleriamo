@@ -13,6 +13,7 @@ import { proposalRoutes } from "./proposte/routes";
 import { metaRoutes } from "./meta/routes";
 import { stageRoutes, userRoutes } from "./stages/routes";
 import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/routes";
+import { integrazioniRoutes } from "./integrazioni/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -40,6 +41,7 @@ app.route("/api/users", userRoutes);
 app.route("/api/settings", settingsRoutes);
 app.route("/api/stage-rules", stageRuleRoutes);
 app.route("/api/templates", templateRoutes);
+app.route("/api/integrations", integrazioniRoutes);
 app.route("/api/badge", badgeRoutes);
 app.route("/api/calls", callRoutes);
 app.route("/api/proposals", proposalRoutes);

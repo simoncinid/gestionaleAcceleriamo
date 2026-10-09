@@ -9,6 +9,6 @@
     { "binding": "DB", "database_name": "acceleriamo-os", "database_id": "6fe0f895-cbe5-4feb-9987-f4346f700343", "migrations_dir": "drizzle" }
   ],
   "vars": { "META_GRAPH_VERSION": "v23.0" },
-  "triggers": { "crons": ["*/15 * * * *"] },
+  "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true }
 }
