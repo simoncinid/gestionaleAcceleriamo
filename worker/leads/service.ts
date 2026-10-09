@@ -129,7 +129,8 @@ export async function updateLead(db: Db, id: string, patch: LeadPatch, actorId: 
   // Motivo e dati del vinto si chiedono solo quando la fase cambia davvero:
   // un lead 1A già perso o già chiuso senza questi dati resta modificabile.
   if (stageChanged) {
-    if (stage.requiresReason && !(patch.lostReason ?? current.lostReason)) throw new HTTPException(422, { message: "Scegli il motivo" });
+    const motivo = patch.lostReason !== undefined ? patch.lostReason : current.lostReason;
+    if (stage.requiresReason && !motivo) throw new HTTPException(422, { message: "Scegli il motivo" });
     if (stage.kind === "won") {
       const setup = patch.setupCents !== undefined ? patch.setupCents : current.setupCents;
       const canone = patch.feeCents !== undefined ? patch.feeCents : current.feeCents;

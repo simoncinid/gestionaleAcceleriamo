@@ -28,6 +28,10 @@ const fields = {
   meetLink: text(500),
   proposalUrl: text(500),
   notes: text(20000),
+};
+
+// Motivo e dati del vinto solo in modifica: la creazione li rifiuta (.strict()).
+const campiEsito = {
   setupCents: z.number().int().min(0).nullish(),
   feeCents: z.number().int().min(0).nullish(),
   // Stringa libera: i motivi validi stanno in Impostazioni (chiave "motivi") e si controllano nel servizio.
@@ -39,7 +43,7 @@ export const leadCreateSchema = z
   .object({ company, source: z.enum(["manuale", "sito", "passaparola", "altro"]).optional(), ...fields })
   .strict();
 
-export const leadPatchSchema = z.object({ company: company.optional(), ...fields }).strict();
+export const leadPatchSchema = z.object({ company: company.optional(), ...fields, ...campiEsito }).strict();
 
 export const mergeSchema = z.object({ intoId: z.string().min(1) }).strict();
 

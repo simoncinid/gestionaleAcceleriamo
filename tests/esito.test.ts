@@ -160,4 +160,19 @@ describe("motivi da Impostazioni e controlli solo al cambio di fase", () => {
     const res = await call("/api/leads/p2", { method: "PATCH", json: { stageId: "chiuso", notes: "Cliente contento" } }, cookie);
     expect(res.status).toBe(200);
   });
+
+  it("un lostReason null esplicito su una fase persa non tiene il motivo vecchio", async () => {
+    const cookie = await authed();
+    await insertLead("n1", { lost_reason: "budget" });
+    const res = await call("/api/leads/n1", { method: "PATCH", json: { stageId: "non-chiuso", lostReason: null } }, cookie);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: string }).error).toBe("Scegli il motivo");
+    expect((await leadRow("n1"))?.stage_id).toBe("da-richiamare");
+  });
+
+  it("la creazione rifiuta i dati del vinto e il motivo", async () => {
+    const cookie = await authed();
+    const res = await call("/api/leads", { method: "POST", json: { company: "Officina Nuova", setupCents: 100_000 } }, cookie);
+    expect(res.status).toBe(400);
+  });
 });
