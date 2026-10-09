@@ -1,53 +1,57 @@
-import type { FormEvent } from "react";
-import { Button, Card, Field, Input, Select, Textarea } from "../../../components/ui";
-import { fromInput, toInput } from "../../../format";
+import { useState } from "react";
+import { AreaTesto, Campo, CampoQuando, Pulsante, Selettore } from "../../../ds";
 import type { Lead } from "../../../types";
 
-const TEXT_FIELDS: { key: "company" | "contactName" | "phone" | "email" | "website" | "meetLink" | "proposalUrl"; label: string; type?: string }[] = [
+type CampoTesto = "company" | "contactName" | "phone" | "email" | "website" | "meetLink" | "proposalUrl";
+
+const CAMPI: { key: CampoTesto; label: string; type?: string; inputMode?: "tel" | "email" | "url" }[] = [
   { key: "company", label: "Azienda" },
   { key: "contactName", label: "Referente" },
-  { key: "phone", label: "Telefono", type: "tel" },
-  { key: "email", label: "Email", type: "email" },
-  { key: "website", label: "Sito" },
-  { key: "meetLink", label: "Link Meet", type: "url" },
-  { key: "proposalUrl", label: "Link preventivo", type: "url" },
+  { key: "phone", label: "Telefono", type: "tel", inputMode: "tel" },
+  { key: "email", label: "Email", type: "email", inputMode: "email" },
+  { key: "website", label: "Sito", inputMode: "url" },
+  { key: "meetLink", label: "Link Meet", type: "url", inputMode: "url" },
+  { key: "proposalUrl", label: "Link preventivo", type: "url", inputMode: "url" },
 ];
 
+const NESSUNO = "nessuno";
+
+// Dati del lead in un modulo controllato: responsabile con il selettore, appuntamento con CampoQuando.
+// Chi lo usa lo rimonta (key) quando il lead cambia sul server, così riparte dai valori salvati.
 export function LeadForm({ lead, users, onSave, pending }: { lead: Lead; users: { id: string; name: string }[]; onSave: (p: Record<string, unknown>) => void; pending: boolean }) {
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const v = (k: string) => String(f.get(k) ?? "").trim();
+  const [testi, setTesti] = useState<Record<CampoTesto, string>>(() => Object.fromEntries(CAMPI.map(({ key }) => [key, lead[key] ?? ""])) as Record<CampoTesto, string>);
+  const [valore, setValore] = useState(lead.estimatedValue != null ? String(lead.estimatedValue) : "");
+  const [owner, setOwner] = useState(lead.ownerId ?? NESSUNO);
+  const [appuntamento, setAppuntamento] = useState<number | null>(lead.appointmentAt);
+  const [note, setNote] = useState(lead.notes ?? "");
+  const [linkedin, setLinkedin] = useState(lead.linkedinText ?? "");
+  const numero = valore.trim() ? Number(valore.replace(/\./g, "").replace(",", ".")) : null;
+
+  function salva() {
     const patch: Record<string, unknown> = {};
-    for (const { key } of TEXT_FIELDS) patch[key] = v(key) || null;
-    patch.company = v("company");
-    patch.ownerId = v("ownerId") || null;
-    patch.estimatedValue = v("estimatedValue") ? Math.round(Number(v("estimatedValue"))) : null;
-    patch.appointmentAt = fromInput(v("appointmentAt"));
-    patch.notes = v("notes") || null;
-    patch.linkedinText = v("linkedinText") || null;
+    for (const { key } of CAMPI) patch[key] = testi[key].trim() || null;
+    patch.company = testi.company.trim();
+    patch.ownerId = owner === NESSUNO ? null : owner;
+    patch.estimatedValue = numero == null ? null : Math.round(numero);
+    patch.appointmentAt = appuntamento;
+    patch.notes = note.trim() || null;
+    patch.linkedinText = linkedin.trim() || null;
     onSave(patch);
   }
+  const manca = !testi.company.trim() ? "Serve il nome dell'azienda" : numero != null && (Number.isNaN(numero) || numero < 0) ? "Il valore stimato va scritto in euro" : undefined;
+
   return (
-    <Card title="dati">
-      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
-        {TEXT_FIELDS.map(({ key, label, type }) => (
-          <Field key={key} label={label}>
-            <Input name={key} type={type ?? "text"} defaultValue={lead[key] ?? ""} required={key === "company"} />
-          </Field>
-        ))}
-        <Field label="Valore stimato (euro)"><Input name="estimatedValue" type="number" min={0} step={1} defaultValue={lead.estimatedValue ?? ""} /></Field>
-        <Field label="Responsabile">
-          <Select name="ownerId" defaultValue={lead.ownerId ?? ""}>
-            <option value="">Nessuno</option>
-            {users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Appuntamento"><Input name="appointmentAt" type="datetime-local" defaultValue={toInput(lead.appointmentAt)} /></Field>
-        <Field label="Note" wide><Textarea name="notes" rows={4} defaultValue={lead.notes ?? ""} /></Field>
-        <Field label="Profilo LinkedIn (testo incollato)" wide><Textarea name="linkedinText" rows={3} defaultValue={lead.linkedinText ?? ""} /></Field>
-        <div className="sm:col-span-2"><Button type="submit" disabled={pending}>Salva i dati</Button></div>
-      </form>
-    </Card>
+    <div className="flex flex-col gap-3">
+      {CAMPI.map(({ key, label, type, inputMode }) => (
+        <Campo key={key} etichetta={label} type={type ?? "text"} inputMode={inputMode} value={testi[key]} onChange={(e) => setTesti((t) => ({ ...t, [key]: e.target.value }))} />
+      ))}
+      <Campo etichetta="Valore stimato (euro)" inputMode="numeric" value={valore} onChange={(e) => setValore(e.target.value)} />
+      <Selettore etichetta="Responsabile" valore={owner} onCambia={setOwner}
+        opzioni={[{ valore: NESSUNO, etichetta: "Nessuno" }, ...users.map((u) => ({ valore: u.id, etichetta: u.name }))]} />
+      <CampoQuando etichetta="Appuntamento" valore={appuntamento} onCambia={setAppuntamento} />
+      <AreaTesto etichetta="Note" rows={4} value={note} onChange={(e) => setNote(e.target.value)} />
+      <AreaTesto etichetta="Profilo LinkedIn (testo incollato)" rows={3} value={linkedin} onChange={(e) => setLinkedin(e.target.value)} />
+      <Pulsante variante="secondario" className="self-start" inCorso={pending} motivoSpento={manca} onClick={salva}>Salva i dati</Pulsante>
+    </div>
   );
 }

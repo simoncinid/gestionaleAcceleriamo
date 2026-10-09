@@ -1,52 +1,44 @@
 import { useMutation } from "@tanstack/react-query";
-import { useRef, type FormEvent } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../../api";
-import { Button, Card, Select, Textarea } from "../../../components/ui";
-import { fmtDateTime } from "../../../format";
+import { AreaTesto, Pulsante, Selettore } from "../../../ds";
+import { momento } from "../../../format";
 import { useRefreshLeads } from "../../../hooks";
 import type { Activity } from "../../../types";
 
-const TYPE_LABELS: Record<string, string> = {
-  creazione: "Creato", nota: "Nota", chiamata: "Chiamata", email: "Email", cambio_fase: "Fase", meta: "Meta", documento: "Documento",
-  cestino: "Cestino", ripristino: "Ripristino", unione: "Unione", migrazione: "Importato",
-};
+const TIPI = [{ valore: "nota", etichetta: "Nota" }, { valore: "chiamata", etichetta: "Chiamata" }, { valore: "email", etichetta: "Email" }] as const;
+type Tipo = (typeof TIPI)[number]["valore"];
 
-export function Timeline({ leadId, activities }: { leadId: string; activities: Activity[] }) {
+// Storico: una voce per riga (cosa è successo), sotto chi e quando. In cima si aggiunge una nota a mano.
+export function Timeline({ leadId, activities, ora }: { leadId: string; activities: Activity[]; ora: number }) {
   const refresh = useRefreshLeads();
-  const formRef = useRef<HTMLFormElement>(null);
+  const [tipo, setTipo] = useState<Tipo>("nota");
+  const [testo, setTesto] = useState("");
   const add = useMutation({
-    mutationFn: (json: { type: string; body: string }) => api(`/leads/${leadId}/activities`, { method: "POST", json }),
-    onSuccess: () => {
-      formRef.current?.reset();
-      refresh();
-    },
+    mutationFn: () => api(`/leads/${leadId}/activities`, { method: "POST", json: { type: tipo, body: testo.trim() } }),
+    onSuccess: () => { setTesto(""); toast.success("Aggiunto allo storico"); refresh(); },
     onError: (e) => toast.error(e.message),
   });
-  function submit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    add.mutate({ type: String(f.get("type")), body: String(f.get("body") ?? "") });
-  }
   return (
-    <Card title="storico">
-      <form ref={formRef} onSubmit={submit} className="mb-4 space-y-2">
-        <Select name="type" defaultValue="chiamata" aria-label="Tipo">
-          <option value="chiamata">Chiamata</option>
-          <option value="nota">Nota</option>
-          <option value="email">Email</option>
-        </Select>
-        <Textarea name="body" rows={3} required placeholder="Com'è andata?" aria-label="Testo" />
-        <Button type="submit" disabled={add.isPending}>Aggiungi</Button>
-      </form>
-      <ol className="space-y-3">
-        {activities.map((a) => (
-          <li key={a.id} className="min-w-0 border-l-2 border-brand/30 pl-3">
-            <p className="text-xs text-ink/50">{TYPE_LABELS[a.type] ?? a.type} · {a.authorName} · {fmtDateTime(a.createdAt)}</p>
-            <p className="whitespace-pre-wrap break-words text-sm">{a.body}</p>
-          </li>
-        ))}
-      </ol>
-    </Card>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        <Selettore etichetta="Tipo" valore={tipo} opzioni={[...TIPI]} onCambia={setTipo} />
+        <AreaTesto etichetta="Cosa è successo" rows={2} value={testo} onChange={(e) => setTesto(e.target.value)} />
+        <Pulsante variante="secondario" className="self-start" inCorso={add.isPending} motivoSpento={testo.trim() ? undefined : "Scrivi cosa è successo"} onClick={() => add.mutate()}>
+          Aggiungi
+        </Pulsante>
+      </div>
+      {activities.length === 0 ? <p className="text-secondaria text-grigio">Ancora nessuna voce.</p> : (
+        <ol className="flex flex-col divide-y divide-sabbia">
+          {activities.map((a) => (
+            <li key={a.id} className="flex min-w-0 flex-col gap-0.5 py-3">
+              <p className="whitespace-pre-wrap break-words text-corpo">{a.body}</p>
+              <p className="text-secondaria text-grigio tabular-nums">{a.authorName} · {momento(a.createdAt, ora)}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }

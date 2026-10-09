@@ -1,25 +1,35 @@
-import { Card } from "../../../components/ui";
 import type { Lead } from "../../../types";
 
-export function MetaAnswers({ lead }: { lead: Lead }) {
-  if (!lead.metaAnswers) return null;
-  let answers: Record<string, string>;
+export function contaRisposte(lead: Pick<Lead, "metaAnswers">): number {
+  if (!lead.metaAnswers) return 0;
   try {
-    answers = JSON.parse(lead.metaAnswers) as Record<string, string>;
+    return Object.keys(JSON.parse(lead.metaAnswers) as Record<string, string>).length;
   } catch {
-    return null;
+    return 0;
   }
+}
+
+// Risposte del modulo Meta: domanda sopra, risposta sotto, una per riga.
+export function MetaAnswers({ lead }: { lead: Lead }) {
+  let answers: Record<string, string> = {};
+  try {
+    answers = lead.metaAnswers ? (JSON.parse(lead.metaAnswers) as Record<string, string>) : {};
+  } catch {
+    answers = {};
+  }
+  const voci = Object.entries(answers);
+  if (voci.length === 0) return <p className="text-secondaria text-grigio">Nessuna risposta dal modulo.</p>;
   return (
-    <Card title="risposte del modulo meta">
-      <dl className="grid gap-2 text-sm">
-        {Object.entries(answers).map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-ink/50">{k.replace(/_/g, " ")}</dt>
-            <dd>{v}</dd>
+    <div className="flex flex-col gap-2">
+      <dl className="flex flex-col divide-y divide-sabbia">
+        {voci.map(([k, v]) => (
+          <div key={k} className="flex flex-col gap-0.5 py-3">
+            <dt className="text-secondaria text-grigio">{k.replace(/_/g, " ")}</dt>
+            <dd className="text-corpo">{v}</dd>
           </div>
         ))}
       </dl>
-      {(lead.metaAdset || lead.metaAd) && <p className="mt-3 text-xs text-ink/50">Inserzione: {[lead.metaAdset, lead.metaAd].filter(Boolean).join(" / ")}</p>}
-    </Card>
+      {(lead.metaAdset || lead.metaAd) && <p className="text-meta text-grigio">Inserzione: {[lead.metaAdset, lead.metaAd].filter(Boolean).join(", ")}</p>}
+    </div>
   );
 }

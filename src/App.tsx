@@ -6,11 +6,11 @@ import { REDIRECT_1A } from "./guscio/aree";
 import { Guscio } from "./guscio/Guscio";
 import { Login } from "./pages/Login";
 import { resetSession } from "./session";
-import { LeadPage } from "./pages/LeadPage";
+import { SchedaLeadRotta } from "./pagine/commerciale/SchedaLead";
 import { Oggi } from "./pagine/commerciale/Oggi";
 import { FogliCreazione } from "./pagine/FogliCreazione";
-import { Numeri } from "./pages/Numeri";
-import { Cestino } from "./pages/Cestino";
+import { Numeri } from "./pagine/commerciale/Numeri";
+import { Cestino } from "./pagine/impostazioni/Cestino";
 import { Fasi } from "./pagine/impostazioni/Fasi";
 import { Scaletta } from "./pagine/commerciale/Scaletta";
 import type { User } from "./types";
@@ -54,7 +54,7 @@ export function App() {
         <Route index element={<Navigate to="/commerciale/oggi" replace />} />
         <Route path="/commerciale/oggi" element={<Oggi />} />
         <Route path="/commerciale/scaletta" element={<Scaletta />} />
-        <Route path="/commerciale/lead/:id" element={<LeadPage />} />
+        <Route path="/commerciale/lead/:id" element={<SchedaLeadRotta />} />
         <Route path="/commerciale/numeri" element={<Numeri />} />
         <Route path="/impostazioni/dati/cestino" element={<Cestino />} />
         <Route path="/impostazioni/fasi" element={<Fasi />} />

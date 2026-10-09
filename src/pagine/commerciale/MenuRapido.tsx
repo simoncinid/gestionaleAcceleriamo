@@ -4,7 +4,7 @@ import { Contatto, Pulsante } from "../../ds";
 import { useModelli } from "../../hooks";
 import type { LeadListItem } from "../../types";
 import { avviaContatto } from "./chiamata";
-import { compila, modelloPer } from "./RigaOggi";
+import { compila, modelloPer } from "./modelli";
 
 const TOCCO_LUNGO = 500;
 

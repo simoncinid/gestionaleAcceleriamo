@@ -49,7 +49,7 @@ export function relative(ms: number) {
 }
 
 export const SOURCE_LABELS: Record<string, string> = {
-  meta: "Meta", manuale: "A mano", sito: "Sito", passaparola: "Passaparola", altro: "Altro", migrazione: "Vecchio gestionale",
+  meta: "Meta", manuale: "A mano", sito: "Sito", passaparola: "Passaparola", altro: "Altro", migrazione: "Vecchio gestionale", foglio_andrea: "Foglio Andrea",
 };
 
 export const TONE_CLASSES: Record<string, string> = {

@@ -15,6 +15,7 @@ export type LeadListItem = {
 export type Lead = LeadListItem & {
   website: string | null; linkedinText: string | null; metaLeadId: string | null; metaAnswers: string | null; metaAdset: string | null;
   metaAd: string | null; meetLink: string | null; proposalUrl: string | null; notes: string | null; createdBy: string | null;
+  confirmationSentAt: number | null; confirmationAttempts: number; confirmationError: string | null;
 };
 
 export type Activity = { id: string; type: string; body: string; createdAt: number; authorId: string | null; authorName: string };

@@ -1,23 +1,11 @@
 import { Clock, Hourglass } from "@phosphor-icons/react";
 import { Link } from "react-router";
-import type { MessageTemplate } from "../../../worker/db/schema";
 import { Contatto, Pulsante, Punto, cx } from "../../ds";
-import { euro, quando, riempiModello, testoSla, trascorso } from "../../format";
+import { euro, quando, testoSla, trascorso } from "../../format";
 import { useModelli } from "../../hooks";
 import type { PropostaOggi, RigaOggi as Riga } from "../../types";
 import { avviaContatto } from "./chiamata";
-
-const primoNome = (nome: string | null) => nome?.trim().split(/\s+/)[0] ?? null;
-
-// PV3: il modello del canale giusto, prima quello della fase del lead, poi il ripiego dello stesso canale.
-export function modelloPer(modelli: MessageTemplate[] | undefined, canale: "whatsapp" | "email", stageId: string | null, ripiego: string) {
-  const delCanale = (modelli ?? []).filter((m) => m.channel === canale);
-  return delCanale.find((m) => stageId != null && m.stageId === stageId) ?? delCanale.find((m) => m.key === ripiego);
-}
-
-// PV3: un solo modo di compilare i modelli, con riempiModello e i segnaposto { referente, azienda, numero }.
-export const compila = (testo: string | null | undefined, v: { contactName: string | null; company: string; numero?: string }) =>
-  testo ? riempiModello(testo, { referente: primoNome(v.contactName), azienda: v.company, numero: v.numero }) : undefined;
+import { compila, modelloPer } from "./modelli";
 
 const soldi = (setup: number | null, canone: number | null) =>
   setup != null || canone != null ? `Setup ${euro(setup ?? 0)}, canone ${euro(canone ?? 0)}` : null;
