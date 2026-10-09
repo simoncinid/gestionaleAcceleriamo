@@ -1,3 +1,4 @@
+import { linkHttp } from "./validation";
 import { and, desc, eq } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
@@ -18,7 +19,7 @@ export const esitoSchema = z
     lostReason: z.string().min(1).max(40).nullish(),
     note: z.string().trim().max(4000).optional(),
     call: z
-      .object({ kind: z.enum(["conoscenza", "presentazione"]), scheduledAt: z.number().int(), meetLink: z.string().url().nullable() })
+      .object({ kind: z.enum(["conoscenza", "presentazione"]), scheduledAt: z.number().int(), meetLink: linkHttp("Link Meet non valido").nullable() })
       .strict()
       .optional(),
   })

@@ -63,7 +63,7 @@ export function RigaLead({ l, ora, onEsito, onRimanda }: { l: Riga; ora: number;
       <div className="flex items-center gap-2">
         {l.phone ? (
           <>
-            <Contatto tipo="chiama" lead={l} variante="icona" onAvvio={() => avviaContatto(l.id, "chiamata")} />
+            <Contatto tipo="chiama" lead={l} variante="icona" senzaNome onAvvio={() => avviaContatto(l.id, "chiamata")} />
             <Contatto tipo="whatsapp" lead={l} variante="icona" testo={compila(wa?.body, l)} onAvvio={() => avviaContatto(l.id, "whatsapp", wa?.id)} />
           </>
         ) : (
@@ -99,7 +99,7 @@ export function RigaProposta({ p, ora }: { p: PropostaOggi; ora: number }) {
         {p.email ? (
           <Contatto tipo="email" lead={p} variante="icona" oggetto={compila(fu?.subject, v)} testo={compila(fu?.body, v)} onAvvio={() => avviaContatto(p.leadId, "email", fu?.id)} />
         ) : (
-          <Contatto tipo="chiama" lead={p} variante="icona" onAvvio={() => avviaContatto(p.leadId, "chiamata")} />
+          <Contatto tipo="chiama" lead={p} variante="icona" senzaNome onAvvio={() => avviaContatto(p.leadId, "chiamata")} />
         )}
         {p.status === "registrata" && (
           <Pulsante variante="fantasma" misura="md" className="px-3!" inCorso={presentata.isPending} onClick={() => presentata.mutate()}>Segna presentata</Pulsante>

@@ -36,13 +36,14 @@ describe("GET /today", () => {
     const o = await oggi(cookie);
     expect(o.nuovi.map((l) => l.id)).toEqual(["nuovo"]);
     expect(o.nuovi[0].slaScadenza).toBe(NOW + 90 * 60_000);
-    expect(o.daFare.map((l) => l.id)).toEqual(["scaduto", "stasera"]);
+    // "scaduto" sta in Adesso e non si ripete in Da fare (ogni lead una volta sola).
+    expect(o.daFare.map((l) => l.id)).toEqual(["stasera"]);
     expect(o.proposte.map((p) => p.number)).toEqual(["ACC-2026-001"]);
     expect(o.finePausa.map((l) => l.id)).toEqual(["pausa"]);
     expect(o.fermi.map((l) => l.id)).toEqual(["fermo"]);
     expect(o.call.map((k) => k.id)).toEqual(["k1"]);
     expect(o.adesso).toMatchObject({ tipo: "lead", id: "scaduto" });
-    expect(o.totale).toBe(1 + 2 + 1 + 1 + 1);
+    expect(o.totale).toBe(1 + 1 + 1 + 1 + 1 + 1);
     expect(o.numeri.proposteAperte).toBe(1);
     expect(o.numeri.leadNuovi).toBe(1);
   });
@@ -65,8 +66,9 @@ describe("GET /today", () => {
     await insertLead("mio", { next_action_at: NOW - 1000 });
     await insertLead("libero", { next_action_at: NOW - 2000, owner_id: null });
     await insertLead("suo", { next_action_at: NOW - 3000, owner_id: "diego" });
-    expect((await oggi(cookie, "mie")).daFare.map((l) => l.id).sort()).toEqual(["libero", "mio"]);
-    expect((await oggi(cookie, "tutte")).daFare).toHaveLength(3);
+    const ids = (o: Oggi) => [o.adesso?.tipo === "lead" ? o.adesso.id : null, ...o.daFare.map((l) => l.id)].filter(Boolean).sort();
+    expect(ids(await oggi(cookie, "mie"))).toEqual(["libero", "mio"]);
+    expect(ids(await oggi(cookie, "tutte"))).toEqual(["libero", "mio", "suo"]);
   });
 
   it("call e proposte di lead cestinati non contano nei numeri", async () => {
@@ -88,7 +90,8 @@ describe("GET /today", () => {
     await insertLead("tardi", { next_action_at: Date.UTC(2026, 9, 25, 22, 30) }); // 23:30 a Roma, stesso giorno
     await insertLead("lunedi", { next_action_at: Date.UTC(2026, 9, 25, 23, 30) }); // 00:30 di lunedì a Roma
     const o = (await (await call(`/api/today?chi=tutte&now=${domenica}`, {}, cookie)).json()) as Oggi;
-    expect(o.daFare.map((l) => l.id)).toEqual(["tardi"]);
+    expect(o.adesso).toMatchObject({ tipo: "lead", id: "tardi" });
+    expect(o.daFare).toEqual([]);
   });
 });
 

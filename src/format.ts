@@ -44,6 +44,16 @@ export function momento(ms: number, ora = Date.now()): string {
   return dataBreve(ms, ora, true);
 }
 
+// Q13: quando è arrivato un lead. Oggi e ieri con l'ora, poi solo giorno e mese ("3 ott").
+export function arrivato(ms: number, ora = Date.now()): string {
+  const diff = numeroGiorno(partiRoma(ora)) - numeroGiorno(partiRoma(ms));
+  if (diff === 0) return `oggi ${hhmm(partiRoma(ms))}`;
+  if (diff === 1) return `ieri ${hhmm(partiRoma(ms))}`;
+  const p = partiRoma(ms);
+  const anno = p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : "";
+  return `${p.giorno} ${MESI[p.mese - 1]}${anno}`;
+}
+
 export function trascorso(ms: number, ora = Date.now()): string {
   const d = ora - ms;
   if (d < MIN) return "adesso";
@@ -91,6 +101,17 @@ export function presetQuando(ora = Date.now()) {
     { etichetta: "Oggi 18:00", ms: daRoma(p.anno, p.mese, p.giorno, 18, 0) },
     { etichetta: "Domani 10:00", ms: daRoma(p.anno, p.mese, p.giorno + 1, 10, 0) },
     { etichetta: "Tra 3 giorni", ms: daRoma(p.anno, p.mese, p.giorno + 3, 10, 0) },
+  ];
+}
+
+// Data di inizio di un contratto (chiusura vinta): giorni interi, a mezzanotte di Roma. Mai preset da richiamo.
+export function presetInizio(ora = Date.now()) {
+  const p = partiRoma(ora);
+  const finoALunedi = (8 - p.settimana) % 7 || 7;
+  return [
+    { etichetta: "Oggi", ms: daRoma(p.anno, p.mese, p.giorno) },
+    { etichetta: "Lunedì prossimo", ms: daRoma(p.anno, p.mese, p.giorno + finoALunedi) },
+    { etichetta: "Primo del mese prossimo", ms: daRoma(p.anno, p.mese + 1, 1) },
   ];
 }
 

@@ -43,6 +43,13 @@
       "when": 1791576703687,
       "tag": "0005_indice_conferma",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791582963639,
+      "tag": "0006_invito_in_coda",
+      "breakpoints": true
     }
   ]
 }

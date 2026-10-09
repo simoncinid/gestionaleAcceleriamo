@@ -60,9 +60,9 @@ describe("azioni multiple", () => {
     expect(await conta("SELECT count(*) n FROM leads WHERE deleted_at IS NOT NULL")).toBe(2);
   });
 
-  it("rifiuta più di 100 lead", async () => {
+  it("rifiuta più di 15 lead", async () => {
     const cookie = await authed();
-    const r = await call("/api/leads/bulk", { method: "POST", json: { ids: Array.from({ length: 101 }, (_, i) => `l${i}`), azione: "cestino" } }, cookie);
+    const r = await call("/api/leads/bulk", { method: "POST", json: { ids: Array.from({ length: 16 }, (_, i) => `l${i}`), azione: "cestino" } }, cookie);
     expect(r.status).toBe(400);
     const vuoto = await call("/api/leads/bulk", { method: "POST", json: { ids: [], azione: "cestino" } }, cookie);
     expect(vuoto.status).toBe(400);

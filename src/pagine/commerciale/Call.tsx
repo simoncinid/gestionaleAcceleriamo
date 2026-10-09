@@ -99,7 +99,7 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
           {ks.map((k) => (
             <BloccoCall key={k.id} k={k} secondaria={`Call di ${k.kind}`} meta={k.inviteSentAt ? "Invito mandato" : undefined} onApri={() => setAperta(k)}
               azione={k.meetLink
-                ? <Contatto tipo="meet" lead={k} variante={k.id === prossimaOggi?.id ? "primario" : "secondario"} misura="sm" />
+                ? <Contatto tipo="meet" lead={k} variante={k.id === prossimaOggi?.id ? "primario" : "secondario"} misura="md" intero />
                 : <span className="text-meta text-grigio">Senza link</span>} />
           ))}
         </Gruppo>

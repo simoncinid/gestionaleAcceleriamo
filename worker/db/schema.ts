@@ -206,12 +206,18 @@ export const calls = sqliteTable(
     outcome: text("outcome", { enum: ["fatta", "saltata", "rimandata"] }),
     outcomeAt: integer("outcome_at"),
     inviteSentAt: integer("invite_sent_at"),
+    // Invito chiesto quando Resend non era collegato: lo manda il giro programmato appena c'è la chiave.
+    inviteQueuedAt: integer("invite_queued_at"),
     createdBy: text("created_by"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
     deletedAt: integer("deleted_at"),
   },
-  (t) => [index("idx_calls_scheduled").on(t.scheduledAt), index("idx_calls_lead").on(t.leadId)],
+  (t) => [
+    index("idx_calls_scheduled").on(t.scheduledAt),
+    index("idx_calls_lead").on(t.leadId),
+    index("idx_calls_invito_in_coda").on(t.inviteQueuedAt).where(sql`invite_sent_at IS NULL`),
+  ],
 );
 
 export const PROPOSAL_STATUSES = ["bozza", "registrata", "presentata", "accettata", "rifiutata", "scaduta"] as const;

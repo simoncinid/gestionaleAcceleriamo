@@ -26,3 +26,27 @@ export const idPerPreventivo = (id: string) => `lead: ${id}`;
 export const MAX_TENTATIVI_CONFERMA = 4;
 export const confermaNonPartita = (l: { confirmationSentAt: number | null; confirmationAttempts: number }) =>
   l.confirmationSentAt == null && l.confirmationAttempts >= MAX_TENTATIVI_CONFERMA;
+
+// 250000 diventa "2.500", 180050 diventa "1.800,50": il formato che si scrive nei campi in euro.
+export function euroPerCampo(cents: number | null | undefined): string {
+  if (cents == null) return "";
+  const interi = String(Math.floor(Math.abs(cents) / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const resto = Math.abs(cents) % 100;
+  return `${cents < 0 ? "-" : ""}${interi}${resto ? `,${String(resto).padStart(2, "0")}` : ""}`;
+}
+
+type PropostaPerChiusura = { status: string; option: string; setupCents: number | null; feeCents: number | null };
+
+// Q6: il foglio di Chiuso parte dalla proposta accettata; senza proposta usa i soldi già scritti sul lead.
+// Il nome del cliente parte dall'azienda.
+export function precompilaChiusura(
+  lead: { company: string; setupCents: number | null; feeCents: number | null },
+  proposte: PropostaPerChiusura[] = [],
+): { setup: string; canone: string; nome: string } {
+  const accettata = proposte.find((p) => p.status === "accettata");
+  if (accettata) {
+    const canone = accettata.option === "proprieta" ? 0 : accettata.feeCents;
+    return { setup: euroPerCampo(accettata.setupCents), canone: euroPerCampo(canone), nome: lead.company };
+  }
+  return { setup: euroPerCampo(lead.setupCents), canone: euroPerCampo(lead.feeCents), nome: lead.company };
+}

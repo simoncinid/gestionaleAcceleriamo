@@ -57,7 +57,9 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   // Tornando dalla chiamata si apre il Foglio Esito del lead chiamato (spec 6.4, passo 2).
   useRitornoChiamata((id) => {
     const d = q.data;
-    const l = d ? [...d.nuovi, ...d.daFare, ...d.fermi, ...d.finePausa].find((x) => x.id === id) : undefined;
+    // Il lead in Adesso non si ripete nei gruppi: si cerca anche lì.
+    const inAdesso = d?.adesso?.tipo === "lead" ? [d.adesso] : [];
+    const l = d ? [...inAdesso, ...d.nuovi, ...d.daFare, ...d.fermi, ...d.finePausa].find((x) => x.id === id) : undefined;
     if (l) setEsito(l);
     else void api<{ lead: Lead }>(`/leads/${id}`).then((r) => setEsito(r.lead)).catch(() => undefined);
   });

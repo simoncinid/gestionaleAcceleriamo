@@ -3,9 +3,10 @@ import { toast } from "sonner";
 import { api } from "../../api";
 import { Selettore } from "../../ds";
 import type { Stage } from "../../types";
+import { callPerFase } from "../../../worker/regole/fasi-call";
 
 // Selettore a espansione della fase: il cambio è immediato, con "Annulla" nel toast.
-// Le fasi che chiedono il motivo e Chiuso (setup, canone, inizio) aprono il loro foglio.
+// Le fasi che chiedono il motivo, Chiuso (setup, canone, inizio) e quelle con una call (giorno e ora) aprono il loro foglio.
 export function StepperFasi({ leadId, attuale, fasi, senzaAzione = false, onServeFoglio }: {
   leadId: string; attuale: string; fasi: Stage[]; senzaAzione?: boolean; onServeFoglio: (f: Stage) => void;
 }) {
@@ -29,7 +30,7 @@ export function StepperFasi({ leadId, attuale, fasi, senzaAzione = false, onServ
       onCambia={(id) => {
         const f = ordinate.find((x) => x.id === id);
         if (!f || id === attuale) return;
-        if (f.requiresReason || f.kind === "won") onServeFoglio(f);
+        if (f.requiresReason || f.kind === "won" || callPerFase(f.id)) onServeFoglio(f);
         else sposta.mutate(id);
       }} />
   );

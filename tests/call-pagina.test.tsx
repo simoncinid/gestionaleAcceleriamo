@@ -42,7 +42,8 @@ describe("schermata Call", () => {
 
 describe("fogli della call", () => {
   it("Fissa call: un solo primario, invito acceso di default, tipo e giorno con i selettori", () => {
-    const html = render(<FoglioFissaCall leadId="l1" haEmail onChiudi={() => {}} />);
+    // Il pulsante promette l'invito solo con Resend collegato (Q5).
+    const html = render(<FoglioFissaCall leadId="l1" haEmail onChiudi={() => {}} />, { dati: [[["integrazioni"], { segreti: { resend: true } }]] });
     expect(contaPrimari(html)).toBe(1);
     expect(html).toContain("Fissa call e manda l&#x27;invito");
     expect(html).toContain('data-selettore="Tipo"');

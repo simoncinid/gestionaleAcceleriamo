@@ -20,6 +20,7 @@ callRoutes.patch("/:id", async (c) => {
 callRoutes.post("/:id/invito", async (c) => {
   const r = await mandaInvito(c.env, getDb(c.env.DB), c.req.param("id"), c.get("user").id, Date.now());
   if (r.ok) return c.json({ ok: true });
+  if (r.inCoda) return c.json({ ok: false, inCoda: true, messaggio: r.errore }, 202);
   const stato = r.errore === ERRORE_SENZA_EMAIL ? 422 : r.errore === ERRORE_NON_COLLEGATO ? 503 : 502;
   return c.json({ error: r.errore }, stato);
 });

@@ -63,10 +63,12 @@ export function Proposte({ ora: oraFissa }: { ora?: number } = {}) {
       {daAbbinare.length > 0 && (
         <Gruppo titolo="Da abbinare" righe={daAbbinare.length}>
           {daAbbinare.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 rounded-blocco bg-sabbia px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-corpo font-semibold">{p.company ? `${p.number}, ${p.company}` : p.number}</p>
-                <p className="truncate text-secondaria text-grigio tabular-nums">{prezzo(p)}</p>
+            // Una informazione per riga: numero, azienda, prezzo, stato; il pulsante sotto, a testo intero.
+            <li key={p.id} className="flex flex-col items-start gap-3 rounded-blocco bg-sabbia px-4 py-3">
+              <div className="flex w-full min-w-0 flex-col gap-0.5">
+                <p className="text-corpo font-semibold tabular-nums [overflow-wrap:anywhere]">{p.number}</p>
+                {p.company && <p className="text-secondaria [overflow-wrap:anywhere]">{p.company}</p>}
+                <p className="text-secondaria text-grigio tabular-nums">{prezzo(p)}</p>
                 <p className="text-meta text-grigio">Lead non riconosciuto</p>
               </div>
               <Pulsante variante="secondario" className="shrink-0" onClick={() => setAbbina(p)}>Abbina a un lead</Pulsante>

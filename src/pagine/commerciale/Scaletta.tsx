@@ -4,15 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../../api";
-import { CardLead, Chip, Errore, Foglio, Intestazione, Pulsante, Selettore, Skeleton, StatoVuoto, campo } from "../../ds";
-import { euro, quando } from "../../format";
+import { CardLead, Chip, Contatto, Errore, Foglio, Intestazione, Pulsante, Selettore, Skeleton, StatoVuoto, campo } from "../../ds";
+import { SOURCE_LABELS, arrivato, euro, quando } from "../../format";
 import { useDebounced, useStages, useUsers } from "../../hooks";
 import type { LeadListItem } from "../../types";
 import type { Vista } from "../../../worker/leads/service";
+import { avviaContatto } from "./chiamata";
+import { callPerFase } from "../../../worker/regole/fasi-call";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFiltri } from "./FoglioFiltri";
 import { MenuRapido } from "./MenuRapido";
-import { ETICHETTE_VISTE, sopratitolo, FILTRI_VUOTI, TUTTE, applicaCerca, filtriAttivi, listaTelefono, opzioniFase, ordinate, parametri, perFase, totali, type Filtri } from "./filtriScaletta";
+import { ETICHETTE_VISTE, MAX_SELEZIONE, aggiungiAllaSelezione, fonteFase, sopratitolo, FILTRI_VUOTI, TUTTE, applicaCerca, filtriAttivi, listaTelefono, opzioniFase, ordinate, parametri, perFase, totali, type Filtri } from "./filtriScaletta";
 
 type Corpo = { ids: string[]; azione: "responsabile" | "fase" | "cestino"; valore?: string | null };
 const cella = "px-3 py-3 align-top";
@@ -74,9 +76,20 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
       <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni />
     </MenuRapido>
   );
+  // Sul telefono (Q12): ordine per urgenza, riga "fonte · fase" e Chiama su ogni card (secondario: la Scaletta non ha primario).
+  const cardTelefono = (l: LeadListItem) => (
+    <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: [l.id] })}>
+      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni
+        fonteFase={fonteFase(SOURCE_LABELS[l.source] ?? l.source, etichetta.get(l.stageId) ?? "")}
+        azione={<Contatto tipo="chiama" lead={l} senzaNome onAvvio={() => avviaContatto(l.id, "chiamata")} />} />
+    </MenuRapido>
+  );
   const listaTel = listaTelefono(faseTelefono, tutte, gruppi);
-  const tuttiScelti = righe.length > 0 && righe.every((l) => scelti.has(l.id));
-  const scegli = (id: string, si: boolean) => setScelti((s) => { const n = new Set(s); if (si) n.add(id); else n.delete(id); return n; });
+  // Al massimo 15 per volta: "Seleziona tutti" prende i primi 15, oltre il tetto le caselle si spengono.
+  const selezionabili = righe.slice(0, MAX_SELEZIONE);
+  const tuttiScelti = righe.length > 0 && selezionabili.every((l) => scelti.has(l.id));
+  const pieno = scelti.size >= MAX_SELEZIONE;
+  const scegli = (id: string, si: boolean) => setScelti((s) => { if (si) return aggiungiAllaSelezione(s, id); const n = new Set(s); n.delete(id); return n; });
 
   return (
     <div className="flex flex-col gap-4 pb-8">
@@ -106,7 +119,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
         <>
           <div className="flex flex-col gap-3 md:hidden">
             <Selettore etichetta="Fase" valore={faseTelefono} onCambia={setFaseTelefono} opzioni={opzioniFase(tutte, gruppi)} />
-            {listaTel.length ? <ul className="flex flex-col gap-3">{listaTel.map(card)}</ul> : vuoto}
+            {listaTel.length ? <ul className="flex flex-col gap-3">{listaTel.map(cardTelefono)}</ul> : vuoto}
           </div>
           {righe.length === 0 ? (
             <div className="hidden md:block">{vuoto}</div>
@@ -136,6 +149,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
           {scelti.size > 0 && (
             <div className="flex flex-wrap items-center gap-3 rounded-blocco border border-sabbia bg-tinta p-3" role="toolbar" aria-label="Azioni sulla selezione">
               <span className="text-secondaria font-semibold tabular-nums">{scelti.size === 1 ? "1 selezionato" : `${scelti.size} selezionati`}</span>
+              {pieno && <span className="text-meta text-grigio">Al massimo {MAX_SELEZIONE} per volta</span>}
               <div className="min-w-64">
                 <Selettore etichetta="Responsabile" segnaposto="Cambia" valore={null} onCambia={(id) => multipla.mutate({ ids: [...scelti], azione: "responsabile", valore: id })}
                   opzioni={(utenti.data ?? []).map((u) => ({ valore: u.id, etichetta: u.name }))} />
@@ -151,7 +165,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
                   <tr>
                     <th className={`${cella} w-12`}>
                       <input type="checkbox" className="size-5 accent-ink" aria-label="Seleziona tutti" checked={tuttiScelti}
-                        onChange={(e) => setScelti(e.target.checked ? new Set(righe.map((l) => l.id)) : new Set())} />
+                        onChange={(e) => setScelti(e.target.checked ? new Set(selezionabili.map((l) => l.id)) : new Set())} />
                     </th>
                     <th className={cella}>Azienda</th><th className={cella}>Fase</th><th className={cella}>Prossima azione</th><th className={cella}>Arrivato</th>
                   </tr>
@@ -159,7 +173,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
                 <tbody>
                   {righe.map((l) => (
                     <tr key={l.id} className="border-t border-sabbia hover:bg-crema">
-                      <td className={cella}><input type="checkbox" className="size-5 accent-ink" aria-label={`Seleziona ${l.company}`} checked={scelti.has(l.id)} onChange={(e) => scegli(l.id, e.target.checked)} /></td>
+                      <td className={cella}><input type="checkbox" className="size-5 accent-ink" aria-label={`Seleziona ${l.company}`} checked={scelti.has(l.id)} disabled={pieno && !scelti.has(l.id)} title={pieno && !scelti.has(l.id) ? `Al massimo ${MAX_SELEZIONE} per volta` : undefined} onChange={(e) => scegli(l.id, e.target.checked)} /></td>
                       <td className={cella}>
                         <Link to={`/commerciale/lead/${l.id}`} className="block font-semibold text-ink hover:underline">{l.company}</Link>
                         {l.contactName && <span className="block text-grigio">{l.contactName}</span>}
@@ -169,7 +183,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
                         <span className="block">{l.nextAction ?? "Nessuna"}</span>
                         {l.nextActionAt != null && <span className="block text-grigio tabular-nums">{quando(l.nextActionAt, ora)}</span>}
                       </td>
-                      <td className={`${cella} tabular-nums text-grigio`}>{quando(l.createdAt, ora)}</td>
+                      <td className={`${cella} tabular-nums text-grigio`}>{arrivato(l.createdAt, ora)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -185,9 +199,9 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
         <Foglio aperto titolo={aperti.sposta.length === 1 ? "Sposta in fase" : `Sposta ${aperti.sposta.length} lead`} onChiudi={() => setAperti({})}>
           <div className="flex flex-col gap-3">
             <Selettore etichetta="Fase" apertoAllInizio valore={null}
-              opzioni={tutte.filter((f) => !f.requiresReason && f.kind !== "won").map((f) => ({ valore: f.id, etichetta: f.label }))}
+              opzioni={tutte.filter((f) => !f.requiresReason && f.kind !== "won" && !callPerFase(f.id)).map((f) => ({ valore: f.id, etichetta: f.label }))}
               onCambia={(id) => { multipla.mutate({ ids: aperti.sposta!, azione: "fase", valore: id }); setAperti({}); }} />
-            <p className="text-meta text-grigio">Chiuso e le fasi perse si scelgono dalla scheda del lead: chiedono il motivo o i dati del vinto.</p>
+            <p className="text-meta text-grigio">Chiuso, le fasi perse e quelle con una call si scelgono dalla scheda del lead: chiedono il motivo, i dati del vinto o la data della call.</p>
           </div>
         </Foglio>
       )}

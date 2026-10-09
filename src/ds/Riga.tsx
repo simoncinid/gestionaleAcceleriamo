@@ -27,20 +27,34 @@ export type CardLeadDati = {
 
 // Sei righe in ordine fisso (DS 6.4): azienda, referente, azione, quando, prezzo, fermo.
 // spazioAzioni: lascia libero l'angolo in alto a destra per il pulsante DotsThree del menu rapido.
-export function CardLead({ lead, ora = Date.now(), spazioAzioni = false }: { lead: CardLeadDati; ora?: number; spazioAzioni?: boolean }) {
+export function CardLead({ lead, ora = Date.now(), spazioAzioni = false, fonteFase, azione }: {
+  lead: CardLeadDati; ora?: number; spazioAzioni?: boolean; fonteFase?: string; azione?: ReactNode;
+}) {
   const fermo = fermoDa(lead.stageChangedAt, ora);
   const scaduta = lead.nextActionAt != null && lead.nextActionAt < ora;
-  return (
-    <Link to={`/commerciale/lead/${lead.id}`} className="flex flex-col gap-0.5 rounded-blocco border border-sabbia bg-avorio p-4 hover:bg-crema">
+  const corpo = (
+    <>
       <p className={spazioAzioni ? "flex items-center gap-2 text-corpo font-semibold md:pr-10" : "flex items-center gap-2 text-corpo font-semibold"}>
         {lead.score && <Punto colore={lead.score} etichetta={`Punteggio ${lead.score}`} />}
         <span className="truncate">{lead.company}</span>
       </p>
       {lead.contactName && <p className="text-secondaria text-grigio">{lead.contactName}</p>}
+      {fonteFase && <p className="text-meta text-grigio">{fonteFase}</p>}
       {lead.nextAction && <p className="text-secondaria">{lead.nextAction}</p>}
       {lead.nextActionAt != null && <p className={scaduta ? "text-meta font-semibold text-errore tabular-nums" : "text-meta text-grigio tabular-nums"}>{quando(lead.nextActionAt, ora)}</p>}
       {(lead.setupCents != null || lead.feeCents != null) && <p className="text-meta text-grigio tabular-nums">Setup {euro(lead.setupCents ?? 0)}, canone {euro(lead.feeCents ?? 0)}</p>}
       {fermo && <p className="text-meta text-attenzione-testo">{fermo}</p>}
-    </Link>
+    </>
   );
+  const href = `/commerciale/lead/${lead.id}`;
+  // Con un'azione (es. Chiama) il pulsante sta fuori dal link: niente pulsanti dentro un link.
+  if (azione) {
+    return (
+      <div className="flex flex-col gap-3 rounded-blocco border border-sabbia bg-avorio p-4">
+        <Link to={href} className="-m-2 flex flex-col gap-0.5 rounded-blocco p-2 hover:bg-crema">{corpo}</Link>
+        <div className="flex">{azione}</div>
+      </div>
+    );
+  }
+  return <Link to={href} className="flex flex-col gap-0.5 rounded-blocco border border-sabbia bg-avorio p-4 hover:bg-crema">{corpo}</Link>;
 }

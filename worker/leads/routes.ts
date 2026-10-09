@@ -1,9 +1,10 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull } from "drizzle-orm";
+import { HTTPException } from "hono/http-exception";
 import { Hono } from "hono";
 import { getDb } from "../db/client";
-import { activities, documents, leads, users } from "../db/schema";
+import { activities, calls, documents, leads, users } from "../db/schema";
 import type { AppEnv } from "../env";
-import { VISTE, addActivity, azioniMultiple, createLead, getLead, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead, type Vista } from "./service";
+import { VISTE, addActivity, azioniMultiple, clienteDelLead, createLead, getLead, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead, type Vista } from "./service";
 import { activitySchema, bulkSchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
 import { audit } from "../lib/audit";
 import { catenaLeadNuovo } from "../regole/catena";
@@ -13,6 +14,8 @@ import { contestoRegole } from "../impostazioni/service";
 import { callDelLead, callNuovaSchema, fissaCall } from "../calls/service";
 import { esitoSchema, primoTentativoAt, registraContatto, salvaEsito } from "./esito";
 import { proposteDelLead } from "../proposte/service";
+import { conScadenzaSla, leggiSla } from "../regole/sla";
+import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -21,8 +24,12 @@ leadRoutes.get("/", async (c) => {
   const num = (v?: string) => (v && /^\d+$/.test(v) ? Number(v) : undefined);
   const score = ["verde", "giallo", "grigio"].includes(q.score ?? "") ? (q.score as "verde" | "giallo" | "grigio") : undefined;
   const vista = q.vista && Object.hasOwn(VISTE, q.vista) ? (q.vista as Vista) : undefined;
-  const rows = await listLeads(getDb(c.env.DB), { q: q.q, stageId: q.stageId, source: q.source, campaign: q.campaign, ownerId: q.ownerId, score, vista, da: num(q.da), a: num(q.a) });
-  return c.json({ leads: rows });
+  const db = getDb(c.env.DB);
+  const [rows, sla] = await Promise.all([
+    listLeads(db, { q: q.q, stageId: q.stageId, source: q.source, campaign: q.campaign, ownerId: q.ownerId, score, vista, da: num(q.da), a: num(q.a) }),
+    leggiSla(db),
+  ]);
+  return c.json({ leads: rows.map((l) => conScadenzaSla(l, sla)) });
 });
 
 // Prima delle rotte con /:id.
@@ -38,13 +45,18 @@ leadRoutes.post("/", async (c) => {
   const db = getDb(c.env.DB);
   const now = Date.now();
   const creato = await createLead(db, input, c.get("user").id, now);
-  await catenaLeadNuovo(c.env, creato.id, "manuale", now);
-  return c.json({ lead: await getLead(db, creato.id) }, 201);
+  // Un errore della catena (regole, avvisi) non deve far fallire la creazione del lead.
+  try {
+    await catenaLeadNuovo(c.env, creato.id, "manuale", now);
+  } catch (e) {
+    console.error("catena_lead_nuovo", e);
+  }
+  return c.json({ lead: conScadenzaSla(await getLead(db, creato.id), await leggiSla(db)) }, 201);
 });
 
 leadRoutes.get("/:id", async (c) => {
   const db = getDb(c.env.DB);
-  const lead = await getLead(db, c.req.param("id"));
+  const lead = conScadenzaSla(await getLead(db, c.req.param("id")), await leggiSla(db));
   const history = await db
     .select({ id: activities.id, type: activities.type, body: activities.body, createdAt: activities.createdAt, authorId: activities.authorId, authorName: users.name })
     .from(activities)
@@ -59,12 +71,40 @@ leadRoutes.get("/:id", async (c) => {
   const duplicateOf = lead.duplicateOfId
     ? ((await db.select({ id: leads.id, company: leads.company }).from(leads).where(and(eq(leads.id, lead.duplicateOfId), isNull(leads.deletedAt))).get()) ?? null)
     : null;
-  return c.json({ lead, activities: history.map((a) => ({ ...a, authorName: a.authorName ?? "Sistema" })), documents: docs, duplicateOf });
+  const cliente = await clienteDelLead(db, lead.id);
+  return c.json({ lead, activities: history.map((a) => ({ ...a, authorName: a.authorName ?? "Sistema" })), documents: docs, duplicateOf, cliente });
 });
 
 leadRoutes.patch("/:id", async (c) => {
   const patch = leadPatchSchema.parse(await c.req.json());
-  const lead = await updateLead(getDb(c.env.DB), c.req.param("id"), patch, c.get("user").id);
+  const db = getDb(c.env.DB);
+  const id = c.req.param("id");
+  const io = c.get("user").id;
+  const kind = callPerFase(patch.stageId);
+  if (kind) {
+    const current = await getLead(db, id);
+    if (current.stageId !== patch.stageId) {
+      const now = Date.now();
+      const { stageId: _fase, callAt, ...resto } = patch;
+      if (callAt != null) {
+        // Q14: la call si fissa come da "Fissa call": fase, prossima azione e storico li applica il motore.
+        if (Object.keys(resto).length) await updateLead(db, id, resto, io, now);
+        await fissaCall(c.env, db, id, { kind, scheduledAt: callAt, meetLink: null, invito: false }, io, now);
+        return c.json({ lead: await getLead(db, id) });
+      }
+      // Senza data va bene solo se la call c'è già (per esempio "Annulla" dopo uno spostamento).
+      const esistente = await db
+        .select({ scheduledAt: calls.scheduledAt })
+        .from(calls)
+        .where(and(eq(calls.leadId, id), eq(calls.kind, kind), isNull(calls.deletedAt), isNull(calls.outcome), gte(calls.scheduledAt, now)))
+        .orderBy(asc(calls.scheduledAt))
+        .get();
+      if (!esistente) throw new HTTPException(422, { message: "Per questa fase serve la call: scegli giorno e ora" });
+      const lead = await updateLead(db, id, { ...patch, nextAction: AZIONE_CALL[kind], nextActionAt: esistente.scheduledAt }, io, now);
+      return c.json({ lead });
+    }
+  }
+  const lead = await updateLead(db, id, patch, io);
   return c.json({ lead });
 });
 

@@ -3,22 +3,27 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
-import { CasellaInvito } from "./CasellaInvito";
+import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
 
-type Risposta = { invito: "mandato" | "non_mandato" | "non_richiesto"; errore?: string };
+type Risposta = { invito: "mandato" | "in_coda" | "non_mandato" | "non_richiesto"; errore?: string };
 
 // Foglio "Fissa call" dalla scheda lead: fissare è l'azione esplicita che applica fase e prossima azione del motore.
-export function FoglioFissaCall({ leadId, haEmail, onChiudi }: { leadId: string; haEmail: boolean; onChiudi: () => void }) {
+// Q14: aperto dal cambio di fase, il tipo è fissato dalla fase e il titolo dice dove va il lead.
+export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase }: {
+  leadId: string; haEmail: boolean; onChiudi: () => void; fase?: { label: string; kind: "conoscenza" | "presentazione" };
+}) {
   const qc = useQueryClient();
-  const [kind, setKind] = useState<"conoscenza" | "presentazione">("conoscenza");
+  const [kind, setKind] = useState<"conoscenza" | "presentazione">(fase?.kind ?? "conoscenza");
   const [quando, setQuando] = useState<number | null>(null);
   const [meet, setMeet] = useState("");
   const [invito, setInvito] = useState(haEmail);
+  const resend = useResendCollegato();
   const salva = useMutation({
     mutationFn: () => api<Risposta>(`/leads/${leadId}/calls`, { method: "POST", json: { kind, scheduledAt: quando, meetLink: meet.trim() || null, invito } }),
     onSuccess: (r) => {
       // Invito non partito: avviso sabbia, la call è comunque salvata.
       if (r.invito === "non_mandato") toast.warning(`Call fissata. ${r.errore ?? "L'invito non è partito"}`);
+      else if (r.invito === "in_coda") toast("Call fissata, invito in coda: partirà quando Resend sarà collegato");
       else toast.success(r.invito === "mandato" ? "Call fissata, invito mandato" : "Call fissata");
       for (const k of [["lead", leadId], ["calls"], ["today"], ["leads"], ["badge"]]) void qc.invalidateQueries({ queryKey: k });
       onChiudi();
@@ -26,18 +31,18 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi }: { leadId: string;
     onError: (e) => toast.error(e.message),
   });
   return (
-    <Foglio aperto titolo="Fissa call" onChiudi={onChiudi}
+    <Foglio aperto titolo={fase ? `${fase.label}: quando è la call` : "Fissa call"} onChiudi={onChiudi}
       principale={
         <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={quando == null ? "Scegli giorno e ora" : undefined} onClick={() => salva.mutate()}>
-          {invito ? "Fissa call e manda l'invito" : "Fissa call"}
+          {invito && haEmail && resend ? "Fissa call e manda l'invito" : "Fissa call"}
         </Pulsante>
       }>
       <div className="flex flex-col gap-3">
-        <Selettore etichetta="Tipo" opzioni={[{ valore: "conoscenza", etichetta: "Conoscenza" }, { valore: "presentazione", etichetta: "Presentazione del preventivo" }]} valore={kind} onCambia={setKind} />
+        {!fase && <Selettore etichetta="Tipo" opzioni={[{ valore: "conoscenza", etichetta: "Conoscenza" }, { valore: "presentazione", etichetta: "Presentazione del preventivo" }]} valore={kind} onCambia={setKind} />}
         <CampoQuando etichetta="Giorno e ora" valore={quando} onCambia={setQuando} />
         <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={meet} onChange={(e) => setMeet(e.target.value)} />
         <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
-        <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={!haEmail} />
+        <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={!haEmail} inCoda={!resend} />
       </div>
     </Foglio>
   );

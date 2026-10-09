@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { app } from "../worker/app";
 import { setEmailFetch } from "../worker/email/fetcher";
+import { mandaInvitiInCoda } from "../worker/calls/service";
 import { PIEDE_LEGALE, conPiede, indirizzoDi, inviaEmail } from "../worker/email/resend";
 import type { Env } from "../worker/env";
 import { authed, call } from "./helpers";
@@ -66,23 +67,45 @@ describe("API delle call", () => {
     expect((await env.DB.prepare("SELECT count(*) n FROM calls WHERE lead_id = 'l3'").first<{ n: number }>())!.n).toBe(1);
   });
 
-  it("chiave Resend mancante: la call nasce, l'invito non parte, messaggio calmo, niente rete", async () => {
+  it("chiave Resend mancante: la call nasce, l'invito va in coda, niente rete; il giro lo manda appena c'è la chiave", async () => {
     const cookie = await authed();
     await insertLead("l3b");
     let chiamate = 0;
-    setEmailFetch(async () => { chiamate++; return Response.json({ id: "no" }); });
+    setEmailFetch(async () => { chiamate++; return Response.json({ id: "email-coda" }); });
+    const senzaChiave = { ...env, RESEND_API_KEY: "" };
     const ctx = createExecutionContext();
     const req = new Request("https://test.local/api/leads/l3b/calls", {
       method: "POST", headers: { cookie, "content-type": "application/json" },
       body: JSON.stringify({ kind: "conoscenza", scheduledAt: DOMANI, meetLink: null, invito: true }),
     });
-    const r = await app.fetch(req, { ...env, RESEND_API_KEY: "" }, ctx);
+    const r = await app.fetch(req, senzaChiave, ctx);
     await waitOnExecutionContext(ctx);
     expect(r.status).toBe(201);
-    expect(await r.json()).toMatchObject({ invito: "non_mandato", errore: "Resend non collegato: l'invito non è partito" });
+    const corpo = (await r.json()) as { call: { id: string }; invito: string; errore: string };
+    expect(corpo).toMatchObject({ invito: "in_coda", errore: "Invito in coda: partirà quando Resend sarà collegato" });
     expect(chiamate).toBe(0);
-    expect(await env.DB.prepare("SELECT ok, last_error FROM integration_status WHERE key = 'resend'").first()).toEqual({ ok: 0, last_error: "Chiave Resend mancante" });
-    expect((await env.DB.prepare("SELECT count(*) n FROM calls WHERE lead_id = 'l3b'").first<{ n: number }>())!.n).toBe(1);
+    const riga = () => env.DB.prepare("SELECT invite_queued_at q, invite_sent_at s FROM calls WHERE id = ?").bind(corpo.call.id).first<{ q: number | null; s: number | null }>();
+    expect((await riga())?.q).not.toBeNull();
+
+    // Ancora senza chiave il giro non fa niente; con la chiave manda l'invito e svuota la coda.
+    expect(await mandaInvitiInCoda(senzaChiave as Env, NOW, 2)).toBe(0);
+    expect(await mandaInvitiInCoda(env as Env, NOW, 2)).toBe(1);
+    expect(chiamate).toBe(1);
+    expect(await riga()).toMatchObject({ q: null });
+    expect((await riga())?.s).not.toBeNull();
+    expect(await mandaInvitiInCoda(env as Env, NOW, 2)).toBe(0);
+  });
+
+  it("invito dal foglio dell'esito senza chiave: 202 in coda, non un errore", async () => {
+    const cookie = await authed();
+    await insertLead("l3c");
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k3c', 'l3c', 'conoscenza', ?, ?, ?)").bind(DOMANI, NOW, NOW).run();
+    const ctx = createExecutionContext();
+    const req = new Request("https://test.local/api/calls/k3c/invito", { method: "POST", headers: { cookie } });
+    const r = await app.fetch(req, { ...env, RESEND_API_KEY: "" }, ctx);
+    await waitOnExecutionContext(ctx);
+    expect(r.status).toBe(202);
+    expect(await r.json()).toMatchObject({ inCoda: true });
   });
 
   it("conoscenza fatta con la presentazione fissata nello stesso foglio", async () => {

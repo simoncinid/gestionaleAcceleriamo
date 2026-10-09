@@ -54,10 +54,27 @@ export function opzioniFase(fasi: Stage[], gruppi: Map<string, LeadListItem[]>):
 }
 
 // La lista del telefono: con "Tutte" i lead aperti fase dopo fase, altrimenti quelli della fase scelta.
-export function listaTelefono(scelta: string, fasi: Stage[], gruppi: Map<string, LeadListItem[]>): LeadListItem[] {
-  if (scelta !== TUTTE) return gruppi.get(scelta) ?? [];
-  return aperte(fasi).flatMap((f) => gruppi.get(f.id) ?? []);
+// Q12: ordine per urgenza. Le scadute vengono prima perché hanno la scadenza più vecchia;
+// poi scadenza crescente; senza scadenza in fondo; a parità conta l'arrivo (prima chi è arrivato prima).
+export function perUrgenza(leads: LeadListItem[]): LeadListItem[] {
+  const chiave = (l: LeadListItem) => l.nextActionAt ?? Number.POSITIVE_INFINITY;
+  return [...leads].sort((a, b) => chiave(a) - chiave(b) || a.createdAt - b.createdAt);
 }
+
+export function listaTelefono(scelta: string, fasi: Stage[], gruppi: Map<string, LeadListItem[]>): LeadListItem[] {
+  if (scelta !== TUTTE) return perUrgenza(gruppi.get(scelta) ?? []);
+  return perUrgenza(aperte(fasi).flatMap((f) => gruppi.get(f.id) ?? []));
+}
+
+// Azioni multiple: al massimo 15 lead per volta (lo stesso tetto del server).
+export const MAX_SELEZIONE = 15;
+export function aggiungiAllaSelezione(scelti: Set<string>, id: string): Set<string> {
+  if (scelti.has(id) || scelti.size >= MAX_SELEZIONE) return scelti;
+  return new Set([...scelti, id]);
+}
+
+// Riga "fonte · fase" della card sul telefono.
+export const fonteFase = (fonte: string, fase: string) => [fonte, fase].filter(Boolean).join(" · ");
 
 // PV6: la lente della testata apre /commerciale/scaletta?cerca=1. Fuoco sulla ricerca, poi il parametro sparisce
 // (con replace) perché un aggiornamento della pagina non lo rimetta.

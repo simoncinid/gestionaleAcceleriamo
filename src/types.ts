@@ -20,7 +20,7 @@ export type Lead = LeadListItem & {
 
 export type Activity = { id: string; type: string; body: string; createdAt: number; authorId: string | null; authorName: string };
 export type DocumentRow = { id: string; leadId: string; name: string; url: string | null; createdAt: number };
-export type LeadDetail = { lead: Lead; activities: Activity[]; documents: DocumentRow[]; duplicateOf: { id: string; company: string } | null };
+export type LeadDetail = { lead: Lead; activities: Activity[]; documents: DocumentRow[]; duplicateOf: { id: string; company: string } | null; cliente?: { id: string; name: string } | null };
 
 export type Stats = {
   bySource: { source: string; total: number; won: number; lost: number }[];

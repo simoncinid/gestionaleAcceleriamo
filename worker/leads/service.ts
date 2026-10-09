@@ -2,11 +2,12 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, lte, ne, or,
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import type { Db } from "../db/client";
-import { activities, auditLog, documents, leads, stages, users, type Activity, type Lead, type LeadSource, type Stage } from "../db/schema";
+import { activities, auditLog, clients, documents, fees, leads, stages, users, type Activity, type Lead, type LeadSource, type Stage } from "../db/schema";
 import { audit } from "../lib/audit";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
 import { leggiImpostazioni } from "../impostazioni/service";
+import { callPerFase } from "../regole/fasi-call";
 
 export const DEFAULT_NEXT_ACTION = "Prima chiamata";
 
@@ -32,7 +33,7 @@ export type LeadInput = {
   lostReason?: string | null;
   wonStartAt?: number | null;
 };
-export type LeadPatch = Partial<Omit<LeadInput, "source">>;
+export type LeadPatch = Partial<Omit<LeadInput, "source">> & { clientName?: string; callAt?: number };
 
 export async function getStage(db: Db, id: string): Promise<Stage> {
   const stage = await db.select().from(stages).where(eq(stages.id, id)).get();
@@ -121,7 +122,8 @@ export async function createLead(db: Db, input: LeadInput, actorId: string | nul
   return getLead(db, id);
 }
 
-export async function updateLead(db: Db, id: string, patch: LeadPatch, actorId: string | null, now = Date.now()): Promise<Lead> {
+export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: string | null, now = Date.now()): Promise<Lead> {
+  const { clientName, callAt: _callAt, ...patch } = input;
   const current = await getLead(db, id);
   if ("ownerId" in patch) await assertOwner(db, patch.ownerId);
   const stage = await getStage(db, patch.stageId ?? current.stageId);
@@ -166,6 +168,7 @@ export async function updateLead(db: Db, id: string, patch: LeadPatch, actorId: 
   if (stageChanged) {
     const from = await getStage(db, current.stageId);
     await addActivity(db, id, "cambio_fase", `Da "${from.label}" a "${stage.label}"`, actorId, now);
+    if (stage.kind === "won") await creaClienteDaLead(db, await getLead(db, id), clientName, actorId, now);
   }
   const changes: Record<string, { from: unknown; to: unknown }> = {};
   for (const [key, value] of Object.entries(patch)) {
@@ -174,6 +177,30 @@ export async function updateLead(db: Db, id: string, patch: LeadPatch, actorId: 
   }
   await audit(db, actorId, "lead", id, "update", changes, now);
   return getLead(db, id);
+}
+
+/** Cliente collegato a un lead vinto (null se non esiste). */
+export async function clienteDelLead(db: Db, leadId: string): Promise<{ id: string; name: string } | null> {
+  const c = await db
+    .select({ id: clients.id, name: clients.name })
+    .from(clients)
+    .where(and(eq(clients.originLeadId, leadId), isNull(clients.deletedAt)))
+    .get();
+  return c ?? null;
+}
+
+// Alla chiusura vinta nasce il cliente con il suo canone in attesa. Idempotente:
+// se il lead ha già un cliente (anche dopo riapertura e nuova chiusura) non se ne crea un altro.
+async function creaClienteDaLead(db: Db, lead: Lead, nome: string | undefined, actorId: string | null, now: number) {
+  if (await clienteDelLead(db, lead.id)) return;
+  const clientId = crypto.randomUUID();
+  const nomeCliente = nome ?? lead.company;
+  await db.insert(clients).values({ id: clientId, name: nomeCliente, scope: "acceleriamo", originLeadId: lead.id, createdAt: now });
+  if (lead.feeCents && lead.feeCents > 0) {
+    await db.insert(fees).values({ id: crypto.randomUUID(), clientId, amountCents: lead.feeCents, billingDay: 1, status: "in_attesa", startAt: lead.wonStartAt });
+  }
+  await addActivity(db, lead.id, "nota", `Cliente creato: ${nomeCliente}`, actorId, now);
+  await audit(db, actorId, "client", clientId, "create", { originLeadId: { from: null, to: lead.id } }, now);
 }
 
 export async function softDeleteLead(db: Db, id: string, actorId: string | null, now = Date.now()) {
@@ -287,7 +314,7 @@ export async function azioniMultiple(db: Db, input: AzioneMultipla, actorId: str
   const fase = input.azione === "fase" ? await db.select().from(stages).where(eq(stages.id, input.valore ?? "")).get() : undefined;
   if (input.azione === "fase") {
     if (!fase) throw new HTTPException(422, { message: "Fase inesistente" });
-    if (fase.requiresReason || fase.kind === "won") throw new HTTPException(422, { message: "Questa fase va scelta lead per lead" });
+    if (fase.requiresReason || fase.kind === "won" || callPerFase(fase.id)) throw new HTTPException(422, { message: "Questa fase va scelta lead per lead" });
   }
   if (input.azione === "responsabile") await assertOwner(db, input.valore);
   const trovati = await db.select().from(leads).where(and(inArray(leads.id, [...new Set(input.ids)]), isNull(leads.deletedAt)));

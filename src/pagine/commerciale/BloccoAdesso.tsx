@@ -20,9 +20,10 @@ export function BloccoAdesso({ voce, ora, onEsito, onRimanda }: { voce: VoceAdes
           </p>
           {voce.nextActionAt != null && <p className="text-corpo font-semibold tabular-nums">{quando(voce.nextActionAt, ora)}</p>}
           <p className="text-secondaria">Fase: {voce.stageLabel}</p>
-          <div className="mt-4 flex items-center gap-2">
-            <Contatto tipo="chiama" lead={voce} variante="su-accento" misura="lg" onAvvio={() => avviaContatto(voce.id, "chiamata")} />
-            <Pulsante variante="secondario" misura="lg" className="shrink-0" onClick={onEsito}>Esito</Pulsante>
+          {/* Sul telefono "Chiama" ha una riga sua, così il nome non si taglia; dal tablet in su stanno in fila. */}
+          <div className="mt-4 flex flex-wrap items-center gap-2 sm:flex-nowrap">
+            <Contatto tipo="chiama" lead={voce} variante="su-accento" misura="lg" className="basis-full sm:basis-auto" onAvvio={() => avviaContatto(voce.id, "chiamata")} />
+            <Pulsante variante="secondario" misura="lg" className="flex-1 sm:flex-none sm:shrink-0" onClick={onEsito}>Esito</Pulsante>
             <PulsanteRimanda suAccento onClick={onRimanda} />
           </div>
         </>
@@ -31,7 +32,7 @@ export function BloccoAdesso({ voce, ora, onEsito, onRimanda }: { voce: VoceAdes
           <p className="mt-2 text-corpo font-semibold">Call di {voce.kind}</p>
           <p className="text-corpo font-semibold tabular-nums">{momento(voce.scheduledAt, ora)}</p>
           <div className="mt-4 flex">
-            <Contatto tipo="meet" lead={voce} variante="su-accento" misura="lg" />
+            <Contatto tipo="meet" lead={voce} variante="su-accento" misura="lg" intero />
           </div>
         </>
       )}

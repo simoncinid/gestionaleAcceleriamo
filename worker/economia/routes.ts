@@ -7,6 +7,7 @@ import { automations, clients, costs, fees, invoices } from "../db/schema";
 import type { AppEnv } from "../env";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { audit } from "../lib/audit";
+import { linkHttp } from "../leads/validation";
 import { meseRoma, partiRoma } from "../lib/roma";
 import { prossimoStatoCanone } from "./calcoli";
 import { costiPerMese, cruscotto, elencoCanoni, elencoFatture } from "./service";
@@ -90,7 +91,7 @@ economiaRoutes.post("/fatture", async (c) => {
   const db = getDb(c.env.DB);
   const b = z.object({
     clientId: id, kind: z.enum(["acconto", "saldo", "canone", "extra"]), amountCents: importo, number: testo(40), period: testo(40),
-    issuedAt: z.number().int().nullish(), pdfUrl: z.string().url().max(500).nullish(), note: testo(500), feeId: id.nullish(),
+    issuedAt: z.number().int().nullish(), pdfUrl: linkHttp("Link del PDF non valido").pipe(z.string().max(500)).nullish(), note: testo(500), feeId: id.nullish(),
   }).strict().parse(await c.req.json());
   await clienteNelPerimetro(db, b.clientId);
   if (b.feeId) await canoneDelCliente(db, b.feeId, b.clientId);

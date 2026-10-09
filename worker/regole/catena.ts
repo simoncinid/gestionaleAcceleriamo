@@ -6,6 +6,7 @@ import type { Env } from "../env";
 import type { Impostazioni } from "../impostazioni/default";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { calcolaPunteggio, datiPerPunteggio } from "./punteggio";
+import { conScadenzaSla, leggiSla } from "./sla";
 
 // Prima chiamata a chi dice Impostazioni; se è via, all'altro (spec 6.3, Assegnazione).
 export async function assegnaResponsabile(db: Db, imp: Impostazioni, ora: number): Promise<string | null> {
@@ -30,7 +31,9 @@ export async function catenaLeadNuovo(env: Env, leadId: string, origine: "meta" 
   const imp = await leggiImpostazioni(db);
   const ownerId = lead.ownerId ?? (await assegnaResponsabile(db, imp, now));
   const score = calcolaPunteggio(datiPerPunteggio(lead), imp.punteggio);
-  await db.update(leads).set({ ownerId, score }).where(eq(leads.id, leadId));
+  // La prima chiamata scade con lo SLA in orario di apertura (stessa funzione di Oggi e della Scaletta).
+  const { nextActionAt } = conScadenzaSla(lead, await leggiSla(db));
+  await db.update(leads).set({ ownerId, score, nextActionAt }).where(eq(leads.id, leadId));
   // Passo 3 (spec 6.1): solo per i lead dalle porte automatiche. Se fallisce, lo riprende il giro.
   if (origine !== "manuale") await mandaConferma(env, leadId, now);
 }

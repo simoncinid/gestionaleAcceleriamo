@@ -1,8 +1,8 @@
-import { and, eq, gte, isNull, lt } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lt } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import type { Db } from "../db/client";
+import { getDb, type Db } from "../db/client";
 import { activities, calls, leads, proposals } from "../db/schema";
 import type { Env } from "../env";
 import { CHIAVE_MANCANTE, base64Utf8, indirizzoDi, inviaEmail } from "../email/resend";
@@ -12,8 +12,9 @@ import { partiRoma } from "../lib/roma";
 import { passiProposta } from "../regole/applica";
 import { propostaEvento } from "../regole/motore";
 import { creaIcs } from "./ics";
+import { linkHttp } from "../leads/validation";
 
-const link = z.string().trim().url("Link Meet non valido").max(500).nullable();
+const link = linkHttp("Link Meet non valido").pipe(z.string().max(500)).nullable();
 export const callNuovaSchema = z.object({ kind: z.enum(["conoscenza", "presentazione"]), scheduledAt: z.number().int(), meetLink: link, invito: z.boolean().default(false) }).strict();
 export const callPatchSchema = z.object({
   scheduledAt: z.number().int().optional(),
@@ -66,10 +67,18 @@ export async function icsDellaCall(db: Db, k: CallAgenda): Promise<string> {
 
 export const ERRORE_SENZA_EMAIL = "Manca l'email del referente";
 export const ERRORE_NON_COLLEGATO = "Resend non collegato: l'invito non è partito";
+export const INVITO_IN_CODA = "Invito in coda: partirà quando Resend sarà collegato";
 
-export async function mandaInvito(env: Env, db: Db, id: string, actorId: string | null, now: number): Promise<{ ok: true } | { ok: false; errore: string }> {
+type EsitoInvito = { ok: true } | { ok: false; errore: string; inCoda?: true };
+
+// Senza la chiave di Resend l'invito non si perde: resta in coda e lo manda il giro programmato.
+export async function mandaInvito(env: Env, db: Db, id: string, actorId: string | null, now: number): Promise<EsitoInvito> {
   const k = await unaCall(db, id);
   if (!k.email) return { ok: false, errore: ERRORE_SENZA_EMAIL };
+  if (!env.RESEND_API_KEY) {
+    await db.update(calls).set({ inviteQueuedAt: now, updatedAt: now }).where(and(eq(calls.id, id), isNull(calls.inviteSentAt)));
+    return { ok: false, errore: INVITO_IN_CODA, inCoda: true };
+  }
   const imp = await leggiImpostazioni(db);
   const nome = k.contactName?.trim().split(/\s+/)[0] ?? "";
   const r = await inviaEmail(env, {
@@ -94,7 +103,7 @@ export async function mandaInvito(env: Env, db: Db, id: string, actorId: string 
   }
   await segnaOk(db, "resend", now);
   await db.batch([
-    db.update(calls).set({ inviteSentAt: now, updatedAt: now }).where(eq(calls.id, id)),
+    db.update(calls).set({ inviteSentAt: now, inviteQueuedAt: null, updatedAt: now }).where(eq(calls.id, id)),
     db.insert(activities).values({ id: crypto.randomUUID(), leadId: k.leadId, type: "email_auto", body: `Invito mandato per la call di ${quandoTesto(k.scheduledAt)}`, authorId: actorId, createdAt: now, callId: id }),
   ]);
   return { ok: true };
@@ -110,11 +119,11 @@ export async function fissaCall(env: Env, db: Db, leadId: string, input: z.infer
     db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `Call di ${input.kind} fissata per ${quandoTesto(input.scheduledAt)}`, authorId: actorId, createdAt: now, callId: id }),
     ...passi,
   ]);
-  let invito: "mandato" | "non_mandato" | "non_richiesto" = "non_richiesto";
+  let invito: "mandato" | "in_coda" | "non_mandato" | "non_richiesto" = "non_richiesto";
   let errore: string | undefined;
   if (input.invito) {
     const r = await mandaInvito(env, db, id, actorId, now);
-    invito = r.ok ? "mandato" : "non_mandato";
+    invito = r.ok ? "mandato" : r.inCoda ? "in_coda" : "non_mandato";
     if (!r.ok) errore = r.errore;
   }
   return { call: await unaCall(db, id), invito, errore };
@@ -158,4 +167,16 @@ export async function aggiornaCall(db: Db, id: string, input: z.infer<typeof cal
   }
   await db.batch([db.update(calls).set(set).where(eq(calls.id, id)), ...passi]);
   return unaCall(db, id);
+}
+
+// Giro programmato: manda gli inviti rimasti in coda, solo per le call ancora da fare e solo se Resend è collegato.
+export async function mandaInvitiInCoda(env: Env, now: number, limite: number): Promise<number> {
+  if (!env.RESEND_API_KEY) return 0;
+  const db = getDb(env.DB);
+  const inCoda = await db.select({ id: calls.id }).from(calls)
+    .where(and(isNotNull(calls.inviteQueuedAt), isNull(calls.inviteSentAt), isNull(calls.deletedAt), gte(calls.scheduledAt, now)))
+    .orderBy(calls.scheduledAt).limit(limite);
+  let mandati = 0;
+  for (const k of inCoda) if ((await mandaInvito(env, db, k.id, null, now)).ok) mandati++;
+  return mandati;
 }

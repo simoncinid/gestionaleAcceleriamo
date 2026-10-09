@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { AppEnv } from "../env";
 import { getDb } from "../db/client";
 import { daRoma, partiRoma } from "../lib/roma";
-import { scadenzaLavorativa } from "../regole/orario";
+import { conScadenzaSla } from "../regole/sla";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { scegliAdesso } from "./adesso";
 import type { CallOggi, Oggi, PropostaOggi, RigaOggi } from "./tipi";
@@ -40,20 +40,16 @@ const parametro = (params: string | undefined, chiave: string): number | undefin
 export const todayRoutes = new Hono<AppEnv>();
 
 // Spec 6.4 e 6.5: una query per gruppo, mai una per riga. I giorni si contano sul fuso di Roma.
-todayRoutes.get("/today", async (c) => {
-  const q = oggiSchema.parse(c.req.query());
-  const db = c.env.DB;
-  const ora = q.now ?? Date.now();
-  const io = c.get("user").id;
+// La stessa funzione dà le righe di Oggi e il numero del badge (un solo conteggio).
+export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" | "tutte", ora: number): Promise<Oggi> {
   // ?1 è sempre l'utente; per "Tutte" la condizione ?1 = ?1 lo consuma senza filtrare.
-  const chi = q.chi === "mie" ? "AND (l.owner_id = ?1 OR l.owner_id IS NULL)" : "AND ?1 = ?1";
+  const chi = chiScelto === "mie" ? "AND (l.owner_id = ?1 OR l.owner_id IS NULL)" : "AND ?1 = ?1";
   const p = partiRoma(ora);
   const inizio = daRoma(p.anno, p.mese, p.giorno);
   const fine = daRoma(p.anno, p.mese, p.giorno + 1);
   const scartoLunedi = (p.settimana + 6) % 7;
   const lunedi = daRoma(p.anno, p.mese, p.giorno - scartoLunedi);
   const lunediDopo = daRoma(p.anno, p.mese, p.giorno - scartoLunedi + 7);
-
   const tutti = <T,>(sql: string, ...b: unknown[]) => db.prepare(sql).bind(io, ...b).all<T>().then((r) => r.results);
   const uno = <T,>(sql: string, ...b: unknown[]) => db.prepare(sql).bind(...b).first<T>();
 
@@ -88,30 +84,56 @@ todayRoutes.get("/today", async (c) => {
     uno<{ n: number }>("SELECT count(*) n FROM proposals p JOIN leads l ON l.id = p.lead_id AND l.deleted_at IS NULL WHERE p.deleted_at IS NULL AND p.status IN ('registrata', 'presentata')"),
   ]);
 
-  const nuovi = nuoviGrezzi.map((l) => ({ ...l, slaScadenza: scadenzaLavorativa(l.createdAt, minutiSla, imp.orario) }));
-  const idNuovi = new Set(nuovi.map((l) => l.id));
+  // Stessa scadenza della Scaletta, dell'Elenco e della scheda (worker/regole/sla.ts).
+  // Stessa scadenza della Scaletta, dell'Elenco e della scheda (worker/regole/sla.ts).
+  const nuoviTutti = nuoviGrezzi.map((l) => {
+    const allineato = conScadenzaSla(l, { minuti: minutiSla, orario: imp.orario });
+    return { ...allineato, slaScadenza: allineato.nextActionAt };
+  });
   const idProposte = new Set(proposte.map((x) => x.leadId));
-  const finePausa = dovuti.filter((l) => l.stageId === "probabilmente-bloccato").map((l) => ({ ...l, slaScadenza: null }));
-  const daFare = dovuti
-    .filter((l) => !idNuovi.has(l.id) && !idProposte.has(l.id) && l.stageId !== "probabilmente-bloccato")
+  const daFareTutti = dovuti
+    .filter((l) => l.stageId !== "da-chiamare-prima-volta" && !idProposte.has(l.id) && l.stageId !== "probabilmente-bloccato")
     .map((l) => ({ ...l, slaScadenza: null }));
+  const adesso = scegliAdesso({ nuovi: nuoviTutti, daFare: daFareTutti, call: callOggi }, ora);
+
+  // Ogni lead compare una volta sola, nella sezione più urgente:
+  // Adesso, poi lead nuovi, call di oggi (con l'orario e il Meet), da fare, proposte, fine pausa, fermi.
+  const visti = new Set<string>();
+  const prendi = <T,>(righe: T[], chiave: (r: T) => string) =>
+    righe.filter((r) => {
+      const k = chiave(r);
+      if (visti.has(k)) return false;
+      visti.add(k);
+      return true;
+    });
+  if (adesso) visti.add(adesso.tipo === "call" ? adesso.leadId : adesso.id);
+  const nuovi = prendi(nuoviTutti, (l) => l.id);
+  const call = prendi(callOggi, (k) => k.leadId);
+  const daFare = prendi(daFareTutti, (l) => l.id);
   // Un lead con proposta compare una volta sola: nel blocco proposte (con "Segna presentata" se registrata).
-  const fermi = fermiGrezzi.filter((l) => !idProposte.has(l.id)).map((l) => ({ ...l, slaScadenza: null }));
+  const proposteVisibili = prendi(proposte, (x) => x.leadId);
+  const finePausa = prendi(dovuti.filter((l) => l.stageId === "probabilmente-bloccato").map((l) => ({ ...l, slaScadenza: null })), (l) => l.id);
+  // I fermi sono a scomparsa e non entrano nel totale.
+  const fermi = prendi(fermiGrezzi.map((l) => ({ ...l, slaScadenza: null })), (l) => l.id);
 
   const m = primaRisposta?.m ?? null;
-  const corpo: Oggi = {
-    adesso: scegliAdesso({ nuovi, daFare, call: callOggi }, ora),
-    nuovi, daFare, call: callOggi, proposte, fermi, finePausa,
+  return {
+    adesso,
+    nuovi, daFare, call, proposte: proposteVisibili, fermi, finePausa,
     numeri: {
       leadNuovi: leadNuovi?.n ?? 0,
       primaRispostaMinuti: m == null ? null : Math.round(m),
       callSettimana: callSettimana?.n ?? 0,
       proposteAperte: proposteAperte?.n ?? 0,
     },
-    // I fermi non entrano nel totale: sono a scomparsa.
-    totale: nuovi.length + daFare.length + callOggi.length + proposte.length + finePausa.length,
+    // Titolo e badge contano le righe davvero mostrate, Adesso compreso.
+    totale: (adesso ? 1 : 0) + nuovi.length + daFare.length + call.length + proposteVisibili.length + finePausa.length,
   };
-  return c.json(corpo);
+}
+
+todayRoutes.get("/today", async (c) => {
+  const q = oggiSchema.parse(c.req.query());
+  return c.json(await calcolaOggi(c.env.DB, c.get("user").id, q.chi, q.now ?? Date.now()));
 });
 
 todayRoutes.get("/stats", async (c) => {

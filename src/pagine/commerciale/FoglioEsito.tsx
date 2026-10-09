@@ -5,7 +5,7 @@ import { api } from "../../api";
 import { AreaTesto, Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
-import { CasellaInvito } from "./CasellaInvito";
+import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
 import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type StatoEsito } from "./esito";
 
 // email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
@@ -22,6 +22,8 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
   const senzaEmail = lead.email === null;
   const [invito, setInvito] = useState(!senzaEmail);
   const mandaInvito = s.esito === "appuntamento" && invito && !senzaEmail;
+  // Senza Resend l'invito va in coda: il pulsante non promette un invio che non parte adesso.
+  const resend = useResendCollegato();
   const fase = fasi.data?.find((f) => f.id === s.stageId);
   const cambiaFase = s.stageId !== lead.stageId;
   // PV2: il motivo serve solo se la fase cambia davvero verso una fase che lo chiede.
@@ -53,8 +55,8 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
     onSuccess: (r) => {
       // L'esito resta salvato anche se l'invito non parte: in quel caso un avviso sabbia, mai un errore rosso.
       if (mandaInvito && r.callId) {
-        void api(`/calls/${r.callId}/invito`, { method: "POST" })
-          .then(() => toast.success("Esito salvato, invito mandato"))
+        void api<{ ok: boolean; inCoda?: boolean }>(`/calls/${r.callId}/invito`, { method: "POST" })
+          .then((x) => (x.inCoda ? toast("Esito salvato, invito in coda: partirà quando Resend sarà collegato") : toast.success("Esito salvato, invito mandato")))
           .catch((e: Error) => toast.warning(`Esito salvato. ${e.message}`))
           .finally(() => void qc.invalidateQueries({ queryKey: ["calls"] }));
       } else toast.success("Esito salvato");
@@ -80,7 +82,7 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
       onChiudi={onChiudi}
       principale={
         <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={errore ?? undefined} onClick={() => salva.mutate()}>
-          {mandaInvito ? "Salva esito e manda l'invito" : "Salva esito"}
+          {mandaInvito && resend ? "Salva esito e manda l'invito" : "Salva esito"}
         </Pulsante>
       }
     >
@@ -101,7 +103,7 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
               onCambia={(ms) => { setS((p) => ({ ...p, callAt: ms })); if (ms != null) void scegli("appuntamento", ms); }} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={s.meetLink} onChange={(e) => setS((p) => ({ ...p, meetLink: e.target.value }))} />
             <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
-            <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} />
+            <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} inCoda={!resend} />
           </div>
         )}
         {s.esito && (motivoObbligatorio || s.lostReason) && (
