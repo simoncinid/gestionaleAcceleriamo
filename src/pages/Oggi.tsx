@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
 import { Link } from "react-router";
 import { api } from "../api";
 import { Empty, cx } from "../components/ui";
@@ -18,15 +17,19 @@ const SECTIONS: SectionDef[] = [
 ];
 
 export function Oggi() {
-  const bounds = useMemo(() => dayBounds(), []);
+  const day = dayBounds();
   const today = useQuery({
-    queryKey: ["today", bounds.from],
-    queryFn: () => api<Today>(`/today?from=${bounds.from}&until=${bounds.until}&now=${bounds.now}`),
+    queryKey: ["today", day.from],
+    queryFn: async () => {
+      const bounds = dayBounds();
+      const data = await api<Today>(`/today?from=${bounds.from}&until=${bounds.until}&now=${bounds.now}`);
+      return { bounds, data };
+    },
     refetchInterval: 60_000,
   });
   if (today.isLoading) return <p className="text-ink/60">Caricamento…</p>;
   if (today.error || !today.data) return <Empty text={today.error?.message ?? "Errore"} />;
-  const data = today.data;
+  const { data, bounds } = today.data;
   return (
     <div className="mx-auto max-w-4xl space-y-8">
       <header>
