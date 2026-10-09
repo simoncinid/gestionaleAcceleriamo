@@ -12,6 +12,7 @@ import { ESITI, propostaEsito } from "../regole/motore";
 import { contestoRegole } from "../impostazioni/service";
 import { callDelLead, callNuovaSchema, fissaCall } from "../calls/service";
 import { esitoSchema, primoTentativoAt, registraContatto, salvaEsito } from "./esito";
+import { proposteDelLead } from "../proposte/service";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -82,6 +83,7 @@ leadRoutes.post("/:id/contatti", async (c) => {
 });
 
 leadRoutes.get("/:id/calls", async (c) => c.json({ calls: await callDelLead(getDb(c.env.DB), c.req.param("id")) }));
+leadRoutes.get("/:id/proposals", async (c) => c.json({ proposte: await proposteDelLead(getDb(c.env.DB), c.req.param("id")) }));
 
 leadRoutes.post("/:id/calls", async (c) => {
   const input = callNuovaSchema.parse(await c.req.json());

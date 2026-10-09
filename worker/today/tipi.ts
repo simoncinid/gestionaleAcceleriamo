@@ -9,7 +9,7 @@ export type RigaOggi = {
 
 export type CallOggi = { id: string; leadId: string; company: string; contactName: string | null; phone: string | null; kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null };
 
-export type PropostaOggi = { id: string; number: string; leadId: string; company: string; contactName: string | null; email: string | null; phone: string | null; setupCents: number | null; feeCents: number | null; nextActionAt: number | null };
+export type PropostaOggi = { id: string; number: string; status: "registrata" | "presentata"; leadId: string; company: string; contactName: string | null; email: string | null; phone: string | null; setupCents: number | null; feeCents: number | null; nextActionAt: number | null };
 
 export type VoceAdesso = ({ tipo: "lead" } & RigaOggi) | ({ tipo: "call" } & CallOggi);
 

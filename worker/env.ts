@@ -7,6 +7,8 @@ export type Env = {
   META_GRAPH_VERSION: string;
   // Segreto di produzione (wrangler secret put). Vuoto o assente: gli inviti non partono, la call si salva lo stesso.
   RESEND_API_KEY: string;
+  // Chiave dell'aggancio dal wiki (wrangler secret put PROPOSAL_HOOK_KEY). Vuota o assente: l'aggancio risponde sempre 401.
+  PROPOSAL_HOOK_KEY: string;
 };
 
 export type SessionUser = { id: string; username: string; name: string };

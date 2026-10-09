@@ -31,3 +31,4 @@ export type Stats = {
 export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";
 
 export type { CallAgenda } from "../worker/calls/service";
+export type { PropostaRiga } from "../worker/proposte/service";

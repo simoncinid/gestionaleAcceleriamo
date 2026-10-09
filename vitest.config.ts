@@ -22,6 +22,7 @@ export default defineWorkersConfig(async () => {
               META_PAGE_TOKEN: "token-test",
               META_GRAPH_VERSION: "v23.0",
               RESEND_API_KEY: "re_test",
+              PROPOSAL_HOOK_KEY: "chiave-aggancio-test",
             },
           },
         },

@@ -69,7 +69,7 @@ todayRoutes.get("/today", async (c) => {
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM} WHERE ${APERTI} ${chi} AND l.stage_id = 'da-chiamare-prima-volta' ORDER BY l.created_at`),
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM}
       WHERE ${APERTI} ${chi} AND l.next_action_at IS NOT NULL AND l.next_action_at < ?2 ORDER BY l.next_action_at`, fine),
-    tutti<PropostaOggi>(`SELECT p.id, p.number, l.id AS leadId, l.company, l.contact_name AS contactName, l.email, l.phone,
+    tutti<PropostaOggi>(`SELECT p.id, p.number, p.status, l.id AS leadId, l.company, l.contact_name AS contactName, l.email, l.phone,
         p.setup_cents AS setupCents, p.fee_cents AS feeCents, l.next_action_at AS nextActionAt
       FROM proposals p JOIN leads l ON l.id = p.lead_id JOIN stages s ON s.id = l.stage_id
       WHERE ${APERTI} ${chi} AND p.deleted_at IS NULL AND p.status IN ('registrata', 'presentata')
