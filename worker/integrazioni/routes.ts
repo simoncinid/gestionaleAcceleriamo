@@ -8,6 +8,8 @@ import type { AppEnv, Env } from "../env";
 import { anteprimaFoglio, giroFoglio } from "../foglio/sync";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { MAX_META_ATTEMPTS } from "../meta/ingest";
+import { pushCollegate } from "../push/invio";
+import { provaPush } from "../push/routes";
 import { hookSchema } from "../proposte/schema";
 import { segnaErrore, segnaOk } from "./stato";
 
@@ -31,6 +33,7 @@ export const SENZA_CHIAVE_RESEND = "Non collegato: manca la chiave di Resend";
 export const SENZA_CHIAVE_AGGANCIO = "Non collegato: manca la chiave dell'aggancio";
 const SENZA_SEGRETI_META = "Non collegato: mancano i segreti di Meta";
 const SENZA_LINK_FOGLIO = "Non collegato: manca il link del foglio";
+export const SENZA_CHIAVI_PUSH = "Non collegato: mancano le chiavi VAPID";
 
 // I segreti risultano solo presenti o mancanti: il valore non esce mai dal Worker.
 const segretiDi = (env: Env) => ({
@@ -47,7 +50,7 @@ integrazioniRoutes.get("/status", async (c) => {
   const db = getDb(c.env.DB);
   const da = Date.now() - SETTIMANA;
   const conta = async (q: string, ...b: unknown[]) => (await c.env.DB.prepare(q).bind(...b).first<{ n: number }>())?.n ?? 0;
-  const [righe, imp, st, ultimoMetaRiga, metaFermi, sMeta, sFoglio, sAggancio] = await Promise.all([
+  const [righe, imp, st, ultimoMetaRiga, metaFermi, sMeta, sFoglio, sAggancio, dispositivi] = await Promise.all([
     db.select().from(integrationStatus),
     leggiImpostazioni(db),
     db.select().from(sheetSyncState).where(eq(sheetSyncState.id, "foglio-andrea")).get(),
@@ -56,6 +59,7 @@ integrazioniRoutes.get("/status", async (c) => {
     conta("SELECT count(*) n FROM leads WHERE source = 'meta' AND created_at >= ?", da),
     conta("SELECT count(*) n FROM leads WHERE source = 'foglio_andrea' AND created_at >= ?", da),
     conta("SELECT count(*) n FROM hook_log WHERE status IN (200, 201) AND outcome <> 'prova' AND at >= ?", da),
+    pushCollegate(c.env) ? conta("SELECT count(*) n FROM push_subscriptions WHERE rotta = 0") : Promise.resolve(0),
   ]);
   const segreti = segretiDi(c.env);
   const collegato = (key: string) => (key === "resend" ? segreti.resend : key === "aggancio" ? segreti.aggancio : true);
@@ -74,6 +78,10 @@ integrazioniRoutes.get("/status", async (c) => {
     : metaFermi > 0
       ? { key: "meta", etichetta: "Meta", stato: "errore", ultimaOk: ultimoMeta, nota: metaFermi === 1 ? "1 lead Meta incompleto" : `${metaFermi} lead Meta incompleti` }
       : { key: "meta", etichetta: "Meta", stato: ultimoMeta ? "ok" : "mai", ultimaOk: ultimoMeta, nota: ultimoMeta ? null : "Nessun lead ricevuto" };
+  // Push: senza chiavi VAPID "Non collegato"; con le chiavi il numero dei dispositivi attivi.
+  const push: Integrazione = pushCollegate(c.env)
+    ? { key: "push", etichetta: "Push", stato: "ok", ultimaOk: null, nota: dispositivi === 1 ? "1 dispositivo" : `${dispositivi} dispositivi` }
+    : { key: "push", etichetta: "Push", stato: "spento", ultimaOk: null, nota: SENZA_CHIAVI_PUSH };
   const foglioSpento = !imp.foglio.spreadsheetId.trim() ? SENZA_LINK_FOGLIO : !imp.foglio.attivo ? "Lettura spenta" : null;
   const out: StatoSistema = {
     integrazioni: [
@@ -81,7 +89,7 @@ integrazioniRoutes.get("/status", async (c) => {
       daRiga("foglio", foglioSpento),
       daRiga("aggancio", segreti.aggancio ? null : SENZA_CHIAVE_AGGANCIO),
       daRiga("resend", segreti.resend ? null : SENZA_CHIAVE_RESEND),
-      futura("push"), futura("telegram"), futura("claude"),
+      push, futura("telegram"), futura("claude"),
       daRiga("giro", null),
     ],
     settimana: { meta: sMeta, foglio: sFoglio, aggancio: sAggancio },
@@ -146,4 +154,9 @@ integrazioniRoutes.post("/resend/prova", async (c) => {
   }
   await segnaOk(db, "resend", now);
   return c.json({ ok: true, a: conferma.rispondiA });
+});
+
+integrazioniRoutes.post("/push/prova", async (c) => {
+  const r = await provaPush({ env: c.env, userId: c.get("user").id });
+  return c.json(r.corpo, r.stato);
 });

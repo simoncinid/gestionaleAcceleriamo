@@ -8,7 +8,12 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "acceleriamo-os", "database_id": "6fe0f895-cbe5-4feb-9987-f4346f700343", "migrations_dir": "drizzle" }
   ],
-  "vars": { "META_GRAPH_VERSION": "v23.0" },
+  "vars": {
+    "META_GRAPH_VERSION": "v23.0",
+    // Chiave pubblica VAPID: vuota finché Tommaso non genera la coppia (README, Task 16). La privata è un segreto.
+    "VAPID_PUBLIC_KEY": "",
+    "VAPID_SOGGETTO": "https://acceleriamo-os.acceleriamo-os.workers.dev"
+  },
   "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true }
 }

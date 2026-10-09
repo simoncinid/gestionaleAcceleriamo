@@ -1,4 +1,5 @@
 import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
+import { consegnaPush } from "./avvisi/consegna";
 import { COSTO_AVVISI, controllaAvvisi, controllaMeta48 } from "./avvisi/controlli";
 import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
@@ -17,8 +18,8 @@ export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "c
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
 // gli statement dentro le batch: foglio 5 fisse più 20 per lead nuovo, Meta 1 più 16 per lead (l'avviso
-// "Lead nuovo" della catena aggiunge una query a lead), avvisi 8 fisse più una per avviso,
-// conferma 1 più 6, invito circa 6,5. Le sottorichieste fisse (la lettura del foglio) stanno dentro la stima
+// "Lead nuovo" della catena aggiunge una query a lead), avvisi 8 fisse più una per avviso, consegna delle push
+// 3 fisse più 2 a push (una sottorichiesta a push), conferma 1 più 6, invito circa 6,5. Le sottorichieste fisse (la lettura del foglio) stanno dentro la stima
 // per unità, che è larga: foglio 2 per lead (CSV più email di conferma), Meta 2 (Graph più email).
 export type DefLavoro = {
   quando: (p: PartiRoma) => boolean;
@@ -26,6 +27,7 @@ export type DefLavoro = {
   perUnita: number;
   sottoPerUnita: number;
   max: number;
+  // Un lavoro può restituire { sottorichieste: n } con quelle usate davvero: le altre prenotate tornano al giro.
   esegui: (env: Env, now: number, limite: number) => Promise<unknown>;
 };
 
@@ -50,6 +52,16 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // chiamare, quindi foglio e Meta passano prima; con un arretrato nel foglio alle :15 gli avvisi aspettano
   // il giro dopo (5 minuti, dentro i 30 del preavviso). Fisse 8 (letture e chiusure), una query per unità.
   avvisi: { quando: sempre, ...COSTO_AVVISI, sottoPerUnita: 0, esegui: (e, n, l) => controllaAvvisi(e, n, l) },
+  // Push (spec 8): subito dopo gli avvisi, così l'avviso nato in questo giro (SLA, "Lead nuovo" della catena di
+  // foglio e Meta) arriva sul telefono nello stesso giro. Prima delle conferme: una push SLA vale più di un'email
+  // di conferma da ritentare, che può aspettare 5 minuti. Misura con contaD1: 2 letture più una batch con al
+  // massimo una scrittura per push e una per avviso letto (al massimo il limite), quindi 3 fisse e 2 a unità;
+  // una sottorichiesta per push, al massimo 10 per giro. Senza chiavi VAPID costa zero query e non manda niente.
+  consegna: {
+    quando: sempre, fisse: 3, perUnita: 2, sottoPerUnita: 1, max: 10,
+    // Le sottorichieste prenotate e non usate (meno push del limite) tornano al giro per i lavori dopo.
+    esegui: async (e, n, l) => ({ sottorichieste: (await consegnaPush(e, n, l)).inviate }),
+  },
   // Conferme e inviti si dividono lo stesso limite: ogni unità (una conferma o un invito) costa al massimo
   // 7 query e una sottorichiesta, così il budget conta anche gli inviti.
   conferme: {
@@ -119,7 +131,9 @@ export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; sa
     }
     sotto -= limite * def.sottoPerUnita;
     try {
-      await def.esegui(envContato, now, limite);
+      const esito = await def.esegui(envContato, now, limite);
+      const usate = (esito as { sottorichieste?: unknown } | null)?.sottorichieste;
+      if (typeof usate === "number") sotto += Math.max(0, limite * def.sottoPerUnita - usate);
       fatti.push(nome);
     } catch (e) {
       errori.push(`${nome}: ${(e as Error).message}`);

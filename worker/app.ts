@@ -18,6 +18,7 @@ import { integrazioniRoutes } from "./integrazioni/routes";
 import { automazioniRoutes } from "./automazioni/routes";
 import { clientiRoutes } from "./clienti/routes";
 import { economiaRoutes } from "./economia/routes";
+import { pushRoutes } from "./push/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -54,6 +55,7 @@ app.route("/api/economia", economiaRoutes);
 app.route("/api/clients", clientiRoutes);
 app.route("/api/automations", automazioniRoutes);
 app.route("/api/notifications", avvisiRoutes);
+app.route("/api/push-subscriptions", pushRoutes);
 app.route("/api", todayRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));
