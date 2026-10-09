@@ -1,0 +1,123 @@
+import { describe, expect, it } from "vitest";
+import { Fasi } from "../src/pagine/impostazioni/Fasi";
+import { Integrazioni } from "../src/pagine/impostazioni/Integrazioni";
+import { Modelli } from "../src/pagine/impostazioni/Modelli";
+import { Stato } from "../src/pagine/impostazioni/Stato";
+import { Login } from "../src/pagine/Login";
+import type { StatoSistema } from "../src/types";
+import { IMPOSTAZIONI_DEFAULT } from "../worker/impostazioni/default";
+import { contaPrimari, render } from "./render";
+
+const ORA = Date.UTC(2026, 9, 13, 8, 0);
+const stato: StatoSistema = {
+  integrazioni: [
+    { key: "meta", etichetta: "Meta", stato: "ok", ultimaOk: ORA - 3_600_000, nota: null },
+    { key: "foglio", etichetta: "Foglio Andrea", stato: "spento", ultimaOk: null, nota: "Non collegato: manca il link del foglio" },
+    { key: "aggancio", etichetta: "Aggancio proposte", stato: "mai", ultimaOk: null, nota: "Non ha ancora lavorato" },
+    { key: "resend", etichetta: "Resend", stato: "errore", ultimaOk: ORA - 86_400_000, nota: "Resend 500: errore finto" },
+    { key: "push", etichetta: "Push", stato: "spento", ultimaOk: null, nota: "Non ancora attivo" },
+    { key: "telegram", etichetta: "Telegram", stato: "spento", ultimaOk: null, nota: "Non ancora attivo" },
+    { key: "claude", etichetta: "Claude", stato: "spento", ultimaOk: null, nota: "Non ancora attivo" },
+    { key: "giro", etichetta: "Giro programmato", stato: "ok", ultimaOk: ORA - 120_000, nota: null },
+  ],
+  settimana: { meta: 4, foglio: 2, aggancio: 1 },
+  errori: [{ key: "resend", etichetta: "Resend", errore: "Resend 500: errore finto", errorId: "ab12cd34", at: ORA - 600_000 }],
+  segreti: { meta: true, resend: true, google: false, aggancio: true },
+  foglio: { ultimaRiga: 41, ultimaLettura: null },
+};
+// Niente segreti, niente foglio: tutto "non collegato", niente rosso.
+const scollegato: StatoSistema = {
+  ...stato,
+  integrazioni: stato.integrazioni.map((i) => (["meta", "foglio", "aggancio", "resend"].includes(i.key) ? { ...i, stato: "spento" as const, nota: `Non collegato: ${i.key}` } : i)),
+  errori: [],
+  segreti: { meta: false, resend: false, google: false, aggancio: false },
+};
+const fasi = [
+  { id: "da-chiamare-prima-volta", label: "Da chiamare", sortOrder: 1, kind: "open", tone: "accento", probability: 5, suggestedNextAction: "Chiamare", suggestedDelayHours: 2, requiresReason: false },
+  { id: "perso", label: "Perso", sortOrder: 9, kind: "lost", tone: "grigio", probability: 0, suggestedNextAction: null, suggestedDelayHours: null, requiresReason: true },
+];
+const regole = [
+  { id: "sla-prima", ruleKey: "sla", stageId: "da-chiamare-prima-volta", event: null, params: { minuti: 120, avvisoMinuti: 90 }, active: true },
+  { id: "ricontatti-decisione", ruleKey: "ricontatti", stageId: null, event: null, params: { giorni: [3, 7, 14] }, active: true },
+];
+const utenti = [{ id: "diego", name: "Diego" }, { id: "tommaso", name: "Tommaso" }];
+const LINEETTE = /[–—]/;
+
+describe("Impostazioni", () => {
+  it("Stato: un semaforo per riga, il rosso porta all'integrazione, errori col codice, nessun primario", () => {
+    const html = render(<Stato ora={ORA} onEsci={() => {}} />, { dati: [[["integrazioni"], stato]] });
+    expect(html).toContain('href="/impostazioni/integrazioni#resend"');
+    expect(html).toContain("Ultima volta oggi 09:00");
+    expect(html).toContain("Non ancora attivo");
+    expect(html).toMatch(/<strong[^>]*>4<\/strong> lead dal webhook Meta/);
+    expect(html).toContain("Codice ab12cd34");
+    expect(html).toContain('href="/impostazioni/fasi"');
+    expect(html).toContain("Esci dall&#x27;account");
+    expect(contaPrimari(html)).toBe(0);
+    expect(html).not.toMatch(LINEETTE);
+  });
+
+  it("Stato senza segreti: non collegato, nessun errore, niente rosso", () => {
+    const html = render(<Stato ora={ORA} onEsci={() => {}} />, { dati: [[["integrazioni"], scollegato]] });
+    expect(html).toContain("Non collegato");
+    expect(html).not.toContain("bg-errore");
+    expect(html).not.toContain("Ultimi errori");
+  });
+
+  it("Fasi e regole: un solo primario, selettori e nessun select nativo, ricontatti come lista, motivi gestibili", () => {
+    const html = render(<Fasi />, { dati: [[["stages"], fasi], [["stage-rules"], regole], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], utenti]] });
+    expect(contaPrimari(html)).toBe(1);
+    expect(html).toContain("Salva le regole");
+    expect(html).toContain('data-selettore="Si aggancia a"');
+    expect(html).toContain('data-selettore="Prima chiamata"');
+    expect(html).toContain('value="3, 7, 14"');
+    expect(html).toContain("Fase 2, persa");
+    expect(html).toContain("Aggiungi un motivo");
+    expect(html).toContain('value="Non raggiungibile"');
+    expect(html).not.toContain("<select");
+    expect(html).not.toMatch(LINEETTE);
+  });
+
+  it("Modelli: una riga per modello, Aggiungi in fondo, il primario sta solo nel foglio", () => {
+    const modelli = [{ id: "mod-primo-contatto", channel: "whatsapp", key: "primo_contatto", title: "Primo contatto", subject: null, body: "Ciao {referente}", stageId: "da-chiamare-prima-volta", sortOrder: 10 }];
+    const html = render(<Modelli />, { dati: [[["templates"], modelli], [["stages"], fasi]] });
+    expect(html).toContain("Primo contatto");
+    expect(html).toContain("Fase: Da chiamare");
+    expect(html).toContain("Aggiungi un modello");
+    expect(contaPrimari(html)).toBe(0);
+  });
+
+  it("Integrazioni: stato, configurazione e prova per ognuna; link intero del foglio; segreti solo presenti o mancanti; nessun primario", () => {
+    const html = render(<Integrazioni ora={ORA} />, { dati: [[["integrazioni"], stato], [["settings"], IMPOSTAZIONI_DEFAULT], [["aggancio-registro"], []]] });
+    for (const t of ["Leggi adesso", "Anteprima della mappa", "Proposta di prova", "Manda un&#x27;email di prova a me", "Account di servizio: mancante", "Ultima riga letta: 41", "In arrivo con il passaggio a cliente", "Link della scheda"]) {
+      expect(html).toContain(t);
+    }
+    expect(html).toContain('id="resend"');
+    expect(html).not.toContain("Id del foglio");
+    expect(contaPrimari(html)).toBe(0);
+    expect(html).not.toMatch(LINEETTE);
+  });
+
+  it("Integrazioni senza segreti: Non collegato al posto dell'errore, prove spente con il motivo", () => {
+    const html = render(<Integrazioni ora={ORA} />, { dati: [[["integrazioni"], scollegato], [["settings"], IMPOSTAZIONI_DEFAULT], [["aggancio-registro"], []]] });
+    expect(html).toContain("Non collegato");
+    expect(html).not.toContain("text-errore");
+    expect(html).toMatch(/aria-disabled="true"[^>]*>Proposta di prova/);
+    expect(html).toMatch(/aria-disabled="true"[^>]*>Manda un&#x27;email di prova a me/);
+  });
+});
+
+describe("Login", () => {
+  it("logo, utente e password, un solo pulsante primario: Entra", () => {
+    const html = render(<Login />);
+    expect(html).toContain('src="/brand/logo.svg"');
+    expect(html).toMatch(/autocomplete="username"/i);
+    expect(html).toMatch(/autocomplete="current-password"/i);
+    expect(html).toContain(">Utente</label>");
+    expect(html).toContain(">Password</label>");
+    expect(html).toContain(">Entra</button>");
+    expect(contaPrimari(html)).toBe(1);
+    expect(html).not.toContain("<select");
+    expect(html).not.toMatch(LINEETTE);
+  });
+});

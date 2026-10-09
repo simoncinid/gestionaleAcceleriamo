@@ -4,7 +4,7 @@ import { Navigate, Route, Routes, useParams } from "react-router";
 import { ApiError, api } from "./api";
 import { REDIRECT_1A } from "./guscio/aree";
 import { Guscio } from "./guscio/Guscio";
-import { Login } from "./pages/Login";
+import { Login } from "./pagine/Login";
 import { resetSession } from "./session";
 import { SchedaLeadRotta } from "./pagine/commerciale/SchedaLead";
 import { Oggi } from "./pagine/commerciale/Oggi";
@@ -15,6 +15,9 @@ import { FogliCreazione } from "./pagine/FogliCreazione";
 import { Numeri } from "./pagine/commerciale/Numeri";
 import { Cestino } from "./pagine/impostazioni/Cestino";
 import { Fasi } from "./pagine/impostazioni/Fasi";
+import { Integrazioni } from "./pagine/impostazioni/Integrazioni";
+import { Modelli } from "./pagine/impostazioni/Modelli";
+import { Stato } from "./pagine/impostazioni/Stato";
 import { Scaletta } from "./pagine/commerciale/Scaletta";
 import type { User } from "./types";
 
@@ -46,8 +49,8 @@ export function App() {
 
   const esci = () => api("/auth/logout", { method: "POST" }).catch(() => null).finally(() => resetSession(qc));
 
-  if (me.isLoading) return <p className="p-10 text-ink/60">Caricamento…</p>;
-  if (me.error) return <p className="p-10 text-red-700">{me.error.message}</p>;
+  if (me.isLoading) return <p className="p-10 text-grigio">Caricamento in corso</p>;
+  if (me.error) return <p role="alert" className="p-10 text-ink">{me.error.message}</p>;
   if (!me.data) return <Login />;
 
   return (
@@ -63,7 +66,10 @@ export function App() {
         <Route path="/commerciale/lead/:id" element={<SchedaLeadRotta />} />
         <Route path="/commerciale/numeri" element={<Numeri />} />
         <Route path="/impostazioni/dati/cestino" element={<Cestino />} />
+        <Route path="/impostazioni" element={<Stato onEsci={esci} />} />
         <Route path="/impostazioni/fasi" element={<Fasi />} />
+        <Route path="/impostazioni/modelli" element={<Modelli />} />
+        <Route path="/impostazioni/integrazioni" element={<Integrazioni />} />
         <Route path="*" element={<Navigate to="/commerciale/oggi" replace />} />
       </Route>
     </Routes>
