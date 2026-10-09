@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   conteggioBadge, euro, fermoDa, linkTel, linkWhatsApp, momento, percentuale, presetQuando, quando, riempiModello,
-  telefonoMostrato, trascorso,
+  telefonoMostrato, testoSla, trascorso,
 } from "../src/format";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0); // martedì 13 ottobre 2026, 10:00 a Roma
@@ -81,5 +81,14 @@ describe("soldi, conteggi, telefoni, modelli", () => {
   });
   it("riempie i segnaposto dei modelli", () => {
     expect(riempiModello("Ciao {referente}, {azienda} {ignoto}", { referente: "Luca", azienda: "Bertini" })).toBe("Ciao Luca, Bertini ");
+  });
+});
+
+describe("timer delle 2 ore", () => {
+  it("prima e dopo la scadenza", () => {
+    expect(testoSla(ORA + 40 * 60_000, ORA)).toBe("mancano 40 min");
+    expect(testoSla(ORA + 70 * 60_000, ORA)).toBe("mancano 1 h 10 min");
+    expect(testoSla(ORA + 120 * 60_000, ORA)).toBe("mancano 2 h");
+    expect(testoSla(ORA - 20 * 60_000, ORA)).toBe("scaduto da 20 min");
   });
 });

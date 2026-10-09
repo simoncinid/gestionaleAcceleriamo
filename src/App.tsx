@@ -7,7 +7,8 @@ import { Guscio } from "./guscio/Guscio";
 import { Login } from "./pages/Login";
 import { resetSession } from "./session";
 import { LeadPage } from "./pages/LeadPage";
-import { Oggi } from "./pages/Oggi";
+import { Oggi } from "./pagine/commerciale/Oggi";
+import { FogliCreazione } from "./pagine/FogliCreazione";
 import { Numeri } from "./pages/Numeri";
 import { Cestino } from "./pages/Cestino";
 import { Fasi } from "./pages/Fasi";
@@ -49,7 +50,7 @@ export function App() {
   return (
     <Routes>
       {REDIRECT_1A.map((r) => <Route key={r.da} path={r.da} element={<Redirect a={r.a} />} />)}
-      <Route element={<Guscio nome={me.data.name} onEsci={esci} fogli={() => null} />}>
+      <Route element={<Guscio nome={me.data.name} onEsci={esci} fogli={(crea, chiudi) => <FogliCreazione crea={crea} chiudi={chiudi} />} />}>
         <Route index element={<Navigate to="/commerciale/oggi" replace />} />
         <Route path="/commerciale/oggi" element={<Oggi />} />
         <Route path="/commerciale/scaletta" element={<Scaletta />} />

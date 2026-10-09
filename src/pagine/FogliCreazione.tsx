@@ -1,0 +1,69 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { toast } from "sonner";
+import { api } from "../api";
+import { AreaTesto, Campo, Foglio, Pulsante, Riga } from "../ds";
+import type { Creazione } from "../guscio/aree";
+import { useDebounced } from "../hooks";
+import type { LeadListItem } from "../types";
+import { FoglioEsito } from "./commerciale/FoglioEsito";
+import { FoglioNuovoLead } from "./commerciale/FoglioNuovoLead";
+
+function ScegliLead({ titolo, onScelto, onChiudi }: { titolo: string; onScelto: (l: LeadListItem) => void; onChiudi: () => void }) {
+  const [q, setQ] = useState("");
+  const cerca = useDebounced(q.trim(), 250);
+  const r = useQuery({
+    queryKey: ["leads", { q: cerca }],
+    queryFn: () => api<{ leads: LeadListItem[] }>(`/leads?q=${encodeURIComponent(cerca)}`).then((x) => x.leads),
+    enabled: cerca.length > 1,
+  });
+  return (
+    <Foglio aperto titolo={titolo} onChiudi={onChiudi}>
+      <div className="flex flex-col gap-3">
+        <Campo etichetta="Cerca il lead" placeholder="Azienda, referente o telefono" autoFocus value={q} onChange={(e) => setQ(e.target.value)} />
+        {cerca.length > 1 && r.data?.length === 0 && <p className="text-secondaria text-grigio">Nessun lead trovato.</p>}
+        <ul className="flex flex-col gap-2">
+          {r.data?.slice(0, 8).map((l) => (
+            <li key={l.id}><Riga titolo={l.company} secondaria={l.contactName ?? undefined} onClick={() => onScelto(l)} /></li>
+          ))}
+        </ul>
+      </div>
+    </Foglio>
+  );
+}
+
+function FoglioNota({ lead, onChiudi }: { lead: LeadListItem; onChiudi: () => void }) {
+  const qc = useQueryClient();
+  const [testo, setTesto] = useState("");
+  const salva = useMutation({
+    mutationFn: () => api(`/leads/${lead.id}/activities`, { method: "POST", json: { type: "nota", body: testo } }),
+    onSuccess: () => {
+      toast.success("Nota salvata");
+      void qc.invalidateQueries({ queryKey: ["lead", lead.id] });
+      onChiudi();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  return (
+    <Foglio aperto titolo={`Nota su ${lead.company}`} onChiudi={onChiudi}
+      principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={testo.trim() ? undefined : "Scrivi qualcosa"} onClick={() => salva.mutate()}>Salva nota</Pulsante>}>
+      <AreaTesto etichetta="Nota" rows={5} autoFocus value={testo} onChange={(e) => setTesto(e.target.value)} />
+    </Foglio>
+  );
+}
+
+// Un foglio per ogni creazione del "+". I Task 14 e 18 aggiungono proposta, cliente, canone, fattura, costo, automazione.
+export function FogliCreazione({ crea, chiudi }: { crea: Creazione | null; chiudi: () => void }) {
+  const [lead, setLead] = useState<LeadListItem | null>(null);
+  const fine = () => { setLead(null); chiudi(); };
+  switch (crea) {
+    case "lead":
+      return <FoglioNuovoLead onChiudi={fine} />;
+    case "esito":
+      return lead ? <FoglioEsito lead={lead} onChiudi={fine} /> : <ScegliLead titolo="Esito di quale lead" onScelto={setLead} onChiudi={fine} />;
+    case "nota":
+      return lead ? <FoglioNota lead={lead} onChiudi={fine} /> : <ScegliLead titolo="Nota su quale lead" onScelto={setLead} onChiudi={fine} />;
+    default:
+      return null;
+  }
+}

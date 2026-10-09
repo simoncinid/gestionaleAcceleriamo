@@ -249,6 +249,11 @@ export async function listLeads(db: Db, f: LeadFilters) {
       createdAt: leads.createdAt,
       updatedAt: leads.updatedAt,
       deletedAt: leads.deletedAt,
+      attemptCount: leads.attemptCount,
+      score: leads.score,
+      setupCents: leads.setupCents,
+      feeCents: leads.feeCents,
+      sequenceStep: leads.sequenceStep,
     })
     .from(leads)
     .where(and(...conds))

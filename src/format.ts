@@ -151,3 +151,12 @@ export function presetQuando(ora = Date.now()) {
     { etichetta: "Tra 3 giorni", ms: daRoma(p.anno, p.mese, p.giorno + 3, 10, 0) },
   ];
 }
+
+// Minuti interi in ore e minuti ("1 h 10 min"): diversa da durata(), che arrotonda all'unità più grande.
+const durataMinuti = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
+
+// Timer delle 2 ore sui lead nuovi (spec 6.4).
+export function testoSla(scadenza: number, ora = Date.now()): string {
+  const minuti = Math.round((scadenza - ora) / 60_000);
+  return minuti >= 0 ? `mancano ${durataMinuti(minuti)}` : `scaduto da ${durataMinuti(-minuti)}`;
+}

@@ -1,11 +1,15 @@
 export type User = { id: string; username: string; name: string };
-export type Stage = { id: string; label: string; sortOrder: number; kind: "open" | "won" | "lost"; tone: string };
+export type Stage = {
+  id: string; label: string; sortOrder: number; kind: "open" | "won" | "lost"; tone: string;
+  requiresReason: boolean; probability: number; suggestedNextAction: string | null; suggestedDelayHours: number | null;
+};
 
 export type LeadListItem = {
   id: string; company: string; contactName: string | null; email: string | null; phone: string | null; source: string;
   metaCampaign: string | null; metaStatus: "pending" | "ok" | "error" | null; stageId: string; stageChangedAt: number;
   estimatedValue: number | null; ownerId: string | null; nextAction: string | null; nextActionAt: number | null;
   appointmentAt: number | null; duplicateOfId: string | null; createdAt: number; updatedAt: number; deletedAt: number | null;
+  attemptCount: number; score: "verde" | "giallo" | "grigio" | null; setupCents: number | null; feeCents: number | null; sequenceStep: number;
 };
 
 export type Lead = LeadListItem & {
@@ -16,12 +20,6 @@ export type Lead = LeadListItem & {
 export type Activity = { id: string; type: string; body: string; createdAt: number; authorId: string | null; authorName: string };
 export type DocumentRow = { id: string; leadId: string; name: string; url: string | null; createdAt: number };
 export type LeadDetail = { lead: Lead; activities: Activity[]; documents: DocumentRow[]; duplicateOf: { id: string; company: string } | null };
-
-export type TodayItem = {
-  id: string; company: string; contactName: string | null; stageId: string; stageLabel: string; nextAction: string | null;
-  nextActionAt: number | null; appointmentAt: number | null; stageChangedAt: number; source: string; metaCampaign: string | null;
-};
-export type Today = Record<"due" | "appointments" | "untouched" | "stale" | "missingAction" | "metaIncomplete", TodayItem[]>;
 
 export type Stats = {
   bySource: { source: string; total: number; won: number; lost: number }[];

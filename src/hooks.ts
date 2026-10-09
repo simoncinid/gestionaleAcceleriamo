@@ -2,7 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { BadgeDati } from "./guscio/BarraBasso";
-import type { Stage } from "./types";
+import type { MessageTemplate } from "../worker/db/schema";
+import type { Stage, User } from "./types";
 
 export const useStages = () =>
   useQuery({ queryKey: ["stages"], queryFn: () => api<{ stages: Stage[] }>("/stages").then((r) => r.stages), staleTime: 60_000 });
@@ -30,3 +31,10 @@ export function useDebounced<T>(value: T, ms: number) {
 // finché manca, la query fallisce in silenzio (niente avviso, niente stato di errore) e i badge non si vedono.
 export const useBadge = () =>
   useQuery({ queryKey: ["badge"], queryFn: () => api<BadgeDati>("/badge"), staleTime: 30_000, refetchOnWindowFocus: true, retry: false });
+
+// L'utente collegato: lo carica App con la chiave ["me"], qui si legge dalla cache.
+export const useMe = () => useQueryClient().getQueryData<User | null>(["me"]) ?? null;
+
+// Modelli dei messaggi (WhatsApp ed email), da compilare con riempiModello.
+export const useModelli = () =>
+  useQuery({ queryKey: ["templates"], queryFn: () => api<{ templates: MessageTemplate[] }>("/templates").then((r) => r.templates), staleTime: 300_000 });
