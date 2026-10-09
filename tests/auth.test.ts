@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
+import { buildUserSql } from "../worker/auth/user-sql";
 import { hashPassword, verifyPassword } from "../worker/auth/password";
 import { authed, call, createUser, loginCookie } from "./helpers";
 
@@ -50,6 +51,15 @@ describe("login", () => {
     expect(((await res.json()) as { error: string }).error).toMatch(/Troppi tentativi/);
   });
 
+  it("tentativi sbagliati in parallelo contano tutti", async () => {
+    await createUser();
+    await Promise.all(
+      Array.from({ length: 6 }, () => call("/api/auth/login", { method: "POST", json: { username: "tommaso", password: "no" } })),
+    );
+    const res = await call("/api/auth/login", { method: "POST", json: { username: "tommaso", password: "password-lunga-1" } });
+    expect(res.status).toBe(429);
+  });
+
   it("logout chiude la sessione", async () => {
     const cookie = await authed();
     await call("/api/auth/logout", { method: "POST" }, cookie);
@@ -73,3 +83,23 @@ async function loginAfterCreate() {
   await createUser();
   return loginCookie();
 }
+
+describe("buildUserSql", () => {
+  it("hash con $ e nome con apostrofo arrivano intatti e permettono il login", async () => {
+    const hash = await hashPassword("password-lunga-2", 1000);
+    expect(hash).toContain("$");
+    await env.DB.exec(buildUserSql(" Anna ", "Anna D'Angelo", hash).trim().replace(/\n+/g, "\n"));
+    const row = await env.DB.prepare("SELECT name, password_hash FROM users WHERE id = 'anna'").first<{ name: string; password_hash: string }>();
+    expect(row).toEqual({ name: "Anna D'Angelo", password_hash: hash });
+    const res = await call("/api/auth/login", { method: "POST", json: { username: "anna", password: "password-lunga-2" } });
+    expect(res.status).toBe(200);
+  });
+
+  it("riesecuzione per utente esistente chiude le sessioni", async () => {
+    const cookie = await authed();
+    const hash = await hashPassword("nuova-password-9", 1000);
+    await env.DB.exec(buildUserSql("tommaso", "Tommaso", hash).trim());
+    expect((await call("/api/auth/me", {}, cookie)).status).toBe(401);
+    expect((await call("/api/auth/login", { method: "POST", json: { username: "tommaso", password: "nuova-password-9" } })).status).toBe(200);
+  });
+});

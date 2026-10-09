@@ -27,10 +27,11 @@ authRoutes.post("/login", async (c) => {
     return c.json({ error: `Troppi tentativi sbagliati, riprova tra ${minutes} minuti` }, 429);
   }
   if (!(await verifyPassword(password, user.password_hash))) {
-    const failed = user.failed_logins + 1;
-    const lock = failed >= MAX_FAILED ? now + LOCK_MS : null;
-    await c.env.DB.prepare("UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?")
-      .bind(lock ? 0 : failed, lock, user.id)
+    // Incremento atomico in una sola istruzione: richieste parallele non si perdono.
+    await c.env.DB.prepare(
+      "UPDATE users SET failed_logins = CASE WHEN failed_logins + 1 >= ?1 THEN 0 ELSE failed_logins + 1 END, locked_until = CASE WHEN failed_logins + 1 >= ?1 THEN ?2 ELSE locked_until END WHERE id = ?3",
+    )
+      .bind(MAX_FAILED, now + LOCK_MS, user.id)
       .run();
     return c.json({ error: "Utente o password sbagliati" }, 401);
   }
