@@ -23,6 +23,8 @@ export default defineWorkersConfig(async () => {
               META_GRAPH_VERSION: "v23.0",
               RESEND_API_KEY: "re_test",
               PROPOSAL_HOOK_KEY: "chiave-aggancio-test",
+              GOOGLE_SA_EMAIL: "",
+              GOOGLE_SA_PRIVATE_KEY: "",
             },
           },
         },
