@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import manifest from "../public/manifest.webmanifest?raw";
 import sw from "../public/sw.js?raw";
+import main from "../src/main.tsx?raw";
 import { etichettaDispositivo, statoPush } from "../src/push";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -46,5 +47,21 @@ describe("statoPush", () => {
   it("etichetta leggibile del dispositivo", () => {
     expect(etichettaDispositivo(IPHONE)).toBe("iPhone, Safari");
     expect(etichettaDispositivo(MAC_CHROME)).toBe("Mac, Chrome");
+  });
+});
+
+describe("iPad e registrazione", () => {
+  const IPAD = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
+  it("iPad che si presenta come Mac: tre passi, non 'non supportato'", () => {
+    expect(statoPush({ ua: IPAD, standalone: false, haPush: false, permesso: "assente", tocco: true }, false)).toBe("serve-home");
+    expect(statoPush({ ua: IPAD, standalone: false, haPush: false, permesso: "assente", tocco: false }, false)).toBe("non-supportato");
+    expect(etichettaDispositivo(IPAD, true)).toBe("iPad, Safari");
+  });
+  it("il service worker si registra solo in produzione", () => {
+    expect(main).toMatch(/if \(import\.meta\.env\.PROD && "serviceWorker" in navigator\) \{\s*window\.addEventListener\("load", \(\) => navigator\.serviceWorker\.register\("\/sw\.js"\)/);
+    expect(main.match(/serviceWorker\.register/g)).toHaveLength(1);
+  });
+  it("pagina offline mancante dalla cache: errore di rete, mai undefined", () => {
+    expect(sw).toContain("r || Response.error()");
   });
 });
