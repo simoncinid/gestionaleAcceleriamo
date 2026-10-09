@@ -6,7 +6,10 @@ import { Layout } from "./pages/Layout";
 import { Login } from "./pages/Login";
 import { resetSession } from "./session";
 import { LeadPage } from "./pages/LeadPage";
-import { Placeholder } from "./pages/Placeholder";
+import { Oggi } from "./pages/Oggi";
+import { Numeri } from "./pages/Numeri";
+import { Cestino } from "./pages/Cestino";
+import { Fasi } from "./pages/Fasi";
 import { Scaletta } from "./pages/Scaletta";
 import type { User } from "./types";
 
@@ -38,12 +41,12 @@ export function App() {
     <Routes>
       <Route element={<Layout user={me.data} />}>
         <Route index element={<Navigate to="/oggi" replace />} />
-        <Route path="oggi" element={<Placeholder title="oggi" />} />
+        <Route path="oggi" element={<Oggi />} />
         <Route path="scaletta" element={<Scaletta />} />
         <Route path="lead/:id" element={<LeadPage />} />
-        <Route path="numeri" element={<Placeholder title="numeri" />} />
-        <Route path="cestino" element={<Placeholder title="cestino" />} />
-        <Route path="fasi" element={<Placeholder title="fasi" />} />
+        <Route path="numeri" element={<Numeri />} />
+        <Route path="cestino" element={<Cestino />} />
+        <Route path="fasi" element={<Fasi />} />
         <Route path="*" element={<Navigate to="/oggi" replace />} />
       </Route>
     </Routes>
