@@ -5,7 +5,7 @@ export default defineWorkersConfig(async () => {
   const migrations = await readD1Migrations(path.resolve("drizzle"));
   return {
     test: {
-      include: ["tests/**/*.test.ts"],
+      include: ["tests/**/*.test.{ts,tsx}"],
       setupFiles: ["./tests/apply-migrations.ts"],
       poolOptions: {
         workers: {
@@ -14,13 +14,17 @@ export default defineWorkersConfig(async () => {
           miniflare: {
             compatibilityDate: "2026-09-15",
             compatibilityFlags: ["nodejs_compat"],
-            d1Databases: ["DB"],
+            d1Databases: ["DB", "DB_PRE"],
             bindings: {
               TEST_MIGRATIONS: migrations,
               META_APP_SECRET: "segreto-test",
               META_VERIFY_TOKEN: "verifica-test",
               META_PAGE_TOKEN: "token-test",
               META_GRAPH_VERSION: "v23.0",
+              RESEND_API_KEY: "re_test",
+              PROPOSAL_HOOK_KEY: "chiave-aggancio-test",
+              GOOGLE_SA_EMAIL: "",
+              GOOGLE_SA_PRIVATE_KEY: "",
             },
           },
         },

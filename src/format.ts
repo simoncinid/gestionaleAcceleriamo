@@ -1,62 +1,162 @@
-const TZ = "Europe/Rome";
-
-export const fmtDateTime = (ms?: number | null) =>
-  ms ? new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(ms) : "";
-
-export const fmtDate = (ms?: number | null) =>
-  ms ? new Intl.DateTimeFormat("it-IT", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(ms) : "";
-
-export const fmtEuro = (n?: number | null) =>
-  n == null ? "" : new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
-
-export function fmtDuration(ms?: number | null) {
-  if (ms == null) return "n.d.";
-  const minutes = Math.round(ms / 60_000);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} h ${minutes % 60} min`;
-  return `${Math.floor(hours / 24)} ${Math.floor(hours / 24) === 1 ? "giorno" : "giorni"} ${hours % 24} h`;
-}
-
-const pad = (n: number) => String(n).padStart(2, "0");
-
-export function toInput(ms?: number | null) {
-  if (!ms) return "";
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function fromInput(v: string): number | null {
-  if (!v) return null;
-  const t = new Date(v).getTime();
-  return Number.isNaN(t) ? null : t;
-}
-
-export function dayBounds(now = new Date()) {
-  const from = new Date(now);
-  from.setHours(0, 0, 0, 0);
-  const until = new Date(now);
-  until.setHours(23, 59, 59, 999);
-  return { from: from.getTime(), until: until.getTime(), now: now.getTime() };
-}
-
-export function relative(ms: number) {
-  const days = Math.floor((Date.now() - ms) / 86_400_000);
-  if (days <= 0) return "oggi";
-  if (days === 1) return "ieri";
-  return `${days} giorni fa`;
-}
+import { daRoma, inizioGiornoRoma, numeroGiorno, partiRoma } from "../worker/lib/roma";
 
 export const SOURCE_LABELS: Record<string, string> = {
-  meta: "Meta", manuale: "A mano", sito: "Sito", passaparola: "Passaparola", altro: "Altro", migrazione: "Vecchio gestionale",
+  meta: "Meta", manuale: "A mano", sito: "Sito", passaparola: "Passaparola", altro: "Altro", migrazione: "Vecchio gestionale", foglio_andrea: "Foglio Andrea",
 };
 
-export const TONE_CLASSES: Record<string, string> = {
-  orange: "bg-brand/15 text-brand",
-  neutral: "bg-ink/10 text-ink/70",
-  yellow: "bg-amber-100 text-amber-800",
-  blue: "bg-sky-100 text-sky-800",
-  violet: "bg-violet-100 text-violet-800",
-  green: "bg-emerald-100 text-emerald-800",
-  red: "bg-red-100 text-red-800",
-};
+const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+const GIORNI = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+const MIN = 60_000;
+const ORA_MS = 3_600_000;
+const GIORNO_MS = 86_400_000;
+
+const hhmm = (p: { ore: number; minuti: number }) => `${String(p.ore).padStart(2, "0")}:${String(p.minuti).padStart(2, "0")}`;
+
+function durata(ms: number) {
+  if (ms < ORA_MS) return `${Math.max(1, Math.floor(ms / MIN))} min`;
+  if (ms < GIORNO_MS) return `${Math.floor(ms / ORA_MS)} h`;
+  const g = Math.floor(ms / GIORNO_MS);
+  return g === 1 ? "1 giorno" : `${g} giorni`;
+}
+
+function dataBreve(ms: number, ora: number, conSettimana: boolean) {
+  const p = partiRoma(ms);
+  const anno = p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : "";
+  const giorno = conSettimana ? `${GIORNI[p.settimana]} ` : "";
+  return `${giorno}${p.giorno} ${MESI[p.mese - 1]}${anno}, ${hhmm(p)}`;
+}
+
+// Unica funzione per le date future e scadute (DS 2.2).
+export function quando(ms?: number | null, ora = Date.now()): string {
+  if (ms == null) return "";
+  if (ms < ora) return `scaduta da ${durata(ora - ms)}`;
+  const diff = numeroGiorno(partiRoma(ms)) - numeroGiorno(partiRoma(ora));
+  if (diff === 0) return `oggi ${hhmm(partiRoma(ms))}`;
+  if (diff === 1) return `domani ${hhmm(partiRoma(ms))}`;
+  return dataBreve(ms, ora, diff <= 6);
+}
+
+// Momento nello storico: oggi, ieri, poi giorno e data.
+export function momento(ms: number, ora = Date.now()): string {
+  const diff = numeroGiorno(partiRoma(ora)) - numeroGiorno(partiRoma(ms));
+  if (diff === 0) return `oggi ${hhmm(partiRoma(ms))}`;
+  if (diff === 1) return `ieri ${hhmm(partiRoma(ms))}`;
+  return dataBreve(ms, ora, true);
+}
+
+// Q13: quando è arrivato un lead. Oggi e ieri con l'ora, poi solo giorno e mese ("3 ott").
+export function arrivato(ms: number, ora = Date.now()): string {
+  const diff = numeroGiorno(partiRoma(ora)) - numeroGiorno(partiRoma(ms));
+  if (diff === 0) return `oggi ${hhmm(partiRoma(ms))}`;
+  if (diff === 1) return `ieri ${hhmm(partiRoma(ms))}`;
+  const p = partiRoma(ms);
+  const anno = p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : "";
+  return `${p.giorno} ${MESI[p.mese - 1]}${anno}`;
+}
+
+export function trascorso(ms: number, ora = Date.now()): string {
+  const d = ora - ms;
+  if (d < MIN) return "adesso";
+  if (d < ORA_MS) return `${Math.floor(d / MIN)} min fa`;
+  if (d < GIORNO_MS) return `${Math.floor(d / ORA_MS)} h fa`;
+  return `${Math.floor(d / GIORNO_MS)} giorni fa`;
+}
+
+export function fermoDa(ms: number, ora = Date.now()): string | null {
+  const g = Math.floor((ora - ms) / GIORNO_MS);
+  if (g < 7) return null;
+  return g > 60 ? `fermo da ${Math.floor(g / 30)} mesi` : `fermo da ${g} giorni`;
+}
+
+// Soldi in centesimi, mostrati senza decimali: "€ 1.800".
+export function euro(cents?: number | null): string {
+  if (cents == null) return "";
+  const n = Math.round(Math.abs(cents) / 100);
+  const testo = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${cents < 0 ? "-" : ""}€ ${testo}`;
+}
+
+export const conteggioBadge = (n: number) => (n <= 0 ? null : n > 9 ? "9+" : String(n));
+
+export const percentuale = (parte: number, totale: number) => (totale < 5 ? "n.d." : `${Math.round((parte / totale) * 100)}%`);
+
+export function telefonoMostrato(e164?: string | null): string {
+  if (!e164) return "";
+  const m = /^\+39(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  return m ? `+39 ${m[1]} ${m[2]} ${m[3]}` : e164;
+}
+
+export const linkTel = (e164: string) => `tel:${e164}`;
+
+export const linkWhatsApp = (e164: string, testo?: string) =>
+  `https://wa.me/${e164.replace(/^\+/, "")}${testo ? `?text=${encodeURIComponent(testo)}` : ""}`;
+
+export const riempiModello = (testo: string, valori: Record<string, string | null | undefined>) =>
+  testo.replace(/\{(\w+)\}/g, (_, k: string) => valori[k] ?? "");
+
+export function presetQuando(ora = Date.now()) {
+  const p = partiRoma(ora);
+  return [
+    { etichetta: "Tra 1 ora", ms: ora + ORA_MS },
+    { etichetta: "Oggi 18:00", ms: daRoma(p.anno, p.mese, p.giorno, 18, 0) },
+    { etichetta: "Domani 10:00", ms: daRoma(p.anno, p.mese, p.giorno + 1, 10, 0) },
+    { etichetta: "Tra 3 giorni", ms: daRoma(p.anno, p.mese, p.giorno + 3, 10, 0) },
+  ];
+}
+
+// Data di inizio di un contratto (chiusura vinta): giorni interi, a mezzanotte di Roma. Mai preset da richiamo.
+export function presetInizio(ora = Date.now()) {
+  const p = partiRoma(ora);
+  const finoALunedi = (8 - p.settimana) % 7 || 7;
+  return [
+    { etichetta: "Oggi", ms: daRoma(p.anno, p.mese, p.giorno) },
+    { etichetta: "Lunedì prossimo", ms: daRoma(p.anno, p.mese, p.giorno + finoALunedi) },
+    { etichetta: "Primo del mese prossimo", ms: daRoma(p.anno, p.mese + 1, 1) },
+  ];
+}
+
+// Minuti interi in ore e minuti ("1 h 10 min"): diversa da durata(), che arrotonda all'unità più grande.
+const durataMinuti = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
+
+// Timer delle 2 ore sui lead nuovi (spec 6.4).
+export function testoSla(scadenza: number, ora = Date.now()): string {
+  const minuti = Math.round((scadenza - ora) / 60_000);
+  return minuti >= 0 ? `mancano ${durataMinuti(minuti)}` : `scaduto da ${durataMinuti(-minuti)}`;
+}
+
+const MESI_LUNGHI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const due = (n: number) => String(n).padStart(2, "0");
+
+// Giorno senza ora (scadenze, date promesse): "15 nov", con l'anno solo se diverso.
+export function giorno(ms: number, ora = Date.now()): string {
+  const p = partiRoma(ms);
+  return `${p.giorno} ${MESI[p.mese - 1]}${p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : ""}`;
+}
+
+// QA 16: scadenza di una fattura contata in giorni di Roma, non in ore UTC.
+// "scade oggi", "scade domani", "scaduta da N giorni", altrimenti "scade il 15 ott" (con l'apostrofo per 8 e 11).
+export function scadenzaFattura(dueAt: number, ora = Date.now()): string {
+  const giorni = Math.round((inizioGiornoRoma(dueAt) - inizioGiornoRoma(ora)) / 86_400_000);
+  if (giorni === 0) return "scade oggi";
+  if (giorni === 1) return "scade domani";
+  if (giorni < 0) return `scaduta da ${-giorni} ${giorni === -1 ? "giorno" : "giorni"}`;
+  const g = partiRoma(dueAt).giorno;
+  return `scade ${g === 8 || g === 11 ? "l'" : "il "}${giorno(dueAt, ora)}`;
+}
+
+// Valore per <input type="date">, sul fuso di Roma.
+export function isoGiorno(ms: number): string {
+  const p = partiRoma(ms);
+  return `${p.anno}-${due(p.mese)}-${due(p.giorno)}`;
+}
+
+// Da <input type="date"> a ms: mezzogiorno di Roma, lontano da ogni cambio di giorno.
+export function daIsoGiorno(s: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  return m ? daRoma(Number(m[1]), Number(m[2]), Number(m[3]), 12, 0) : null;
+}
+
+export function nomeMese(mese: string): string {
+  const [anno, m] = mese.split("-").map(Number);
+  return `${MESI_LUNGHI[m - 1]} ${anno}`;
+}

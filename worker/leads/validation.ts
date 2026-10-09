@@ -1,8 +1,22 @@
 import { z } from "zod";
 
+// Link web: solo http o https (niente javascript:, data: e simili).
+export const linkHttp = (messaggio: string) =>
+  z
+    .string()
+    .trim()
+    .url(messaggio)
+    .refine((u) => /^https?:\/\//i.test(u), "Il link deve iniziare con http o https");
+
 // I campi assenti restano assenti (undefined): così un PATCH non svuota quello che non manda.
 const text = (max = 2000) =>
   z.string().trim().max(max).nullish().transform((v) => (v === undefined ? undefined : v || null));
+
+// Link Meet del lead: come text() la stringa vuota diventa null, ma solo http o https (lo si rende come href).
+const meet = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? null : v),
+  linkHttp("Link Meet non valido").pipe(z.string().max(500)).nullish(),
+);
 
 const email = z
   .string()
@@ -25,16 +39,29 @@ const fields = {
   nextAction: text(300),
   nextActionAt: z.number().int().nullish(),
   appointmentAt: z.number().int().nullish(),
-  meetLink: text(500),
+  meetLink: meet,
   proposalUrl: text(500),
   notes: text(20000),
+};
+
+// Motivo e dati del vinto solo in modifica: la creazione li rifiuta (.strict()).
+const campiEsito = {
+  setupCents: z.number().int().min(0).nullish(),
+  feeCents: z.number().int().min(0).nullish(),
+  // Stringa libera: i motivi validi stanno in Impostazioni (chiave "motivi") e si controllano nel servizio.
+  lostReason: z.string().min(1).max(40).nullish(),
+  wonStartAt: z.number().int().nullish(),
 };
 
 export const leadCreateSchema = z
   .object({ company, source: z.enum(["manuale", "sito", "passaparola", "altro"]).optional(), ...fields })
   .strict();
 
-export const leadPatchSchema = z.object({ company: company.optional(), ...fields }).strict();
+// clientName: nome del cliente che nasce alla chiusura (se manca si usa l'azienda del lead).
+// callAt: giorno e ora della call quando la fase di arrivo ne richiede una (Q14).
+export const leadPatchSchema = z
+  .object({ company: company.optional(), ...fields, ...campiEsito, clientName: z.string().trim().min(1).max(200).optional(), callAt: z.number().int().optional() })
+  .strict();
 
 export const mergeSchema = z.object({ intoId: z.string().min(1) }).strict();
 
@@ -48,10 +75,11 @@ export const activitySchema = z
 export const documentSchema = z
   .object({
     name: z.string().trim().min(1, "Serve un nome").max(200),
-    url: z
-      .string()
-      .trim()
-      .url("Link non valido")
-      .refine((u) => /^https?:\/\//i.test(u), "Il link deve iniziare con http o https"),
+    url: linkHttp("Link non valido"),
   })
+  .strict();
+
+// Azioni multiple della Scaletta: da 1 a 15 lead per volta (tetto delle sottorichieste del piano gratuito).
+export const bulkSchema = z
+  .object({ ids: z.array(z.string().min(1)).min(1).max(15), azione: z.enum(["responsabile", "fase", "cestino"]), valore: z.string().nullish() })
   .strict();

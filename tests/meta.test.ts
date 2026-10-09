@@ -67,6 +67,13 @@ describe("webhook Meta", () => {
     expect(JSON.parse(String(lead?.meta_answers))["quanti_dipendenti_hai?"]).toBe("10-20");
   });
 
+  it("dopo il riempimento la catena dà responsabile, punteggio e telefono in E.164", async () => {
+    await authed();
+    graphOk({ full_name: "Sara Verdi", email: "sara@verdi-prova.it", phone_number: "333 765 4321", company_name: "Verdi Prova" });
+    await postWebhook("L-catena");
+    expect(await leadByMeta("L-catena")).toMatchObject({ owner_id: "tommaso", score: "giallo", phone: "+393337654321", phone_norm: "3337654321" });
+  });
+
   it("modulo senza campo azienda: usa il nome del contatto", async () => {
     graphOk({ first_name: "Anna", last_name: "Neri", email: "anna@neri.it" });
     await postWebhook("L3");
@@ -88,8 +95,10 @@ describe("webhook Meta", () => {
     await postWebhook("L5");
     expect(await leadByMeta("L5")).toMatchObject({ meta_status: "error", meta_attempts: 1, company: "Lead Meta in arrivo" });
     const cookie = await authed();
-    const t = (await (await call(`/api/today?from=0&until=${Date.now() + 1000}`, {}, cookie)).json()) as { metaIncomplete: { company: string }[] };
-    expect(t.metaIncomplete.map((l) => l.company)).toContain("Lead Meta in arrivo");
+    // Nella 1B il gruppo "Meta incompleti" non c'è più: il lead resta visibile tra i nuovi di Oggi.
+    // Con la deduplica di Oggi (Q2) un lead sta in un solo gruppo: Adesso oppure i nuovi.
+    const t = (await (await call("/api/today?chi=tutte", {}, cookie)).json()) as { adesso: { company?: string } | null; nuovi: { company: string }[] };
+    expect([t.adesso?.company, ...t.nuovi.map((l) => l.company)]).toContain("Lead Meta in arrivo");
     graphOk({ full_name: "Recuperato", company_name: "Recuperato Spa" });
     expect(await retryPendingMetaLeads(env)).toBe(1);
     expect(await leadByMeta("L5")).toMatchObject({ meta_status: "ok", company: "Recuperato Spa" });

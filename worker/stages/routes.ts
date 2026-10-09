@@ -10,9 +10,16 @@ import { audit } from "../lib/audit";
 const TONES = ["orange", "neutral", "yellow", "blue", "violet", "green", "red"] as const;
 
 const stagePatchSchema = z
-  .object({ label: z.string().trim().min(1, "Serve un nome").max(60).optional(), tone: z.enum(TONES).optional() })
+  .object({
+    label: z.string().trim().min(1, "Serve un nome").max(60).optional(),
+    tone: z.enum(TONES).optional(),
+    probability: z.number().int().min(0, "Da 0 a 100").max(100, "Da 0 a 100").optional(),
+    suggestedNextAction: z.string().trim().max(120).nullable().optional(),
+    suggestedDelayHours: z.number().int().min(0).max(8760).nullable().optional(),
+    requiresReason: z.boolean().optional(),
+  })
   .strict()
-  .refine((p) => p.label !== undefined || p.tone !== undefined, { message: "Niente da modificare" });
+  .refine((p) => Object.keys(p).length > 0, { message: "Niente da modificare" });
 const orderSchema = z.object({ ids: z.array(z.string()).min(1) }).strict();
 
 export const stageRoutes = new Hono<AppEnv>();
