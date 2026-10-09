@@ -28,6 +28,10 @@ describe("passaggio dati", () => {
   it("legge le date del prototipo", () => {
     expect(parseOldDate("2026-09-01 08:00:00")).toBe(Date.UTC(2026, 8, 1, 8));
     expect(parseOldDate("2026-10-02T09:00:00.000Z")).toBe(Date.UTC(2026, 9, 2, 9));
+    expect(parseOldDate("2026-09-01 08:00:00.123")).toBe(Date.UTC(2026, 8, 1, 8) + 123);
+    expect(parseOldDate("2026-10-12T15:00")).toBe(Date.UTC(2026, 9, 12, 13, 0));
+    expect(parseOldDate("2026-01-15T15:00")).toBe(Date.UTC(2026, 0, 15, 14, 0));
+    expect(parseOldDate("2026-10-12T15:00:00+02:00")).toBe(Date.UTC(2026, 9, 12, 13, 0));
     expect(parseOldDate("")).toBeNull();
     expect(parseOldDate("boh")).toBeNull();
   });
@@ -43,6 +47,7 @@ describe("passaggio dati", () => {
     expect(o1).toMatchObject({ company: "Megaron", stage_id: "chiuso", owner_id: "diego", source: "meta", email_norm: "info@megaron.it",
       phone_norm: "050123456", next_action: null, created_at: Date.UTC(2026, 8, 1, 8) });
     const o2 = await env.DB.prepare("SELECT * FROM leads WHERE id = 'o2'").first<Record<string, unknown>>();
+    expect(o2?.appointment_at).toBe(Date.UTC(2026, 9, 12, 13, 0));
     expect(o2).toMatchObject({ company: "L'Officina", stage_id: "da-chiamare-prima-volta", owner_id: null, source: "migrazione",
       next_action: "Riprendere il contatto (importato)", next_action_at: NOW });
 

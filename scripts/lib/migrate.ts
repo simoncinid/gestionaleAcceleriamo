@@ -16,13 +16,43 @@ export const STAGE_IDS = [
 const OPEN_STAGE_IDS = STAGE_IDS.slice(0, 8);
 export const IMPORTED_NEXT_ACTION = "Riprendere il contatto (importato)";
 
+// Offset (ms) di Europe/Rome rispetto a UTC in un dato istante, indipendente dal fuso della macchina.
+function romeOffsetMs(utcMs: number): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Rome", hourCycle: "h23", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", minute: "numeric", second: "numeric",
+  }).formatToParts(new Date(utcMs));
+  const g = (t: string) => Number(parts.find((p) => p.type === t)!.value);
+  return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second")) - Math.floor(utcMs / 1000) * 1000;
+}
+
+function ms(frac: string | undefined) {
+  return frac ? Math.round(Number(`0.${frac}`) * 1000) : 0;
+}
+
 export function parseOldDate(v: unknown): number | null {
   if (typeof v !== "string" || !v.trim()) return null;
   const s = v.trim();
-  // CURRENT_TIMESTAMP di SQLite: "YYYY-MM-DD HH:MM:SS" in UTC
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) return Date.parse(`${s.replace(" ", "T")}Z`);
-  const t = Date.parse(s);
-  return Number.isNaN(t) ? null : t;
+  // CURRENT_TIMESTAMP di SQLite: "YYYY-MM-DD HH:MM:SS[.fff]" in UTC
+  const sql = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(s);
+  if (sql) {
+    const t = Date.UTC(+sql[1], +sql[2] - 1, +sql[3], +sql[4], +sql[5], +sql[6], ms(sql[7]));
+    return Number.isNaN(t) ? null : t;
+  }
+  // ISO senza fuso (datetime-local): ora di Roma, con ora legale corretta
+  const local = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?$/.exec(s);
+  if (local) {
+    const wall = Date.UTC(+local[1], +local[2] - 1, +local[3], +local[4], +local[5], +(local[6] ?? 0), ms(local[7]));
+    if (Number.isNaN(wall)) return null;
+    let t = wall - romeOffsetMs(wall);
+    t = wall - romeOffsetMs(t);
+    return t;
+  }
+  // ISO con fuso esplicito (Z o ±hh:mm)
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})$/.test(s)) {
+    const t = Date.parse(s);
+    return Number.isNaN(t) ? null : t;
+  }
+  return null;
 }
 
 // Una riga per istruzione: gli a capo dentro i testi diventano char(10).
