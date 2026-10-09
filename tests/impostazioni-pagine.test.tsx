@@ -41,7 +41,7 @@ const regole = [
   { id: "ricontatti-decisione", ruleKey: "ricontatti", stageId: null, event: null, params: { giorni: [3, 7, 14] }, active: true },
 ];
 const utenti = [{ id: "diego", name: "Diego" }, { id: "tommaso", name: "Tommaso" }];
-const LINEETTE = /[–—]/;
+const LINEETTE = /[\u2013\u2014]/;
 
 describe("Impostazioni", () => {
   it("Stato: un semaforo per riga, il rosso porta all'integrazione, errori col codice, nessun primario", () => {
