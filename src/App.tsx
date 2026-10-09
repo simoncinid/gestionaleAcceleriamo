@@ -5,6 +5,7 @@ import { ApiError, api } from "./api";
 import { Layout } from "./pages/Layout";
 import { Login } from "./pages/Login";
 import { resetSession } from "./session";
+import { LeadPage } from "./pages/LeadPage";
 import { Placeholder } from "./pages/Placeholder";
 import { Scaletta } from "./pages/Scaletta";
 import type { User } from "./types";
@@ -39,7 +40,7 @@ export function App() {
         <Route index element={<Navigate to="/oggi" replace />} />
         <Route path="oggi" element={<Placeholder title="oggi" />} />
         <Route path="scaletta" element={<Scaletta />} />
-        <Route path="lead/:id" element={<Placeholder title="lead" />} />
+        <Route path="lead/:id" element={<LeadPage />} />
         <Route path="numeri" element={<Placeholder title="numeri" />} />
         <Route path="cestino" element={<Placeholder title="cestino" />} />
         <Route path="fasi" element={<Placeholder title="fasi" />} />
