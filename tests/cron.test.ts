@@ -5,6 +5,7 @@ import { getDb } from "../worker/db/client";
 import { setEmailFetch } from "../worker/email/fetcher";
 import type { Env } from "../worker/env";
 import { setGoogleFetch } from "../worker/foglio/fetcher";
+import { giroFoglio } from "../worker/foglio/sync";
 import { daRoma } from "../worker/lib/roma";
 import { setMetaFetch } from "../worker/meta/fetcher";
 import { createUser } from "./helpers";
@@ -38,6 +39,42 @@ function contaQuery(): { env: Env; n: () => number } {
   });
   return { env: { ...env, DB: db } as Env, n: () => n };
 }
+
+// Come contaQuery, ma ricorda anche quanti parametri lega ogni query (D1 online ne accetta al massimo 100).
+function contaParametri(): { env: Env; massimo: () => number } {
+  let massimo = 0;
+  const db = new Proxy(env.DB, {
+    get(t, k) {
+      if (k === "prepare") {
+        return (q: string) => {
+          const st = t.prepare(q);
+          return new Proxy(st, {
+            get(s2, k2) {
+              if (k2 === "bind") return (...args: unknown[]) => { massimo = Math.max(massimo, args.length); return s2.bind(...args); };
+              const v = Reflect.get(s2, k2);
+              return typeof v === "function" ? v.bind(s2) : v;
+            },
+          });
+        };
+      }
+      const v = Reflect.get(t, k);
+      return typeof v === "function" ? v.bind(t) : v;
+    },
+  });
+  return { env: { ...env, DB: db } as Env, massimo: () => massimo };
+}
+
+const TESTATA_FOGLIO = "Data di creazione,Azienda,Nome e Cognome,Telefono,Email,Campagna,Id Meta";
+async function foglioFinto(righe: string[]) {
+  setGoogleFetch(async () => new Response([TESTATA_FOGLIO, ...righe].join("\n"), { headers: { "content-type": "text/csv" } }));
+  setEmailFetch(async () => Response.json({ id: "re_1" }));
+  await env.DB.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('foglio', ?, 0)")
+    .bind(JSON.stringify({ attivo: true, spreadsheetId: "foglio-finto", scheda: "", gid: "0", mappa: { data: "Data di creazione", azienda: "Azienda", referente: "Nome e Cognome", telefono: "Telefono", email: "Email", campagna: "Campagna", inserzione: "", metaId: "Id Meta" } }))
+    .run();
+}
+const rigaFoglio = (i: number) => `2026-10-12 09:${String(i % 60).padStart(2, "0")},Officina ${i},Luca Prova,+39 333 100 ${String(1000 + i)},luca${i}@esempio.it,Autunno,meta-${i}`;
+const ultimaRiga = async () => (await env.DB.prepare("SELECT last_row FROM sheet_sync_state WHERE id = 'foglio-andrea'").first<{ last_row: number }>())?.last_row;
+const agganciati = async () => (await env.DB.prepare("SELECT count(*) n FROM leads WHERE sheet_row_key IS NOT NULL").first<{ n: number }>())?.n;
 
 afterEach(() => { setEmailFetch(null); setGoogleFetch(null); setMetaFetch(null); });
 
@@ -120,6 +157,53 @@ describe("giro programmato", () => {
     expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 2 * LIMITI.foglio });
     await giro(env, r(10, 30));
     expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 6 });
+  });
+
+  it("giro del foglio con molti agganci a lead già entrati: sotto il tetto di query, il giro dopo riprende dalla riga giusta", async () => {
+    await createUser();
+    // Telefoni dei lead uguali a quelli del foglio: ogni riga aggancia, nessuna crea.
+    for (let i = 0; i < 50; i++) await insertLead(`l-${i}`, { phone_norm: `333100${1000 + i}` });
+    await foglioFinto(Array.from({ length: 50 }, (_, i) => rigaFoglio(i)));
+    const c = contaQuery();
+    const primo = await giroFoglio(c.env, r(10, 0), LIMITI.foglio);
+    expect(c.n()).toBeLessThan(QUERY_MASSIME);
+    expect(primo).toMatchObject({ create: 0, ancora: true });
+    const dopoPrimo = await agganciati();
+    expect(dopoPrimo).toBeGreaterThan(0);
+    expect(dopoPrimo).toBeLessThan(50);
+    expect(await ultimaRiga()).toBe(1 + primo!.lette);
+    const c2 = contaQuery();
+    const secondo = await giroFoglio(c2.env, r(10, 15), LIMITI.foglio);
+    expect(c2.n()).toBeLessThan(QUERY_MASSIME);
+    expect(secondo!.riletto).toBe(false);
+    expect(await agganciati()).toBe(dopoPrimo! + secondo!.agganciate);
+    expect(await ultimaRiga()).toBe(1 + primo!.lette + secondo!.lette);
+    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 50 });
+  });
+
+  it("con 50 righe nel foglio nessuna query lega più di 100 parametri", async () => {
+    await createUser();
+    await foglioFinto(Array.from({ length: 50 }, (_, i) => rigaFoglio(i)));
+    const c = contaParametri();
+    const esito = await giroFoglio(c.env, r(10, 0), LIMITI.foglio);
+    expect(esito!.errore).toBeUndefined();
+    expect(c.massimo()).toBeGreaterThan(0);
+    expect(c.massimo()).toBeLessThanOrEqual(100);
+  });
+
+  it("ancora: vero finché il foglio ha righe da leggere, falso alla fine", async () => {
+    await createUser();
+    await foglioFinto(Array.from({ length: 3 }, (_, i) => rigaFoglio(i)));
+    expect(await giroFoglio(env, r(10, 0), 2)).toMatchObject({ create: 2, ancora: true });
+    expect(await giroFoglio(env, r(10, 15), 2)).toMatchObject({ create: 1, ancora: false });
+    expect(await giroFoglio(env, r(10, 30), 2)).toMatchObject({ lette: 0, ancora: false });
+  });
+
+  it("le proposte scadute si chiudono a 20 per giro, il giro dopo riprende", async () => {
+    await insertLead("l1");
+    for (let i = 0; i < 25; i++) await insertProposta(`p${String(i).padStart(2, "0")}`, "presentata", { sent_at: NOW - 40 * GIORNO });
+    expect(await scadiProposte(getDb(env.DB), NOW)).toBe(20);
+    expect(await scadiProposte(getDb(env.DB), NOW)).toBe(5);
   });
 
   it("giro delle conferme: cinque email ritentate restano sotto il tetto di query D1", async () => {

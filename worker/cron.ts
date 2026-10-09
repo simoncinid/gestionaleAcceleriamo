@@ -33,7 +33,8 @@ export async function scadiProposte(db: Db, now: number): Promise<number> {
   const { validita } = await leggiImpostazioni(db);
   const limite = sql`coalesce(${proposals.validUntil}, ${proposals.sentAt} + ${validita.giorni * 86_400_000})`;
   const scadute = await db.select({ id: proposals.id, number: proposals.number, leadId: proposals.leadId }).from(proposals)
-    .where(and(inArray(proposals.status, ["registrata", "presentata"]), isNull(proposals.deletedAt), lt(limite, now)));
+    .where(and(inArray(proposals.status, ["registrata", "presentata"]), isNull(proposals.deletedAt), lt(limite, now)))
+    .limit(20); // due scritture per proposta: 20 stanno sotto le 50 query; le altre il giorno dopo
   if (!scadute.length) return 0;
   const passi = scadute.flatMap((p) => [
     db.update(proposals).set({ status: "scaduta", decidedAt: now, updatedAt: now }).where(eq(proposals.id, p.id)),

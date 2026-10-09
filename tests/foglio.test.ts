@@ -60,7 +60,7 @@ describe("Foglio Andrea con l'account di servizio", () => {
   });
 
   it("crea i lead delle righe nuove, scarta la riga di prova e quella vuota, parte la catena", async () => {
-    expect(await giroFoglio(envFoglio, NOW)).toEqual({ lette: 4, create: 2, agganciate: 0, scartate: 2, riletto: false });
+    expect(await giroFoglio(envFoglio, NOW)).toEqual({ lette: 4, create: 2, agganciate: 0, scartate: 2, riletto: false, ancora: false });
     const nuovi = await lead("SELECT company, phone, source, meta_campaign, owner_id, score, meta_answers FROM leads ORDER BY company");
     expect(nuovi.map((l) => l.company)).toEqual(["Bar Bianchi Finto", "Officina Rossi Finta"]);
     expect(nuovi[1]).toMatchObject({ phone: "+393331112222", source: "foglio_andrea", meta_campaign: "Autunno", owner_id: "tommaso" });
@@ -74,7 +74,7 @@ describe("Foglio Andrea con l'account di servizio", () => {
 
   it("il giro dopo non rilegge niente e non rifirma il token", async () => {
     await giroFoglio(envFoglio, NOW);
-    expect(await giroFoglio(envFoglio, NOW + 600_000)).toEqual({ lette: 0, create: 0, agganciate: 0, scartate: 0, riletto: false });
+    expect(await giroFoglio(envFoglio, NOW + 600_000)).toEqual({ lette: 0, create: 0, agganciate: 0, scartate: 0, riletto: false, ancora: false });
     expect(chiamate.filter((u) => u.includes("oauth2")).length).toBe(1);
     expect((await lead("SELECT id FROM leads")).length).toBe(2);
   });
@@ -131,7 +131,7 @@ describe("Foglio Andrea con l'account di servizio", () => {
     expect(email).toBe(2);
     await env.DB.prepare("UPDATE leads SET deleted_at = ? WHERE company = 'Officina Rossi Finta'").bind(NOW).run();
     foglio = [TESTATA, SOLO_NOME, BIANCHI, ROSSI];
-    expect(await giroFoglio(envFoglio, NOW + 600_000)).toEqual({ lette: 3, create: 0, agganciate: 3, scartate: 0, riletto: true });
+    expect(await giroFoglio(envFoglio, NOW + 600_000)).toEqual({ lette: 3, create: 0, agganciate: 3, scartate: 0, riletto: true, ancora: false });
     expect((await lead("SELECT id FROM leads")).length).toBe(3);
     expect((await lead("SELECT id FROM activities WHERE type = 'foglio'")).length).toBe(0);
     expect(email).toBe(2);
@@ -220,7 +220,7 @@ describe("Foglio Andrea letto come CSV (foglio condiviso con il link)", () => {
   });
 
   it("senza account di servizio legge il CSV del link, con virgole, virgolette e a capo nelle celle", async () => {
-    expect(await giroFoglio(env, NOW)).toEqual({ lette: 3, create: 2, agganciate: 0, scartate: 1, riletto: false });
+    expect(await giroFoglio(env, NOW)).toEqual({ lette: 3, create: 2, agganciate: 0, scartate: 1, riletto: false, ancora: false });
     expect(chiamate).toEqual([URL_CSV]);
     const nuovi = await lead("SELECT company, phone, source, sheet_row_key, meta_answers FROM leads ORDER BY company");
     expect(nuovi.map((l) => l.company)).toEqual(["Bar Bianchi Finto", "Officina Rossi Finta, S.r.l."]);
@@ -234,9 +234,9 @@ describe("Foglio Andrea letto come CSV (foglio condiviso con il link)", () => {
 
   it("il giro dopo salta le righe già importate e prende solo quella aggiunta in fondo", async () => {
     await giroFoglio(env, NOW);
-    expect(await giroFoglio(env, NOW + 600_000)).toEqual({ lette: 0, create: 0, agganciate: 0, scartate: 0, riletto: false });
+    expect(await giroFoglio(env, NOW + 600_000)).toEqual({ lette: 0, create: 0, agganciate: 0, scartate: 0, riletto: false, ancora: false });
     csv += CSV_VERDI + "\r\n";
-    expect(await giroFoglio(env, NOW + 1_200_000)).toEqual({ lette: 1, create: 1, agganciate: 0, scartate: 0, riletto: false });
+    expect(await giroFoglio(env, NOW + 1_200_000)).toEqual({ lette: 1, create: 1, agganciate: 0, scartate: 0, riletto: false, ancora: false });
     expect((await lead("SELECT id FROM leads")).length).toBe(3);
     expect((await stato())?.last_row).toBe(5);
   });

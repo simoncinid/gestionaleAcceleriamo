@@ -12,12 +12,19 @@ import { catenaLeadNuovo } from "../regole/catena";
 import { tokenGoogle } from "./jwt";
 import { leggiCsv, leggiIntervalli } from "./leggi";
 
-export type GiroFoglio = { lette: number; create: number; agganciate: number; scartate: number; riletto: boolean; errore?: string };
+// `ancora`: il giro si è fermato prima della fine del foglio (tetto o blocco pieno), un altro giro troverà altre righe.
+export type GiroFoglio = { lette: number; create: number; agganciate: number; scartate: number; riletto: boolean; ancora: boolean; errore?: string };
 export type RigaAnteprima = { riga: number; azienda: string; referente: string; telefono: string | null; email: string | null; campagna: string; scartata: string | null };
 
 const BLOCCO = 50;            // righe nuove guardate per giro
 const MASSIMO_CREATI = 10;    // lead nuovi per giro: ognuno manda un'email, restiamo sotto le 15 sottorichieste
 const RILETTURA = 2000;       // righe lette quando il foglio ha cambiato forma
+// D1 online lega al massimo 100 parametri per query: candidati() ne usa fino a 5 per riga, quindi blocchi da 16.
+const RIGHE_PER_RICERCA = 16;
+// Costo in query D1 di ogni passo del ciclo. Il budget del giro è massimoCreati * creato + 2: con il tetto del cron
+// (2 lead) fa 36, e il resto del giro ne usa circa 6, sotto le 50 di una invocazione. Prima di ogni riga si tiene
+// posto per il caso peggiore, un lead nuovo con la sua catena: così anche gli agganci (2 query l'uno) hanno un tetto.
+const SPESA = { ricerca: 1, aggancio: 2, creato: 17 } as const;
 
 type ImpFoglio = Impostazioni["foglio"];
 // Intervalli di righe del foglio (numerate da 1, estremi inclusi) → righe di ciascun intervallo.
@@ -98,7 +105,7 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
   const db = getDb(env.DB);
   const { foglio } = await leggiImpostazioni(db);
   if (!foglio.attivo || !foglio.spreadsheetId.trim()) return null;
-  const esito: GiroFoglio = { lette: 0, create: 0, agganciate: 0, scartate: 0, riletto: false };
+  const esito: GiroFoglio = { lette: 0, create: 0, agganciate: 0, scartate: 0, riletto: false, ancora: false };
   const fallisci = async (errore: string) => {
     await segnaErrore(db, "foglio", errore, now);
     await salvaStato(db, { lastRunAt: now, lastRun: JSON.stringify({ ...esito, errore }) });
@@ -125,12 +132,25 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
 
     const mappate = righe.map(mappaRiga);
     // Impronta solo se c'è almeno data o email: due righe senza nessuna delle due non devono sembrare la stessa.
-    const impronte = await Promise.all(mappate.map((r) => (r.data || r.email ? impronta(r.data, r.email) : null)));
-    const esistenti = await candidati(db, mappate, impronte);
+    // Impronte e candidati si cercano a blocchi, solo quando il ciclo ci arriva.
+    const impronte: (string | null)[] = [];
+    const esistenti: Awaited<ReturnType<typeof candidati>> = [];
+    const budget = massimoCreati * SPESA.creato + 2;
+    let spesa = 0;
     let fine = da - 1;
     let ultimaImpronta = st?.lastRowHash ?? null;
+    let fermato = false;
     for (const [i, r] of mappate.entries()) {
-      if (esito.create >= massimoCreati) break;
+      const nuovoBlocco = i % RIGHE_PER_RICERCA === 0;
+      if (esito.create >= massimoCreati || spesa + (nuovoBlocco ? SPESA.ricerca : 0) + SPESA.creato > budget) { fermato = true; break; }
+      if (nuovoBlocco) {
+        const blocco = mappate.slice(i, i + RIGHE_PER_RICERCA);
+        const chiavi = await Promise.all(blocco.map((b) => (b.data || b.email ? impronta(b.data, b.email) : null)));
+        impronte.push(...chiavi);
+        const visti = new Set(esistenti.map((l) => l.id));
+        esistenti.push(...(await candidati(db, blocco, chiavi)).filter((l) => !visti.has(l.id)));
+        spesa += SPESA.ricerca;
+      }
       fine = da + i;
       ultimaImpronta = await impronta(r.data, r.email);
       esito.lette++;
@@ -146,6 +166,7 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
           await db.update(leads).set({ sheetRowKey: ultimaImpronta, updatedAt: now }).where(eq(leads.id, trovato.id));
           await addActivity(db, trovato.id, "foglio", "Visto anche nel Foglio Andrea", null, now);
           trovato.sheetRowKey = ultimaImpronta;
+          spesa += SPESA.aggancio;
         }
         continue;
       }
@@ -173,7 +194,9 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
         console.error("catena_lead_nuovo_fallita", creato.id, err);
       }
       esito.create++;
+      spesa += SPESA.creato;
     }
+    esito.ancora = fermato || righe.length >= (esito.riletto ? RILETTURA : BLOCCO);
     await salvaStato(db, { lastRow: Math.max(fine, esito.riletto ? 1 : ultima), lastRowHash: ultimaImpronta, lastRunAt: now, lastRun: JSON.stringify(esito) });
     await segnaOk(db, "foglio", now);
     return esito;
