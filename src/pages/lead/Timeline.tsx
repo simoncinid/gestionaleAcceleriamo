@@ -41,9 +41,9 @@ export function Timeline({ leadId, activities }: { leadId: string; activities: A
       </form>
       <ol className="space-y-3">
         {activities.map((a) => (
-          <li key={a.id} className="border-l-2 border-brand/30 pl-3">
+          <li key={a.id} className="min-w-0 border-l-2 border-brand/30 pl-3">
             <p className="text-xs text-ink/50">{TYPE_LABELS[a.type] ?? a.type} · {a.authorName} · {fmtDateTime(a.createdAt)}</p>
-            <p className="whitespace-pre-wrap text-sm">{a.body}</p>
+            <p className="whitespace-pre-wrap break-words text-sm">{a.body}</p>
           </li>
         ))}
       </ol>

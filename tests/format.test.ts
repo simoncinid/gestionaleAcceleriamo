@@ -19,5 +19,6 @@ describe("formato", () => {
     expect(fmtDuration(45 * 60_000)).toBe("45 min");
     expect(fmtDuration(135 * 60_000)).toBe("2 h 15 min");
     expect(fmtDuration(50 * 3_600_000)).toBe("2 giorni 2 h");
+    expect(fmtDuration(26 * 3_600_000)).toBe("1 giorno 2 h");
   });
 });

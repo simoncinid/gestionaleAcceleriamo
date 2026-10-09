@@ -32,8 +32,8 @@ export function Documents({ leadId, documents }: { leadId: string; documents: Do
       <ul className="mb-4 space-y-2 text-sm">
         {documents.map((d) => (
           <li key={d.id} className="flex items-center justify-between gap-2">
-            {d.url ? <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-brand underline">{d.name}</a> : <span>{d.name}</span>}
-            <button type="button" className="text-xs text-ink/40 hover:text-red-700" onClick={() => confirm(`Togliere "${d.name}"?`) && remove.mutate(d.id)}>Togli</button>
+            {d.url ? <a href={d.url} target="_blank" rel="noopener noreferrer" className="min-w-0 break-all text-brand underline">{d.name}</a> : <span className="min-w-0 break-all">{d.name}</span>}
+            <button type="button" className="shrink-0 text-xs text-ink/40 hover:text-red-700" onClick={() => confirm(`Togliere "${d.name}"?`) && remove.mutate(d.id)}>Togli</button>
           </li>
         ))}
         {!documents.length && <li className="text-ink/50">Nessun documento.</li>}

@@ -47,11 +47,12 @@ export function Fasi() {
       <p className="text-sm text-ink/60">Rinomina e riordina le fasi della scaletta. Il tipo (aperta, vinta, persa) decide se serve la prossima azione.</p>
       <ul className="space-y-2">
         {list.map((s, i) => (
-          <li key={s.id} className="flex items-center gap-2 rounded-xl bg-white p-3 ring-1 ring-ink/5">
-            <StageBadge label={KIND_LABELS[s.kind]} tone={s.tone} />
+          <li key={s.id} className="flex flex-wrap items-center gap-2 rounded-xl bg-white p-3 ring-1 ring-ink/5">
+            <span className="order-1"><StageBadge label={KIND_LABELS[s.kind]} tone={s.tone} /></span>
             <Input
               key={`${s.id}-${s.label}-${resets}`}
               defaultValue={s.label}
+              className="order-3 min-w-0 basis-full sm:order-2 sm:basis-0 sm:flex-1"
               aria-label={`Nome della fase ${s.label}`}
               onBlur={(e) => {
                 const label = e.target.value.trim();
@@ -59,8 +60,10 @@ export function Fasi() {
                 else if (label !== s.label) rename.mutate({ id: s.id, label });
               }}
             />
-            <Button variant="ghost" aria-label="Sposta su" onClick={() => move(i, -1)} disabled={busy || i === 0}>↑</Button>
-            <Button variant="ghost" aria-label="Sposta giù" onClick={() => move(i, 1)} disabled={busy || i === list.length - 1}>↓</Button>
+            <div className="order-2 ml-auto flex gap-2 sm:order-3 sm:ml-0">
+              <Button variant="ghost" aria-label="Sposta su" onClick={() => move(i, -1)} disabled={busy || i === 0}>↑</Button>
+              <Button variant="ghost" aria-label="Sposta giù" onClick={() => move(i, 1)} disabled={busy || i === list.length - 1}>↓</Button>
+            </div>
           </li>
         ))}
       </ul>

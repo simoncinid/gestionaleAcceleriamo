@@ -43,8 +43,8 @@ export function mapMetaFields(f: Record<string, string>) {
   return {
     company: pick(f, ["company_name", "azienda", "nome_azienda", "nome_dell'azienda", "company"]),
     contactName,
-    email: pick(f, ["email", "e-mail"]),
-    phone: pick(f, ["phone_number", "telefono", "numero_di_telefono"]),
+    email: pick(f, ["email", "e-mail", "work_email"]),
+    phone: pick(f, ["phone_number", "telefono", "numero_di_telefono", "work_phone_number"]),
     website: pick(f, ["website", "sito_web", "sito", "sito_internet"]),
   };
 }

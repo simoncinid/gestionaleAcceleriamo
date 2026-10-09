@@ -95,6 +95,12 @@ describe("webhook Meta", () => {
     expect(await leadByMeta("L5")).toMatchObject({ meta_status: "ok", company: "Recuperato Spa" });
   });
 
+  it("legge email e telefono di lavoro dei moduli B2B", async () => {
+    graphOk({ full_name: "Anna Bianchi", work_email: "Anna@Bianchi.it", work_phone_number: "+39 340 1112223", company_name: "Bianchi Srl" });
+    await postWebhook("L7");
+    expect(await leadByMeta("L7")).toMatchObject({ email_norm: "anna@bianchi.it", phone_norm: "3401112223", company: "Bianchi Srl" });
+  });
+
   it("segnala il doppione con un lead inserito a mano", async () => {
     const cookie = await authed();
     const manual = await call("/api/leads", { method: "POST", json: { company: "Già noto", phone: "333 999 8888" } }, cookie);

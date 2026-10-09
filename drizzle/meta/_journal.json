@@ -15,6 +15,13 @@
       "when": 1791506295089,
       "tag": "0001_fasi_iniziali",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791508978076,
+      "tag": "0002_indice_appuntamenti",
+      "breakpoints": true
     }
   ]
 }

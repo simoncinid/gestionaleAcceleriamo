@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../api";
@@ -16,6 +17,8 @@ export function LeadPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const refresh = useRefreshLeads();
+  const qc = useQueryClient();
+  const [formVersion, setFormVersion] = useState(0);
   const stages = useStages();
   const users = useUsers();
   const detail = useQuery({ queryKey: ["lead", id], queryFn: () => api<LeadDetail>(`/leads/${id}`) });
@@ -28,10 +31,24 @@ export function LeadPage() {
     },
     onError,
   });
+  // Dopo il salvataggio del modulo, questo riparte dai valori del server; prima, le modifiche non salvate restano.
+  const saveForm = (json: Record<string, unknown>) =>
+    patch.mutateAsync(json).then(
+      async () => {
+        await qc.invalidateQueries({ queryKey: ["lead", id] });
+        setFormVersion((n) => n + 1);
+      },
+      () => undefined,
+    );
+  // Il lead di questa pagina non esiste più: lo tolgo dalla cache senza rifare la richiesta (darebbe 404).
+  function leaveLead() {
+    qc.removeQueries({ queryKey: ["lead", id] });
+    for (const key of ["leads", "today", "stats", "trash"]) void qc.invalidateQueries({ queryKey: [key] });
+  }
   const remove = useMutation({
     mutationFn: () => api(`/leads/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      refresh();
+      leaveLead();
       toast.success("Spostato nel cestino");
       navigate("/scaletta");
     },
@@ -40,7 +57,7 @@ export function LeadPage() {
   const merge = useMutation({
     mutationFn: (intoId: string) => api<{ lead: Lead }>(`/leads/${id}/merge`, { method: "POST", json: { intoId } }),
     onSuccess: ({ lead }) => {
-      refresh();
+      leaveLead();
       toast.success("Lead uniti");
       navigate(`/lead/${lead.id}`);
     },
@@ -65,9 +82,9 @@ export function LeadPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <Link to="/scaletta" className="text-sm text-ink/50 hover:text-brand">‹ Scaletta</Link>
-          <h1 className="text-4xl lowercase">{lead.company}</h1>
+          <h1 className="break-words text-4xl">{lead.company}</h1>
           <p className="text-ink/60">{[lead.contactName, SOURCE_LABELS[lead.source] ?? lead.source, lead.metaCampaign].filter(Boolean).join(" · ")}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -90,13 +107,13 @@ export function LeadPage() {
         <p className="rounded-xl bg-red-50 p-4 text-sm text-red-900 ring-1 ring-red-200">I dati del modulo Meta non sono ancora arrivati: riprovo da solo ogni 15 minuti.</p>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
-        <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-6">
           <NextActionCard lead={lead} kind={stage?.kind} onSave={patch.mutate} pending={patch.isPending} />
-          <LeadForm key={lead.updatedAt} lead={lead} users={users.data ?? []} onSave={patch.mutate} pending={patch.isPending} />
+          <LeadForm key={`${lead.id}-${formVersion}`} lead={lead} users={users.data ?? []} onSave={saveForm} pending={patch.isPending} />
           <MetaAnswers lead={lead} />
         </div>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Timeline leadId={lead.id} activities={activities} />
           <Documents leadId={lead.id} documents={documents} />
         </div>

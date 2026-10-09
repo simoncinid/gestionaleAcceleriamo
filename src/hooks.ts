@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { api } from "./api";
 import type { Stage } from "./types";
 
@@ -13,4 +14,13 @@ export function useRefreshLeads() {
   return () => {
     for (const key of ["leads", "lead", "today", "stats", "trash"]) void qc.invalidateQueries({ queryKey: [key] });
   };
+}
+
+export function useDebounced<T>(value: T, ms: number) {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
 }

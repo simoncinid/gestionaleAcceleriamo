@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
@@ -6,7 +7,7 @@ import { api } from "../api";
 import { NewLeadDialog } from "../components/NewLeadDialog";
 import { Button, Input, Select, StageBadge, cx } from "../components/ui";
 import { SOURCE_LABELS, fmtDateTime } from "../format";
-import { useRefreshLeads, useStages, useUsers } from "../hooks";
+import { useDebounced, useRefreshLeads, useStages, useUsers } from "../hooks";
 import type { LeadListItem } from "../types";
 
 export function Scaletta() {
@@ -14,14 +15,17 @@ export function Scaletta() {
   const users = useUsers();
   const refresh = useRefreshLeads();
   const [q, setQ] = useState("");
+  const debouncedQ = useDebounced(q, 300);
   const [source, setSource] = useState("");
   const [campaign, setCampaign] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [showClosed, setShowClosed] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const params = new URLSearchParams(Object.entries({ q, source, campaign, ownerId }).filter(([, v]) => v)).toString();
-  const leads = useQuery({ queryKey: ["leads", params], queryFn: () => api<{ leads: LeadListItem[] }>(`/leads?${params}`).then((r) => r.leads) });
+  const params = new URLSearchParams(Object.entries({ q: debouncedQ, source, campaign, ownerId }).filter(([, v]) => v)).toString();
+  const leads = useQuery({ queryKey: ["leads", params], queryFn: () => api<{ leads: LeadListItem[] }>(`/leads?${params}`).then((r) => r.leads),
+    placeholderData: keepPreviousData,
+  });
   const campaigns = useQuery({
     queryKey: ["leads", "campaigns"],
     queryFn: () =>
@@ -42,16 +46,16 @@ export function Scaletta() {
         <Button onClick={() => setCreating(true)}>Nuovo lead</Button>
       </header>
       <div className="flex flex-wrap gap-2">
-        <Input className="max-w-xs" placeholder="Cerca azienda, referente, email, telefono" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca" />
-        <Select className="w-auto" value={source} onChange={(e) => setSource(e.target.value)} aria-label="Fonte">
+        <Input className="sm:w-80!" placeholder="Cerca azienda, referente, email, telefono" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Cerca" />
+        <Select className="sm:w-auto!" value={source} onChange={(e) => setSource(e.target.value)} aria-label="Fonte">
           <option value="">Tutte le fonti</option>
           {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </Select>
-        <Select className="w-auto" value={campaign} onChange={(e) => setCampaign(e.target.value)} aria-label="Campagna">
+        <Select className="sm:w-auto!" value={campaign} onChange={(e) => setCampaign(e.target.value)} aria-label="Campagna">
           <option value="">Tutte le campagne</option>
           {campaigns.data?.map((c) => <option key={c} value={c}>{c}</option>)}
         </Select>
-        <Select className="w-auto" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} aria-label="Responsabile">
+        <Select className="sm:w-auto!" value={ownerId} onChange={(e) => setOwnerId(e.target.value)} aria-label="Responsabile">
           <option value="">Tutti</option>
           {users.data?.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </Select>

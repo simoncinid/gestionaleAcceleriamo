@@ -25,7 +25,7 @@ export function Oggi() {
       const data = await api<Today>(`/today?from=${bounds.from}&until=${bounds.until}&now=${bounds.now}`);
       return { bounds, data };
     },
-    refetchInterval: 60_000,
+    refetchInterval: 300_000,
   });
   if (today.isLoading) return <p className="text-ink/60">Caricamento…</p>;
   if (today.error || !today.data) return <Empty text={today.error?.message ?? "Errore"} />;

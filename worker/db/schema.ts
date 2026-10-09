@@ -71,6 +71,7 @@ export const leads = sqliteTable(
     index("idx_leads_email").on(t.emailNorm),
     index("idx_leads_phone").on(t.phoneNorm),
     index("idx_leads_next").on(t.nextActionAt),
+    index("idx_leads_appointment").on(t.appointmentAt),
     index("idx_leads_meta_status").on(t.metaStatus),
   ],
 );

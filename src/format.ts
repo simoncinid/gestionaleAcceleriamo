@@ -15,7 +15,7 @@ export function fmtDuration(ms?: number | null) {
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours} h ${minutes % 60} min`;
-  return `${Math.floor(hours / 24)} giorni ${hours % 24} h`;
+  return `${Math.floor(hours / 24)} ${Math.floor(hours / 24) === 1 ? "giorno" : "giorni"} ${hours % 24} h`;
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");

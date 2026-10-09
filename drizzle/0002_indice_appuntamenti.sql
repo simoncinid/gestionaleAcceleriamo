@@ -1,0 +1,1 @@
+CREATE INDEX `idx_leads_appointment` ON `leads` (`appointment_at`);

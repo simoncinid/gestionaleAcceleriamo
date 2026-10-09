@@ -21,9 +21,9 @@ export function Layout({ user }: { user: User }) {
   }
   return (
     <div className="min-h-screen md:flex">
-      <aside className="flex items-center gap-4 border-b border-ink/10 bg-white/70 px-4 py-3 md:sticky md:top-0 md:h-screen md:w-56 md:flex-col md:items-stretch md:border-b-0 md:border-r md:px-5 md:py-6">
+      <aside className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink/10 bg-white/70 px-4 py-3 md:sticky md:top-0 md:flex-nowrap md:h-screen md:w-56 md:flex-col md:items-stretch md:border-b-0 md:border-r md:px-5 md:py-6">
         <img src="/brand/logo.svg" alt="Acceleriamo" className="h-8 md:mb-6 md:self-start" />
-        <nav className="flex gap-1 overflow-x-auto md:flex-col">
+        <nav className="order-last flex w-full flex-wrap gap-1 md:order-none md:w-auto md:flex-col">
           {NAV.map((n) => (
             <NavLink
               key={n.to}
