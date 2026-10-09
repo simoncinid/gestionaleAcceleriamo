@@ -1,6 +1,6 @@
 import type { EventoAvviso } from "../db/schema";
 import type { Env } from "../env";
-import { mandaPush, pushCollegate } from "../push/invio";
+import { mandaPush, pushCollegate, scritturaDispositivo, type EsitoPush } from "../push/invio";
 import { canaleAcceso, inSilenzio } from "./silenzio";
 
 const VECCHIO = 6 * 3_600_000; // una push di più di 6 ore non serve più: si segna e si salta
@@ -19,7 +19,7 @@ export async function consegnaPush(env: Env, now: number, limite: number): Promi
   const pendenti = (await db.prepare(`SELECT n.id, n.user_id AS userId, n.evento, n.titolo, n.testo, n.href, n.created_at AS createdAt,
       u.quiet_hours AS quiet, u.notify_prefs AS prefs
     FROM notifications n JOIN users u ON u.id = n.user_id
-    WHERE n.push_at IS NULL AND n.closed_at IS NULL ORDER BY n.created_at LIMIT ?1`).bind(limite).all<Pendente>()).results;
+    WHERE n.push_at IS NULL AND n.closed_at IS NULL AND n.read_at IS NULL ORDER BY n.created_at LIMIT ?1`).bind(limite).all<Pendente>()).results;
   if (!pendenti.length) return { inviate: 0, saltate: 0 };
   const utenti = [...new Set(pendenti.map((p) => p.userId))];
   const subs = (await db.prepare(`SELECT id, user_id AS userId, endpoint, p256dh, auth, errori FROM push_subscriptions
@@ -29,7 +29,7 @@ export async function consegnaPush(env: Env, now: number, limite: number): Promi
   let saltate = 0;
   const scritture: D1PreparedStatement[] = [];
   // Un dispositivo si scrive una volta sola per giro, con l'ultimo esito; uno sparito non riceve altro.
-  const esiti = new Map<string, "ok" | "sparita" | "errore">();
+  const esiti = new Map<string, EsitoPush>();
   for (const p of pendenti) {
     const mie = subs.filter((s) => s.userId === p.userId && esiti.get(s.id) !== "sparita");
     const salta = now - p.createdAt > VECCHIO || inSilenzio(p.quiet, now) || !canaleAcceso(p.prefs, p.evento) || mie.length === 0;
@@ -39,17 +39,22 @@ export async function consegnaPush(env: Env, now: number, limite: number): Promi
       continue;
     }
     // Un avviso si consegna a tutti i dispositivi della persona o resta per il giro dopo: mai a metà.
-    if (inviate + mie.length > limite) break;
+    // Se non entra nel limite rimasto aspetta, ma gli avvisi dopo (di altre persone, con meno dispositivi) partono.
+    if (inviate + mie.length > limite) continue;
+    const questi: EsitoPush[] = [];
     for (const s of mie) {
       inviate++;
-      esiti.set(s.id, await mandaPush(env, s, { titolo: p.titolo, testo: p.testo ?? undefined, href: p.href ?? "/", tag: p.id }, now));
+      const esito = await mandaPush(env, s, { titolo: p.titolo, testo: p.testo ?? undefined, href: p.href ?? "/", tag: p.id }, now);
+      esiti.set(s.id, esito);
+      questi.push(esito);
     }
-    scritture.push(db.prepare("UPDATE notifications SET push_at = ?1 WHERE id = ?2").bind(now, p.id));
+    // 5xx, rete giù o 429 su tutti i dispositivi: l'avviso resta in coda e si ritenta al giro dopo, fino a VECCHIO.
+    const daRitentare = !questi.includes("ok") && questi.some((e) => e === "ritenta" || e === "occupato");
+    if (!daRitentare) scritture.push(db.prepare("UPDATE notifications SET push_at = ?1 WHERE id = ?2").bind(now, p.id));
   }
   for (const [id, esito] of esiti) {
-    if (esito === "ok") scritture.push(db.prepare("UPDATE push_subscriptions SET errori = 0, last_ok_at = ?1 WHERE id = ?2").bind(now, id));
-    else if (esito === "sparita") scritture.push(db.prepare("DELETE FROM push_subscriptions WHERE id = ?1").bind(id));
-    else scritture.push(db.prepare("UPDATE push_subscriptions SET errori = errori + 1, rotta = CASE WHEN errori + 1 >= 3 THEN 1 ELSE 0 END WHERE id = ?1").bind(id));
+    const w = scritturaDispositivo(db, id, esito, now);
+    if (w) scritture.push(w);
   }
   if (scritture.length) await db.batch(scritture);
   return { inviate, saltate };

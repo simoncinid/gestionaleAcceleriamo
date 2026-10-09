@@ -400,7 +400,8 @@ describe("giro con i lavori veri insieme", () => {
     ["10:00, 2 righe nel foglio, Meta, conferme, Meta 48 ore e 12 push", r(10, 0), 2, false, ["foglio"]],
     ["10:05, foglio, conferme e 12 push", r(10, 5), 2, false, ["foglio", "avvisi"]],
     ["10:10, 1 riga nel foglio, conferme, inviti e 12 push", r(10, 10), 1, false, ["foglio", "avvisi", "consegna"]],
-    ["10:15, foglio, Meta, conferme e 12 push", r(10, 15), 2, false, ["foglio", "meta"]],
+    // Con le push collegate la riserva tiene fuori Meta finché il foglio ha righe nuove: riprova alle :30.
+    ["10:15, foglio, Meta, conferme e 12 push", r(10, 15), 2, false, ["foglio", "consegna"]],
     ["11:05, foglio, avvisi pieni, conferme e 12 push", r(11, 5), 2, true, ["foglio", "avvisi"]],
     ["11:10, foglio vuoto, avvisi pieni, conferme e 12 push", r(11, 10), 0, true, ["foglio", "avvisi", "consegna"]],
     ["6:00, proposte scadute e 12 push", r(6, 0), 2, false, ["proposte_scadute"]],
@@ -436,13 +437,41 @@ describe("giro con i lavori veri insieme", () => {
     expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE push_at IS NULL AND id LIKE 'np%'").first<{ n: number }>())?.n).toBe(0);
   });
 
-  it("senza chiavi VAPID la consegna non consuma sottorichieste: le conferme le trovano tutte", async () => {
-    const s = await prepara(0);
+  it("senza chiavi VAPID la consegna non consuma sottorichieste: le conferme hanno il limite pieno", async () => {
+    await prepara(0);
     await conPush(r(11, 10));
-    const esito = await giro(env, r(11, 10));
-    expect(esito.fatti).toEqual(expect.arrayContaining(["consegna", "conferme"]));
-    expect(s.push()).toBe(0);
+    const conferme = LAVORI.conferme!;
+    let limite = 0;
+    const salvato = conferme.esegui;
+    conferme.esegui = async (e, n, l) => { limite = l; return salvato(e, n, l); };
+    try {
+      const esito = await giro(env, r(11, 10));
+      expect(esito.fatti).toEqual(expect.arrayContaining(["consegna", "conferme"]));
+      // Senza il rimborso le sottorichieste rimaste sarebbero 1 (15 meno 4 del foglio meno 10 della consegna):
+      // con il rimborso il limite delle conferme dipende solo dalle query rimaste.
+      expect(limite).toBeGreaterThan(1);
+    } finally {
+      conferme.esegui = salvato;
+    }
   });
+
+  // Riserva per la consegna: con un arretrato nel foglio (10 righe nuove) ogni giro manda almeno 2 push.
+  for (const [nome, quando] of [["10:05", r(10, 5)], ["10:10", r(10, 10)], ["10:15 con Meta", r(10, 15)], ["11:05 con avvisi pieni", r(11, 5)]] as const) {
+    it(`arretrato nel foglio e 12 push alle ${nome}: almeno 2 push partono, totale entro 45`, async () => {
+      const s = await prepara(10);
+      if (nome.includes("avvisi")) await conAvvisi();
+      const chiavi = await conPush(quando);
+      const c = contaQuery();
+      const esito = await giro({ ...c.env, ...chiavi }, quando);
+      expect(esito.errori).toEqual([]);
+      expect(esito.fatti).toEqual(expect.arrayContaining(["foglio", "consegna"]));
+      expect(s.push()).toBeGreaterThanOrEqual(2);
+      expect(s.push()).toBeLessThanOrEqual(10);
+      expect(c.n()).toBeLessThanOrEqual(45);
+      expect(esito.query).toBeLessThanOrEqual(45);
+      expect(s.sotto()).toBeLessThanOrEqual(15);
+    });
+  }
 });
 
 describe("arretrato nel foglio", () => {

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv, Env } from "../env";
-import { mandaPush, pushCollegate } from "./invio";
+import { mandaPush, pushCollegate, scritturaDispositivo } from "./invio";
 
 export const pushRoutes = new Hono<AppEnv>();
 
@@ -39,9 +39,12 @@ pushRoutes.delete("/:id", async (c) => {
 // Prova (spec 11.5): "Manda una push di prova" ai miei dispositivi, al massimo 5.
 export async function provaPush(c: { env: Env; userId: string }) {
   if (!pushCollegate(c.env)) return { stato: 409 as const, corpo: { error: "Le push non sono collegate: mancano le chiavi VAPID." } };
-  const subs = (await c.env.DB.prepare("SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?1 AND rotta = 0 LIMIT 5").bind(c.userId).all<{ endpoint: string; p256dh: string; auth: string }>()).results;
+  const subs = (await c.env.DB.prepare("SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?1 AND rotta = 0 LIMIT 5").bind(c.userId).all<{ id: string; endpoint: string; p256dh: string; auth: string }>()).results;
   if (!subs.length) return { stato: 409 as const, corpo: { error: "Nessun dispositivo attivo: attiva le notifiche da Profilo." } };
   const now = Date.now();
   const esiti = await Promise.all(subs.map((s) => mandaPush(c.env, s, { titolo: "Push di prova", testo: "Se la vedi, le notifiche funzionano.", href: "/impostazioni/profilo" }, now)));
+  // Come nel giro: un 410 cancella il dispositivo, gli altri errori contano.
+  const scritture = subs.map((s, i) => scritturaDispositivo(c.env.DB, s.id, esiti[i], now)).filter((w): w is D1PreparedStatement => w !== null);
+  if (scritture.length) await c.env.DB.batch(scritture);
   return { stato: 200 as const, corpo: { inviate: esiti.filter((e) => e === "ok").length, totale: subs.length } };
 }

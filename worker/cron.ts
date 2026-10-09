@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { consegnaPush } from "./avvisi/consegna";
+import { pushCollegate } from "./push/invio";
 import { COSTO_AVVISI, controllaAvvisi, controllaMeta48 } from "./avvisi/controlli";
 import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
@@ -27,6 +28,9 @@ export type DefLavoro = {
   perUnita: number;
   sottoPerUnita: number;
   max: number;
+  // Budget lasciato ai lavori che vengono dopo (la consegna delle push): il lavoro prende le sue unità solo
+  // da quello che resta tolta la riserva. Vale solo se le push sono collegate.
+  riserva?: { query: number; sotto: number };
   // Un lavoro può restituire { sottorichieste: n } con quelle usate davvero: le altre prenotate tornano al giro.
   esegui: (env: Env, now: number, limite: number) => Promise<unknown>;
 };
@@ -37,6 +41,12 @@ const ogni15 = (p: PartiRoma) => blocco(p) % 3 === 0;
 const sempre = () => true;
 const alle6 = (p: PartiRoma) => p.ore === 6 && p.minuti < 5;
 
+// Foglio, Meta e avvisi (i lavori prima della consegna) lasciano sempre alla consegna 7 query e 2 sottorichieste
+// (3 fisse più 2 push): anche con un arretrato nel foglio ogni giro manda almeno 2 push. Con le push collegate e
+// un arretrato nel foglio, alle :15 Meta non entra più (25 + 18 + 7 > 44) e riprova al quarto d'ora dopo;
+// gli avvisi nascono a gruppi più piccoli.
+const RISERVA_PUSH = { query: 7, sotto: 2 };
+
 // L'ordine delle chiavi è la priorità: prima ciò che tocca un lead che aspetta, poi il resto.
 // Eccezione: le proposte scadute girano solo alle 6:00 e chiedono 42 query fisse, quindi passano per prime
 // in quel giro (come nel Piano A, da sole): Meta e conferme saltano e riprovano ai giri dopo.
@@ -46,12 +56,12 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // (tranne alle 6:00, che è delle proposte) e prende quanti lead il budget consente, al massimo 2.
   // Con un arretrato grande (prima lettura del foglio) il foglio non deve affamare Meta e conferme: se nel
   // giro è in programma un altro lavoro prende al massimo 1 lead (25 query), da solo fino a 2 se il budget li copre.
-  foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 20, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, altriInProgramma("foglio", n) ? Math.min(1, l) : l) },
-  meta: { quando: ogni15, fisse: 2, perUnita: 16, sottoPerUnita: 2, max: 2, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
+  foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 20, sottoPerUnita: 2, max: 2, riserva: RISERVA_PUSH, esegui: (e, n, l) => giroFoglio(e, n, altriInProgramma("foglio", n) ? Math.min(1, l) : l) },
+  meta: { quando: ogni15, fisse: 2, perUnita: 16, sottoPerUnita: 2, max: 2, riserva: RISERVA_PUSH, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
   // Avvisi in app (spec 8): a ogni giro, dopo l'ingresso dei lead. Un lead che non è ancora entrato non si può
   // chiamare, quindi foglio e Meta passano prima; con un arretrato nel foglio alle :15 gli avvisi aspettano
   // il giro dopo (5 minuti, dentro i 30 del preavviso). Fisse 8 (letture e chiusure), una query per unità.
-  avvisi: { quando: sempre, ...COSTO_AVVISI, sottoPerUnita: 0, esegui: (e, n, l) => controllaAvvisi(e, n, l) },
+  avvisi: { quando: sempre, ...COSTO_AVVISI, sottoPerUnita: 0, riserva: RISERVA_PUSH, esegui: (e, n, l) => controllaAvvisi(e, n, l) },
   // Push (spec 8): subito dopo gli avvisi, così l'avviso nato in questo giro (SLA, "Lead nuovo" della catena di
   // foglio e Meta) arriva sul telefono nello stesso giro. Prima delle conferme: una push SLA vale più di un'email
   // di conferma da ritentare, che può aspettare 5 minuti. Misura con contaD1: 2 letture più una batch con al
@@ -87,7 +97,11 @@ export function registraLavoro(nome: Lavoro, def: DefLavoro) {
   LAVORI[nome] = def;
 }
 
-export function limiteDi(def: DefLavoro, residuoQuery: number, residuoSotto: number): number {
+export function limiteDi(def: DefLavoro, residuoQuery: number, residuoSotto: number, conRiserva = false): number {
+  if (conRiserva && def.riserva) {
+    residuoQuery -= def.riserva.query;
+    residuoSotto -= def.riserva.sotto;
+  }
   if (residuoQuery < def.fisse) return 0;
   const perQuery = def.perUnita > 0 ? Math.floor((residuoQuery - def.fisse) / def.perUnita) : def.max;
   const perSotto = def.sottoPerUnita > 0 ? Math.floor(residuoSotto / def.sottoPerUnita) : def.max;
@@ -122,9 +136,10 @@ export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; sa
   const errori: string[] = [];
   let sotto = SOTTORICHIESTE_GIRO;
   const RISERVA_FINALE = 1; // la riga "giro" in integration_status
+  const conRiserva = pushCollegate(env); // senza chiavi VAPID la consegna non spende niente: niente riserva
   for (const [nome, def] of Object.entries(LAVORI) as [Lavoro, DefLavoro][]) {
     if (!def.quando(p)) continue;
-    const limite = limiteDi(def, QUERY_GIRO - RISERVA_FINALE - contatore.query, sotto);
+    const limite = limiteDi(def, QUERY_GIRO - RISERVA_FINALE - contatore.query, sotto, conRiserva);
     if (limite < 1) {
       saltati.push(nome);
       continue;

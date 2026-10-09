@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { b64u, cifra, daB64u, intestazioneVapid } from "../worker/push/cifra";
 import { setPushFetch } from "../worker/push/fetcher";
 import { mandaPush } from "../worker/push/invio";
+import { provaPush } from "../worker/push/routes";
 import { consegnaPush } from "../worker/avvisi/consegna";
 import { avvisa } from "../worker/avvisi/service";
 import { LAVORI } from "../worker/cron";
@@ -185,6 +186,70 @@ describe("consegna dal giro", () => {
     const r = await consegnaPush(e, 1000 + 7 * 3_600_000, 10);
     expect(chiamate).toBe(0);
     expect(r).toEqual({ inviate: 0, saltate: 2 });
+  });
+
+  it("3 dispositivi per tommaso e 1 per diego, un sla_90 a testa, limite 2: parte l'avviso di Diego", async () => {
+    for (let i = 0; i < 3; i++) await iscrivi("tommaso", `https://push.esempio.it/t${i}`);
+    await iscrivi("diego", "https://push.esempio.it/d");
+    const chiamate: string[] = [];
+    setPushFetch(async (url) => { chiamate.push(url); return new Response("", { status: 201 }); });
+    await avvisa(getDb(env.DB), { evento: "sla_90", entityId: "A", titolo: "x", responsabile: "tommaso" }, 1000);
+    await avvisa(getDb(env.DB), { evento: "sla_90", entityId: "B", titolo: "x", responsabile: "diego" }, 1001);
+    expect(await consegnaPush(e, 2000, 2)).toEqual({ inviate: 1, saltate: 0 });
+    expect(chiamate).toEqual(["https://push.esempio.it/d"]);
+    expect(await env.DB.prepare("SELECT user_id FROM notifications WHERE push_at IS NULL").all()).toMatchObject({ results: [{ user_id: "tommaso" }] });
+  });
+
+  it("un avviso già letto in app non parte come push", async () => {
+    await iscrivi("tommaso", "https://push.esempio.it/t");
+    let chiamate = 0;
+    setPushFetch(async () => { chiamate++; return new Response("", { status: 201 }); });
+    await avvisa(getDb(env.DB), { evento: "sla_90", entityId: "L7", titolo: "x", responsabile: "tommaso" }, 1000);
+    await env.DB.prepare("UPDATE notifications SET read_at = 1500").run();
+    expect(await consegnaPush(e, 2000, 10)).toEqual({ inviate: 0, saltate: 0 });
+    expect(chiamate).toBe(0);
+  });
+
+  it("503 poi 201: l'avviso resta in coda e parte al giro dopo", async () => {
+    await iscrivi("tommaso", "https://push.esempio.it/t");
+    let stato = 503;
+    setPushFetch(async () => new Response("", { status: stato }));
+    await avvisa(getDb(env.DB), { evento: "sla_90", entityId: "L8", titolo: "x", responsabile: "tommaso" }, 1000);
+    await consegnaPush(e, 2000, 10);
+    expect(await env.DB.prepare("SELECT push_at FROM notifications").first()).toEqual({ push_at: null });
+    expect(await env.DB.prepare("SELECT errori FROM push_subscriptions").first()).toEqual({ errori: 1 });
+    stato = 201;
+    await consegnaPush(e, 3000, 10);
+    expect(await env.DB.prepare("SELECT push_at FROM notifications").first()).toEqual({ push_at: 3000 });
+    expect(await env.DB.prepare("SELECT errori, last_ok_at FROM push_subscriptions").first()).toEqual({ errori: 0, last_ok_at: 3000 });
+  });
+
+  it("429: si ritenta al giro dopo senza contare un errore, fino a 6 ore", async () => {
+    await iscrivi("tommaso", "https://push.esempio.it/t");
+    setPushFetch(async () => new Response("", { status: 429 }));
+    await avvisa(getDb(env.DB), { evento: "sla_90", entityId: "L10", titolo: "x", responsabile: "tommaso" }, 1000);
+    await consegnaPush(e, 2000, 10);
+    expect(await env.DB.prepare("SELECT push_at FROM notifications").first()).toEqual({ push_at: null });
+    expect(await env.DB.prepare("SELECT errori FROM push_subscriptions").first()).toEqual({ errori: 0 });
+    await consegnaPush(e, 1000 + 7 * 3_600_000, 10);
+    expect(await env.DB.prepare("SELECT push_at FROM notifications").first()).toEqual({ push_at: 1000 + 7 * 3_600_000 });
+  });
+
+  it("TTL di 6 ore sulla push", async () => {
+    const t = await telefono();
+    let ttl: string | null = null;
+    setPushFetch(async (_u, init) => { ttl = new Headers(init?.headers).get("TTL"); return new Response("", { status: 201 }); });
+    await mandaPush(e, { endpoint: "https://push.esempio.it/a", ...t }, { titolo: "x" }, 1000);
+    expect(ttl).toBe("21600");
+  });
+
+  it("prova: un 410 cancella il dispositivo, un 500 conta un errore", async () => {
+    await iscrivi("tommaso", "https://push.esempio.it/sparita");
+    await iscrivi("tommaso", "https://push.esempio.it/giu");
+    setPushFetch(async (url) => new Response("", { status: url.endsWith("sparita") ? 410 : 500 }));
+    const r = await provaPush({ env: e, userId: "tommaso" });
+    expect(r).toMatchObject({ stato: 200, corpo: { inviate: 0, totale: 2 } });
+    expect((await env.DB.prepare("SELECT endpoint, errori FROM push_subscriptions").all()).results).toEqual([{ endpoint: "https://push.esempio.it/giu", errori: 1 }]);
   });
 
   it("senza chiavi VAPID non manda niente e non segna errori", async () => {
