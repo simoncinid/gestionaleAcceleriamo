@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  conteggioBadge, euro, fermoDa, linkTel, linkWhatsApp, momento, percentuale, presetQuando, quando, riempiModello,
-  telefonoMostrato, testoSla, trascorso,
+  conteggioBadge, daIsoGiorno, euro, fermoDa, linkTel, linkWhatsApp, momento, percentuale, presetQuando, quando, riempiModello,
+  giorno, isoGiorno, nomeMese, telefonoMostrato, testoSla, trascorso,
 } from "../src/format";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0); // martedì 13 ottobre 2026, 10:00 a Roma
@@ -90,5 +90,19 @@ describe("timer delle 2 ore", () => {
     expect(testoSla(ORA + 70 * 60_000, ORA)).toBe("mancano 1 h 10 min");
     expect(testoSla(ORA + 120 * 60_000, ORA)).toBe("mancano 2 h");
     expect(testoSla(ORA - 20 * 60_000, ORA)).toBe("scaduto da 20 min");
+  });
+});
+
+describe("giorni senza ora", () => {
+  it("giorno breve, anno solo se diverso", () => {
+    expect(giorno(Date.UTC(2026, 10, 15, 10, 0), ORA)).toBe("15 nov");
+    expect(giorno(Date.UTC(2027, 0, 3, 10, 0), ORA)).toBe("3 gen 2027");
+    expect(giorno(Date.UTC(2026, 9, 31, 23, 30), ORA)).toBe("1 nov"); // a Roma è già l'1
+  });
+  it("ISO avanti e indietro sul fuso di Roma", () => {
+    expect(isoGiorno(Date.UTC(2026, 9, 31, 23, 30))).toBe("2026-11-01");
+    expect(daIsoGiorno("2026-11-15")).toBe(Date.UTC(2026, 10, 15, 11, 0));
+    expect(daIsoGiorno("15/11/2026")).toBeNull();
+    expect(nomeMese("2026-10")).toBe("ottobre 2026");
   });
 });

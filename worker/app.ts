@@ -14,6 +14,9 @@ import { metaRoutes } from "./meta/routes";
 import { stageRoutes, userRoutes } from "./stages/routes";
 import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/routes";
 import { integrazioniRoutes } from "./integrazioni/routes";
+import { automazioniRoutes } from "./automazioni/routes";
+import { clientiRoutes } from "./clienti/routes";
+import { economiaRoutes } from "./economia/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -46,6 +49,9 @@ app.route("/api/badge", badgeRoutes);
 app.route("/api/calls", callRoutes);
 app.route("/api/proposals", proposalRoutes);
 app.route("/api/hooks", agganciRoutes);
+app.route("/api/economia", economiaRoutes);
+app.route("/api/clients", clientiRoutes);
+app.route("/api/automations", automazioniRoutes);
 app.route("/api", todayRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));

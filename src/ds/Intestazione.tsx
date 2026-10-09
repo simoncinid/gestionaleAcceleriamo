@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export function Intestazione({ titolo, numero, coda, eyebrow, children }: { titolo: string; numero?: number; coda?: string; eyebrow?: string; children?: ReactNode }) {
+export function Intestazione({ titolo, numero, coda, eyebrow, children }: { titolo: string; numero?: number | string; coda?: string; eyebrow?: string; children?: ReactNode }) {
   return (
     <header className="flex flex-col gap-1 pb-4">
       {eyebrow && <p className="text-etichetta uppercase text-grigio">{eyebrow}</p>}

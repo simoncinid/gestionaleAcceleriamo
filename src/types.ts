@@ -36,3 +36,7 @@ export type { MessageTemplate, StageRule } from "../worker/db/schema";
 export type { Impostazioni } from "../worker/impostazioni/default";
 export type { Integrazione, StatoSistema, VoceRegistro } from "../worker/integrazioni/routes";
 export type { GiroFoglio, RigaAnteprima } from "../worker/foglio/sync";
+export type { Automation, Client, Cost, Fee, Invoice } from "../worker/db/schema";
+export type { CanoneRiga, CostoRiga, Cruscotto, FatturaRiga, MeseCosti } from "../worker/economia/service";
+export type { ClienteRiga, SchedaClienteDati } from "../worker/clienti/routes";
+export type { AutomazioneRiga } from "../worker/automazioni/routes";

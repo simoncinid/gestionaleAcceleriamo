@@ -102,3 +102,29 @@ export function testoSla(scadenza: number, ora = Date.now()): string {
   const minuti = Math.round((scadenza - ora) / 60_000);
   return minuti >= 0 ? `mancano ${durataMinuti(minuti)}` : `scaduto da ${durataMinuti(-minuti)}`;
 }
+
+const MESI_LUNGHI = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+const due = (n: number) => String(n).padStart(2, "0");
+
+// Giorno senza ora (scadenze, date promesse): "15 nov", con l'anno solo se diverso.
+export function giorno(ms: number, ora = Date.now()): string {
+  const p = partiRoma(ms);
+  return `${p.giorno} ${MESI[p.mese - 1]}${p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : ""}`;
+}
+
+// Valore per <input type="date">, sul fuso di Roma.
+export function isoGiorno(ms: number): string {
+  const p = partiRoma(ms);
+  return `${p.anno}-${due(p.mese)}-${due(p.giorno)}`;
+}
+
+// Da <input type="date"> a ms: mezzogiorno di Roma, lontano da ogni cambio di giorno.
+export function daIsoGiorno(s: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  return m ? daRoma(Number(m[1]), Number(m[2]), Number(m[3]), 12, 0) : null;
+}
+
+export function nomeMese(mese: string): string {
+  const [anno, m] = mese.split("-").map(Number);
+  return `${MESI_LUNGHI[m - 1]} ${anno}`;
+}
