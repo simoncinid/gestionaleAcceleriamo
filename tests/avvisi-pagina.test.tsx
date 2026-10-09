@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BarraLaterale } from "../src/guscio/BarraLaterale";
 import { Testata } from "../src/guscio/Testata";
 import { Avvisi } from "../src/pagine/avvisi/Avvisi";
+import { Stato } from "../src/pagine/impostazioni/Stato";
 import { contaPrimari, render } from "./render";
 
 describe("pagina Avvisi", () => {
@@ -32,5 +33,25 @@ describe("avatar e avvisi", () => {
   it("testata: con avvisi l'avatar porta agli Avvisi", async () => {
     const html = await render(<Testata nome="Tommaso" puntoAvatar avvisi={1} onCerca={() => {}} onPiu={() => {}} />, { percorso: "/commerciale/oggi" });
     expect(html).toContain('href="/impostazioni/avvisi"');
+  });
+});
+
+describe("letti e non letti", () => {
+  it("il non letto ha titolo in peso medio e pallino, il letto peso normale", async () => {
+    const base = { evento: "sla_scaduto", testo: null, href: null, createdAt: 0 };
+    const html = await render(<Avvisi />, { percorso: "/impostazioni/avvisi", dati: [[["notifications"], { nonLetti: 1, avvisi: [{ ...base, id: "1", titolo: "Nuovo", letto: false }, { ...base, id: "2", titolo: "Vecchio", letto: true }] }]] });
+    expect(html).toMatch(/font-medium">Nuovo</);
+    expect(html).toMatch(/font-normal">Vecchio</);
+    expect(html.match(/Da leggere/g)).toHaveLength(1);
+  });
+});
+
+describe("Avvisi in Stato", () => {
+  it("in testa, fuori da Configurazione, con il numero degli aperti", async () => {
+    const stato = { integrazioni: [], settimana: { meta: 0, foglio: 0, aggancio: 0 }, errori: [] };
+    const avvisi = { nonLetti: 0, avvisi: [{ id: "1" }, { id: "2" }, { id: "3" }] };
+    const html = await render(<Stato ora={0} onEsci={() => {}} />, { dati: [[["integrazioni"], stato], [["notifications"], avvisi]] });
+    expect(html).toContain("Avvisi (3)");
+    expect(html.indexOf("Avvisi (3)")).toBeLessThan(html.indexOf("Collegamenti"));
   });
 });

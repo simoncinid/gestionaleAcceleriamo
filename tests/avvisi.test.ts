@@ -90,6 +90,44 @@ describe("controllaAvvisi", () => {
   });
 });
 
+describe("turni dello stesso evento", () => {
+  it("seconda pausa: dopo la prima chiusa nasce un avviso nuovo", async () => {
+    await lead("L5", { stage_id: "probabilmente-bloccato", paused_until: lun(8), owner_id: "diego" });
+    await controllaAvvisi(env, lun(9), 10);
+    await env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES ('a1', 'L5', 'nota', 'Sentito, richiamo a fine mese', 'diego', ?)").bind(lun(9, 30)).run();
+    await controllaAvvisi(env, lun(9, 35), 10);
+    expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE closed_at IS NULL").first<{ n: number }>())?.n).toBe(0);
+    const dieciGiorni = lun(8) + 10 * 86_400_000;
+    await env.DB.prepare("UPDATE leads SET paused_until = ? WHERE id = 'L5'").bind(dieciGiorni).run();
+    await controllaAvvisi(env, dieciGiorni + 60_000, 10);
+    const aperti = await env.DB.prepare("SELECT user_id FROM notifications WHERE evento = 'fine_pausa' AND closed_at IS NULL").all();
+    expect(aperti.results).toEqual([{ user_id: "diego" }]);
+  });
+
+  it("la nota di sistema della fine pausa non chiude l'avviso", async () => {
+    await lead("L6", { stage_id: "probabilmente-bloccato", paused_until: lun(8), owner_id: "diego" });
+    await controllaAvvisi(env, lun(9), 10);
+    await env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES ('a2', 'L6', 'nota', 'automatica', NULL, ?)").bind(lun(9, 30)).run();
+    await controllaAvvisi(env, lun(9, 35), 10);
+    expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE closed_at IS NULL").first<{ n: number }>())?.n).toBe(1);
+  });
+
+  it("proposta il giorno dopo: chiamata fatta, torna da seguire 3 giorni dopo, nuovo avviso", async () => {
+    await lead("L7", { stage_id: "in-attesa-decisione", next_action_at: lun(9), owner_id: "tommaso" });
+    await env.DB.prepare("INSERT INTO proposals (id, number, lead_id, status, registered_via, created_at, updated_at) VALUES ('p7', 'ACC-7', 'L7', 'presentata', 'manuale', ?, ?)").bind(lun(8), lun(8)).run();
+    await controllaAvvisi(env, lun(10), 10);
+    expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE evento = 'proposta_oggi'").first<{ n: number }>())?.n).toBe(1);
+    await env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES ('a3', 'L7', 'chiamata', 'Ci pensa', 'tommaso', ?)").bind(lun(11)).run();
+    const fra3 = lun(9) + 3 * 86_400_000;
+    await env.DB.prepare("UPDATE leads SET next_action_at = ? WHERE id = 'L7'").bind(fra3).run();
+    await controllaAvvisi(env, lun(11, 5), 10);
+    expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE closed_at IS NULL").first<{ n: number }>())?.n).toBe(0);
+    await controllaAvvisi(env, fra3 + 3_600_000, 10);
+    const r = await env.DB.prepare("SELECT count(*) n FROM notifications WHERE evento = 'proposta_oggi' AND closed_at IS NULL").first<{ n: number }>();
+    expect(r?.n).toBe(1);
+  });
+});
+
 describe("costo del lavoro", () => {
   it("vuoto: 8 query; con 3 pause finite e 10 avvisi resta dentro fisse più una per avviso", async () => {
     const c = { query: 0 };

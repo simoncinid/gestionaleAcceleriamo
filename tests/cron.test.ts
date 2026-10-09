@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { afterEach, describe, expect, it } from "vitest";
 import { giro, LAVORI, limiteDi, registraLavoro, scadiProposte, type DefLavoro } from "../worker/cron";
+import { controllaAvvisi } from "../worker/avvisi/controlli";
 import { getDb } from "../worker/db/client";
 import { setEmailFetch } from "../worker/email/fetcher";
 import type { Env } from "../worker/env";
@@ -378,6 +379,25 @@ describe("giro con i lavori veri insieme", () => {
 });
 
 describe("arretrato nel foglio", () => {
+  it("11:10 con 10 righe nuove, avvisi da creare e un invito in coda: l'invito parte e il totale resta sotto 45", async () => {
+    await createUser();
+    await foglioFinto(Array.from({ length: 10 }, (_, i) => rigaFoglio(i)));
+    for (let i = 0; i < 3; i++) await insertLead(`s${i}`, { stage_id: "da-chiamare-prima-volta", created_at: r(8, 0) - i, owner_id: "tommaso" });
+    for (let i = 0; i < 6; i++) await insertLead(`c${i}`, { source: "meta", email: `conf${i}@esempio.it`, confirmation_error: "Resend non raggiungibile, si riprova", confirmation_attempts: 1, created_at: r(10, 0) - i });
+    await insertLead("inv0", { email: "anna@esempio.it", contact_name: "Anna Prova" });
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, invite_queued_at, created_at, updated_at) VALUES ('kq0', 'inv0', 'conoscenza', ?, ?, ?, ?)")
+      .bind(r(11, 10) + 2 * GIORNO, NOW, NOW, NOW).run();
+    // Gli avvisi SLA sono nati al giro prima: in questo giro gli avvisi costano le sole 8 fisse.
+    await controllaAvvisi(env, r(11, 5), 12);
+    const c = contaQuery();
+    const esito = await giro(c.env, r(11, 10));
+    expect(esito.errori).toEqual([]);
+    expect(esito.fatti).toEqual(["foglio", "avvisi", "conferme"]);
+    expect((await env.DB.prepare("SELECT count(*) n FROM calls WHERE invite_sent_at IS NOT NULL").first<{ n: number }>())?.n).toBe(1);
+    expect(c.n()).toBeLessThanOrEqual(45);
+    expect(esito.query).toBeLessThanOrEqual(45);
+  });
+
   // Prima lettura del foglio di Andrea: tante righe nuove. Il foglio prende 1 lead e lascia il resto
   // del budget a Meta e alle conferme, che hanno scadenze più strette.
   it("10:15 con 10 righe nuove e 3 lead Meta in coda: Meta gira e il totale resta sotto 45", async () => {

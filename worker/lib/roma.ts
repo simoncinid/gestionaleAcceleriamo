@@ -33,6 +33,12 @@ export function meseRoma(ms: number) {
   return `${p.anno}-${String(p.mese).padStart(2, "0")}`;
 }
 
+// "AAAA-MM-GG" del giorno di Roma.
+export function giornoRoma(ms: number) {
+  const p = partiRoma(ms);
+  return `${p.anno}-${String(p.mese).padStart(2, "0")}-${String(p.giorno).padStart(2, "0")}`;
+}
+
 export function inizioGiornoRoma(ms: number) {
   const p = partiRoma(ms);
   return daRoma(p.anno, p.mese, p.giorno);

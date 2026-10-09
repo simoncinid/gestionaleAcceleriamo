@@ -55,9 +55,10 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   conferme: {
     quando: sempre, fisse: 2, perUnita: 7, sottoPerUnita: 1, max: 7,
     esegui: async (e, n, l) => {
-      const inviti = Math.min(2, Math.floor(l / 2));
-      await ritentaConferme(e, n, l - inviti);
-      if (inviti > 0) await mandaInvitiInCoda(e, n, inviti);
+      // Prima gli inviti (fino a metà del limite, arrotondata in su): con un limite di 1 l'invito parte lo stesso.
+      // Le conferme prendono quello che gli inviti non hanno usato.
+      const fatti = await mandaInvitiInCoda(e, n, Math.min(2, Math.ceil(l / 2)));
+      if (l - fatti > 0) await ritentaConferme(e, n, l - fatti);
     },
   },
   // Spec 8: Meta senza lead da 48 ore, una volta l'ora (giro delle :00). 3 query misurate.

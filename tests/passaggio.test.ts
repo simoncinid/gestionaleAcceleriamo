@@ -7,7 +7,7 @@ import { call } from "./helpers";
 // (Piano A e 1A); "x" sta per un id qualsiasi: il controllo della sessione viene prima di tutto il resto.
 const PROTETTE: [string, string][] = [
   ["GET", "/api/auth/me"], ["POST", "/api/auth/logout"],
-  ["GET", "/api/today"], ["GET", "/api/stats"], ["GET", "/api/badge"],
+  ["GET", "/api/today"], ["GET", "/api/stats"], ["GET", "/api/badge"], ["GET", "/api/notifications"], ["POST", "/api/notifications/letti"],
   ["GET", "/api/leads"], ["POST", "/api/leads"], ["POST", "/api/leads/bulk"], ["GET", "/api/leads/trash"],
   ["GET", "/api/leads/x"], ["PATCH", "/api/leads/x"], ["DELETE", "/api/leads/x"], ["PATCH", "/api/leads/x/esito"],
   ["POST", "/api/leads/x/contatti"], ["GET", "/api/leads/x/calls"], ["POST", "/api/leads/x/calls"],

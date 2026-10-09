@@ -3,9 +3,12 @@ import type { Db } from "../db/client";
 import { notifications, users, type EventoAvviso } from "../db/schema";
 import { EVENTI } from "./eventi";
 
-export type NuovoAvviso = { evento: EventoAvviso; entityId: string; titolo: string; testo?: string; href?: string; responsabile?: string | null };
+// turno: distingue due volte dello stesso evento sullo stesso oggetto (la seconda pausa di un lead, la proposta
+// che torna da seguire un altro giorno). Entra solo nella chiave: entity_id resta l'id, le chiusure non cambiano.
+export type NuovoAvviso = { evento: EventoAvviso; entityId: string; turno?: string; titolo: string; testo?: string; href?: string; responsabile?: string | null };
 
-export const chiaveAvviso = (evento: EventoAvviso, entityId: string, userId: string) => `${evento}:${entityId}:${userId}`;
+export const chiaveAvviso = (evento: EventoAvviso, entityId: string, userId: string, turno?: string) =>
+  turno ? `${evento}:${entityId}@${turno}:${userId}` : `${evento}:${entityId}:${userId}`;
 
 // Solo il responsabile se l'evento è suo e il lead ne ha uno; altrimenti tutti gli utenti attivi.
 const soloResponsabile = (a: Pick<NuovoAvviso, "evento" | "responsabile">) => (EVENTI[a.evento].chi === "responsabile" && a.responsabile ? a.responsabile : null);
@@ -28,7 +31,7 @@ export async function avvisa(db: Db, a: NuovoAvviso, now: number, chi?: string[]
     if (!persone.length) return 0;
     const righe = persone.map((userId) => ({
       id: crypto.randomUUID(),
-      chiave: chiaveAvviso(a.evento, a.entityId, userId),
+      chiave: chiaveAvviso(a.evento, a.entityId, userId, a.turno),
       userId,
       evento: a.evento,
       entityId: a.entityId,
@@ -43,7 +46,7 @@ export async function avvisa(db: Db, a: NuovoAvviso, now: number, chi?: string[]
     return r.length;
   }
   const r = await db.all<{ id: string }>(sql`INSERT INTO notifications (id, chiave, user_id, evento, entity_id, titolo, testo, href, created_at, push_at, telegram_at)
-    SELECT lower(hex(randomblob(16))), ${`${a.evento}:${a.entityId}:`} || u.id, u.id, ${a.evento}, ${a.entityId}, ${a.titolo}, ${a.testo ?? null}, ${a.href ?? null}, ${now}, ${pushAt}, ${telegramAt}
+    SELECT lower(hex(randomblob(16))), ${a.turno ? `${a.evento}:${a.entityId}@${a.turno}:` : `${a.evento}:${a.entityId}:`} || u.id, u.id, ${a.evento}, ${a.entityId}, ${a.titolo}, ${a.testo ?? null}, ${a.href ?? null}, ${now}, ${pushAt}, ${telegramAt}
     FROM users u WHERE u.active = 1
     ON CONFLICT (chiave) DO NOTHING RETURNING id`);
   return r.length;

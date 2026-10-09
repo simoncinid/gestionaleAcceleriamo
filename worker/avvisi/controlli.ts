@@ -1,6 +1,6 @@
 import { getDb } from "../db/client";
 import type { Env } from "../env";
-import { inizioGiornoRoma, meseRoma } from "../lib/roma";
+import { giornoRoma, inizioGiornoRoma, meseRoma } from "../lib/roma";
 import { finePausa } from "../regole/motore";
 import { FASE_PRIMA_CHIAMATA, leggiSla, scadenzaPrimaChiamata } from "../regole/sla";
 import { avvisa, chiaveAvviso, destinatari, type NuovoAvviso } from "./service";
@@ -21,7 +21,7 @@ async function chiudiFatti(db: D1Database, now: number, mese: string) {
       (evento IN ('lead_nuovo','sla_90','sla_scaduto') AND EXISTS (SELECT 1 FROM leads l WHERE l.id = notifications.entity_id
         AND (l.first_response_at IS NOT NULL OR l.stage_id <> '${FASE_PRIMA_CHIAMATA}' OR l.deleted_at IS NOT NULL)))
       OR (evento IN ('proposta_oggi','fine_pausa') AND EXISTS (SELECT 1 FROM activities a WHERE a.lead_id = notifications.entity_id
-        AND a.type IN ${UMANE} AND a.created_at > notifications.created_at))
+        AND a.type IN ${UMANE} AND a.author_id IS NOT NULL AND a.created_at > notifications.created_at))
       OR (evento = 'integrazione_rotta' AND EXISTS (SELECT 1 FROM integration_status s WHERE s.ok = 1 AND notifications.entity_id LIKE s.key || ':%'))
       OR (evento = 'claude_tetto' AND entity_id < ?2))`).bind(now, mese).run();
 }
@@ -47,10 +47,10 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
       SELECT * FROM (SELECT 'pausa' AS tipo, id, company, owner_id AS ownerId, created_at AS createdAt, stage_id AS stageId, paused_until AS pausedUntil FROM leads
         WHERE stage_id = 'probabilmente-bloccato' AND paused_until IS NOT NULL AND paused_until <= ?3 AND deleted_at IS NULL ORDER BY paused_until LIMIT ?4)`)
       .bind(FASE_PRIMA_CHIAMATA, settimanaFa, now, pauseMax).all<RigaLead>(),
-    raw.prepare(`SELECT p.number, l.id, l.company, l.owner_id AS ownerId FROM proposals p JOIN leads l ON l.id = p.lead_id
+    raw.prepare(`SELECT p.number, l.id, l.company, l.owner_id AS ownerId, l.next_action_at AS nextActionAt FROM proposals p JOIN leads l ON l.id = p.lead_id
       WHERE p.status = 'presentata' AND p.deleted_at IS NULL AND l.deleted_at IS NULL AND l.stage_id = 'in-attesa-decisione'
         AND l.next_action_at IS NOT NULL AND l.next_action_at < ?1 LIMIT 10`)
-      .bind(inizioGiornoRoma(now) + 86_400_000).all<{ number: string; id: string; company: string; ownerId: string | null }>(),
+      .bind(inizioGiornoRoma(now) + 86_400_000).all<{ number: string; id: string; company: string; ownerId: string | null; nextActionAt: number }>(),
     raw.prepare("SELECT key, error_id AS errorId FROM integration_status WHERE ok = 0 AND key IN ('foglio','resend')").all<{ key: string; errorId: string | null }>(),
     raw.prepare("SELECT chiave FROM notifications WHERE created_at > ?1").bind(settimanaFa).all<{ chiave: string }>(),
   ]);
@@ -68,7 +68,7 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
       raw.prepare("UPDATE leads SET paused_until = NULL, next_action = ?1, next_action_at = ?2, updated_at = ?2 WHERE id = ?3").bind(azione.nextAction, azione.nextActionAt, l.id),
       raw.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES (?1, ?2, 'nota', 'Fine della pausa: da richiamare', NULL, ?3)").bind(crypto.randomUUID(), l.id, now),
     ]);
-    pausa.push({ evento: "fine_pausa", entityId: l.id, titolo: `Fine della pausa: ${l.company}`, href: `/commerciale/lead/${l.id}`, responsabile: l.ownerId });
+    pausa.push({ evento: "fine_pausa", entityId: l.id, turno: String(l.pausedUntil), titolo: `Fine della pausa: ${l.company}`, href: `/commerciale/lead/${l.id}`, responsabile: l.ownerId });
   }
   for (const l of righe.results.filter((r) => r.tipo === "nuovo")) {
     const scade = scadenzaPrimaChiamata(l.createdAt, sla);
@@ -77,7 +77,7 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
     else if (now >= scade - MINUTI_PREAVVISO * 60_000) candidati.push({ evento: "sla_90", entityId: l.id, titolo: `Da chiamare entro 30 minuti: ${l.company}`, href, responsabile: l.ownerId });
   }
   for (const p of proposte.results) {
-    candidati.push({ evento: "proposta_oggi", entityId: p.id, titolo: `Proposta ${p.number} da seguire oggi: ${p.company}`, href: `/commerciale/lead/${p.id}`, responsabile: p.ownerId });
+    candidati.push({ evento: "proposta_oggi", entityId: p.id, turno: giornoRoma(p.nextActionAt), titolo: `Proposta ${p.number} da seguire oggi: ${p.company}`, href: `/commerciale/lead/${p.id}`, responsabile: p.ownerId });
   }
   for (const r of rotte.results) {
     candidati.push({ evento: "integrazione_rotta", entityId: `${r.key}:${r.errorId ?? "x"}`, titolo: r.key === "foglio" ? "Il foglio di Andrea non si legge" : "Resend non manda le email", href: "/impostazioni" });
@@ -90,7 +90,7 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
   for (const [i, c] of [...pausa, ...candidati].entries()) {
     if (i >= pausa.length && fatti >= resto) break;
     const chi = c.responsabile && (c.evento === "sla_90" || c.evento === "proposta_oggi" || c.evento === "fine_pausa") ? [c.responsabile] : tutti;
-    const nuoviChi = chi.filter((u) => !gia.has(chiaveAvviso(c.evento, c.entityId, u)));
+    const nuoviChi = chi.filter((u) => !gia.has(chiaveAvviso(c.evento, c.entityId, u, c.turno)));
     if (!nuoviChi.length) continue;
     creati += await avvisa(db, c, now, nuoviChi);
     if (i >= pausa.length) fatti += 1;

@@ -1,9 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../api";
 import { Errore, Intestazione, Pulsante, Punto, Riga, Skeleton } from "../../ds";
 import { momento } from "../../format";
 import { COLORE, ETICHETTA_STATO, Sezione, conGiroInRitardo, testoUltima, useStatoSistema } from "./parti";
 
 const VOCI = [
-  { titolo: "Avvisi", href: "/impostazioni/avvisi" },
   { titolo: "Fasi e regole", href: "/impostazioni/fasi" },
   { titolo: "Modelli", href: "/impostazioni/modelli" },
   { titolo: "Integrazioni", href: "/impostazioni/integrazioni" },
@@ -13,6 +14,8 @@ const VOCI = [
 // Spec 11.1: "funziona tutto?". Nessun pulsante pieno: ogni semaforo rosso porta alla sua integrazione.
 export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () => void }) {
   const s = useStatoSistema();
+  // Stessa chiave della pagina Avvisi: aprendola dopo, l'elenco è già in cache.
+  const avvisi = useQuery({ queryKey: ["notifications"], queryFn: () => api<{ avvisi: unknown[]; nonLetti: number }>("/notifications") });
   if (s.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
   if (s.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={s.error} onRiprova={() => void s.refetch()} /></div>;
   const d = { ...s.data!, integrazioni: conGiroInRitardo(s.data!.integrazioni, ora) };
@@ -20,6 +23,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
   return (
     <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-28">
       <Intestazione eyebrow="Impostazioni" titolo="Stato del sistema" />
+      <Riga titolo={avvisi.data?.avvisi.length ? `Avvisi (${avvisi.data.avvisi.length})` : "Avvisi"} href="/impostazioni/avvisi" />
       <Sezione titolo="Collegamenti" coda={rossi ? `${rossi} da controllare` : undefined}>
         <ul className="grid gap-2">
           {d.integrazioni.map((i) => (

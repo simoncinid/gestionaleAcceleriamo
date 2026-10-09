@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
+import { catenaLeadNuovo } from "../worker/regole/catena";
 import { authed, call, createUser } from "./helpers";
 
 async function lead(id: string) {
@@ -54,5 +55,25 @@ describe("catena del lead nuovo", () => {
     await env.DB.prepare("UPDATE users SET active = 0 WHERE id = 'diego'").run();
     const due = (await (await call("/api/leads", { method: "POST", json: { company: "Due Prova" } }, cookie)).json()) as { lead: { id: string } };
     expect((await lead(due.lead.id))?.owner_id).toBe("anna");
+  });
+});
+
+describe("avviso Lead nuovo dalla catena", () => {
+  const avvisi = async (id: string) => (await env.DB.prepare("SELECT user_id FROM notifications WHERE evento = 'lead_nuovo' AND entity_id = ? ORDER BY user_id").bind(id).all()).results;
+  async function nuovo(id: string, source: string) {
+    await env.DB.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at) VALUES (?, 'Officina Prova', ?, 'da-chiamare-prima-volta', 1, 1, 1)").bind(id, source).run();
+  }
+  it("foglio e Meta avvisano tutti e due, il lead a mano nessuno", async () => {
+    await createUser();
+    await createUser("diego", "password-lunga-2", "Diego");
+    await nuovo("F1", "foglio_andrea");
+    await nuovo("M1", "meta");
+    await nuovo("A1", "manuale");
+    await catenaLeadNuovo(env, "F1", "foglio", 1000);
+    await catenaLeadNuovo(env, "M1", "meta", 1000);
+    await catenaLeadNuovo(env, "A1", "manuale", 1000);
+    expect(await avvisi("F1")).toEqual([{ user_id: "diego" }, { user_id: "tommaso" }]);
+    expect(await avvisi("M1")).toEqual([{ user_id: "diego" }, { user_id: "tommaso" }]);
+    expect(await avvisi("A1")).toEqual([]);
   });
 });

@@ -3,11 +3,14 @@ import type { ReactNode } from "react";
 import { euro, fermoDa, quando } from "../format";
 import { Punto } from "./Segni";
 
-export function Riga({ titolo, secondaria, meta, href, onClick, destra }: { titolo: string; secondaria?: ReactNode; meta?: ReactNode; href?: string; onClick?: () => void; destra?: ReactNode }) {
+// peso: il titolo è in semibold; "medio" e "normale" servono agli elenchi letti e non letti (Avvisi).
+const PESO = { forte: "font-semibold", medio: "font-medium", normale: "font-normal" } as const;
+
+export function Riga({ titolo, secondaria, meta, href, onClick, destra, peso = "forte" }: { titolo: string; secondaria?: ReactNode; meta?: ReactNode; href?: string; onClick?: () => void; destra?: ReactNode; peso?: keyof typeof PESO }) {
   const corpo = (
     <>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-corpo font-semibold">{titolo}</p>
+        <p className={`truncate text-corpo ${PESO[peso]}`}>{titolo}</p>
         {secondaria && <p className="truncate text-secondaria text-grigio">{secondaria}</p>}
         {meta && <p className="text-meta text-grigio tabular-nums">{meta}</p>}
       </div>
