@@ -4,11 +4,13 @@ import { CampoQuando, Pulsante, Selettore, cx } from "../../../ds";
 import { quando } from "../../../format";
 import type { Lead, Stage } from "../../../types";
 import { opzioniAzione, testoTentativo } from "../esito";
+import { poiSeRiesce, type Salva } from "./salvataggi";
 
 // Blocco "Prossima azione" della scheda: cosa, quando, tentativo e cosa succede se non risponde.
 // "Cambia" apre in posto la scelta dell'azione e del momento; si salva con un pulsante secondario (il primario è Chiama).
+// L'editor si chiude solo se il server accetta: se rifiuta, le scelte restano lì.
 export function NextActionCard({ lead, kind, ora, seNonRisponde, onSave, pending }: {
-  lead: Lead; kind?: Stage["kind"]; ora: number; seNonRisponde?: string; onSave: (p: Record<string, unknown>) => void; pending: boolean;
+  lead: Lead; kind?: Stage["kind"]; ora: number; seNonRisponde?: string; onSave: Salva; pending: boolean;
 }) {
   const [cambia, setCambia] = useState(false);
   const [azione, setAzione] = useState(lead.nextAction ?? "");
@@ -35,7 +37,7 @@ export function NextActionCard({ lead, kind, ora, seNonRisponde, onSave, pending
           <CampoQuando etichetta="Quando" valore={momento} onCambia={setMomento} />
           <div className="flex gap-2">
             <Pulsante variante="secondario" inCorso={pending} motivoSpento={!azione.trim() || momento == null ? "Scegli l'azione e quando" : undefined}
-              onClick={() => { onSave({ nextAction: azione.trim(), nextActionAt: momento }); setCambia(false); }}>Salva</Pulsante>
+              onClick={() => poiSeRiesce(onSave, () => setCambia(false))({ nextAction: azione.trim(), nextActionAt: momento })}>Salva</Pulsante>
             <Pulsante variante="fantasma" onClick={() => setCambia(false)}>Annulla</Pulsante>
           </div>
         </div>

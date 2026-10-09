@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { SchedaLead } from "../src/pagine/commerciale/SchedaLead";
 import { compila, modelliDelCanale, modelloPer } from "../src/pagine/commerciale/modelli";
+import { corpoDati, statoDati } from "../src/pagine/commerciale/lead/LeadForm";
+import { poiSeRiesce, type Salva } from "../src/pagine/commerciale/lead/salvataggi";
 import { centesimi, idPerPreventivo, provenienza } from "../src/pagine/commerciale/scheda";
 import type { MessageTemplate } from "../worker/db/schema";
 import type { LeadDetail, Stage } from "../src/types";
@@ -68,5 +70,56 @@ describe("scheda lead, pagina", () => {
     expect(html).not.toContain("<select");
     expect(html).toContain('aria-label="Scrivi su WhatsApp"');
     expect(html).not.toMatch(/[–—]/);
+  });
+});
+
+// Il pool Workers rende solo lato server (niente DOM per digitare): il comportamento si prova sulla logica che lo decide.
+const salvaFinto = (riesce: boolean) => {
+  const chiamate: Record<string, unknown>[] = [];
+  const salva: Salva = (corpo, opzioni) => { chiamate.push(corpo); if (riesce) opzioni?.onSuccess?.(); };
+  return { salva, chiamate };
+};
+
+describe("scheda lead, correzioni della revisione", () => {
+  it("il modulo dati si rimonta solo dopo il suo salvataggio riuscito, non per gli altri salvataggi", () => {
+    let versione = 0;
+    const ok = salvaFinto(true);
+    poiSeRiesce(ok.salva, () => { versione += 1; })({ company: "Officina" });
+    expect(versione).toBe(1);
+    const ko = salvaFinto(false);
+    poiSeRiesce(ko.salva, () => { versione += 1; })({ company: "Officina" });
+    expect(versione).toBe(1);
+    // Un altro salvataggio della scheda (fase, prossima azione) cambia updatedAt ma non la versione: il testo scritto resta.
+    const lead = DETTAGLIO.lead;
+    const scritto = { ...statoDati(lead), note: "Testo scritto a mano" };
+    const dopoAltroSalvataggio = { ...lead, updatedAt: lead.updatedAt + 60_000 };
+    expect(dopoAltroSalvataggio.updatedAt).not.toBe(lead.updatedAt);
+    expect(corpoDati(scritto).notes).toBe("Testo scritto a mano");
+    const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], { ...DETTAGLIO, lead: dopoAltroSalvataggio }], [["stages"], FASI]] });
+    expect(html).toContain("Salva i dati");
+  });
+  it("la prossima azione resta in modifica se il server rifiuta", () => {
+    let aperto = true;
+    const ko = salvaFinto(false);
+    poiSeRiesce(ko.salva, () => { aperto = false; })({ nextAction: "Richiamare", nextActionAt: ORA });
+    expect(ko.chiamate).toHaveLength(1);
+    expect(aperto).toBe(true);
+    const ok = salvaFinto(true);
+    poiSeRiesce(ok.salva, () => { aperto = false; })({ nextAction: "Richiamare", nextActionAt: ORA });
+    expect(aperto).toBe(false);
+  });
+  it("spec 18: valore stimato, appuntamento, link Meet e preventivo solo in lettura", () => {
+    const corpo = corpoDati(statoDati(DETTAGLIO.lead));
+    for (const k of ["estimatedValue", "appointmentAt", "meetLink", "proposalUrl"]) expect(corpo).not.toHaveProperty(k);
+    expect(corpo).toMatchObject({ company: "Officina Prova", contactName: "Luca Prova", ownerId: "tommaso" });
+    const conDati = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, estimatedValue: 2400, meetLink: "https://meet.google.com/abc", appointmentAt: ORA + 86_400_000, proposalUrl: null } };
+    const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], conDati], [["stages"], FASI]] });
+    expect(html).toContain(">Valore stimato</dt>");
+    expect(html).toContain(">Link Meet</dt>");
+    expect(html).toContain(">Appuntamento</dt>");
+    expect(html).not.toContain(">Link preventivo</dt>");
+    for (const etichetta of ["Link Meet", "Link preventivo", "Appuntamento", "Valore stimato (euro)"]) expect(html).not.toContain(`>${etichetta}</label>`);
+    const senza = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
+    expect(senza).not.toContain("Dati di sola lettura");
   });
 });

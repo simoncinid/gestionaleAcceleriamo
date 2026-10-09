@@ -15,8 +15,10 @@ import { FoglioEsito } from "./FoglioEsito";
 import { FoglioScrivi } from "./FoglioScrivi";
 import { Documents } from "./lead/Documents";
 import { LeadForm } from "./lead/LeadForm";
+import { Dato } from "./lead/Dato";
 import { MetaAnswers, contaRisposte } from "./lead/MetaAnswers";
 import { NextActionCard } from "./lead/NextActionCard";
+import { poiSeRiesce } from "./lead/salvataggi";
 import { Timeline } from "./lead/Timeline";
 import { idPerPreventivo, provenienza } from "./scheda";
 import { StepperFasi } from "./StepperFasi";
@@ -37,16 +39,6 @@ function Piega({ titolo, riassunto, aperta = false, children }: { titolo: string
   );
 }
 
-// Una riga del blocco dati: etichetta a sinistra, valore a destra.
-function Dato({ etichetta, children }: { etichetta: string; children: ReactNode }) {
-  return (
-    <div className="flex min-h-12 items-center justify-between gap-4 py-2">
-      <dt className="text-etichetta uppercase text-grigio">{etichetta}</dt>
-      <dd className="min-w-0 truncate text-right text-corpo tabular-nums">{children}</dd>
-    </div>
-  );
-}
-
 export function SchedaLeadRotta() {
   const { id = "" } = useParams();
   return <SchedaLead key={id} id={id} />;
@@ -62,6 +54,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   // Le azioni che non si annullano chiedono un secondo tocco sullo stesso pulsante: niente confirm() del browser.
   const [chiede, setChiede] = useState<null | "unisci" | "cestino">(null);
   const [uscito, setUscito] = useState(false);
+  // Il modulo dati si rimonta solo dopo un suo salvataggio riuscito: gli altri salvataggi non cancellano quello che si scrive.
+  const [versione, setVersione] = useState(0);
   const d = useQuery({ queryKey: ["lead", id], queryFn: () => api<LeadDetail>(`/leads/${id}`), enabled: !uscito });
   const aperta = fasi.data?.find((f) => f.id === d.data?.lead.stageId)?.kind === "open";
   const passo = useQuery({
@@ -71,7 +65,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   });
   const patch = useMutation({
     mutationFn: (json: Record<string, unknown>) => api(`/leads/${id}`, { method: "PATCH", json }),
-    onSuccess: () => { toast.success("Salvato"); for (const k of [["lead", id], ["leads"], ["today"]]) void qc.invalidateQueries({ queryKey: k }); },
+    onSuccess: () => { toast.success("Salvato"); for (const k of [["lead", id], ["leads"], ["today"], ["badge"]]) void qc.invalidateQueries({ queryKey: k }); },
     onError: (e) => toast.error(e.message),
   });
   // Il lead cestinato o unito non esiste più: si toglie dalla cache senza rifare la richiesta (darebbe 404).
@@ -158,7 +152,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
           <Timeline leadId={lead.id} activities={activities} ora={ora} />
         </Piega>
         <Piega titolo="Note e dati" riassunto={lead.notes ? "1 nota" : undefined}>
-          <LeadForm key={lead.updatedAt} lead={lead} users={utenti.data ?? []} onSave={patch.mutate} pending={patch.isPending} />
+          <LeadForm key={versione} lead={lead} users={utenti.data ?? []} ora={ora} onSave={poiSeRiesce(patch.mutate, () => setVersione((v) => v + 1))} pending={patch.isPending} />
         </Piega>
         <Piega titolo="Documenti" riassunto={documents.length ? `${documents.length} file` : "nessuno"}>
           <Documents leadId={lead.id} documents={documents} ora={ora} />

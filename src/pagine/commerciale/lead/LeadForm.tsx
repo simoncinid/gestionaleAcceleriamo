@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { AreaTesto, Campo, CampoQuando, Pulsante, Selettore } from "../../../ds";
+import { AreaTesto, Campo, Pulsante, Selettore } from "../../../ds";
+import { euro, momento } from "../../../format";
 import type { Lead } from "../../../types";
+import { Dato } from "./Dato";
 
-type CampoTesto = "company" | "contactName" | "phone" | "email" | "website" | "meetLink" | "proposalUrl";
+type CampoTesto = "company" | "contactName" | "phone" | "email" | "website";
 
 const CAMPI: { key: CampoTesto; label: string; type?: string; inputMode?: "tel" | "email" | "url" }[] = [
   { key: "company", label: "Azienda" },
@@ -10,48 +12,56 @@ const CAMPI: { key: CampoTesto; label: string; type?: string; inputMode?: "tel" 
   { key: "phone", label: "Telefono", type: "tel", inputMode: "tel" },
   { key: "email", label: "Email", type: "email", inputMode: "email" },
   { key: "website", label: "Sito", inputMode: "url" },
-  { key: "meetLink", label: "Link Meet", type: "url", inputMode: "url" },
-  { key: "proposalUrl", label: "Link preventivo", type: "url", inputMode: "url" },
 ];
 
 const NESSUNO = "nessuno";
 
-// Dati del lead in un modulo controllato: responsabile con il selettore, appuntamento con CampoQuando.
-// Chi lo usa lo rimonta (key) quando il lead cambia sul server, così riparte dai valori salvati.
-export function LeadForm({ lead, users, onSave, pending }: { lead: Lead; users: { id: string; name: string }[]; onSave: (p: Record<string, unknown>) => void; pending: boolean }) {
-  const [testi, setTesti] = useState<Record<CampoTesto, string>>(() => Object.fromEntries(CAMPI.map(({ key }) => [key, lead[key] ?? ""])) as Record<CampoTesto, string>);
-  const [valore, setValore] = useState(lead.estimatedValue != null ? String(lead.estimatedValue) : "");
-  const [owner, setOwner] = useState(lead.ownerId ?? NESSUNO);
-  const [appuntamento, setAppuntamento] = useState<number | null>(lead.appointmentAt);
-  const [note, setNote] = useState(lead.notes ?? "");
-  const [linkedin, setLinkedin] = useState(lead.linkedinText ?? "");
-  const numero = valore.trim() ? Number(valore.replace(/\./g, "").replace(",", ".")) : null;
+export type StatoDati = { testi: Record<CampoTesto, string>; owner: string; note: string; linkedin: string };
 
-  function salva() {
-    const patch: Record<string, unknown> = {};
-    for (const { key } of CAMPI) patch[key] = testi[key].trim() || null;
-    patch.company = testi.company.trim();
-    patch.ownerId = owner === NESSUNO ? null : owner;
-    patch.estimatedValue = numero == null ? null : Math.round(numero);
-    patch.appointmentAt = appuntamento;
-    patch.notes = note.trim() || null;
-    patch.linkedinText = linkedin.trim() || null;
-    onSave(patch);
-  }
-  const manca = !testi.company.trim() ? "Serve il nome dell'azienda" : numero != null && (Number.isNaN(numero) || numero < 0) ? "Il valore stimato va scritto in euro" : undefined;
+export const statoDati = (lead: Lead): StatoDati => ({
+  testi: Object.fromEntries(CAMPI.map(({ key }) => [key, lead[key] ?? ""])) as Record<CampoTesto, string>,
+  owner: lead.ownerId ?? NESSUNO,
+  note: lead.notes ?? "",
+  linkedin: lead.linkedinText ?? "",
+});
+
+// Corpo del PATCH dei dati. Spec 18: valore stimato, appuntamento, link Meet e link preventivo in 1B sono di sola lettura e non partono mai.
+export function corpoDati(s: StatoDati): Record<string, unknown> {
+  const corpo: Record<string, unknown> = {};
+  for (const { key } of CAMPI) corpo[key] = s.testi[key].trim() || null;
+  corpo.company = s.testi.company.trim();
+  corpo.ownerId = s.owner === NESSUNO ? null : s.owner;
+  corpo.notes = s.note.trim() || null;
+  corpo.linkedinText = s.linkedin.trim() || null;
+  return corpo;
+}
+
+// Dati del lead in un modulo controllato, responsabile con il selettore. Chi lo usa lo rimonta (key) solo dopo un salvataggio
+// del modulo riuscito: gli altri salvataggi della scheda non cancellano quello che si sta scrivendo.
+export function LeadForm({ lead, users, ora, onSave, pending }: { lead: Lead; users: { id: string; name: string }[]; ora: number; onSave: (p: Record<string, unknown>) => void; pending: boolean }) {
+  const [s, setS] = useState<StatoDati>(() => statoDati(lead));
+  const manca = !s.testi.company.trim() ? "Serve il nome dell'azienda" : undefined;
+  const sola = lead.estimatedValue != null || lead.appointmentAt != null || lead.meetLink || lead.proposalUrl;
 
   return (
     <div className="flex flex-col gap-3">
       {CAMPI.map(({ key, label, type, inputMode }) => (
-        <Campo key={key} etichetta={label} type={type ?? "text"} inputMode={inputMode} value={testi[key]} onChange={(e) => setTesti((t) => ({ ...t, [key]: e.target.value }))} />
+        <Campo key={key} etichetta={label} type={type ?? "text"} inputMode={inputMode} value={s.testi[key]}
+          onChange={(e) => { const v = e.target.value; setS((p) => ({ ...p, testi: { ...p.testi, [key]: v } })); }} />
       ))}
-      <Campo etichetta="Valore stimato (euro)" inputMode="numeric" value={valore} onChange={(e) => setValore(e.target.value)} />
-      <Selettore etichetta="Responsabile" valore={owner} onCambia={setOwner}
+      <Selettore etichetta="Responsabile" valore={s.owner} onCambia={(owner) => setS((p) => ({ ...p, owner }))}
         opzioni={[{ valore: NESSUNO, etichetta: "Nessuno" }, ...users.map((u) => ({ valore: u.id, etichetta: u.name }))]} />
-      <CampoQuando etichetta="Appuntamento" valore={appuntamento} onCambia={setAppuntamento} />
-      <AreaTesto etichetta="Note" rows={4} value={note} onChange={(e) => setNote(e.target.value)} />
-      <AreaTesto etichetta="Profilo LinkedIn (testo incollato)" rows={3} value={linkedin} onChange={(e) => setLinkedin(e.target.value)} />
-      <Pulsante variante="secondario" className="self-start" inCorso={pending} motivoSpento={manca} onClick={salva}>Salva i dati</Pulsante>
+      <AreaTesto etichetta="Note" rows={4} value={s.note} onChange={(e) => { const v = e.target.value; setS((p) => ({ ...p, note: v })); }} />
+      <AreaTesto etichetta="Profilo LinkedIn (testo incollato)" rows={3} value={s.linkedin} onChange={(e) => { const v = e.target.value; setS((p) => ({ ...p, linkedin: v })); }} />
+      <Pulsante variante="secondario" className="self-start" inCorso={pending} motivoSpento={manca} onClick={() => onSave(corpoDati(s))}>Salva i dati</Pulsante>
+      {sola && (
+        <dl aria-label="Dati di sola lettura" className="flex flex-col divide-y divide-sabbia border-t border-sabbia pt-1">
+          {lead.estimatedValue != null && <Dato etichetta="Valore stimato">{euro(lead.estimatedValue * 100)}</Dato>}
+          {lead.appointmentAt != null && <Dato etichetta="Appuntamento">{momento(lead.appointmentAt, ora)}</Dato>}
+          {lead.meetLink && <Dato etichetta="Link Meet"><a href={lead.meetLink} target="_blank" rel="noreferrer" className="text-accento-testo underline-offset-4 hover:underline">{lead.meetLink}</a></Dato>}
+          {lead.proposalUrl && <Dato etichetta="Link preventivo"><a href={lead.proposalUrl} target="_blank" rel="noreferrer" className="text-accento-testo underline-offset-4 hover:underline">{lead.proposalUrl}</a></Dato>}
+        </dl>
+      )}
     </div>
   );
 }
