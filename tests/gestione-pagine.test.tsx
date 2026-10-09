@@ -17,7 +17,7 @@ const fattura = (x: Partial<FatturaRiga>): FatturaRiga => ({
   issuedAt: ORA - 20 * G, dueAt: Date.UTC(2026, 10, 15, 11, 0), paidAt: null, pdfUrl: null, note: null, stato: "in_ritardo", ...x,
 });
 const cruscotto = (x: Partial<DatiCruscotto> = {}): DatiCruscotto => ({
-  ricorrenteCents: 30000, obiettivoCents: 200000, inRitardo: [fattura({})], setupMeseCents: 150000, setupAnnoCents: 250000, daIncassareCents: 30000, costiMeseCents: 4500, ...x,
+  ricorrenteCents: 30000, obiettivoCents: 200000, inRitardo: [fattura({})], inScadenzaOggi: [], setupMeseCents: 150000, setupAnnoCents: 250000, daIncassareCents: 30000, costiMeseCents: 4500, ...x,
 });
 const automazione = (x: Partial<AutomazioneRiga>): AutomazioneRiga => ({
   id: "a1", clientId: "c1", proposalId: null, name: "Ordini da WhatsApp", family: "documenti", description: null, status: "attiva", runsOn: "Cloudflare",
@@ -34,7 +34,7 @@ describe("Economia", () => {
     expect(html).toContain("€ 300 di € 2.000");
     expect(html).toContain('aria-valuenow="15"');
     expect(html).toContain("Nel mese: € 1.500");
-    expect(html).toContain("Scaduta il 15 nov");
+    expect(html).toContain("Scaduta da 5 giorni");
     expect(html).toContain("Segna incassata");
     expect(contaPrimari(html)).toBe(1);
   });
@@ -43,6 +43,27 @@ describe("Economia", () => {
     const html = render(<Cruscotto ora={ORA} />, { dati: [[["economia", "cruscotto"], cruscotto({ inRitardo: [] })]] });
     expect(html).not.toContain("Da fare");
     expect(contaPrimari(html)).toBe(0);
+  });
+
+  it("QA 16: la fattura che scade oggi sta nel Da fare, con un solo primario, dopo quelle in ritardo", () => {
+    const oggi = fattura({ id: "i9", cliente: "Gelateria Prova", stato: "emessa", dueAt: Date.UTC(2026, 10, 20, 11, 0) });
+    const solo = render(<Cruscotto ora={ORA} />, { dati: [[["economia", "cruscotto"], cruscotto({ inRitardo: [], inScadenzaOggi: [oggi] })]] });
+    expect(solo).toContain(">Da fare<");
+    expect(solo).toContain("Da incassare oggi");
+    expect(solo).toContain("Scade oggi");
+    expect(solo).toContain("Gelateria Prova");
+    expect(contaPrimari(solo)).toBe(1);
+    const tutte = render(<Cruscotto ora={ORA} />, { dati: [[["economia", "cruscotto"], cruscotto({ inScadenzaOggi: [oggi] })]] });
+    expect(tutte.indexOf("Officina Prova")).toBeLessThan(tutte.indexOf("Gelateria Prova"));
+    expect(tutte).toContain("2 da incassare");
+    expect(contaPrimari(tutte)).toBe(1);
+  });
+
+  it("QA 16: in Fatture la scadenza di oggi dice scade oggi", () => {
+    const fatture = [fattura({ id: "i9", stato: "emessa", dueAt: Date.UTC(2026, 10, 20, 11, 0) }), fattura({ id: "i8", stato: "emessa", dueAt: Date.UTC(2026, 10, 21, 11, 0) })];
+    const html = render(<Fatture ora={ORA} />, { dati: [[["economia", "fatture"], fatture]] });
+    expect(html).toContain("scade oggi");
+    expect(html).toContain("scade domani");
   });
 
   it("Fatture: gruppi nell'ordine della spec, scadenza breve, tipo come etichetta", () => {
@@ -55,8 +76,8 @@ describe("Economia", () => {
     const html = render(<Fatture ora={ORA} />, { dati: [[["economia", "fatture"], fatture]] });
     const pos = ["In ritardo", "Emesse", "Da emettere", "Incassate"].map((t) => html.indexOf(`>${t}<`));
     expect(pos.every((p, i) => p > 0 && (i === 0 || p > pos[i - 1]))).toBe(true);
-    expect(html).toContain("scaduta 15 nov");
-    expect(html).toContain("scade 5 dic");
+    expect(html).toContain("scaduta da 5 giorni");
+    expect(html).toContain("scade il 5 dic");
     expect(html).toContain("ottobre 2026: € 300");
     expect(html).toContain(">Saldo<");
     expect(contaPrimari(html)).toBe(1);
@@ -136,33 +157,58 @@ describe("Automazioni", () => {
 });
 
 describe("Clienti", () => {
-  it("una riga per cliente: canone, stato, fuori perimetro; cessati a scomparsa; nessun primario", () => {
+  it("una riga per cliente: canone, stato, fuori perimetro nel suo gruppo; cessati a scomparsa; nessun primario", () => {
     const base = { sector: null, originLeadId: null };
     const clienti: ClienteRiga[] = [
-      { ...base, id: "c1", name: "Officina Prova", city: "Pisa", scope: "acceleriamo", canoneCents: 30000, stato: "attivo" },
-      { ...base, id: "c2", name: "Studio Prova", city: "Lucca", scope: "fuori_perimetro", canoneCents: 0, stato: "in_costruzione" },
-      { ...base, id: "c3", name: "Bar Prova", city: null, scope: "acceleriamo", canoneCents: 0, stato: "cessato" },
+      { ...base, id: "c1", name: "Officina Prova", city: "Pisa", scope: "acceleriamo", canoneCents: 30000, stato: "attivo", canone: { cents: 30000, stato: "attivo" } },
+      { ...base, id: "c2", name: "Studio Prova", city: "Lucca", scope: "fuori_perimetro", canoneCents: 0, stato: "in_costruzione", canone: null },
+      { ...base, id: "c3", name: "Bar Prova", city: null, scope: "acceleriamo", canoneCents: 0, stato: "cessato", canone: null },
     ];
     const html = render(<Clienti />, { dati: [[["clienti"], clienti]] });
     expect(html).toMatch(/Clienti(<!-- -->)?, <strong[^>]*>3<\/strong>/);
     expect(html).toContain("€ 300 al mese");
     expect(html).toContain("Nessun canone");
-    expect(html).toContain("Fuori perimetro");
+    expect(html.indexOf(">Fuori perimetro<")).toBeLessThan(html.indexOf("Studio Prova"));
     expect(html).toMatch(/<details[^>]*>.*Cessati, 1/s);
     expect(contaPrimari(html)).toBe(0);
   });
 
-  it("cliente con il canone in pausa: nel gruppo A canone, col tag in pausa, prima di In costruzione", () => {
+  it("cliente con il canone in pausa: nel gruppo A canone, prima di In costruzione", () => {
     const base = { sector: null, originLeadId: null, city: null, scope: "acceleriamo" as const };
     const clienti: ClienteRiga[] = [
-      { ...base, id: "c4", name: "Studio Fermo", canoneCents: 0, stato: "in_pausa" },
-      { ...base, id: "c5", name: "Vivaio Nuovo", canoneCents: 0, stato: "in_costruzione" },
-      { ...base, id: "c1", name: "Officina Prova", canoneCents: 30000, stato: "attivo" },
+      { ...base, id: "c4", name: "Studio Fermo", canoneCents: 0, stato: "in_pausa", canone: { cents: 9000, stato: "in_pausa" } },
+      { ...base, id: "c5", name: "Vivaio Nuovo", canoneCents: 0, stato: "in_costruzione", canone: null },
+      { ...base, id: "c1", name: "Officina Prova", canoneCents: 30000, stato: "attivo", canone: { cents: 30000, stato: "attivo" } },
     ];
     const html = render(<Clienti />, { dati: [[["clienti"], clienti]] });
     const pos = [">A canone<", "Officina Prova", "Studio Fermo", ">In costruzione<", "Vivaio Nuovo"].map((t) => html.indexOf(t));
     expect(pos.every((p, i) => p > 0 && (i === 0 || p > pos[i - 1]))).toBe(true);
-    expect(html).toContain(">in pausa<");
     expect(html).not.toContain("Cessati");
+  });
+
+  it("QA 10: canone in pausa e in attesa mostrano l'importo, una sola chip di stato per riga, sempre in terza riga", () => {
+    const base = { sector: null, originLeadId: null, city: null, scope: "acceleriamo" as const };
+    const clienti: ClienteRiga[] = [
+      { ...base, id: "g", name: "Gelateria Prova", canoneCents: 0, stato: "in_pausa", canone: { cents: 9000, stato: "in_pausa" } },
+      { ...base, id: "p", name: "Palestra Prova", canoneCents: 0, stato: "in_costruzione", canone: { cents: 12000, stato: "in_attesa" } },
+      { ...base, id: "k", name: "Caseificio Prova", canoneCents: 15000, stato: "attivo", canone: { cents: 15000, stato: "attivo" } },
+      { ...base, id: "s", name: "Studio Esterno Prova", scope: "fuori_perimetro", canoneCents: 0, stato: "in_costruzione", canone: null },
+    ];
+    const html = render(<Clienti />, { dati: [[["clienti"], clienti]] });
+    expect(html).toContain("€ 90 al mese");
+    expect(html).toContain("€ 120 al mese");
+    expect(html).toContain("€ 150 al mese");
+    expect(html.match(/Nessun canone/g)).toHaveLength(1);
+    // "in pausa" una volta sola: niente stato ripetuto tra riga e chip.
+    expect(html.match(/in pausa/gi)).toHaveLength(1);
+    const righe = [...html.matchAll(/<a [^>]*href="\/commerciale\/clienti\/[^"]+"[^>]*>(.*?)<\/a>/gs)].map((m) => m[1]);
+    expect(righe).toHaveLength(4);
+    for (const r of righe) {
+      expect(r.match(/data-stato-cliente/g)).toHaveLength(1);
+      expect(r.match(/rounded-full bg-sabbia/g)).toHaveLength(1);
+      expect(r).not.toContain("Fuori perimetro");
+    }
+    const chip = righe.map((r) => r.match(/data-stato-cliente[^>]*><span[^>]*>([^<]+)</)![1]);
+    expect(chip).toEqual(["attivo", "in pausa", "in attesa di attivazione", "in costruzione"]);
   });
 });

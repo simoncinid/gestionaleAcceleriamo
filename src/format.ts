@@ -1,4 +1,4 @@
-import { daRoma, numeroGiorno, partiRoma } from "../worker/lib/roma";
+import { daRoma, inizioGiornoRoma, numeroGiorno, partiRoma } from "../worker/lib/roma";
 
 export const SOURCE_LABELS: Record<string, string> = {
   meta: "Meta", manuale: "A mano", sito: "Sito", passaparola: "Passaparola", altro: "Altro", migrazione: "Vecchio gestionale", foglio_andrea: "Foglio Andrea",
@@ -131,6 +131,17 @@ const due = (n: number) => String(n).padStart(2, "0");
 export function giorno(ms: number, ora = Date.now()): string {
   const p = partiRoma(ms);
   return `${p.giorno} ${MESI[p.mese - 1]}${p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : ""}`;
+}
+
+// QA 16: scadenza di una fattura contata in giorni di Roma, non in ore UTC.
+// "scade oggi", "scade domani", "scaduta da N giorni", altrimenti "scade il 15 ott" (con l'apostrofo per 8 e 11).
+export function scadenzaFattura(dueAt: number, ora = Date.now()): string {
+  const giorni = Math.round((inizioGiornoRoma(dueAt) - inizioGiornoRoma(ora)) / 86_400_000);
+  if (giorni === 0) return "scade oggi";
+  if (giorni === 1) return "scade domani";
+  if (giorni < 0) return `scaduta da ${-giorni} ${giorni === -1 ? "giorno" : "giorni"}`;
+  const g = partiRoma(dueAt).giorno;
+  return `scade ${g === 8 || g === 11 ? "l'" : "il "}${giorno(dueAt, ora)}`;
 }
 
 // Valore per <input type="date">, sul fuso di Roma.

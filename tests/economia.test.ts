@@ -130,7 +130,39 @@ describe("Economia", () => {
   });
 });
 
+describe("Cruscotto, scadenza di oggi (QA 16)", () => {
+  it("la fattura emessa che scade oggi a Roma sta in inScadenzaOggi, non in ritardo; quella di domani no", async () => {
+    const cookie = await authed();
+    const now = await semina();
+    const q = (s: string, ...b: unknown[]) => env.DB.prepare(s).bind(...b).run();
+    const { inizioGiornoRoma } = await import("../worker/lib/roma");
+    const oggi = inizioGiornoRoma(now);
+    await q("INSERT INTO invoices (id, client_id, kind, number, amount_cents, issued_at, due_at) VALUES ('i5', 'c1', 'canone', '9/2026', 9000, ?1, ?2)", now - 30 * G, oggi + 60_000);
+    await q("INSERT INTO invoices (id, client_id, kind, number, amount_cents, issued_at, due_at) VALUES ('i6', 'c1', 'canone', '10/2026', 9000, ?1, ?2)", now - 30 * G, oggi + G + 60_000);
+    const d = await json<{ inRitardo: { id: string }[]; inScadenzaOggi: { id: string }[] }>(await call("/api/economia/cruscotto", {}, cookie));
+    expect(d.inScadenzaOggi.map((f) => f.id)).toEqual(["i5"]);
+    expect(d.inRitardo.map((f) => f.id)).toEqual(["i1"]);
+  });
+});
+
 describe("Clienti", () => {
+  it("QA 10: il canone in pausa o in attesa arriva con importo e stato; senza canoni è null", async () => {
+    const cookie = await authed();
+    const now = await semina();
+    const q = (s: string, ...b: unknown[]) => env.DB.prepare(s).bind(...b).run();
+    await q("INSERT INTO clients (id, name, scope, created_at) VALUES ('c3', 'Gelateria Prova', 'acceleriamo', ?1)", now);
+    await q("INSERT INTO clients (id, name, scope, created_at) VALUES ('c4', 'Palestra Prova', 'acceleriamo', ?1)", now);
+    await q("INSERT INTO clients (id, name, scope, created_at) VALUES ('c5', 'Vivaio Prova', 'acceleriamo', ?1)", now);
+    await q("INSERT INTO fees (id, client_id, amount_cents, billing_day, status) VALUES ('f3', 'c3', 9000, 1, 'in_pausa')");
+    await q("INSERT INTO fees (id, client_id, amount_cents, billing_day, status) VALUES ('f4', 'c4', 12000, 1, 'in_attesa')");
+    const { clienti } = await json<{ clienti: { id: string; canone: { cents: number; stato: string } | null }[] }>(await call("/api/clients", {}, cookie));
+    const di = (id: string) => clienti.find((c) => c.id === id)!.canone;
+    expect(di("c1")).toEqual({ cents: 30000, stato: "attivo" });
+    expect(di("c3")).toEqual({ cents: 9000, stato: "in_pausa" });
+    expect(di("c4")).toEqual({ cents: 12000, stato: "in_attesa" });
+    expect(di("c5")).toBeNull();
+  });
+
   it("elenco con stato calcolato e perimetro; scheda con canoni, fatture e lead di origine", async () => {
     const cookie = await authed();
     await semina();

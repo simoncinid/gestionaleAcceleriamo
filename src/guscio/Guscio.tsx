@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { useBadge } from "../hooks";
 import { creazioneDelPiu, creazioniDelPercorso, type Creazione } from "./aree";
@@ -8,10 +8,6 @@ import { FoglioCrea } from "./FoglioCrea";
 import { leggiScorciatoia } from "./scorciatoie";
 import { Testata } from "./Testata";
 import { useAzzeraAnonimoFuoriArea } from "../pagine/automazioni/anonimo";
-
-type CreaCtx = { crea: Creazione | null; apri: (c: Creazione) => void; chiudi: () => void };
-const Ctx = createContext<CreaCtx>({ crea: null, apri: () => {}, chiudi: () => {} });
-export const useCrea = () => useContext(Ctx);
 
 // I fogli di creazione arrivano dalle pagine dei task 10, 14 e 18 tramite `fogli`.
 export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => void; fogli: (crea: Creazione | null, chiudi: () => void) => ReactNode }) {
@@ -36,14 +32,14 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
     return () => window.removeEventListener("keydown", suTasto);
   }, [pathname, vai]);
 
-  const ctx: CreaCtx = { crea, apri: setCrea, chiudi: () => setCrea(null) };
+  const chiudi = () => setCrea(null);
   const voci = creazioniDelPercorso(pathname);
   // Con una sola voce (Automazioni) il foglio dell'elenco non serve: si apre subito la creazione.
   const piu = () => (voci.length === 1 ? setCrea(voci[0].id) : setMenu(true));
   return (
-    <Ctx.Provider value={ctx}>
+    <>
       <div className="flex min-h-dvh bg-crema">
-        <BarraLaterale nome={nome} badge={badge} onPiu={piu} onEsci={onEsci} />
+        <BarraLaterale nome={nome} badge={badge} onCrea={setCrea} onEsci={onEsci} />
         <div className="min-w-0 flex-1">
           <div className="sticky top-0 z-10">
             <Testata nome={nome} puntoAvatar={badge?.avatar ?? false} onCerca={() => vai("/commerciale/scaletta?cerca=1")} onPiu={piu} />
@@ -53,7 +49,7 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
       </div>
       <BarraBasso badge={badge} />
       <FoglioCrea aperto={menu} voci={voci} onChiudi={() => setMenu(false)} onScegli={(c) => { setMenu(false); setCrea(c); }} />
-      {fogli(crea, ctx.chiudi)}
-    </Ctx.Provider>
+      {fogli(crea, chiudi)}
+    </>
   );
 }

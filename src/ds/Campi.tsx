@@ -9,7 +9,7 @@ export const campo = "h-12 w-full rounded-controllo border-[1.5px] border-sabbia
 export function Campo({ etichetta, aiuto, className, ...p }: InputHTMLAttributes<HTMLInputElement> & { etichetta: string; aiuto?: string }) {
   const id = useId();
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <label htmlFor={id} className="text-secondaria font-medium">{etichetta}</label>
       <input id={id} {...p} className={cx(campo, className)} />
       {aiuto && <p className="text-meta text-grigio">{aiuto}</p>}

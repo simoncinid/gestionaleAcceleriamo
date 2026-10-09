@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AREE, REDIRECT_1A, SOTTOMENU, TUTTE_LE_CREAZIONI, areaDi, creazioneDelPiu, creazioniDelPercorso } from "../src/guscio/aree";
+import { Route, Routes } from "react-router";
+import { Pulsante } from "../src/ds";
+import { AREE, REDIRECT_1A, SOTTOMENU, TUTTE_LE_CREAZIONI, areaDi, creazioneDelPiu, creazioneDellaBarra, creazioniDelPercorso } from "../src/guscio/aree";
+import { Guscio } from "../src/guscio/Guscio";
 import { BarraBasso } from "../src/guscio/BarraBasso";
 import { BarraLaterale } from "../src/guscio/BarraLaterale";
 import { Testata } from "../src/guscio/Testata";
@@ -112,17 +115,46 @@ describe("BarraLaterale", () => {
   it.each([
     ["/commerciale/oggi", "Nuovo lead"], ["/automazioni", "Nuova automazione"], ["/economia/canoni", "Nuova fattura"], ["/impostazioni", "Nuovo lead"],
   ])("in %s il pulsante dice %s", (percorso, etichetta) => {
-    const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onPiu={() => {}} onEsci={() => {}} />, { percorso });
+    const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onCrea={() => {}} onEsci={() => {}} />, { percorso });
     expect(html).toContain(`</svg>${etichetta}</button>`);
     expect(html).not.toContain("</svg>Crea</button>");
   });
   it("stesso ordine delle aree, area corrente aperta con il suo sottomenu", () => {
-    const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onPiu={() => {}} onEsci={() => {}} />, { percorso: "/commerciale/oggi" });
+    const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onCrea={() => {}} onEsci={() => {}} />, { percorso: "/commerciale/oggi" });
     const aree = [...html.matchAll(/data-area="([^"]+)"/g)].map((m) => m[1]);
     expect(aree).toEqual(["commerciale", "automazioni", "economia"]);
     expect(html).toContain('href="/commerciale/scaletta"');
     expect(html).not.toContain('href="/economia/canoni"');
     expect(contaPrimari(html)).toBe(0);
+  });
+});
+
+describe("una sola azione in accento sul computer (QA 8 e 9)", () => {
+  it("il pulsante della barra laterale è secondario: bordo, nessun fondo accento", () => {
+    const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onCrea={() => {}} onEsci={() => {}} />, { percorso: "/commerciale/oggi" });
+    const pulsante = html.match(/<button [^>]*data-variante="secondario"[^>]*>.*?<\/button>/)![0];
+    expect(pulsante).toContain("Nuovo lead");
+    expect(pulsante).not.toContain("bg-accento");
+    expect(pulsante).toContain("border-chrome-testo/60");
+  });
+  it("guscio con una pagina che ha la sua azione primaria: un solo primario", () => {
+    const html = render(
+      <Routes>
+        <Route element={<Guscio nome="Tommaso" onEsci={() => {}} fogli={() => null} />}>
+          <Route path="/commerciale/clienti" element={<Pulsante variante="primario">Aggiungi il cliente</Pulsante>} />
+        </Route>
+      </Routes>,
+      { percorso: "/commerciale/clienti" },
+    );
+    expect(html).toContain("Aggiungi il cliente");
+    expect(html).toContain("</svg>Nuovo lead</button>");
+    expect(contaPrimari(html)).toBe(1);
+  });
+  it.each([
+    ["/commerciale/oggi", "lead", "Nuovo lead"], ["/commerciale/clienti", "lead", "Nuovo lead"],
+    ["/economia/canoni", "fattura", "Nuova fattura"], ["/automazioni", "automazione", "Nuova automazione"],
+  ])("in %s il pulsante apre direttamente il foglio %s, quello che dice %s", (percorso, id, etichetta) => {
+    expect(creazioneDellaBarra(percorso)).toEqual({ id, etichetta });
   });
 });
 

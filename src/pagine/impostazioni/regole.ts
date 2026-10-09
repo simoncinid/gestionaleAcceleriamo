@@ -24,6 +24,26 @@ export const CAMPI_REGOLE: Record<RuleKey, { chiave: string; etichetta: string; 
   fermo: [{ chiave: "giorni", etichetta: "Giorni" }],
 };
 
+// QA 11: le regole agganciate a una fase, in sintesi, una per riga nell'elenco delle fasi.
+const piu = (n: number, uno: string, molti: string) => `${n} ${n === 1 ? uno : molti}`;
+const durata = (minuti: number) => (minuti >= 60 && minuti % 60 === 0 ? piu(minuti / 60, "ora", "ore") : piu(minuti, "minuto", "minuti"));
+const num = (v: number | number[] | undefined) => (typeof v === "number" ? v : 0);
+
+export function sintesiRegola(r: Pick<RegolaLetta, "ruleKey" | "params">): string {
+  const p = r.params;
+  switch (r.ruleKey) {
+    case "sla": return `Prima chiamata entro ${durata(num(p.minuti))}`;
+    case "tentativi": return `Pausa dopo ${piu(num(p.massimo), "tentativo", "tentativi")}`;
+    case "preventivo_48h": return `Preventivo entro ${piu(num(p.ore), "ora", "ore")}`;
+    case "ricontatti": return `Ricontatti dopo ${Array.isArray(p.giorni) ? p.giorni.join(", ") : num(p.giorni)} giorni`;
+    case "pausa": return `In pausa per ${piu(num(p.mesi), "mese", "mesi")}`;
+    case "fermo": return `Fermo dopo ${piu(num(p.giorni), "giorno", "giorni")}`;
+  }
+}
+
+export const sintesiDellaFase = (regole: RegolaLetta[], faseId: string) =>
+  regole.filter((r) => r.active && r.stageId === faseId).map(sintesiRegola);
+
 export const ETICHETTE_TIPO = { open: "aperta", won: "vinta", lost: "persa" } as const;
 
 const EVENTI: Opzione<string>[] = [{ valore: "evento:call_conoscenza_fatta", etichetta: "Dopo la call di conoscenza" }];

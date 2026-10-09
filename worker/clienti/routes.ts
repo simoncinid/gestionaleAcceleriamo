@@ -3,12 +3,17 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb } from "../db/client";
 import { automations, clients, fees, leads, type Client, type Fee } from "../db/schema";
-import { statoCliente, type StatoCliente } from "../economia/calcoli";
+import { canonePrincipale, statoCliente, type StatoCliente } from "../economia/calcoli";
 import { elencoFatture, type FatturaRiga } from "../economia/service";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
 
-export type ClienteRiga = Pick<Client, "id" | "name" | "sector" | "city" | "scope" | "originLeadId"> & { canoneCents: number; stato: StatoCliente };
+export type ClienteRiga = Pick<Client, "id" | "name" | "sector" | "city" | "scope" | "originLeadId"> & {
+  canoneCents: number;
+  stato: StatoCliente;
+  // Il canone da mostrare nell'elenco (QA 10): null solo se il cliente non ne ha nessuno.
+  canone: { cents: number; stato: Fee["status"] } | null;
+};
 export type SchedaClienteDati = {
   cliente: ClienteRiga;
   canoni: Fee[];
@@ -40,6 +45,7 @@ clientiRoutes.get("/", async (c) => {
         id: k.id, name: k.name, sector: k.sector, city: k.city, scope: k.scope, originLeadId: k.originLeadId,
         canoneCents: suoi.filter((f) => f.status === "attivo").reduce((t, f) => t + f.amountCents, 0),
         stato: statoCliente(suoi, autom.filter((a) => a.clientId === k.id)),
+        canone: canonePrincipale(suoi),
       };
     })
     .sort((a, b) => a.name.localeCompare(b.name, "it"));
@@ -67,7 +73,7 @@ clientiRoutes.get("/:id", async (c) => {
   ]);
   const ultime = [...fatture].sort((a, b) => (b.issuedAt ?? Infinity) - (a.issuedAt ?? Infinity)).slice(0, 5);
   const dati: SchedaClienteDati = {
-    cliente: { id: k.id, name: k.name, sector: k.sector, city: k.city, scope: k.scope, originLeadId: k.originLeadId, canoneCents: canoni.filter((f) => f.status === "attivo").reduce((t, f) => t + f.amountCents, 0), stato: statoCliente(canoni, autom) },
+    cliente: { id: k.id, name: k.name, sector: k.sector, city: k.city, scope: k.scope, originLeadId: k.originLeadId, canoneCents: canoni.filter((f) => f.status === "attivo").reduce((t, f) => t + f.amountCents, 0), stato: statoCliente(canoni, autom), canone: canonePrincipale(canoni) },
     canoni,
     automazioni: autom,
     fatture: ultime,

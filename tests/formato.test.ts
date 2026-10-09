@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   conteggioBadge, daIsoGiorno, euro, fermoDa, linkTel, linkWhatsApp, momento, percentuale, presetQuando, quando, riempiModello,
-  giorno, isoGiorno, nomeMese, telefonoMostrato, testoSla, trascorso,
+  giorno, isoGiorno, nomeMese, scadenzaFattura, telefonoMostrato, testoSla, trascorso,
 } from "../src/format";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0); // martedì 13 ottobre 2026, 10:00 a Roma
@@ -104,5 +104,22 @@ describe("giorni senza ora", () => {
     expect(daIsoGiorno("2026-11-15")).toBe(Date.UTC(2026, 10, 15, 11, 0));
     expect(daIsoGiorno("15/11/2026")).toBeNull();
     expect(nomeMese("2026-10")).toBe("ottobre 2026");
+  });
+});
+
+describe("scadenzaFattura (QA 16, giorno di Roma)", () => {
+  const venerdi2320 = Date.UTC(2026, 9, 9, 21, 20); // venerdì 9 ottobre, 23:20 a Roma
+  it("oggi, domani, scaduta da N giorni, altrimenti il giorno", () => {
+    expect(scadenzaFattura(Date.UTC(2026, 9, 9, 10, 0), venerdi2320)).toBe("scade oggi");
+    expect(scadenzaFattura(Date.UTC(2026, 9, 10, 10, 0), venerdi2320)).toBe("scade domani");
+    expect(scadenzaFattura(Date.UTC(2026, 9, 8, 10, 0), venerdi2320)).toBe("scaduta da 1 giorno");
+    expect(scadenzaFattura(Date.UTC(2026, 9, 4, 10, 0), venerdi2320)).toBe("scaduta da 5 giorni");
+    expect(scadenzaFattura(Date.UTC(2026, 9, 15, 10, 0), venerdi2320)).toBe("scade il 15 ott");
+    expect(scadenzaFattura(Date.UTC(2026, 10, 11, 10, 0), venerdi2320)).toBe("scade l'11 nov");
+  });
+  it("conta il giorno di Roma, non quello UTC: dopo mezzanotte a Roma la scadenza di ieri è passata", () => {
+    const sabato0030 = Date.UTC(2026, 9, 9, 22, 30); // sabato 10 ottobre, 00:30 a Roma, ancora venerdì in UTC
+    expect(scadenzaFattura(Date.UTC(2026, 9, 9, 10, 0), sabato0030)).toBe("scaduta da 1 giorno");
+    expect(scadenzaFattura(Date.UTC(2026, 9, 9, 22, 10), venerdi2320)).toBe("scade domani"); // 00:10 di sabato a Roma
   });
 });

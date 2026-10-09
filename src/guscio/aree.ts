@@ -60,6 +60,11 @@ export function creazioniDelPercorso(percorso: string) {
   return CREAZIONI_DELL_AREA[areaDi(percorso) ?? "commerciale"].map((id) => TUTTE_LE_CREAZIONI.find((c) => c.id === id)!);
 }
 
+// Pulsante della barra laterale: la prima creazione dell'area, che apre subito il suo foglio.
+export function creazioneDellaBarra(percorso: string) {
+  return creazioniDelPercorso(percorso)[0];
+}
+
 // Tasto "n" sul computer: crea subito l'oggetto naturale della pagina, senza passare dal foglio.
 export function creazioneDelPiu(percorso: string): Creazione {
   if (percorso.startsWith("/commerciale/proposte")) return "proposta";

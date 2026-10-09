@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ETICHETTE_FATTURA, ETICHETTE_TIPO_FATTURA, type StatoFattura } from "../../../worker/economia/calcoli";
 import { meseRoma } from "../../../worker/lib/roma";
 import { Errore, Intestazione, Pulsante, Riga, Skeleton, StatoVuoto, Tag } from "../../ds";
-import { euro, giorno, nomeMese } from "../../format";
+import { euro, giorno, nomeMese, scadenzaFattura } from "../../format";
 import { useOra } from "../../hooks";
 import type { FatturaRiga } from "../../types";
 import { useFatture } from "../dati-gestione";
@@ -15,7 +15,7 @@ const somma = (xs: FatturaRiga[]) => xs.reduce((t, f) => t + f.amountCents, 0);
 function metaFattura(f: FatturaRiga, ora: number) {
   if (f.stato === "incassata") return `incassata ${giorno(f.paidAt!, ora)}`;
   if (f.dueAt == null) return "da emettere";
-  return `${f.stato === "in_ritardo" ? "scaduta" : "scade"} ${giorno(f.dueAt, ora)}`;
+  return scadenzaFattura(f.dueAt, ora);
 }
 
 export function RigaFattura({ f, ora, onClick }: { f: FatturaRiga; ora: number; onClick?: () => void }) {

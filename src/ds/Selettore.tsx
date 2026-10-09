@@ -7,7 +7,7 @@ export type Opzione<T extends string> = { valore: T; etichetta: string; meta?: s
 
 const OLTRE_IL_FOGLIO = 8;
 
-// Chiuso: una riga da 48 px. Aperto: opzioni da 44 px sotto la riga, o in un foglio se sono più di otto.
+// Chiuso: una riga da 48 px (di più solo se il valore va a capo). Aperto: opzioni da 44 px sotto la riga, o in un foglio se sono più di otto.
 // L'ordine delle opzioni è quello che passa chi lo usa: frequenza d'uso, o l'ordine del processo per le fasi.
 export function Selettore<T extends string>({ etichetta, opzioni, valore, onCambia, segnaposto = "Scegli", testoValore, apertoAllInizio = false }: {
   etichetta: string; opzioni: Opzione<T>[]; valore: T | null; onCambia: (v: T) => void; segnaposto?: string; testoValore?: string; apertoAllInizio?: boolean;
@@ -42,8 +42,8 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
       {opzioni.map((o) => (
         <li key={o.valore} role="none">
           <button type="button" role="option" aria-selected={o.valore === valore} onClick={() => { onCambia(o.valore); chiudi(); }}
-            className="flex h-11 w-full items-center gap-3 rounded-controllo px-3 text-left text-corpo hover:bg-crema focus-visible:bg-crema">
-            <span className="flex-1 truncate">{o.etichetta}</span>
+            className="flex min-h-11 w-full items-center gap-3 rounded-controllo px-3 py-2 text-left text-corpo hover:bg-crema focus-visible:bg-crema">
+            <span className="min-w-0 flex-1 break-words">{o.etichetta}</span>
             {o.meta && <span className="text-meta text-grigio tabular-nums">{o.meta}</span>}
             <span className="flex w-5 justify-end">{o.valore === valore && <Check data-spunta size={18} weight="bold" aria-hidden className="text-ink" />}</span>
           </button>
@@ -54,9 +54,10 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
   return (
     <div ref={contenitore} data-selettore={etichetta} onKeyDown={tasti} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
       <button ref={trigger} type="button" aria-expanded={aperto} aria-controls={id} onClick={() => setAperto((a) => !a)}
-        className="flex h-12 w-full items-center gap-3 px-3 text-left">
-        <span className="text-secondaria font-medium">{etichetta}</span>
-        <span className={cx("flex-1 truncate text-right text-corpo", !mostrato && "text-grigio")}>{mostrato ?? segnaposto}</span>
+        className="flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left">
+        <span className="shrink-0 text-secondaria font-medium">{etichetta}</span>
+        {/* Niente puntini: un valore lungo va a capo e la riga cresce (QA 11, testi tagliati). */}
+        <span className={cx("min-w-0 flex-1 break-words text-right text-corpo", !mostrato && "text-grigio")}>{mostrato ?? segnaposto}</span>
         <CaretDown size={18} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperto && !nelFoglio && "rotate-180")} />
       </button>
       {nelFoglio

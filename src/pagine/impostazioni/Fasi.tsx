@@ -1,14 +1,14 @@
-import { ArrowDown, ArrowUp } from "@phosphor-icons/react";
+import { CaretRight } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
-import { Campo, CampoQuando, Errore, Intestazione, Pulsante, Selettore, Skeleton, type Opzione } from "../../ds";
+import { Campo, CampoQuando, Errore, Foglio, Intestazione, Pulsante, Selettore, Skeleton, type Opzione } from "../../ds";
 import { useStages, useUsers } from "../../hooks";
 import type { Impostazioni, Stage } from "../../types";
 import { centesimi } from "../commerciale/scheda";
 import { Aggiungi, Sezione, useImpostazioni } from "./parti";
-import { CAMPI_REGOLE, ETICHETTE_REGOLE, ETICHETTE_TIPO, bozzaDi, corpoRegole, opzioniAggancio, type BozzaRegola, type RegolaLetta } from "./regole";
+import { CAMPI_REGOLE, ETICHETTE_REGOLE, ETICHETTE_TIPO, bozzaDi, corpoRegole, opzioniAggancio, sintesiDellaFase, type BozzaRegola, type RegolaLetta } from "./regole";
 
 const GIORNI: [number, string][] = [[1, "Lunedì"], [2, "Martedì"], [3, "Mercoledì"], [4, "Giovedì"], [5, "Venerdì"], [6, "Sabato"], [0, "Domenica"]];
 type Operatore = Impostazioni["punteggio"][number]["operatore"];
@@ -21,56 +21,77 @@ type Bozza = Pick<Impostazioni, "orario" | "punteggio" | "motivi" | "assegnazion
 
 export const useRegole = () => useQuery({ queryKey: ["stage-rules"], queryFn: () => api<{ rules: RegolaLetta[] }>("/stage-rules").then((r) => r.rules) });
 
-// Le fasi salvano al blur, come nella 1A (spec 11.2).
-function ListaFasi({ fasi }: { fasi: Stage[] }) {
+// QA 11 (prototipo 29): elenco in sola lettura, una riga per fase con nome, scadenze e azione proposta,
+// un'informazione per riga e niente testo tagliato. Toccando la riga si apre il foglio di quella fase.
+// "Riordina" arriva nel Piano B: l'ordine si legge qui ma non si cambia.
+// La fase aperta sta nel genitore: col foglio aperto il "Salva le regole" della pagina si nasconde,
+// così l'unica azione in accento è "Salva la fase".
+function ListaFasi({ fasi, regole, aperta, setAperta }: { fasi: Stage[]; regole: RegolaLetta[]; aperta: Stage | null; setAperta: (f: Stage | null) => void }) {
+  return (
+    <>
+      <ul className="divide-y divide-sabbia overflow-hidden rounded-blocco border border-sabbia bg-avorio">
+        {fasi.map((f) => {
+          const scadenze = sintesiDellaFase(regole, f.id);
+          return (
+            <li key={f.id}>
+              <button type="button" data-fase={f.id} onClick={() => setAperta(f)}
+                className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-(--durata-veloce) hover:bg-crema">
+                <span className="grid min-w-0 flex-1 gap-0.5">
+                  <span className="break-words text-corpo font-semibold">{f.label}</span>
+                  {scadenze.length
+                    ? scadenze.map((t) => <span key={t} className="break-words text-secondaria text-grigio">{t}</span>)
+                    : <span className="text-secondaria text-grigio">Nessuna scadenza</span>}
+                  <span className="break-words text-secondaria text-grigio">{f.suggestedNextAction ? `Azione proposta: ${f.suggestedNextAction}` : "Nessuna azione proposta"}</span>
+                </span>
+                <CaretRight size={18} weight="bold" aria-hidden className="shrink-0 text-grigio" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {aperta && <FoglioFase key={aperta.id} fase={aperta} onChiudi={() => setAperta(null)} />}
+    </>
+  );
+}
+
+// Il modulo di una sola fase: nome, probabilità, azione proposta. "Salva la fase" è l'unica azione del foglio.
+export function FoglioFase({ fase, onChiudi }: { fase: Stage; onChiudi: () => void }) {
   const qc = useQueryClient();
-  const [giro, setGiro] = useState(0);
-  const ricarica = () => qc.invalidateQueries({ queryKey: ["stages"] });
-  const patch = useMutation({
-    mutationFn: ({ id, campi }: { id: string; campi: Record<string, unknown> }) => api(`/stages/${id}`, { method: "PATCH", json: campi }),
-    onSuccess: () => { ricarica(); toast.success("Fase salvata"); },
-    onError: (e) => { setGiro((n) => n + 1); toast.error(e.message); },
-  });
-  const ordine = useMutation({
-    mutationFn: (ids: string[]) => api("/stages/order", { method: "PUT", json: { ids } }),
-    onSuccess: ricarica,
+  const [nome, setNome] = useState(fase.label);
+  const [probabilita, setProbabilita] = useState(String(fase.probability));
+  const [azione, setAzione] = useState(fase.suggestedNextAction ?? "");
+  const salva = useMutation({
+    mutationFn: () => {
+      const r = campiFase(fase, { nome, probabilita, azione });
+      if ("errore" in r) throw new Error(r.errore);
+      return Object.keys(r.campi).length ? api(`/stages/${fase.id}`, { method: "PATCH", json: r.campi }) : Promise.resolve(null);
+    },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["stages"] }); toast.success("Fase salvata"); onChiudi(); },
     onError: (e) => toast.error(e.message),
   });
-  const sposta = (i: number, d: number) => {
-    const ids = fasi.map((f) => f.id);
-    [ids[i], ids[i + d]] = [ids[i + d], ids[i]];
-    ordine.mutate(ids);
-  };
-  const alBlur = (f: Stage, campo: "label" | "probability" | "suggestedNextAction", testo: string) => {
-    const v = testo.trim();
-    const prima = campo === "probability" ? String(f.probability) : (f[campo] ?? "");
-    if (v === prima) return;
-    if (campo === "label" && !v) { setGiro((n) => n + 1); return toast.error("La fase ha bisogno di un nome"); }
-    if (campo === "probability") {
-      const n = Number(v);
-      if (!Number.isInteger(n) || n < 0 || n > 100) { setGiro((x) => x + 1); return toast.error("Probabilità: un numero da 0 a 100"); }
-      return patch.mutate({ id: f.id, campi: { probability: n } });
-    }
-    patch.mutate({ id: f.id, campi: { [campo]: campo === "suggestedNextAction" ? v || null : v } });
-  };
   return (
-    <ul className="grid gap-3">
-      {fasi.map((f, i) => (
-        <li key={`${f.id}:${f.label}:${f.probability}:${f.suggestedNextAction}:${giro}`} className="grid gap-2 rounded-card bg-avorio p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-meta text-grigio">{`Fase ${i + 1}, ${ETICHETTE_TIPO[f.kind]}`}</p>
-            <div className="flex gap-2">
-              <Pulsante variante="icona" misura="sm" aria-label={`Sposta su: ${f.label}`} motivoSpento={i === 0 ? "È già la prima" : undefined} inCorso={ordine.isPending} onClick={() => sposta(i, -1)} icona={<ArrowUp size={18} weight="bold" aria-hidden />} />
-              <Pulsante variante="icona" misura="sm" aria-label={`Sposta giù: ${f.label}`} motivoSpento={i === fasi.length - 1 ? "È già l'ultima" : undefined} inCorso={ordine.isPending} onClick={() => sposta(i, 1)} icona={<ArrowDown size={18} weight="bold" aria-hidden />} />
-            </div>
-          </div>
-          <Campo etichetta="Nome" defaultValue={f.label} onBlur={(e) => alBlur(f, "label", e.target.value)} />
-          <Campo etichetta="Probabilità, in percentuale" inputMode="numeric" defaultValue={String(f.probability)} onBlur={(e) => alBlur(f, "probability", e.target.value)} />
-          <Campo etichetta="Azione proposta" defaultValue={f.suggestedNextAction ?? ""} onBlur={(e) => alBlur(f, "suggestedNextAction", e.target.value)} />
-        </li>
-      ))}
-    </ul>
+    <Foglio aperto titolo={fase.label} onChiudi={onChiudi}
+      principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva la fase</Pulsante>}>
+      <p className="text-secondaria text-grigio">{`Fase ${ETICHETTE_TIPO[fase.kind]}`}</p>
+      <Campo etichetta="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
+      <Campo etichetta="Probabilità, in percentuale" inputMode="numeric" value={probabilita} onChange={(e) => setProbabilita(e.target.value)} />
+      <Campo etichetta="Azione proposta" value={azione} onChange={(e) => setAzione(e.target.value)} />
+    </Foglio>
   );
+}
+
+// Solo i campi cambiati vanno nella PATCH; il primo errore ferma il salvataggio con una frase in italiano.
+export function campiFase(f: Pick<Stage, "label" | "probability" | "suggestedNextAction">, v: { nome: string; probabilita: string; azione: string }): { campi: Record<string, unknown> } | { errore: string } {
+  const nome = v.nome.trim();
+  const azione = v.azione.trim();
+  const n = Number(v.probabilita.trim());
+  if (!nome) return { errore: "La fase ha bisogno di un nome" };
+  if (!v.probabilita.trim() || !Number.isInteger(n) || n < 0 || n > 100) return { errore: "Probabilità: un numero da 0 a 100" };
+  const campi: Record<string, unknown> = {};
+  if (nome !== f.label) campi.label = nome;
+  if (n !== f.probability) campi.probability = n;
+  if (azione !== (f.suggestedNextAction ?? "")) campi.suggestedNextAction = azione || null;
+  return { campi };
 }
 
 function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: RegolaLetta[]; imp: Impostazioni; utenti: { id: string; name: string }[] }) {
@@ -80,6 +101,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
     orario: imp.orario, punteggio: imp.punteggio, motivi: imp.motivi, assegnazione: imp.assegnazione,
     setup: String(imp.prezzi.setupCents / 100), ore: String(imp.prezzi.ore), moltiplicatore: String(imp.prezzi.moltiplicatore),
   }));
+  const [faseAperta, setFaseAperta] = useState<Stage | null>(null);
   const persone: Opzione<string>[] = utenti.map((u) => ({ valore: u.id, etichetta: u.name }));
   const regola = (id: string, campi: Partial<BozzaRegola>) => setBozze((x) => x.map((r) => (r.id === id ? { ...r, ...campi } : r)));
   const assegna = (campi: Partial<Impostazioni["assegnazione"]>) => setB({ ...b, assegnazione: { ...b.assegnazione, ...campi } });
@@ -117,8 +139,8 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
     <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-28">
       <Intestazione eyebrow="Impostazioni" titolo="Fasi e regole" />
       <Sezione titolo="Fasi">
-        <p className="text-secondaria text-grigio">Nome, probabilità e azione proposta si salvano quando esci dal campo.</p>
-        <ListaFasi fasi={fasi} />
+        <p className="text-secondaria text-grigio">Tocca una fase per cambiarne nome, probabilità o azione proposta.</p>
+        <ListaFasi fasi={fasi} regole={regole} aperta={faseAperta} setAperta={setFaseAperta} />
       </Sezione>
 
       <Sezione titolo="Regole">
@@ -208,9 +230,11 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
         <Campo etichetta="Moltiplicatore della proprietà, da 5 a 10" inputMode="decimal" value={b.moltiplicatore} onChange={(e) => setB({ ...b, moltiplicatore: e.target.value })} />
       </Sezione>
 
-      <div className="sticky bottom-20 md:bottom-4">
-        <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva le regole</Pulsante>
-      </div>
+      {!faseAperta && (
+        <div className="sticky bottom-20 md:bottom-4">
+          <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva le regole</Pulsante>
+        </div>
+      )}
     </div>
   );
 }

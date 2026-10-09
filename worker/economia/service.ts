@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { clients, fees, invoices, type Fee, type Invoice } from "../db/schema";
-import { daRoma, meseRoma, partiRoma } from "../lib/roma";
+import { daRoma, inizioGiornoRoma, meseRoma, partiRoma } from "../lib/roma";
 import { statoFattura, type StatoFattura } from "./calcoli";
 
 export type FatturaRiga = Omit<Invoice, "deletedAt" | "feeId"> & { cliente: string; stato: StatoFattura };
@@ -12,6 +12,8 @@ export type Cruscotto = {
   ricorrenteCents: number;
   obiettivoCents: number;
   inRitardo: FatturaRiga[];
+  // QA 16: emesse, non incassate, che scadono nel giorno di Roma di oggi. Stanno nel Da fare dopo le scadute.
+  inScadenzaOggi: FatturaRiga[];
   setupMeseCents: number;
   setupAnnoCents: number;
   daIncassareCents: number;
@@ -75,6 +77,7 @@ export async function cruscotto(db: Db, d1: D1Database, now: number, obiettivoCe
     ricorrenteCents: somma(canoni.filter((c) => c.status === "attivo")),
     obiettivoCents,
     inRitardo: fatture.filter((f) => f.stato === "in_ritardo").sort((a, b) => a.dueAt! - b.dueAt!),
+    inScadenzaOggi: fatture.filter((f) => f.stato === "emessa" && f.dueAt != null && inizioGiornoRoma(f.dueAt) === inizioGiornoRoma(now)),
     setupMeseCents: somma(setup.filter((f) => f.paidAt! >= inizioMese)),
     setupAnnoCents: somma(setup.filter((f) => f.paidAt! >= inizioAnno)),
     daIncassareCents: somma(fatture.filter((f) => f.stato === "emessa" || f.stato === "in_ritardo")),

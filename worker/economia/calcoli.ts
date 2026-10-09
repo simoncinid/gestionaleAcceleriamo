@@ -32,6 +32,17 @@ export function statoFattura(f: { issuedAt: number | null; dueAt: number | null;
   return "emessa";
 }
 
+// QA 10: il canone da mostrare nella riga del cliente. Se esiste, si vede sempre con il suo stato;
+// con più canoni vince lo stato più vivo (attivo, in pausa, in attesa, cessato) e si sommano quelli in quello stato.
+const ORDINE_CANONE: Fee["status"][] = ["attivo", "in_pausa", "in_attesa", "cessato"];
+export function canonePrincipale(canoni: { status: Fee["status"]; amountCents: number }[]): { cents: number; stato: Fee["status"] } | null {
+  for (const stato of ORDINE_CANONE) {
+    const suoi = canoni.filter((c) => c.status === stato);
+    if (suoi.length) return { cents: suoi.reduce((t, c) => t + c.amountCents, 0), stato };
+  }
+  return null;
+}
+
 // Spec 6.10. Un cliente appena creato, senza canoni né automazioni, conta come in costruzione: "cessato" sarebbe falso.
 export function statoCliente(canoni: { status: string }[], automazioni: { status: string }[]): StatoCliente {
   if (canoni.some((c) => c.status === "attivo") || automazioni.some((a) => a.status === "attiva")) return "attivo";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Fasi } from "../src/pagine/impostazioni/Fasi";
+import { Fasi, FoglioFase, campiFase } from "../src/pagine/impostazioni/Fasi";
+import { sintesiRegola } from "../src/pagine/impostazioni/regole";
 import { Integrazioni } from "../src/pagine/impostazioni/Integrazioni";
 import { FoglioModello, Modelli } from "../src/pagine/impostazioni/Modelli";
 import { Stato } from "../src/pagine/impostazioni/Stato";
@@ -81,11 +82,55 @@ describe("Impostazioni", () => {
     expect(html).toContain('data-selettore="Si aggancia a"');
     expect(html).toContain('data-selettore="Prima chiamata"');
     expect(html).toContain('value="3, 7, 14"');
-    expect(html).toContain("Fase 2, persa");
     expect(html).toContain("Aggiungi un motivo");
     expect(html).toContain('value="Non raggiungibile"');
     expect(html).not.toContain("<select");
     expect(html).not.toMatch(LINEETTE);
+  });
+
+  it("QA 11: le fasi sono un elenco in sola lettura, una riga per fase, niente moduli né riordino nella pagina", () => {
+    const html = render(<Fasi />, { dati: [[["stages"], fasi], [["stage-rules"], regole], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], utenti]] });
+    const righe = [...html.matchAll(/<button [^>]*data-fase="([^"]+)"[^>]*>(.*?)<\/button>/gs)];
+    expect(righe.map((r) => r[1])).toEqual(["da-chiamare-prima-volta", "perso"]);
+    const [prima, persa] = righe.map((r) => r[2]);
+    expect(prima).toContain(">Da chiamare<");
+    expect(prima).toContain(">Prima chiamata entro 2 ore<");
+    expect(prima).toContain(">Azione proposta: Chiamare<");
+    expect(persa).toContain(">Nessuna scadenza<");
+    expect(persa).toContain(">Nessuna azione proposta<");
+    for (const r of [prima, persa]) {
+      expect(r).not.toContain("truncate");
+      expect(r).not.toContain("<input");
+    }
+    expect(html).not.toContain('value="Da chiamare"');
+    expect(html).not.toContain("Sposta su");
+    expect(html).not.toContain("Riordina");
+  });
+
+  it("QA 11: il foglio della fase ha solo i suoi tre campi e Salva la fase come unica azione", () => {
+    const html = render(<FoglioFase fase={fasi[0] as never} onChiudi={() => {}} />);
+    expect(html).toContain('value="Da chiamare"');
+    expect(html).toContain('value="5"');
+    expect(html).toContain('value="Chiamare"');
+    expect(html).toContain("Salva la fase");
+    expect(contaPrimari(html)).toBe(1);
+    expect(html).not.toContain("Salva le regole");
+  });
+
+  it("QA 11: la PATCH porta solo i campi cambiati, con errori in italiano", () => {
+    const f = { label: "Da chiamare", probability: 5, suggestedNextAction: "Chiamare" };
+    expect(campiFase(f, { nome: "Da chiamare", probabilita: "5", azione: "Chiamare" })).toEqual({ campi: {} });
+    expect(campiFase(f, { nome: " Nuovi ", probabilita: "10", azione: "" })).toEqual({ campi: { label: "Nuovi", probability: 10, suggestedNextAction: null } });
+    expect(campiFase(f, { nome: "", probabilita: "5", azione: "" })).toEqual({ errore: "La fase ha bisogno di un nome" });
+    expect(campiFase(f, { nome: "x", probabilita: "120", azione: "" })).toEqual({ errore: "Probabilità: un numero da 0 a 100" });
+  });
+
+  it("sintesi delle regole, al singolare e al plurale", () => {
+    expect(sintesiRegola({ ruleKey: "sla", params: { minuti: 90 } })).toBe("Prima chiamata entro 90 minuti");
+    expect(sintesiRegola({ ruleKey: "sla", params: { minuti: 60 } })).toBe("Prima chiamata entro 1 ora");
+    expect(sintesiRegola({ ruleKey: "tentativi", params: { massimo: 5 } })).toBe("Pausa dopo 5 tentativi");
+    expect(sintesiRegola({ ruleKey: "ricontatti", params: { giorni: [3, 7, 14] } })).toBe("Ricontatti dopo 3, 7, 14 giorni");
+    expect(sintesiRegola({ ruleKey: "pausa", params: { mesi: 1 } })).toBe("In pausa per 1 mese");
   });
 
   it("Modelli: una riga per modello, Aggiungi in fondo, il primario sta solo nel foglio", () => {
