@@ -17,3 +17,8 @@ export function centesimi(testo: string): number | null {
 
 // Riga da incollare nel frontmatter del preventivo nel wiki (spec 6.8, abbinamento per id).
 export const idPerPreventivo = (id: string) => `lead: ${id}`;
+
+// Stessa regola di worker/email/conferma.ts (MAX_TENTATIVI_CONFERMA = 4): il frontend non importa il modulo che parla con Resend.
+export const MAX_TENTATIVI_CONFERMA = 4;
+export const confermaNonPartita = (l: { confirmationSentAt: number | null; confirmationAttempts: number }) =>
+  l.confirmationSentAt == null && l.confirmationAttempts >= MAX_TENTATIVI_CONFERMA;

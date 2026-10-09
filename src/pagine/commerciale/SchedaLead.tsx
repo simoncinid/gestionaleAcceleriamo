@@ -21,7 +21,7 @@ import { MetaAnswers, contaRisposte } from "./lead/MetaAnswers";
 import { NextActionCard } from "./lead/NextActionCard";
 import { poiSeRiesce } from "./lead/salvataggi";
 import { Timeline } from "./lead/Timeline";
-import { idPerPreventivo, provenienza } from "./scheda";
+import { confermaNonPartita, idPerPreventivo, provenienza } from "./scheda";
 import { StepperFasi } from "./StepperFasi";
 import { SezioneCall } from "./SezioneCall";
 import { SezioneProposta } from "./SezioneProposta";
@@ -113,6 +113,13 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
 
         {lead.metaStatus && lead.metaStatus !== "ok" && (
           <p className="rounded-blocco border border-sabbia bg-errore-fondo p-4 text-secondaria">I dati del modulo Meta non sono ancora arrivati: riprovo da solo ogni 15 minuti.</p>
+        )}
+
+        {confermaNonPartita(lead) && (
+          <div role="status" className="flex flex-col gap-1 rounded-blocco border border-sabbia bg-errore-fondo p-4 text-secondaria">
+            <p className="font-semibold">Email di conferma non partita</p>
+            <p className="text-grigio break-words">{lead.confirmationError ?? "Motivo non registrato"}</p>
+          </div>
         )}
 
         <StepperFasi leadId={lead.id} attuale={lead.stageId} fasi={fasi.data ?? []} senzaAzione={!lead.nextAction || lead.nextActionAt == null}

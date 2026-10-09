@@ -3,7 +3,8 @@ import { SchedaLead } from "../src/pagine/commerciale/SchedaLead";
 import { compila, modelliDelCanale, modelloPer } from "../src/pagine/commerciale/modelli";
 import { corpoDati, statoDati } from "../src/pagine/commerciale/lead/LeadForm";
 import { poiSeRiesce, type Salva } from "../src/pagine/commerciale/lead/salvataggi";
-import { centesimi, idPerPreventivo, provenienza } from "../src/pagine/commerciale/scheda";
+import { centesimi, confermaNonPartita, idPerPreventivo, provenienza } from "../src/pagine/commerciale/scheda";
+import { MAX_TENTATIVI_CONFERMA } from "../worker/email/conferma";
 import type { MessageTemplate } from "../worker/db/schema";
 import type { LeadDetail, Stage } from "../src/types";
 import { contaPrimari, render } from "./render";
@@ -122,4 +123,21 @@ describe("scheda lead, correzioni della revisione", () => {
     const senza = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
     expect(senza).not.toContain("Dati di sola lettura");
   });
+describe("scheda lead, email di conferma", () => {
+  it("la regola del frontend è la stessa del Worker", () => {
+    expect(confermaNonPartita({ confirmationSentAt: null, confirmationAttempts: MAX_TENTATIVI_CONFERMA })).toBe(true);
+    expect(confermaNonPartita({ confirmationSentAt: null, confirmationAttempts: MAX_TENTATIVI_CONFERMA - 1 })).toBe(false);
+    expect(confermaNonPartita({ confirmationSentAt: ORA, confirmationAttempts: MAX_TENTATIVI_CONFERMA })).toBe(false);
+  });
+  it("tentativi finiti: avviso su due righe, nessun pulsante in più", () => {
+    const fallita = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, confirmationAttempts: 4, confirmationError: "Resend 422: indirizzo rifiutato" } };
+    const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], fallita], [["stages"], FASI]] });
+    expect(html).toContain("Email di conferma non partita</p>");
+    expect(html).toContain("Resend 422: indirizzo rifiutato");
+    expect(contaPrimari(html)).toBe(1);
+    const normale = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
+    expect(normale).not.toContain("Email di conferma non partita");
+  });
+});
+
 });
