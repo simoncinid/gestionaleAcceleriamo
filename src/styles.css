@@ -40,6 +40,9 @@
   --color-ink: #1C1915;
   --color-errore: #9B3D22;
   --color-errore-fondo: #F6E3DC;
+  --color-successo: #3F7A4F;
+  --color-attenzione: #C98A1B;
+  --color-attenzione-testo: #8A5A00;
 
   /* Ruoli che leggono le variabili di base */
   --color-accento: var(--accento);
@@ -71,8 +74,11 @@
   --radius-tag: 8px;
   --radius-controllo: 12px;
   --radius-blocco: 20px;
+  --radius-card: 20px;
+  --radius-pillola: 9999px;
 
   --shadow-galleggiante: 0 -1px 0 #E3DCD2, 0 12px 32px rgb(28 25 21 / 0.14);
+  --shadow-card: 0 0 0 1px #E3DCD2;
   --shadow-barra: 0 -8px 24px rgb(28 25 21 / 0.18);
 
   --ease-uscita: cubic-bezier(0.25, 1, 0.5, 1);
@@ -118,3 +124,8 @@
     .spinner { animation-duration: 1s !important; animation-iteration-count: infinite !important; } /* unico moto che resta: dice "sto lavorando" */
   }
 }
+
+@keyframes sale { from { transform: translateY(24px); opacity: 0; } }
+@keyframes appare { from { transform: scale(0.98); opacity: 0; } }
+@keyframes respiro { 50% { opacity: 0.55; } }
+.skeleton { background: var(--color-sabbia); animation: respiro 1.4s ease-in-out infinite; }
