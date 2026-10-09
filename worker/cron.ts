@@ -14,9 +14,10 @@ import { retryPendingMetaLeads } from "./meta/ingest";
 export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lunedi";
 
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
-// (un lead, una conferma, una push) e sottorichieste per unità. I numeri vengono dalle misure di
-// tests/cron.test.ts del Piano A: lead dal foglio circa 17 query, una conferma 6. Meta misurato con contaD1
-// (che conta anche gli statement dentro le batch): 1 query fissa più 15 per lead, quindi 2 lead per giro.
+// (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
+// gli statement dentro le batch: foglio 5 fisse più 19 per lead nuovo, Meta 1 più 15 per lead,
+// conferma 1 più 6, invito circa 6,5. Le sottorichieste fisse (la lettura del foglio) stanno dentro la stima
+// per unità, che è larga: foglio 2 per lead (CSV più email di conferma), Meta 2 (Graph più email).
 export type DefLavoro = {
   quando: (p: PartiRoma) => boolean;
   fisse: number;
@@ -28,7 +29,6 @@ export type DefLavoro = {
 
 // Spec 16, frequenze. Il blocco è di 5 minuti: un giro partito in ritardo di qualche secondo resta il suo.
 const blocco = (p: PartiRoma) => Math.floor(p.minuti / 5);
-const ogni10 = (p: PartiRoma) => blocco(p) % 2 === 0;
 const ogni15 = (p: PartiRoma) => blocco(p) % 3 === 0;
 const sempre = () => true;
 const alle6 = (p: PartiRoma) => p.ore === 6 && p.minuti < 5;
@@ -38,13 +38,18 @@ const alle6 = (p: PartiRoma) => p.ore === 6 && p.minuti < 5;
 // in quel giro (come nel Piano A, da sole): Meta e conferme saltano e riprovano ai giri dopo.
 export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   proposte_scadute: { quando: alle6, fisse: 42, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => scadiProposte(getDb(e.DB), n) },
-  foglio: { quando: (p) => ogni10(p) && !alle6(p), fisse: 6, perUnita: 17, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, l) },
-  meta: { quando: ogni15, fisse: 2, perUnita: 15, sottoPerUnita: 1, max: 2, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
+  // Criterio 1 della spec: un lead del foglio in Scaletta entro 10 minuti. Il foglio gira a ogni giro
+  // (tranne alle 6:00, che è delle proposte) e prende quanti lead il budget consente, al massimo 2.
+  foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 19, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, l) },
+  meta: { quando: ogni15, fisse: 2, perUnita: 15, sottoPerUnita: 2, max: 2, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
+  // Conferme e inviti si dividono lo stesso limite: ogni unità (una conferma o un invito) costa al massimo
+  // 7 query e una sottorichiesta, così il budget conta anche gli inviti.
   conferme: {
-    quando: sempre, fisse: 2, perUnita: 7, sottoPerUnita: 1, max: 5,
+    quando: sempre, fisse: 2, perUnita: 7, sottoPerUnita: 1, max: 7,
     esegui: async (e, n, l) => {
-      await ritentaConferme(e, n, l);
-      await mandaInvitiInCoda(e, n, Math.min(2, l));
+      const inviti = Math.min(2, Math.floor(l / 2));
+      await ritentaConferme(e, n, l - inviti);
+      if (inviti > 0) await mandaInvitiInCoda(e, n, inviti);
     },
   },
 };
@@ -103,7 +108,8 @@ export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; sa
       errori.push(`${nome}: ${(e as Error).message}`);
     }
   }
-  const db = getDb(env.DB);
+  // Anche la riga "giro" passa dal contatore: query restituito è il totale vero dell'invocazione.
+  const db = getDb(envContato.DB);
   if (errori.length) await segnaErrore(db, "giro", errori.join("; "), now);
   else await segnaOk(db, "giro", now);
   return { fatti, saltati, errori, query: contatore.query };

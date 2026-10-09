@@ -100,17 +100,17 @@ describe("limiteDi", () => {
 
 describe("calendario del giro", () => {
   const quali = (now: number) => Object.entries(LAVORI).filter(([, d]) => d!.quando(partiDi(now))).map(([k]) => k);
-  it("foglio ogni 10 minuti, Meta ogni 15, proposte alle 6", async () => {
+  it("foglio a ogni giro tranne le 6, Meta ogni 15, proposte alle 6", async () => {
     expect(quali(lun10)).toEqual(expect.arrayContaining(["foglio", "meta", "conferme"]));
-    expect(quali(lun1005)).not.toContain("foglio");
+    expect(quali(lun1005)).toContain("foglio");
     expect(quali(lun1005)).not.toContain("meta");
     expect(quali(lun1015)).toContain("meta");
-    expect(quali(lun1015)).not.toContain("foglio");
+    expect(quali(lun1015)).toContain("foglio");
     expect(quali(mar0600)).toContain("proposte_scadute");
+    expect(quali(mar0600)).not.toContain("foglio");
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");
-    expect(quali(lun1015 + 40_000)).not.toContain("foglio");
   });
   it("le 6 sono le 6 di Roma anche il giorno del cambio d'ora", () => {
     expect(quali(daRoma(2026, 10, 25, 6, 0))).toContain("proposte_scadute");
@@ -187,7 +187,7 @@ describe("proposte scadute", () => {
 
 describe("giro programmato", () => {
   it("registra la sua ora in integration_status", async () => {
-    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["conferme"], saltati: [], errori: [] });
+    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["foglio", "conferme"], saltati: [], errori: [] });
     expect(await env.DB.prepare("SELECT ok, last_ok_at FROM integration_status WHERE key = 'giro'").first()).toEqual({ ok: 1, last_ok_at: r(10, 5) });
   });
 
@@ -260,7 +260,7 @@ describe("giro programmato", () => {
     expect(await scadiProposte(getDb(env.DB), NOW)).toBe(5);
   });
 
-  it("giro delle conferme: cinque email ritentate e due inviti in coda restano sotto il tetto di query D1", async () => {
+  it("giro delle conferme: conferme e inviti si dividono lo stesso limite e restano sotto il tetto di query D1", async () => {
     for (let i = 0; i < 6; i++) await insertLead(`c${i}`, { source: "meta", email: `luca${i}@esempio.it`, confirmation_error: "Resend non raggiungibile, si riprova", confirmation_attempts: 1, created_at: r(10, 0) - i });
     // Due inviti rimasti in coda: lead con email (già confermati) e call future non ancora mandate.
     for (let i = 0; i < 2; i++) {
@@ -272,9 +272,10 @@ describe("giro programmato", () => {
     setEmailFetch(async () => { inviate++; return Response.json({ id: `re_${inviate}` }); });
     const c = contaQuery();
     const esito = await giro(c.env, r(10, 5));
-    expect(esito).toMatchObject({ fatti: ["conferme"], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "conferme"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
-    expect(inviate).toBe(MAX.conferme + MAX.inviti);
+    // Foglio spento (1 query): alle conferme restano 43 query, cioè 5 unità: 3 conferme e 2 inviti.
+    expect(inviate).toBe(5);
     const svuotata = await env.DB.prepare("SELECT COUNT(*) AS n FROM calls WHERE invite_sent_at IS NOT NULL").first<{ n: number }>();
     expect(svuotata?.n).toBe(2);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
@@ -287,9 +288,9 @@ describe("giro programmato", () => {
     setMetaFetch(async () => { chiamate++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`anna${chiamate}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
     setEmailFetch(async () => Response.json({ id: "re_1" }));
     const c = contaQuery();
-    // Due lead da Meta (31 query) lasciano alle conferme il residuo: ne entra una, il resto al giro dopo.
+    // Foglio spento (1 query), due lead da Meta (31): alle conferme resta il residuo per una, il resto al giro dopo.
     const esito = await giro(c.env, r(10, 15));
-    expect(esito).toMatchObject({ fatti: ["meta", "conferme"], saltati: [], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "conferme"], saltati: [], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
     expect(chiamate).toBe(MAX.meta);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
@@ -301,4 +302,50 @@ describe("giro programmato", () => {
     expect(esito.errori[0]).toMatch(/^proposte_scadute: /);
     expect(await env.DB.prepare("SELECT ok FROM integration_status WHERE key = 'giro'").first()).toEqual({ ok: 0 });
   });
+});
+
+describe("giro con i lavori veri insieme", () => {
+  // Tutto in attesa: righe nuove nel foglio, lead Meta da completare, conferme in errore, inviti in coda,
+  // proposte scadute. Conta ogni prepare (riga "giro" compresa) e ogni sottorichiesta verso l'esterno.
+  async function prepara(righeFoglio: number, conProposte = false) {
+    await createUser();
+    await foglioFinto(Array.from({ length: righeFoglio }, (_, i) => rigaFoglio(i)));
+    for (let i = 0; i < 3; i++) await insertLead(`m${i}`, { source: "meta", meta_lead_id: `lg-${i}`, meta_status: "pending", meta_attempts: 0, stage_id: "da-chiamare-prima-volta" });
+    for (let i = 0; i < 6; i++) await insertLead(`c${i}`, { source: "meta", email: `conf${i}@esempio.it`, confirmation_error: "Resend non raggiungibile, si riprova", confirmation_attempts: 1, created_at: r(10, 0) - i });
+    for (let i = 0; i < 2; i++) {
+      await insertLead(`inv${i}`, { email: `anna${i}@esempio.it`, contact_name: "Anna Prova" });
+      await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, invite_queued_at, created_at, updated_at) VALUES (?, ?, 'conoscenza', ?, ?, ?, ?)")
+        .bind(`kq${i}`, `inv${i}`, r(10, 0) + 2 * GIORNO, NOW, NOW, NOW).run();
+    }
+    if (conProposte) {
+      await insertLead("l1");
+      for (let i = 0; i < 25; i++) await insertProposta(`p${String(i).padStart(2, "0")}`, "presentata", { sent_at: NOW - 40 * GIORNO });
+    }
+    let sotto = 0;
+    const google = async () => { sotto++; return new Response([TESTATA_FOGLIO, ...Array.from({ length: righeFoglio }, (_, i) => rigaFoglio(i))].join("\n"), { headers: { "content-type": "text/csv" } }); };
+    setGoogleFetch(google);
+    setEmailFetch(async () => { sotto++; return Response.json({ id: `re_${sotto}` }); });
+    setMetaFetch(async () => { sotto++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`meta${sotto}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
+    return { sotto: () => sotto };
+  }
+
+  const casi: [string, number, number, boolean][] = [
+    ["10:00, 2 lead dal foglio, Meta, conferme", r(10, 0), 2, false],
+    ["10:05, foglio e conferme", r(10, 5), 2, false],
+    ["10:10, 1 lead dal foglio, 6 conferme in errore, 2 inviti", r(10, 10), 1, false],
+    ["10:15, foglio, Meta e conferme", r(10, 15), 2, false],
+    ["6:00, proposte scadute da sole", r(6, 0), 2, true],
+  ];
+  for (const [nome, quando, righe, conProposte] of casi) {
+    it(`${nome}: al massimo 45 query e 15 sottorichieste`, async () => {
+      const s = await prepara(righe, conProposte);
+      const c = contaQuery();
+      const esito = await giro(c.env, quando);
+      expect(esito.errori).toEqual([]);
+      expect(esito.fatti.length).toBeGreaterThan(0);
+      expect(c.n()).toBeLessThanOrEqual(45);
+      expect(esito.query).toBeLessThanOrEqual(45);
+      expect(s.sotto()).toBeLessThanOrEqual(15);
+    });
+  }
 });
