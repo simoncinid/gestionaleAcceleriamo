@@ -10,7 +10,11 @@ export function provenienza(l: { source: string; metaCampaign: string | null }):
 
 // "1.800,50" diventa 180050. Vuoto o non numerico: null.
 export function centesimi(testo: string): number | null {
-  const pulito = testo.replace(/[€\s]/g, "").replace(/\./g, "").replace(",", ".");
+  const grezzo = testo.replace(/[€\s]/g, "");
+  // Un solo punto con una o due cifre in fondo e nessuna virgola ("1234.5", "150.50") è il decimale;
+  // altrimenti il punto separa le migliaia ("1.234", "1.234,50").
+  const puntoDecimale = !grezzo.includes(",") && /^\d+\.\d{1,2}$/.test(grezzo);
+  const pulito = puntoDecimale ? grezzo : grezzo.replace(/\./g, "").replace(",", ".");
   if (!pulito || !/^\d+(\.\d{1,2})?$/.test(pulito)) return null;
   return Math.round(Number(pulito) * 100);
 }

@@ -40,6 +40,13 @@ describe("scheda lead, logica", () => {
     expect(centesimi("1.800")).toBe(180_000);
     expect(centesimi("1.800,50")).toBe(180_050);
     expect(centesimi("300")).toBe(30_000);
+    // Un solo punto con una o due cifre in fondo, senza virgola: è il decimale.
+    expect(centesimi("1234.5")).toBe(123_450);
+    expect(centesimi("150.50")).toBe(15_050);
+    expect(centesimi("1.234")).toBe(123_400);
+    expect(centesimi("1.234,50")).toBe(123_450);
+    expect(centesimi("1234,5")).toBe(123_450);
+    expect(centesimi("1.234.567")).toBe(123_456_700);
     expect(centesimi("")).toBeNull();
     expect(centesimi("abc")).toBeNull();
   });

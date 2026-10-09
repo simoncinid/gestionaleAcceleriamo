@@ -105,6 +105,7 @@ describe("Automazioni", () => {
     expect(html).toContain("Un&#x27;officina meccanica di Pisa");
     expect(html).toContain("Uno studio dentistico di Lucca");
     expect(html).not.toContain("Officina Prova");
+    expect(html).not.toContain("Studio Prova");
     expect(html).not.toContain("Fuori perimetro");
   });
 
@@ -149,5 +150,19 @@ describe("Clienti", () => {
     expect(html).toContain("Fuori perimetro");
     expect(html).toMatch(/<details[^>]*>.*Cessati, 1/s);
     expect(contaPrimari(html)).toBe(0);
+  });
+
+  it("cliente con il canone in pausa: nel gruppo A canone, col tag in pausa, prima di In costruzione", () => {
+    const base = { sector: null, originLeadId: null, city: null, scope: "acceleriamo" as const };
+    const clienti: ClienteRiga[] = [
+      { ...base, id: "c4", name: "Studio Fermo", canoneCents: 0, stato: "in_pausa" },
+      { ...base, id: "c5", name: "Vivaio Nuovo", canoneCents: 0, stato: "in_costruzione" },
+      { ...base, id: "c1", name: "Officina Prova", canoneCents: 30000, stato: "attivo" },
+    ];
+    const html = render(<Clienti />, { dati: [[["clienti"], clienti]] });
+    const pos = [">A canone<", "Officina Prova", "Studio Fermo", ">In costruzione<", "Vivaio Nuovo"].map((t) => html.indexOf(t));
+    expect(pos.every((p, i) => p > 0 && (i === 0 || p > pos[i - 1]))).toBe(true);
+    expect(html).toContain(">in pausa<");
+    expect(html).not.toContain("Cessati");
   });
 });
