@@ -10,6 +10,7 @@ import { catenaLeadNuovo } from "../regole/catena";
 import { z } from "zod";
 import { ESITI, propostaEsito } from "../regole/motore";
 import { contestoRegole } from "../impostazioni/service";
+import { callDelLead, callNuovaSchema, fissaCall } from "../calls/service";
 import { esitoSchema, primoTentativoAt, registraContatto, salvaEsito } from "./esito";
 
 export const leadRoutes = new Hono<AppEnv>();
@@ -81,6 +82,15 @@ leadRoutes.post("/:id/contatti", async (c) => {
 });
 
 // Le regole propongono, le persone salvano: questa rotta calcola soltanto, non scrive nulla.
+leadRoutes.get("/:id/calls", async (c) => c.json({ calls: await callDelLead(getDb(c.env.DB), c.req.param("id")) }));
+
+leadRoutes.post("/:id/calls", async (c) => {
+  const input = callNuovaSchema.parse(await c.req.json());
+  const db = getDb(c.env.DB);
+  await getLead(db, c.req.param("id"));
+  return c.json(await fissaCall(c.env, db, c.req.param("id"), input, c.get("user").id, Date.now()), 201);
+});
+
 leadRoutes.get("/:id/proposta", async (c) => {
   const db = getDb(c.env.DB);
   const lead = await getLead(db, c.req.param("id"));

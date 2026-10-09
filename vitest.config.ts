@@ -21,6 +21,7 @@ export default defineWorkersConfig(async () => {
               META_VERIFY_TOKEN: "verifica-test",
               META_PAGE_TOKEN: "token-test",
               META_GRAPH_VERSION: "v23.0",
+              RESEND_API_KEY: "re_test",
             },
           },
         },

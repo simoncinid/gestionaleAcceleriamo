@@ -7,6 +7,7 @@ import { authRoutes } from "./auth/routes";
 import { documentRoutes, leadRoutes } from "./leads/routes";
 import { todayRoutes } from "./today/routes";
 import { badgeRoutes } from "./badge/routes";
+import { callRoutes } from "./calls/routes";
 import { metaRoutes } from "./meta/routes";
 import { stageRoutes, userRoutes } from "./stages/routes";
 import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/routes";
@@ -38,6 +39,7 @@ app.route("/api/settings", settingsRoutes);
 app.route("/api/stage-rules", stageRuleRoutes);
 app.route("/api/templates", templateRoutes);
 app.route("/api/badge", badgeRoutes);
+app.route("/api/calls", callRoutes);
 app.route("/api", todayRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));
