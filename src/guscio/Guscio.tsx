@@ -7,6 +7,7 @@ import { BarraLaterale } from "./BarraLaterale";
 import { FoglioCrea } from "./FoglioCrea";
 import { leggiScorciatoia } from "./scorciatoie";
 import { Testata } from "./Testata";
+import { useAzzeraAnonimoFuoriArea } from "../pagine/automazioni/anonimo";
 
 type CreaCtx = { crea: Creazione | null; apri: (c: Creazione) => void; chiudi: () => void };
 const Ctx = createContext<CreaCtx>({ crea: null, apri: () => {}, chiudi: () => {} });
@@ -14,6 +15,7 @@ export const useCrea = () => useContext(Ctx);
 
 // I fogli di creazione arrivano dalle pagine dei task 10, 14 e 18 tramite `fogli`.
 export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => void; fogli: (crea: Creazione | null, chiudi: () => void) => ReactNode }) {
+  useAzzeraAnonimoFuoriArea();
   const { pathname } = useLocation();
   const vai = useNavigate();
   const [crea, setCrea] = useState<Creazione | null>(null);

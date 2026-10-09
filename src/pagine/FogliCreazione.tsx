@@ -8,6 +8,9 @@ import type { LeadListItem } from "../types";
 import { FoglioEsito } from "./commerciale/FoglioEsito";
 import { FoglioNuovoLead } from "./commerciale/FoglioNuovoLead";
 import { CercaLead, FoglioPropostaManuale } from "./commerciale/FoglioProposta";
+import { FoglioNuovaAutomazione } from "./automazioni/FoglioAutomazione";
+import { FoglioNuovoCliente } from "./commerciale/FoglioCliente";
+import { FoglioNuovaFattura, FoglioNuovoCanone, FoglioNuovoCosto } from "./economia/Fogli";
 
 function ScegliLead({ titolo, onScelto, onChiudi }: { titolo: string; onScelto: (l: LeadListItem) => void; onChiudi: () => void }) {
   return (
@@ -37,7 +40,7 @@ function FoglioNota({ lead, onChiudi }: { lead: LeadListItem; onChiudi: () => vo
   );
 }
 
-// Un foglio per ogni creazione del "+". I Task 14 e 18 aggiungono proposta, cliente, canone, fattura, costo, automazione.
+// Un foglio per ogni creazione del "+": lo switch copre tutte le nove Creazione.
 export function FogliCreazione({ crea, chiudi }: { crea: Creazione | null; chiudi: () => void }) {
   const [lead, setLead] = useState<LeadListItem | null>(null);
   const fine = () => { setLead(null); chiudi(); };
@@ -50,7 +53,16 @@ export function FogliCreazione({ crea, chiudi }: { crea: Creazione | null; chiud
       return lead ? <FoglioNota lead={lead} onChiudi={fine} /> : <ScegliLead titolo="Nota su quale lead" onScelto={setLead} onChiudi={fine} />;
     case "proposta":
       return <FoglioPropostaManuale onChiudi={fine} />;
-    default:
-      return null;
+    case "cliente":
+      return <FoglioNuovoCliente onChiudi={fine} />;
+    case "canone":
+      return <FoglioNuovoCanone onChiudi={fine} />;
+    case "fattura":
+      return <FoglioNuovaFattura onChiudi={fine} />;
+    case "costo":
+      return <FoglioNuovoCosto onChiudi={fine} />;
+    case "automazione":
+      return <FoglioNuovaAutomazione onChiudi={fine} />;
   }
+  return null;
 }

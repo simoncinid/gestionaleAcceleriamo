@@ -11,3 +11,4 @@ export * from "./Foglio";
 export * from "./Selettore";
 export * from "./Campi";
 export * from "./Riga";
+export * from "./Interruttore";

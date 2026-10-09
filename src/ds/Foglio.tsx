@@ -18,7 +18,7 @@ export function Foglio({ aperto, titolo, onChiudi, principale, children }: { ape
         <h2 id={id} className="font-display text-titolo-card">{titolo}</h2>
         <Pulsante variante="fantasma" onClick={onChiudi}>Annulla</Pulsante>
       </header>
-      <div className="overflow-y-auto px-4 py-4">{aperto && children}</div>
+      <div className="flex flex-col gap-4 overflow-y-auto px-4 py-4">{aperto && children}</div>
       {principale && <footer className="border-t border-sabbia px-4 pt-3 pb-[calc(16px+env(safe-area-inset-bottom))]">{principale}</footer>}
     </dialog>
   );
