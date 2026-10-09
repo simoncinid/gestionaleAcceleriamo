@@ -11,7 +11,8 @@ const TONES = ["orange", "neutral", "yellow", "blue", "violet", "green", "red"] 
 
 const stagePatchSchema = z
   .object({ label: z.string().trim().min(1, "Serve un nome").max(60).optional(), tone: z.enum(TONES).optional() })
-  .strict();
+  .strict()
+  .refine((p) => p.label !== undefined || p.tone !== undefined, { message: "Niente da modificare" });
 const orderSchema = z.object({ ids: z.array(z.string()).min(1) }).strict();
 
 export const stageRoutes = new Hono<AppEnv>();

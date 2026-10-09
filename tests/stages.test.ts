@@ -12,6 +12,13 @@ describe("fasi e utenti", () => {
     expect(list.stages.find((s) => s.id === "non-chiamato")?.label).toBe("Non risponde");
   });
 
+  it("rifiuta una modifica vuota, un tono non valido e una fase inesistente", async () => {
+    const cookie = await authed();
+    expect((await call("/api/stages/non-chiamato", { method: "PATCH", json: {} }, cookie)).status).toBe(400);
+    expect((await call("/api/stages/non-chiamato", { method: "PATCH", json: { tone: "fucsia" } }, cookie)).status).toBe(400);
+    expect((await call("/api/stages/non-esiste", { method: "PATCH", json: { label: "X" } }, cookie)).status).toBe(404);
+  });
+
   it("riordina le fasi", async () => {
     const cookie = await authed();
     const before = (await (await call("/api/stages", {}, cookie)).json()) as Stages;
