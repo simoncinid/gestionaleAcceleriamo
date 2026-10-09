@@ -1,12 +1,12 @@
 import { env } from "cloudflare:test";
 import { afterEach, describe, expect, it } from "vitest";
-import { LIMITI, giro, lavoriDelGiro, scadiProposte } from "../worker/cron";
+import { giro, LAVORI, limiteDi, registraLavoro, scadiProposte, type DefLavoro } from "../worker/cron";
 import { getDb } from "../worker/db/client";
 import { setEmailFetch } from "../worker/email/fetcher";
 import type { Env } from "../worker/env";
 import { setGoogleFetch } from "../worker/foglio/fetcher";
 import { giroFoglio } from "../worker/foglio/sync";
-import { daRoma } from "../worker/lib/roma";
+import { daRoma, partiRoma as partiDi } from "../worker/lib/roma";
 import { setMetaFetch } from "../worker/meta/fetcher";
 import { createUser } from "./helpers";
 
@@ -15,6 +15,12 @@ const GIORNO = 86_400_000;
 const NOW = r(6, 0);
 // Piano gratuito Workers: 50 query D1 per invocazione. Il giro deve restarne ben sotto.
 const QUERY_MASSIME = 50;
+const lun10 = daRoma(2026, 10, 12, 10, 0); // lunedì 12 ottobre 2026, 10:00 di Roma
+const lun1005 = daRoma(2026, 10, 12, 10, 5);
+const lun1015 = daRoma(2026, 10, 12, 10, 15);
+const mar0600 = daRoma(2026, 10, 13, 6, 0);
+// Massimi per giro dei lavori del Piano A, letti dalla definizione del giro.
+const MAX = { foglio: LAVORI.foglio!.max, meta: LAVORI.meta!.max, conferme: LAVORI.conferme!.max, inviti: 2 };
 
 async function insertLead(id: string, extra: Record<string, unknown> = {}) {
   const row = { id, company: "Officina Prova", source: "manuale", stage_id: "in-attesa-decisione", stage_changed_at: NOW, created_at: NOW, updated_at: NOW, ...extra };
@@ -78,36 +84,81 @@ const agganciati = async () => (await env.DB.prepare("SELECT count(*) n FROM lea
 
 afterEach(() => { setEmailFetch(null); setGoogleFetch(null); setMetaFetch(null); });
 
-describe("smistatore del cron", () => {
-  it("un lavoro pesante per giro, a rotazione ogni 15 minuti: foglio, conferme, Meta", () => {
-    expect(lavoriDelGiro(r(10, 0))).toEqual(["foglio"]);
-    expect(lavoriDelGiro(r(10, 5))).toEqual(["conferme"]);
-    expect(lavoriDelGiro(r(10, 10))).toEqual(["meta"]);
-    expect(lavoriDelGiro(r(10, 15))).toEqual(["foglio"]);
-    expect(lavoriDelGiro(r(10, 50))).toEqual(["conferme"]);
-    expect(lavoriDelGiro(r(10, 55))).toEqual(["meta"]);
+describe("limiteDi", () => {
+  const def: DefLavoro = { quando: () => true, fisse: 4, perUnita: 6, sottoPerUnita: 1, max: 5, esegui: async () => 0 };
+  it("rispetta il massimo, le query e le sottorichieste", () => {
+    expect(limiteDi(def, 45, 15)).toBe(5);
+    expect(limiteDi(def, 20, 15)).toBe(2); // (20-4)/6
+    expect(limiteDi(def, 45, 3)).toBe(3);
+    expect(limiteDi(def, 9, 15)).toBe(0);
   });
+  it("un lavoro senza unità gira se bastano le fisse", () => {
+    expect(limiteDi({ ...def, perUnita: 0, sottoPerUnita: 0, max: 1 }, 4, 0)).toBe(1);
+    expect(limiteDi({ ...def, perUnita: 0, sottoPerUnita: 0, max: 1 }, 3, 0)).toBe(0);
+  });
+});
 
-  it("foglio e conferme non girano mai nella stessa invocazione", () => {
-    for (let m = 0; m < 24 * 60; m += 5) {
-      const l = lavoriDelGiro(r(Math.floor(m / 60), m % 60));
-      expect(l).toHaveLength(1);
+describe("calendario del giro", () => {
+  const quali = (now: number) => Object.entries(LAVORI).filter(([, d]) => d!.quando(partiDi(now))).map(([k]) => k);
+  it("foglio ogni 10 minuti, Meta ogni 15, proposte alle 6", async () => {
+    expect(quali(lun10)).toEqual(expect.arrayContaining(["foglio", "meta", "conferme"]));
+    expect(quali(lun1005)).not.toContain("foglio");
+    expect(quali(lun1005)).not.toContain("meta");
+    expect(quali(lun1015)).toContain("meta");
+    expect(quali(lun1015)).not.toContain("foglio");
+    expect(quali(mar0600)).toContain("proposte_scadute");
+  });
+  it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
+    expect(quali(lun1015 + 40_000)).toContain("meta");
+    expect(quali(lun1015 + 40_000)).not.toContain("foglio");
+  });
+  it("le 6 sono le 6 di Roma anche il giorno del cambio d'ora", () => {
+    expect(quali(daRoma(2026, 10, 25, 6, 0))).toContain("proposte_scadute");
+    expect(quali(daRoma(2026, 10, 25, 5, 0))).not.toContain("proposte_scadute");
+  });
+});
+
+describe("giro a budget", () => {
+  it("giro pieno: mai oltre 45 query, i lavori che non entrano aspettano", async () => {
+    const chiamati: [string, number][] = [];
+    const finto = (nome: string, query: number): DefLavoro => ({
+      quando: () => true, fisse: 2, perUnita: query, sottoPerUnita: 1, max: 5,
+      esegui: async (e, _n, limite) => {
+        chiamati.push([nome, limite]);
+        for (let i = 0; i < 2 + limite * query; i++) await e.DB.prepare("SELECT 1").first();
+      },
+    });
+    const salvati = { ...LAVORI };
+    try {
+      for (const k of Object.keys(LAVORI)) delete (LAVORI as Record<string, unknown>)[k];
+      registraLavoro("foglio", finto("foglio", 17));
+      registraLavoro("meta", finto("meta", 13));
+      registraLavoro("conferme", finto("conferme", 6));
+      const r = await giro(env, lun10);
+      expect(r.query).toBeLessThanOrEqual(45);
+      expect(chiamati[0]).toEqual(["foglio", 2]);
+      expect(r.saltati.length + r.fatti.length).toBe(3);
+    } finally {
+      for (const k of Object.keys(LAVORI)) delete (LAVORI as Record<string, unknown>)[k];
+      Object.assign(LAVORI, salvati);
     }
   });
 
-  it("alle 6 di Roma le proposte scadute prendono il posto del foglio", () => {
-    expect(lavoriDelGiro(r(6, 0))).toEqual(["proposte_scadute"]);
-    expect(lavoriDelGiro(r(6, 5))).toEqual(["conferme"]);
-    expect(lavoriDelGiro(r(6, 15))).toEqual(["foglio"]);
-  });
-
-  it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
-    expect(lavoriDelGiro(r(10, 10) + 40_000)).toEqual(["meta"]);
-  });
-
-  it("le 6 sono le 6 di Roma anche il giorno del cambio d'ora", () => {
-    expect(lavoriDelGiro(daRoma(2026, 10, 25, 6, 0))).toContain("proposte_scadute");
-    expect(lavoriDelGiro(daRoma(2026, 10, 25, 5, 0))).not.toContain("proposte_scadute");
+  it("un lavoro che lancia non ferma gli altri e il giro diventa rosso", async () => {
+    const salvati = { ...LAVORI };
+    try {
+      for (const k of Object.keys(LAVORI)) delete (LAVORI as Record<string, unknown>)[k];
+      registraLavoro("foglio", { quando: () => true, fisse: 1, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: async () => { throw new Error("foglio giù"); } });
+      registraLavoro("meta", { quando: () => true, fisse: 1, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: async () => 1 });
+      const r = await giro(env, lun10);
+      expect(r.fatti).toEqual(["meta"]);
+      expect(r.errori[0]).toContain("foglio giù");
+      const riga = await env.DB.prepare("SELECT ok FROM integration_status WHERE key = 'giro'").first<{ ok: number }>();
+      expect(riga?.ok).toBe(0);
+    } finally {
+      for (const k of Object.keys(LAVORI)) delete (LAVORI as Record<string, unknown>)[k];
+      Object.assign(LAVORI, salvati);
+    }
   });
 });
 
@@ -136,7 +187,7 @@ describe("proposte scadute", () => {
 
 describe("giro programmato", () => {
   it("registra la sua ora in integration_status", async () => {
-    expect(await giro(env, r(10, 5))).toEqual({ fatti: ["conferme"], errori: [] });
+    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["conferme"], saltati: [], errori: [] });
     expect(await env.DB.prepare("SELECT ok, last_ok_at FROM integration_status WHERE key = 'giro'").first()).toEqual({ ok: 1, last_ok_at: r(10, 5) });
   });
 
@@ -150,12 +201,15 @@ describe("giro programmato", () => {
       .bind(JSON.stringify({ attivo: true, spreadsheetId: "foglio-finto", scheda: "", gid: "0", mappa: { data: "Data di creazione", azienda: "Azienda", referente: "Nome e Cognome", telefono: "Telefono", email: "Email", campagna: "Campagna", inserzione: "", metaId: "" } }))
       .run();
     const c = contaQuery();
-    expect(await giro(c.env, r(10, 0))).toEqual({ fatti: ["foglio"], errori: [] });
-    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: LIMITI.foglio });
+    const primo = await giro(c.env, r(10, 0));
+    expect(primo.fatti[0]).toBe("foglio");
+    expect(primo.errori).toEqual([]);
+    expect(primo.query).toBeLessThanOrEqual(45);
+    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: MAX.foglio });
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
-    await giro(env, r(10, 15));
-    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 2 * LIMITI.foglio });
-    await giro(env, r(10, 30));
+    await giro(env, r(10, 10));
+    expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 2 * MAX.foglio });
+    await giro(env, r(10, 20));
     expect(await env.DB.prepare("SELECT count(*) n FROM leads").first()).toEqual({ n: 6 });
   });
 
@@ -165,7 +219,7 @@ describe("giro programmato", () => {
     for (let i = 0; i < 50; i++) await insertLead(`l-${i}`, { phone_norm: `333100${1000 + i}` });
     await foglioFinto(Array.from({ length: 50 }, (_, i) => rigaFoglio(i)));
     const c = contaQuery();
-    const primo = await giroFoglio(c.env, r(10, 0), LIMITI.foglio);
+    const primo = await giroFoglio(c.env, r(10, 0), MAX.foglio);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
     expect(primo).toMatchObject({ create: 0, ancora: true });
     const dopoPrimo = await agganciati();
@@ -173,7 +227,7 @@ describe("giro programmato", () => {
     expect(dopoPrimo).toBeLessThan(50);
     expect(await ultimaRiga()).toBe(1 + primo!.lette);
     const c2 = contaQuery();
-    const secondo = await giroFoglio(c2.env, r(10, 15), LIMITI.foglio);
+    const secondo = await giroFoglio(c2.env, r(10, 15), MAX.foglio);
     expect(c2.n()).toBeLessThan(QUERY_MASSIME);
     expect(secondo!.riletto).toBe(false);
     expect(await agganciati()).toBe(dopoPrimo! + secondo!.agganciate);
@@ -185,7 +239,7 @@ describe("giro programmato", () => {
     await createUser();
     await foglioFinto(Array.from({ length: 50 }, (_, i) => rigaFoglio(i)));
     const c = contaParametri();
-    const esito = await giroFoglio(c.env, r(10, 0), LIMITI.foglio);
+    const esito = await giroFoglio(c.env, r(10, 0), MAX.foglio);
     expect(esito!.errore).toBeUndefined();
     expect(c.massimo()).toBeGreaterThan(0);
     expect(c.massimo()).toBeLessThanOrEqual(100);
@@ -217,22 +271,27 @@ describe("giro programmato", () => {
     let inviate = 0;
     setEmailFetch(async () => { inviate++; return Response.json({ id: `re_${inviate}` }); });
     const c = contaQuery();
-    expect(await giro(c.env, r(10, 5))).toEqual({ fatti: ["conferme"], errori: [] });
-    expect(inviate).toBe(LIMITI.conferme + LIMITI.inviti);
+    const esito = await giro(c.env, r(10, 5));
+    expect(esito).toMatchObject({ fatti: ["conferme"], errori: [] });
+    expect(esito.query).toBeLessThanOrEqual(45);
+    expect(inviate).toBe(MAX.conferme + MAX.inviti);
     const svuotata = await env.DB.prepare("SELECT COUNT(*) AS n FROM calls WHERE invite_sent_at IS NOT NULL").first<{ n: number }>();
     expect(svuotata?.n).toBe(2);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
   });
 
-  it("giro di Meta: al massimo 3 lead completati e sotto il tetto di query D1", async () => {
+  it("giro di Meta: al massimo 2 lead completati e sotto il tetto di query D1", async () => {
     await createUser();
     for (let i = 0; i < 5; i++) await insertLead(`m${i}`, { source: "meta", meta_lead_id: `lg-${i}`, meta_status: "pending", meta_attempts: 0, stage_id: "da-chiamare-prima-volta" });
     let chiamate = 0;
     setMetaFetch(async () => { chiamate++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`anna${chiamate}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
     setEmailFetch(async () => Response.json({ id: "re_1" }));
     const c = contaQuery();
-    expect(await giro(c.env, r(10, 10))).toEqual({ fatti: ["meta"], errori: [] });
-    expect(chiamate).toBe(LIMITI.meta);
+    // Due lead da Meta (31 query) lasciano alle conferme il residuo: ne entra una, il resto al giro dopo.
+    const esito = await giro(c.env, r(10, 15));
+    expect(esito).toMatchObject({ fatti: ["meta", "conferme"], saltati: [], errori: [] });
+    expect(esito.query).toBeLessThanOrEqual(45);
+    expect(chiamate).toBe(MAX.meta);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
   });
 

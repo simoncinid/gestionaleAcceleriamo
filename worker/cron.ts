@@ -7,27 +7,57 @@ import type { Env } from "./env";
 import { giroFoglio } from "./foglio/sync";
 import { leggiImpostazioni } from "./impostazioni/service";
 import { segnaErrore, segnaOk } from "./integrazioni/stato";
-import { partiRoma } from "./lib/roma";
+import { contaD1, QUERY_GIRO, SOTTORICHIESTE_GIRO } from "./lib/bilancio";
+import { partiRoma, type PartiRoma } from "./lib/roma";
 import { retryPendingMetaLeads } from "./meta/ingest";
 
-export type Lavoro = "conferme" | "foglio" | "meta" | "proposte_scadute";
+export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lunedi";
 
-// Quanto fa al massimo ogni lavoro in un giro. Sul piano gratuito una invocazione ha 50 query D1 (e al massimo
-// 15 sottorichieste per giro, vincolo del piano). Misurato in tests/cron.test.ts: un lead nuovo dal foglio costa
-// circa 17 query con la sua catena (2 lead: 40), uno da Meta circa 13 (3 lead: 41), cinque conferme ritentate 32.
-// Gli inviti in coda viaggiano con le conferme: un invito costa circa 7 query e una sottorichiesta.
-export const LIMITI = { conferme: 5, foglio: 2, meta: 3, inviti: 2 } as const;
+// Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
+// (un lead, una conferma, una push) e sottorichieste per unità. I numeri vengono dalle misure di
+// tests/cron.test.ts del Piano A: lead dal foglio circa 17 query, una conferma 6. Meta misurato con contaD1
+// (che conta anche gli statement dentro le batch): 1 query fissa più 15 per lead, quindi 2 lead per giro.
+export type DefLavoro = {
+  quando: (p: PartiRoma) => boolean;
+  fisse: number;
+  perUnita: number;
+  sottoPerUnita: number;
+  max: number;
+  esegui: (env: Env, now: number, limite: number) => Promise<unknown>;
+};
 
-// Spec 16.1: un solo Cron Trigger ogni 5 minuti; lo smistatore decide sull'ora di Roma.
-// Un lavoro pesante per giro, a rotazione: foglio, conferme, Meta (ognuno ogni 15 minuti), così i tetti
-// di query non si sommano. Alle 6:00 le proposte scadute prendono il posto del foglio, che riprende alle 6:15.
-// Si guarda il blocco di 5 minuti e non il minuto esatto: un giro partito in ritardo di qualche secondo resta il suo giro.
-export function lavoriDelGiro(now: number): Lavoro[] {
-  const p = partiRoma(now);
-  const blocco = Math.floor(p.minuti / 5) % 3;
-  if (blocco === 1) return ["conferme"];
-  if (blocco === 2) return ["meta"];
-  return p.ore === 6 && p.minuti < 5 ? ["proposte_scadute"] : ["foglio"];
+// Spec 16, frequenze. Il blocco è di 5 minuti: un giro partito in ritardo di qualche secondo resta il suo.
+const blocco = (p: PartiRoma) => Math.floor(p.minuti / 5);
+const ogni10 = (p: PartiRoma) => blocco(p) % 2 === 0;
+const ogni15 = (p: PartiRoma) => blocco(p) % 3 === 0;
+const sempre = () => true;
+const alle6 = (p: PartiRoma) => p.ore === 6 && p.minuti < 5;
+
+// L'ordine delle chiavi è la priorità: prima ciò che tocca un lead che aspetta, poi il resto.
+// Eccezione: le proposte scadute girano solo alle 6:00 e chiedono 42 query fisse, quindi passano per prime
+// in quel giro (come nel Piano A, da sole): Meta e conferme saltano e riprovano ai giri dopo.
+export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
+  proposte_scadute: { quando: alle6, fisse: 42, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => scadiProposte(getDb(e.DB), n) },
+  foglio: { quando: (p) => ogni10(p) && !alle6(p), fisse: 6, perUnita: 17, sottoPerUnita: 2, max: 2, esegui: (e, n, l) => giroFoglio(e, n, l) },
+  meta: { quando: ogni15, fisse: 2, perUnita: 15, sottoPerUnita: 1, max: 2, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
+  conferme: {
+    quando: sempre, fisse: 2, perUnita: 7, sottoPerUnita: 1, max: 5,
+    esegui: async (e, n, l) => {
+      await ritentaConferme(e, n, l);
+      await mandaInvitiInCoda(e, n, Math.min(2, l));
+    },
+  },
+};
+
+export function registraLavoro(nome: Lavoro, def: DefLavoro) {
+  LAVORI[nome] = def;
+}
+
+export function limiteDi(def: DefLavoro, residuoQuery: number, residuoSotto: number): number {
+  if (residuoQuery < def.fisse) return 0;
+  const perQuery = def.perUnita > 0 ? Math.floor((residuoQuery - def.fisse) / def.perUnita) : def.max;
+  const perSotto = def.sottoPerUnita > 0 ? Math.floor(residuoSotto / def.sottoPerUnita) : def.max;
+  return Math.max(0, Math.min(def.max, perQuery, perSotto));
 }
 
 // Spec 6.8: validità di 30 giorni. Senza data di validità conta l'invio più i giorni di Impostazioni.
@@ -47,27 +77,34 @@ export async function scadiProposte(db: Db, now: number): Promise<number> {
 }
 
 // Un lavoro che fallisce non ferma gli altri; il giro diventa rosso con l'elenco degli errori.
-export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; errori: string[] }> {
-  const db = getDb(env.DB);
-  const fatti = lavoriDelGiro(now);
-  const esegui: Record<Lavoro, () => Promise<unknown>> = {
-    conferme: async () => {
-      await ritentaConferme(env, now, LIMITI.conferme);
-      await mandaInvitiInCoda(env, now, LIMITI.inviti);
-    },
-    foglio: () => giroFoglio(env, now, LIMITI.foglio),
-    meta: () => retryPendingMetaLeads(env, LIMITI.meta),
-    proposte_scadute: () => scadiProposte(db, now),
-  };
+// Le query si contano davvero (contaD1); le sottorichieste si prenotano dalla stima del lavoro.
+export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; saltati: Lavoro[]; errori: string[]; query: number }> {
+  if (env.SPAZIO === "demo") return { fatti: [], saltati: [], errori: [], query: 0 };
+  const contatore = { query: 0 };
+  const envContato: Env = { ...env, DB: contaD1(env.DB, contatore) };
+  const p = partiRoma(now);
+  const fatti: Lavoro[] = [];
+  const saltati: Lavoro[] = [];
   const errori: string[] = [];
-  for (const l of fatti) {
+  let sotto = SOTTORICHIESTE_GIRO;
+  const RISERVA_FINALE = 1; // la riga "giro" in integration_status
+  for (const [nome, def] of Object.entries(LAVORI) as [Lavoro, DefLavoro][]) {
+    if (!def.quando(p)) continue;
+    const limite = limiteDi(def, QUERY_GIRO - RISERVA_FINALE - contatore.query, sotto);
+    if (limite < 1) {
+      saltati.push(nome);
+      continue;
+    }
+    sotto -= limite * def.sottoPerUnita;
     try {
-      await esegui[l]();
+      await def.esegui(envContato, now, limite);
+      fatti.push(nome);
     } catch (e) {
-      errori.push(`${l}: ${(e as Error).message}`);
+      errori.push(`${nome}: ${(e as Error).message}`);
     }
   }
+  const db = getDb(env.DB);
   if (errori.length) await segnaErrore(db, "giro", errori.join("; "), now);
   else await segnaOk(db, "giro", now);
-  return { fatti, errori };
+  return { fatti, saltati, errori, query: contatore.query };
 }

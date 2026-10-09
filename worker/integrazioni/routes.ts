@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { LIMITI } from "../cron";
+import { LAVORI } from "../cron";
 import { getDb } from "../db/client";
 import { hookLog, integrationStatus, sheetSyncState } from "../db/schema";
 import { inviaEmail } from "../email/resend";
@@ -99,7 +99,7 @@ integrazioniRoutes.get("/status", async (c) => {
 
 // Stesso tetto del cron: anche una richiesta HTTP ha 50 query D1 sul piano gratuito.
 integrazioniRoutes.post("/foglio/leggi", async (c) => {
-  const esito = await giroFoglio(c.env, Date.now(), LIMITI.foglio);
+  const esito = await giroFoglio(c.env, Date.now(), LAVORI.foglio?.max ?? 2);
   if (!esito) return c.json({ error: "La lettura del foglio è spenta: incolla il link, accendila e salva" }, 409);
   return c.json({ giro: esito });
 });
