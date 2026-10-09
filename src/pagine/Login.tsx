@@ -1,10 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { LOGOUT_REASON_KEY, api } from "../api";
+import { ApiError, LOGOUT_REASON_KEY, api } from "../api";
 import { Campo, Pulsante } from "../ds";
 import type { User } from "../types";
 
 const motivoUscita = () => (typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(LOGOUT_REASON_KEY));
+
+// Gli errori del server arrivano già in italiano; tutto il resto (fetch che lancia senza rete) è la connessione.
+export const messaggioAccesso = (err: unknown) =>
+  err instanceof ApiError && err.message ? err.message : "Connessione assente, riprova";
 
 // Accesso: logo, due campi, un solo pulsante pieno. Gli errori restano calmi, sotto i campi.
 export function Login() {
@@ -23,7 +27,7 @@ export function Login() {
       sessionStorage.removeItem(LOGOUT_REASON_KEY);
       qc.setQueryData(["me"], r.user);
     } catch (err) {
-      setErrore(err instanceof Error && err.message ? err.message : "Accesso non riuscito: controlla utente e password e riprova");
+      setErrore(messaggioAccesso(err));
     } finally {
       setInCorso(false);
     }

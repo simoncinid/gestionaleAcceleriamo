@@ -1,6 +1,6 @@
 import { Errore, Intestazione, Pulsante, Punto, Riga, Skeleton } from "../../ds";
 import { momento } from "../../format";
-import { COLORE, ETICHETTA_STATO, Sezione, testoUltima, useStatoSistema } from "./parti";
+import { COLORE, ETICHETTA_STATO, Sezione, conGiroInRitardo, testoUltima, useStatoSistema } from "./parti";
 
 const VOCI = [
   { titolo: "Fasi e regole", href: "/impostazioni/fasi" },
@@ -14,7 +14,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
   const s = useStatoSistema();
   if (s.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
   if (s.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={s.error} onRiprova={() => void s.refetch()} /></div>;
-  const d = s.data!;
+  const d = { ...s.data!, integrazioni: conGiroInRitardo(s.data!.integrazioni, ora) };
   const rossi = d.integrazioni.filter((i) => i.stato === "errore").length;
   return (
     <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-28">
@@ -25,7 +25,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
             <li key={i.key}>
               <Riga
                 titolo={i.etichetta}
-                href={i.stato === "errore" ? `/impostazioni/integrazioni#${i.key}` : undefined}
+                href={i.stato === "errore" && i.key !== "giro" ? `/impostazioni/integrazioni#${i.key}` : undefined}
                 secondaria={<span className="inline-flex items-center gap-2"><Punto colore={COLORE[i.stato]} etichetta={ETICHETTA_STATO[i.stato]} />{i.stato === "errore" ? (i.nota ?? "Errore") : testoUltima(i, ora)}</span>}
                 meta={i.stato === "errore" && i.ultimaOk != null ? `Ultima volta ${momento(i.ultimaOk, ora)}` : undefined}
               />

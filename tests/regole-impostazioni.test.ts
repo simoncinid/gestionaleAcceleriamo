@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aggancioDi, bozzaDi, corpoRegole, daAggancio, daLinkFoglio, linkDelFoglio, opzioniAggancio, type RegolaLetta } from "../src/pagine/impostazioni/regole";
+import { aggancioDi, bozzaDi, corpoRegole, daAggancio, daLinkFoglio, leggiFinoAllaFine, linkDelFoglio, MASSIMO_GIRI, opzioniAggancio, type RegolaLetta } from "../src/pagine/impostazioni/regole";
 
 const sla: RegolaLetta = { id: "sla-prima", ruleKey: "sla", stageId: "da-chiamare-prima-volta", event: null, params: { minuti: 120, avvisoMinuti: 90 }, active: true };
 const ricontatti: RegolaLetta = { id: "ricontatti-decisione", ruleKey: "ricontatti", stageId: "in-attesa-decisione", event: null, params: { giorni: [3, 7, 14] }, active: true };
@@ -59,5 +59,20 @@ describe("link del Foglio Andrea", () => {
   it("dal salvato si ricompone il link da mostrare", () => {
     expect(linkDelFoglio({ spreadsheetId: ID, gid: "12" })).toBe(`https://docs.google.com/spreadsheets/d/${ID}/edit#gid=12`);
     expect(linkDelFoglio({ spreadsheetId: "", gid: "0" })).toBe("");
+  });
+});
+
+describe("Leggi adesso", () => {
+  const giro = (ancora: boolean, errore?: string) => ({ lette: 10, create: 2, agganciate: 1, ancora, errore });
+  it("ripete finché ancora, somma e avvisa a ogni passo", async () => {
+    const esiti = [giro(true), giro(true), giro(false)];
+    const passi: number[] = [];
+    const t = await leggiFinoAllaFine(async () => esiti.shift()!, (a) => passi.push(a.lette));
+    expect(t).toMatchObject({ lette: 30, create: 6, agganciate: 3, giri: 3, ancora: false });
+    expect(passi).toEqual([10, 20]);
+  });
+  it("si ferma al primo errore e al massimo dopo 30 giri", async () => {
+    expect(await leggiFinoAllaFine(async () => giro(true, "Colonna Email non trovata"), () => {})).toMatchObject({ giri: 1, errore: "Colonna Email non trovata" });
+    expect(await leggiFinoAllaFine(async () => giro(true), () => {})).toMatchObject({ giri: MASSIMO_GIRI, ancora: true });
   });
 });

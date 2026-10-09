@@ -17,7 +17,14 @@ const corpoModello = (b: BozzaModello) => ({
   channel: b.channel, title: b.title.trim(), subject: b.channel === "email" ? b.subject.trim() || null : null, body: b.body.trim(), stageId: b.stageId === "nessuna" ? null : b.stageId,
 });
 
-function FoglioModello({ iniziale, fasi, onChiudi }: { iniziale: BozzaModello; fasi: Stage[]; onChiudi: () => void }) {
+// PV3: i segnaposto che i modelli sanno davvero riempire.
+const VARIABILI: [string, string][] = [
+  ["{referente}", "primo nome del contatto"],
+  ["{azienda}", "nome dell'azienda"],
+  ["{numero}", "numero del preventivo, solo nei messaggi delle proposte"],
+];
+
+export function FoglioModello({ iniziale, fasi, onChiudi }: { iniziale: BozzaModello; fasi: Stage[]; onChiudi: () => void }) {
   const qc = useQueryClient();
   const [b, setB] = useState(iniziale);
   const [secondoTocco, setSecondoTocco] = useState(false);
@@ -37,10 +44,16 @@ function FoglioModello({ iniziale, fasi, onChiudi }: { iniziale: BozzaModello; f
     <Foglio aperto titolo={b.id ? b.title || "Modello" : "Nuovo modello"} onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Salva il modello</Pulsante>}>
       <Campo etichetta="Titolo" value={b.title} onChange={(e) => setB({ ...b, title: e.target.value })} />
-      <Selettore etichetta="Canale" opzioni={CANALI} valore={b.channel} onCambia={(v) => setB({ ...b, channel: v })} />
+      {b.key ? (
+        <p className="text-corpo">{`Canale: ${b.channel === "email" ? "Email" : "WhatsApp"}`}<span className="block text-meta text-grigio">Modello di sistema: il canale non si cambia</span></p>
+      ) : (
+        <Selettore etichetta="Canale" opzioni={CANALI} valore={b.channel} onCambia={(v) => setB({ ...b, channel: v })} />
+      )}
       {b.channel === "email" && <Campo etichetta="Oggetto" value={b.subject} onChange={(e) => setB({ ...b, subject: e.target.value })} />}
       <AreaTesto etichetta="Testo" rows={6} value={b.body} onChange={(e) => setB({ ...b, body: e.target.value })} />
-      <p className="text-meta text-grigio">Segnaposto: {"{referente}, {azienda}, {link_meet}, {ora}, {data}"}</p>
+      <ul className="grid gap-1 text-meta text-grigio" aria-label="Variabili del testo">
+        {VARIABILI.map(([v, spiega]) => <li key={v}><span className="font-semibold text-ink">{v}</span>{`: ${spiega}`}</li>)}
+      </ul>
       <Selettore etichetta="Fase" opzioni={[{ valore: "nessuna", etichetta: "Nessuna fase" }, ...fasi.map((f) => ({ valore: f.id, etichetta: f.label }))]} valore={b.stageId} onCambia={(v) => setB({ ...b, stageId: v })} />
       {b.id && !b.key && (
         <Pulsante variante="distruttivo" inCorso={cancella.isPending} onClick={() => (secondoTocco ? cancella.mutate() : setSecondoTocco(true))}>

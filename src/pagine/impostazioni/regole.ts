@@ -97,3 +97,24 @@ export function daLinkFoglio(link: string): { spreadsheetId: string; gid: string
 
 export const linkDelFoglio = (f: { spreadsheetId: string; gid: string }) =>
   f.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${f.spreadsheetId}/edit#gid=${f.gid || "0"}` : "";
+
+// "Leggi adesso": ripete il giro finché il foglio ha ancora righe e non c'è errore, al massimo 30 volte.
+// Il cron resta com'è; qui serve per il primo caricamento di un foglio lungo.
+export type Giro = { lette: number; create: number; agganciate: number; ancora: boolean; errore?: string };
+export const MASSIMO_GIRI = 30;
+export async function leggiFinoAllaFine(chiama: () => Promise<Giro | null>, avanzamento: (t: { lette: number; create: number }) => void) {
+  const totale = { lette: 0, create: 0, agganciate: 0, giri: 0, ancora: false, errore: undefined as string | undefined };
+  while (totale.giri < MASSIMO_GIRI) {
+    const g = await chiama();
+    totale.giri++;
+    if (!g) break;
+    totale.lette += g.lette;
+    totale.create += g.create;
+    totale.agganciate += g.agganciate;
+    totale.ancora = g.ancora;
+    totale.errore = g.errore;
+    if (g.errore || !g.ancora) break;
+    avanzamento(totale);
+  }
+  return totale;
+}

@@ -6,7 +6,7 @@ import { AreaTesto, Campo, Errore, Intestazione, Pulsante, Punto, Riga, Skeleton
 import { momento } from "../../format";
 import type { GiroFoglio, Impostazioni, Integrazione, RigaAnteprima, StatoSistema, VoceRegistro } from "../../types";
 import { COLORE, ETICHETTA_STATO, Sezione, testoUltima, useImpostazioni, useStatoSistema } from "./parti";
-import { daLinkFoglio, linkDelFoglio } from "./regole";
+import { daLinkFoglio, leggiFinoAllaFine, linkDelFoglio } from "./regole";
 
 type Anteprima = { colonneMancanti: string[]; righe: RigaAnteprima[] };
 const MAPPA: [keyof Impostazioni["foglio"]["mappa"], string][] = [
@@ -57,14 +57,20 @@ function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Impostazio
     onSuccess: () => { toast.success("Foglio salvato"); for (const k of [["settings"], ["integrazioni"]]) void qc.invalidateQueries({ queryKey: k }); },
     onError: (e) => toast.error(e.message),
   });
+  // Un solo avviso che si aggiorna: avanzamento mentre gira, esito alla fine.
   const leggi = useMutation({
-    mutationFn: () => api<{ giro: GiroFoglio }>("/integrations/foglio/leggi", { method: "POST" }),
-    onSuccess: ({ giro }) => {
-      if (giro.errore) toast.error(giro.errore);
-      else toast.success(`Lette ${giro.lette} righe: ${giro.create} lead nuovi, ${giro.agganciate} già presenti`);
+    mutationFn: () => {
+      const id = toast.loading("Lettura del foglio in corso");
+      return leggiFinoAllaFine(
+        () => api<{ giro: GiroFoglio | null }>("/integrations/foglio/leggi", { method: "POST" }).then((r) => r.giro),
+        (t) => toast.loading(`Lette ${t.lette} righe, creati ${t.create} lead`, { id }),
+      ).then((t) => ({ ...t, id }), (e: Error) => { toast.error(e.message, { id }); throw e; });
+    },
+    onSuccess: (t) => {
+      if (t.errore) toast.error(t.errore, { id: t.id });
+      else toast.success(`Lette ${t.lette} righe, creati ${t.create} lead${t.ancora ? ": il resto lo legge il giro automatico" : ""}`, { id: t.id });
       void qc.invalidateQueries({ queryKey: ["integrazioni"] });
     },
-    onError: (e) => toast.error(e.message),
   });
   const vedi = useMutation({
     mutationFn: () => api<Anteprima>("/integrations/foglio/anteprima"),

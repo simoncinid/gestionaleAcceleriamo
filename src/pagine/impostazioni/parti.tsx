@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { api } from "../../api";
 import { momento } from "../../format";
+import { partiRoma } from "../../../worker/lib/roma";
 import type { Impostazioni, Integrazione, StatoSistema } from "../../types";
 
 export const useImpostazioni = () => useQuery({ queryKey: ["settings"], queryFn: () => api<Impostazioni>("/settings") });
@@ -10,6 +11,17 @@ export const useStatoSistema = () => useQuery({ queryKey: ["integrazioni"], quer
 // "spento" copre anche il segreto o il link mancante: si legge "Non collegato", mai come un errore.
 export const COLORE = { ok: "verde", errore: "rosso", spento: "grigio", mai: "giallo" } as const;
 export const ETICHETTA_STATO = { ok: "Funziona", errore: "Errore", spento: "Non collegato", mai: "Mai partito" } as const;
+
+// Il giro parte ogni 5 minuti: se l'ultimo riuscito ha più di 20 minuti il cron è fermo, e va segnato.
+const GIRO_FERMO_MS = 20 * 60_000;
+export function conGiroInRitardo(integrazioni: Integrazione[], ora: number): Integrazione[] {
+  return integrazioni.map((i) => {
+    if (i.key !== "giro" || i.stato !== "ok" || i.ultimaOk == null || ora - i.ultimaOk <= GIRO_FERMO_MS) return i;
+    const p = partiRoma(i.ultimaOk);
+    const hhmm = `${String(p.ore).padStart(2, "0")}:${String(p.minuti).padStart(2, "0")}`;
+    return { ...i, stato: "errore", nota: `Ultimo giro alle ${hhmm}, atteso ogni 5 minuti` };
+  });
+}
 
 export function testoUltima(i: Integrazione, ora: number) {
   if (i.stato === "spento") return i.nota ?? "Non collegato";
