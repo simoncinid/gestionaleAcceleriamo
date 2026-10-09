@@ -117,6 +117,11 @@ describe("segni, chip e intestazione", () => {
     expect(html).toContain('aria-label="Esito"');
     expect(html).toMatch(/<button[^>]*aria-expanded="true"/);
   });
+  it("le card avorio hanno il bordo sabbia e nessuna ombra", () => {
+    const html = render(<CardLead ora={ORA} lead={{ id: "l1", company: "Officina", stageLabel: "Nuovo", stageChangedAt: ORA }} />);
+    expect(html).toContain("border-sabbia");
+    expect(html).not.toContain("shadow");
+  });
   it("stato vuoto senza pulsante pieno se non serve", () => {
     expect(contaPrimari(render(<StatoVuoto titolo="Tutto fatto" testo="Niente in scadenza." />))).toBe(0);
   });

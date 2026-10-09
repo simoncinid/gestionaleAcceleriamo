@@ -1,5 +1,5 @@
 import { CaretDown, Check } from "@phosphor-icons/react";
-import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { cx } from "./cx";
 import { Foglio } from "./Foglio";
 
@@ -15,7 +15,15 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
   const [aperto, setAperto] = useState(apertoAllInizio);
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
-  const chiudi = () => { setAperto(false); trigger.current?.focus(); };
+  const contenitore = useRef<HTMLDivElement>(null);
+  const riportaFuoco = useRef(false);
+  const nelFoglio = opzioni.length > OLTRE_IL_FOGLIO;
+  // Il fuoco si sposta dopo il rendering: nel foglio il dialog si chiude prima (effetto del figlio), poi la riga torna attiva.
+  const chiudi = () => { riportaFuoco.current = true; setAperto(false); };
+  useEffect(() => {
+    if (!aperto && riportaFuoco.current) { riportaFuoco.current = false; trigger.current?.focus(); }
+    if (aperto && !nelFoglio) (contenitore.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? contenitore.current?.querySelector<HTMLElement>('[role="option"]'))?.focus();
+  }, [aperto, nelFoglio]);
   // Frecce, Home e Fine spostano il fuoco tra le opzioni; Esc chiude e riporta il fuoco sulla riga.
   const tasti = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === "Escape" && aperto) { e.stopPropagation(); return chiudi(); }
@@ -28,7 +36,6 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
     voci[verso].focus();
   };
   const scelta = opzioni.find((o) => o.valore === valore);
-  const nelFoglio = opzioni.length > OLTRE_IL_FOGLIO;
   const mostrato = testoValore ?? scelta?.etichetta;
   const elenco = (
     <ul id={id} role="listbox" aria-label={etichetta} className="flex flex-col">
@@ -45,7 +52,7 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
     </ul>
   );
   return (
-    <div data-selettore={etichetta} onKeyDown={tasti} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
+    <div ref={contenitore} data-selettore={etichetta} onKeyDown={tasti} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
       <button ref={trigger} type="button" aria-expanded={aperto} aria-controls={id} onClick={() => setAperto((a) => !a)}
         className="flex h-12 w-full items-center gap-3 px-3 text-left">
         <span className="text-secondaria font-medium">{etichetta}</span>
