@@ -57,6 +57,19 @@ describe("GET /today", () => {
     expect((await oggi(cookie, "tutte")).daFare).toHaveLength(3);
   });
 
+  it("call e proposte di lead cestinati non contano nei numeri", async () => {
+    const cookie = await authed();
+    await insertLead("vivo");
+    await insertLead("cestinato", { deleted_at: NOW });
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k1', 'vivo', 'conoscenza', ?, ?, ?), ('k2', 'cestinato', 'conoscenza', ?, ?, ?)")
+      .bind(NOW + 3_600_000, NOW, NOW, NOW + 3_600_000, NOW, NOW).run();
+    await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('p1', 'vivo', 'ACC-2026-001', 'registrata', 'aggancio', ?, ?), ('p2', 'cestinato', 'ACC-2026-002', 'presentata', 'aggancio', ?, ?)")
+      .bind(NOW, NOW, NOW, NOW).run();
+    const o = await oggi(cookie);
+    expect(o.numeri.callSettimana).toBe(1);
+    expect(o.numeri.proposteAperte).toBe(1);
+  });
+
   it("il giorno finisce a mezzanotte di Roma anche quando dura 25 ore (cambio d'ora)", async () => {
     const cookie = await authed();
     const domenica = Date.UTC(2026, 9, 25, 9, 0); // 25 ottobre, torna l'ora solare: 10:00 a Roma

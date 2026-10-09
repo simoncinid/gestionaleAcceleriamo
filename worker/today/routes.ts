@@ -83,8 +83,8 @@ todayRoutes.get("/today", async (c) => {
         AND k.scheduled_at >= ?2 AND k.scheduled_at < ?3 ORDER BY k.scheduled_at`, inizio, fine),
     uno<{ n: number }>("SELECT count(*) n FROM leads WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ?", inizio, fine),
     uno<{ m: number | null }>("SELECT avg(first_response_at - created_at) / 60000.0 m FROM leads WHERE deleted_at IS NULL AND first_response_at IS NOT NULL AND created_at >= ?", ora - 7 * GIORNO),
-    uno<{ n: number }>("SELECT count(*) n FROM calls WHERE deleted_at IS NULL AND scheduled_at >= ? AND scheduled_at < ?", lunedi, lunediDopo),
-    uno<{ n: number }>("SELECT count(*) n FROM proposals WHERE deleted_at IS NULL AND status IN ('registrata', 'presentata')"),
+    uno<{ n: number }>("SELECT count(*) n FROM calls k JOIN leads l ON l.id = k.lead_id AND l.deleted_at IS NULL WHERE k.deleted_at IS NULL AND k.scheduled_at >= ? AND k.scheduled_at < ?", lunedi, lunediDopo),
+    uno<{ n: number }>("SELECT count(*) n FROM proposals p JOIN leads l ON l.id = p.lead_id AND l.deleted_at IS NULL WHERE p.deleted_at IS NULL AND p.status IN ('registrata', 'presentata')"),
   ]);
 
   const nuovi = nuoviGrezzi.map((l) => ({ ...l, slaScadenza: scadenzaLavorativa(l.createdAt, minutiSla, imp.orario) }));
