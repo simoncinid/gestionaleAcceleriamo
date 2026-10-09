@@ -68,7 +68,7 @@ describe("email di conferma", () => {
     resend(500);
     await insertLead("c");
     expect(await mandaConferma(env, "c", NOW)).toBe("errore");
-    expect(await lead("c")).toMatchObject({ confirmation_sent_at: null, confirmation_attempts: 1, confirmation_error: "Resend 500: errore finto" });
+    expect(await lead("c")).toMatchObject({ confirmation_sent_at: null, confirmation_attempts: 1, confirmation_error: "Resend non raggiungibile, si riprova" });
     for (let i = 0; i < 5; i++) await ritentaConferme(env, NOW + (i + 1) * 300_000);
     expect(inviate).toHaveLength(MAX_TENTATIVI_CONFERMA);
     expect((await lead("c"))?.confirmation_attempts).toBe(MAX_TENTATIVI_CONFERMA);
@@ -113,6 +113,57 @@ describe("email di conferma", () => {
   it("nei test nessuna chiamata di rete vera: senza fetcher finto l'invio fallisce in locale", async () => {
     await insertLead("rete");
     expect(await mandaConferma(env, "rete", NOW)).toBe("errore");
-    expect((await lead("rete"))?.confirmation_error).toContain("rete vietata nei test");
+    // Una chiamata vera con la chiave finta tornerebbe 401 ("Chiave Resend non valida"): qui l'errore nasce in locale.
+    expect(await lead("rete")).toMatchObject({ confirmation_attempts: 1, confirmation_error: "Resend non raggiungibile, si riprova" });
+  });
+  it("motivo in italiano: un 422 diventa \"Indirizzo email rifiutato da Resend\", il testo tecnico resta nello stato", async () => {
+    resend(422);
+    await insertLead("r422");
+    expect(await mandaConferma(env, "r422", NOW)).toBe("errore");
+    expect(await lead("r422")).toMatchObject({ confirmation_attempts: MAX_TENTATIVI_CONFERMA, confirmation_error: "Indirizzo email rifiutato da Resend" });
+    const stato = await env.DB.prepare("SELECT last_error FROM integration_status WHERE key = 'resend'").first<{ last_error: string }>();
+    expect(stato?.last_error).toContain("Resend 422: errore finto");
+  });
+
+  it("doppione in coda non blocca il giro: esce dalla coda e il giro dopo non lo ritrova", async () => {
+    resend();
+    const senzaChiave = { ...env, RESEND_API_KEY: "" };
+    await insertLead("l1", { created_at: NOW - 2000 });
+    await insertLead("l2", { created_at: NOW - 1000 });
+    await mandaConferma(senzaChiave, "l1", NOW);
+    await mandaConferma(senzaChiave, "l2", NOW);
+    await env.DB.prepare("UPDATE leads SET duplicate_of_id = 'l1' WHERE id = 'l2'").run();
+    expect(await ritentaConferme(env, NOW + 300_000)).toBe(1);
+    expect(await lead("l2")).toMatchObject({ confirmation_sent_at: null, confirmation_error: null });
+    const coda = await env.DB.prepare("SELECT count(*) AS n FROM leads WHERE confirmation_sent_at IS NULL AND confirmation_error IS NOT NULL").first<{ n: number }>();
+    expect(coda?.n).toBe(0);
+    expect(await ritentaConferme(env, NOW + 600_000)).toBe(0);
+    expect(inviate).toHaveLength(1);
+  });
+
+  it("richiesta arrivata più di 48 ore prima della chiave: nessuna email, motivo scritto, non si ritenta", async () => {
+    resend();
+    const vecchio = NOW - 3 * 86_400_000;
+    await insertLead("vecchio", { created_at: vecchio });
+    await mandaConferma({ ...env, RESEND_API_KEY: "" }, "vecchio", vecchio + 1000);
+    expect(await ritentaConferme(env, NOW)).toBe(0);
+    expect(await lead("vecchio")).toMatchObject({
+      confirmation_sent_at: null, confirmation_attempts: MAX_TENTATIVI_CONFERMA,
+      confirmation_error: "Non mandata: richiesta arrivata più di 48 ore prima del collegamento di Resend",
+    });
+    expect(await ritentaConferme(env, NOW + 300_000)).toBe(0);
+    expect(inviate).toHaveLength(0);
+    expect(await env.DB.prepare("SELECT ok FROM integration_status WHERE key = 'resend'").first()).toBeNull();
+  });
+
+  it("il giro rispetta il limite: 7 in coda, ne manda 5", async () => {
+    resend();
+    const senzaChiave = { ...env, RESEND_API_KEY: "" };
+    for (let i = 0; i < 7; i++) {
+      await insertLead(`q${i}`, { created_at: NOW + i });
+      await mandaConferma(senzaChiave, `q${i}`, NOW);
+    }
+    expect(await ritentaConferme(env, NOW + 300_000, 5)).toBe(5);
+    expect(inviate).toHaveLength(5);
   });
 });

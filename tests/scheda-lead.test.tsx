@@ -123,6 +123,8 @@ describe("scheda lead, correzioni della revisione", () => {
     const senza = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
     expect(senza).not.toContain("Dati di sola lettura");
   });
+});
+
 describe("scheda lead, email di conferma", () => {
   it("la regola del frontend è la stessa del Worker", () => {
     expect(confermaNonPartita({ confirmationSentAt: null, confirmationAttempts: MAX_TENTATIVI_CONFERMA })).toBe(true);
@@ -130,14 +132,12 @@ describe("scheda lead, email di conferma", () => {
     expect(confermaNonPartita({ confirmationSentAt: ORA, confirmationAttempts: MAX_TENTATIVI_CONFERMA })).toBe(false);
   });
   it("tentativi finiti: avviso su due righe, nessun pulsante in più", () => {
-    const fallita = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, confirmationAttempts: 4, confirmationError: "Resend 422: indirizzo rifiutato" } };
+    const fallita = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, confirmationAttempts: 4, confirmationError: "Indirizzo email rifiutato da Resend" } };
     const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], fallita], [["stages"], FASI]] });
     expect(html).toContain("Email di conferma non partita</p>");
-    expect(html).toContain("Resend 422: indirizzo rifiutato");
+    expect(html).toContain("Indirizzo email rifiutato da Resend");
     expect(contaPrimari(html)).toBe(1);
     const normale = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
     expect(normale).not.toContain("Email di conferma non partita");
   });
-});
-
 });
