@@ -121,8 +121,10 @@ describe("classificazione e scheda", () => {
     expect(doppia.versione).toBe(1);
     await env.DB.prepare("UPDATE company_profiles SET status = 'ready', content = 'x' WHERE lead_id = 'L5'").run();
     await env.DB.prepare("UPDATE ai_jobs SET stato = 'pronto'").run();
-    const b = await (await call("/api/leads/L5/scheda-azienda", { method: "POST", json: { forza: true } }, cookie)).json<{ versione: number }>();
-    expect(b.versione).toBe(2);
+    const b = await (await call("/api/leads/L5/scheda-azienda", { method: "POST", json: { forza: true } }, cookie)).json<{ stato: string; versione: number }>();
+    // La versione 2 è in coda; finché non è pronta l'interfaccia mostra la 1 (revisione del Task 7).
+    expect(b).toMatchObject({ stato: "in_coda", versione: 1 });
+    expect((await env.DB.prepare("SELECT max(version) v FROM company_profiles WHERE lead_id = 'L5'").first<{ v: number }>())?.v).toBe(2);
     expect(await contaJobs("tipo = 'classificazione'")).toBe(0);
   });
 
@@ -155,6 +157,23 @@ describe("classificazione e scheda", () => {
     await call(`/api/ai-jobs/${e.jobId}/riprova`, { method: "POST" }, cookie);
     const r = await (await call("/api/leads/L7/scheda-azienda", {}, cookie)).json<{ stato: string }>();
     expect(r.stato).toBe("in_coda");
+  });
+
+  it("rigenera fallita: resta visibile la versione 1, anche nella stampa", async () => {
+    await lead("L8", { source: "manuale" });
+    await env.DB.prepare("INSERT INTO company_profiles (id, lead_id, version, status, content, sources, model, created_at, updated_at) VALUES ('p8', 'L8', 1, 'ready', '## Chi è\nversione buona', ?1, 'claude-sonnet-5-5', 0, 5)")
+      .bind(JSON.stringify([{ url: "https://a.it", titolo: "A" }])).run();
+    const cookie = await loginCookie("tommaso", "password-lunga-1");
+    const inCoda = await (await call("/api/leads/L8/scheda-azienda", { method: "POST", json: { forza: true } }, cookie)).json<{ stato: string; versione: number; contenuto: string; fonti: unknown[]; aggiornata: number }>();
+    expect(inCoda).toMatchObject({ stato: "in_coda", versione: 1, contenuto: "## Chi è\nversione buona", fonti: [{ url: "https://a.it", titolo: "A" }], aggiornata: 5 });
+    expect(await (await call("/api/leads/L8/scheda-azienda/stampa", {}, cookie)).text()).toContain("versione buona");
+    setClaudeFetch(async () => rispostaClaude({ testo: "troncata", stop: "max_tokens", modello: "claude-sonnet-5-5" }));
+    await lavoraCoda(env, ora, 3);
+    const s = await (await call("/api/leads/L8/scheda-azienda", {}, cookie)).json<{ stato: string; versione: number; contenuto: string; errore: string }>();
+    expect(s).toMatchObject({ stato: "errore", versione: 1, contenuto: "## Chi è\nversione buona", errore: "Risposta troncata" });
+    const r = await call("/api/leads/L8/scheda-azienda/stampa", {}, cookie);
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain("versione buona");
   });
 
   it("stampa: HTML con CSS di stampa, testo escapato, 401 senza sessione", async () => {

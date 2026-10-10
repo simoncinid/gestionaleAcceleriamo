@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TestoMarkdown } from "../src/ds";
 import { Oggi } from "../src/pagine/commerciale/Oggi";
 import { SezioneSchedaAzienda } from "../src/pagine/commerciale/SezioneSchedaAzienda";
@@ -66,5 +66,33 @@ describe("Oggi: riga della call di conoscenza", () => {
     const html = render(<Oggi ora={ORA} />, { percorso: "/commerciale/oggi", dati: [[["today", "mie"], dati]] });
     expect(html.match(/Scheda azienda pronta/g)?.length).toBe(1);
     expect(html).toContain("Scheda in preparazione");
+  });
+});
+
+describe("SezioneSchedaAzienda: errori e versione precedente", () => {
+  it("Prepara, Rigenera e Riprova che falliscono mostrano il toast con l'errore", async () => {
+    const { toast } = await import("sonner");
+    const { QueryClient } = await import("@tanstack/react-query");
+    const { azioniScheda } = await import("../src/pagine/commerciale/SezioneSchedaAzienda");
+    const spia = vi.spyOn(toast, "error").mockImplementation(() => "t");
+    const a = azioniScheda(new QueryClient(), "L1");
+    a.prepara.onError(new Error("Lead non trovato"));
+    a.riprova.onError(new Error("Lavoro non trovato"));
+    expect(spia.mock.calls.map((c) => c[0])).toEqual(["Lead non trovato", "Lavoro non trovato"]);
+    spia.mockRestore();
+  });
+  it("nuova versione in preparazione: la precedente resta visibile e stampabile", async () => {
+    const html = await r("in_coda", { contenuto: "## Chi è\nvecchia", versione: 1, aggiornata: 0 });
+    expect(html).toContain("Nuova versione in preparazione");
+    expect(html).toContain("vecchia");
+    expect(html).toContain("/api/leads/L1/scheda-azienda/stampa");
+    expect(html).not.toContain("Rigenera la scheda");
+  });
+  it("nuova versione non riuscita: Riprova e la precedente resta", async () => {
+    const html = await r("errore", { contenuto: "## Chi è\nvecchia", versione: 1, aggiornata: 0, errore: "Risposta troncata", jobId: "j2" });
+    expect(html).toContain("Nuova versione non riuscita");
+    expect(html).toContain("Riprova la scheda");
+    expect(html).toContain("vecchia");
+    expect(contaPrimari(html)).toBe(0);
   });
 });

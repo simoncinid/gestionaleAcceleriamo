@@ -26,7 +26,7 @@ const leggiJson = <T>(s: string | null, vuoto: T): T => {
   }
 };
 
-// Lo stato della scheda dall'ultima versione e dal suo lavoro. Senza versioni guarda la classificazione:
+// Lo stato della scheda dall'ultima versione e dal suo lavoro; il contenuto dall'ultima versione pronta. Senza versioni guarda la classificazione:
 // se è in coda o ferma per il tetto, la scheda è "in coda" o "ferma", altrimenti "nessuna".
 export async function statoScheda(db: D1Database, leadId: string): Promise<SchedaApi> {
   const p = await db.prepare(`SELECT id, version, status, content, sources, model, error, classification, updated_at AS updatedAt
@@ -49,9 +49,19 @@ export async function statoScheda(db: D1Database, leadId: string): Promise<Sched
     : p.status === "error" || job?.stato === "errore" ? "errore"
     : "in_coda";
   const cls = leggiJson<{ motivo?: string } | null>(p.classification, null);
+  // Mentre una versione nuova è in coda, in corso, ferma o non riuscita, si vede (e si stampa) l'ultima pronta:
+  // "Rigenera" non toglie la scheda buona prima di una call. Una query in più, solo in questi stati (fuori dal giro).
+  const pronta = stato === "pronta" ? p
+    : stato === "privato" ? null
+    : await db.prepare(`SELECT id, version, status, content, sources, model, error, classification, updated_at AS updatedAt
+        FROM company_profiles WHERE lead_id = ?1 AND status = 'ready' ORDER BY version DESC LIMIT 1`).bind(leadId).first<Riga>();
   return {
-    stato, versione: p.version, contenuto: stato === "pronta" ? p.content : null, fonti: stato === "pronta" ? leggiJson<Fonte[]>(p.sources, []) : [],
-    modello: p.model, aggiornata: p.updatedAt,
+    stato,
+    versione: pronta?.version ?? p.version,
+    contenuto: pronta?.content ?? null,
+    fonti: pronta ? leggiJson<Fonte[]>(pronta.sources, []) : [],
+    modello: pronta?.model ?? p.model,
+    aggiornata: pronta?.updatedAt ?? p.updatedAt,
     errore: stato === "errore" ? (job?.errore ?? p.error) : null,
     motivo: stato === "privato" ? (cls?.motivo ?? null) : null,
     jobId: job?.id ?? null,
