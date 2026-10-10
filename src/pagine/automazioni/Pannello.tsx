@@ -52,7 +52,7 @@ export function Pannello({ ora: oraFissa }: { ora?: number } = {}) {
       <Intestazione titolo="Automazioni" numero={totali.attive} coda={totali.attive === 1 ? "attiva" : "attive"} eyebrow={eyebrow} />
       {interruttore}
       <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
-        <p className="text-corpo tabular-nums">{`${totali.attive} attive`}</p>
+        <p className="text-corpo tabular-nums">{totali.attive === 1 ? "1 attiva" : `${totali.attive} attive`}</p>
         <p className="text-corpo tabular-nums">{`${totali.inCostruzione} in costruzione`}</p>
         <p className="text-corpo tabular-nums">{`${euro(totali.costiViviCents)} di costi vivi al mese`}</p>
       </div>

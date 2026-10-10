@@ -1,4 +1,4 @@
-import { ArrowsClockwise, CaretDown, CaretRight, Database, Envelope, Clock, Gear, MapPin, PaperPlaneTilt, Shuffle, Sparkle, Table, UsersThree } from "@phosphor-icons/react";
+import { ArrowsClockwise, CaretDown, Database, Envelope, Clock, Gear, MapPin, PaperPlaneTilt, Shuffle, Sparkle, Table, UsersThree } from "@phosphor-icons/react";
 import type { ComponentType } from "react";
 import { cx, Foglio, Selettore, type Opzione } from "../../ds";
 import type { AutomationStep } from "../../types";
@@ -20,33 +20,67 @@ export const ICONE: Record<string, { Icona: Icona; etichetta: string }> = {
 export const OPZIONI_ICONA: Opzione<string>[] = Object.entries(ICONE).map(([valore, v]) => ({ valore, etichetta: v.etichetta }));
 const iconaDi = (nome: string | null) => (nome && ICONE[nome]?.Icona) || Gear;
 
-// Il flusso: passaggi uno sotto l'altro sul telefono, in orizzontale a capo sul computer largo. Un passaggio di ramo ha il tratteggio e l'etichetta sulla linea.
-export function Flusso({ passi, onApri }: { passi: AutomationStep[]; onApri: (p: AutomationStep) => void }) {
+type Principale = { p: AutomationStep; n: number; rami: { p: AutomationStep; sigla: string }[] };
+
+// La numerazione segue l'ordine principale. Un ramo (passaggio con etichetta sulla linea) sta sotto il passaggio principale che lo precede e prende la sigla 6a, 6b...
+export function ordinaFlusso(passi: AutomationStep[]): { principali: Principale[]; sigle: Map<string, string> } {
+  const principali: Principale[] = [];
+  const sigle = new Map<string, string>();
+  for (const p of passi) {
+    const ultimo = principali[principali.length - 1];
+    if (p.branch && ultimo) {
+      const sigla = `${ultimo.n}${String.fromCharCode(97 + ultimo.rami.length)}`;
+      ultimo.rami.push({ p, sigla });
+      sigle.set(p.id, sigla);
+    } else {
+      principali.push({ p, n: principali.length + 1, rami: [] });
+      sigle.set(p.id, String(principali.length));
+    }
+  }
+  return { principali, sigle };
+}
+
+function Blocco({ p, sigla, ramo, onApri }: { p: AutomationStep; sigla: string; ramo?: boolean; onApri: (p: AutomationStep) => void }) {
+  const Icona = iconaDi(p.icon);
   return (
-    <ol aria-label="Flusso dell'automazione" className="flex flex-col items-stretch lg:flex-row lg:flex-wrap lg:items-stretch lg:gap-y-4">
-      {passi.map((p, i) => {
-        const Icona = iconaDi(p.icon);
-        return (
-          <li key={p.id} className="flex flex-col lg:flex-row lg:items-center">
-            {i > 0 && (
-              <div aria-hidden className={cx("flex items-center justify-center gap-2 self-center text-grigio", "min-h-9 flex-row lg:min-h-0 lg:w-24 lg:flex-col", !p.branch && "lg:w-10")}>
-                {p.branch && <span className="max-w-[240px] text-center text-meta text-ink lg:max-w-24">{p.branch}</span>}
-                <CaretDown size={20} weight="bold" className="lg:hidden" />
-                <CaretRight size={20} weight="bold" className="hidden lg:block" />
+    <button type="button" onClick={() => onApri(p)} aria-label={`Passaggio ${sigla}: ${p.title}. Apri il dettaglio tecnico`}
+      className={cx("flex min-h-11 w-full flex-col gap-2 rounded-blocco border bg-avorio p-4 text-left hover:bg-crema", ramo ? "border-dashed border-sabbia-2" : "border-sabbia")}>
+      <span className="flex items-center gap-2">
+        <span className={cx("inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-etichetta font-semibold tabular-nums", ramo ? "border-[1.5px] border-ink text-ink" : "bg-ink text-avorio")}>{sigla}</span>
+        <Icona size={22} weight="regular" aria-hidden />
+      </span>
+      <span className="text-corpo font-semibold">{p.title}</span>
+      <span className="text-secondaria text-grigio">{p.summary}</span>
+    </button>
+  );
+}
+
+// Una colonna sola, a ogni larghezza: i passaggi principali uniti da una linea con freccia; ogni ramo spostato a destra, sotto il passaggio da cui parte, con linea tratteggiata e la sua etichetta.
+export function Flusso({ passi, onApri }: { passi: AutomationStep[]; onApri: (p: AutomationStep) => void }) {
+  const { principali } = ordinaFlusso(passi);
+  return (
+    <ol aria-label="Flusso dell'automazione" className="flex max-w-[720px] flex-col">
+      {principali.map(({ p, n, rami }, i) => (
+        <li key={p.id} className="flex flex-col">
+          {i > 0 && (
+            <div aria-hidden className="flex h-9 flex-col items-start pl-[26px] text-ink">
+              <span className="w-px flex-1 bg-ink" />
+              <CaretDown size={14} weight="bold" className="-ml-[6px] -mt-1" />
+            </div>
+          )}
+          <Blocco p={p} sigla={String(n)} onApri={onApri} />
+          {rami.map(({ p: r, sigla }) => (
+            <div key={r.id} className="ml-[26px] flex flex-col sm:ml-12">
+              <div aria-hidden className="flex h-9 items-center gap-3">
+                <span className="h-full w-0 border-l-2 border-dashed border-ink/60" />
+                <span className="text-meta text-ink">{r.branch}</span>
               </div>
-            )}
-            <button type="button" onClick={() => onApri(p)} aria-label={`Passaggio ${i + 1}: ${p.title}. Apri il dettaglio tecnico`}
-              className={cx("flex h-full w-full min-h-11 flex-col gap-2 rounded-blocco border bg-avorio p-4 text-left hover:bg-crema lg:w-[210px]", p.branch ? "border-dashed border-sabbia-2" : "border-sabbia")}>
-              <span className="flex items-center gap-2">
-                <span className="inline-flex size-7 items-center justify-center rounded-full bg-ink text-etichetta font-semibold tabular-nums text-avorio">{i + 1}</span>
-                <Icona size={22} weight="regular" aria-hidden />
-              </span>
-              <span className="text-corpo font-semibold">{p.title}</span>
-              <span className="text-secondaria text-grigio">{p.summary}</span>
-            </button>
-          </li>
-        );
-      })}
+              <Blocco p={r} sigla={sigla} ramo onApri={onApri} />
+              <p className="pt-2 text-meta text-grigio">{i + 1 < principali.length ? `Poi si torna al passaggio ${n + 1}` : "Il flusso finisce qui"}</p>
+            </div>
+          ))}
+        </li>
+      ))}
     </ol>
   );
 }
@@ -62,7 +96,7 @@ function Voce({ etichetta, children }: { etichetta: string; children?: string | 
 }
 
 // Dettaglio tecnico di un passaggio: foglio dal basso sul telefono, pannello laterale sul computer. Un'informazione per riga.
-export function FoglioPasso({ passo, numero, onChiudi }: { passo: AutomationStep; numero: number; onChiudi: () => void }) {
+export function FoglioPasso({ passo, numero, onChiudi }: { passo: AutomationStep; numero: string; onChiudi: () => void }) {
   return (
     <Foglio aperto lato titolo={`${numero}. ${passo.title}`} onChiudi={onChiudi}>
       <p className="text-corpo">{passo.summary}</p>

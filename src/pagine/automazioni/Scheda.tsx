@@ -12,7 +12,7 @@ import { usePassi } from "../lavori/dati";
 import { useAutomazione, useRicarica } from "../dati-gestione";
 import { Sezione } from "../impostazioni/parti";
 import { useAnonimo } from "./anonimo";
-import { Flusso, FoglioPasso } from "./Flusso";
+import { Flusso, FoglioPasso, ordinaFlusso } from "./Flusso";
 import { FoglioPassaggi } from "./FoglioPassaggi";
 import { nomeCliente } from "./Pannello";
 
@@ -66,7 +66,7 @@ export function SchedaAutomazione({ id }: { id: string }) {
         {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
         <p className="flex items-center gap-2 text-secondaria"><Punto colore={a.status === "attiva" ? "verde" : a.status === "in_costruzione" ? "giallo" : "grigio"} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
       </Intestazione>
-      <Sezione titolo="Flusso" coda={passiQ.data?.length ? `${passiQ.data.length} passaggi` : undefined}>
+      <Sezione titolo="Flusso" coda={passiQ.data?.length ? passiQ.data.length === 1 ? "1 passaggio" : `${passiQ.data.length} passaggi` : undefined}>
         {passiQ.data && passiQ.data.length > 0
           ? <Flusso passi={passiQ.data} onApri={setPasso} />
           : <p className="text-secondaria text-grigio">Il flusso non è ancora descritto.</p>}
@@ -97,7 +97,7 @@ export function SchedaAutomazione({ id }: { id: string }) {
         <AreaTesto etichetta="Note" cresce defaultValue={a.notes ?? ""} onBlur={(e) => alBlur("notes", e.target.value)} />
       </Sezione>
       </div>
-      {passo && passiQ.data && <FoglioPasso passo={passo} numero={passiQ.data.indexOf(passo) + 1} onChiudi={() => setPasso(null)} />}
+      {passo && passiQ.data && <FoglioPasso passo={passo} numero={ordinaFlusso(passiQ.data).sigle.get(passo.id) ?? ""} onChiudi={() => setPasso(null)} />}
       {modifica && <FoglioPassaggi automazioneId={id} iniziali={passiQ.data ?? []} onChiudi={() => setModifica(false)} />}
       {a.status === "in_costruzione" && (
         <div className="sticky bottom-20 md:bottom-4">
