@@ -51,7 +51,7 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
       WHERE p.status = 'presentata' AND p.deleted_at IS NULL AND l.deleted_at IS NULL AND l.stage_id = 'in-attesa-decisione'
         AND l.next_action_at IS NOT NULL AND l.next_action_at < ?1 LIMIT 10`)
       .bind(inizioGiornoRoma(now) + 86_400_000).all<{ number: string; id: string; company: string; ownerId: string | null; nextActionAt: number }>(),
-    raw.prepare("SELECT key, error_id AS errorId FROM integration_status WHERE ok = 0 AND key IN ('foglio','resend')").all<{ key: string; errorId: string | null }>(),
+    raw.prepare("SELECT key, last_ok_at AS lastOkAt FROM integration_status WHERE ok = 0 AND key IN ('foglio','resend')").all<{ key: string; lastOkAt: number | null }>(),
     raw.prepare("SELECT chiave FROM notifications WHERE created_at > ?1").bind(settimanaFa).all<{ chiave: string }>(),
   ]);
   const gia = new Set(esistenti.results.map((r) => r.chiave));
@@ -79,8 +79,10 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
   for (const p of proposte.results) {
     candidati.push({ evento: "proposta_oggi", entityId: p.id, turno: giornoRoma(p.nextActionAt), titolo: `Proposta ${p.number} da seguire oggi: ${p.company}`, href: `/commerciale/lead/${p.id}`, responsabile: p.ownerId });
   }
+  // Un avviso per episodio di guasto: last_ok_at resta fermo finché l'integrazione è rotta e cambia solo
+  // dopo un ritorno al verde. Il prefisso "key:" tiene valida la chiusura automatica in chiudiFatti.
   for (const r of rotte.results) {
-    candidati.push({ evento: "integrazione_rotta", entityId: `${r.key}:${r.errorId ?? "x"}`, titolo: r.key === "foglio" ? "Il foglio di Andrea non si legge" : "Resend non manda le email", href: "/impostazioni" });
+    candidati.push({ evento: "integrazione_rotta", entityId: `${r.key}:${r.lastOkAt ?? 0}`, titolo: r.key === "foglio" ? "Il foglio di Andrea non si legge" : "Resend non manda le email", href: "/impostazioni" });
   }
 
   // Un INSERT per candidato con almeno una persona ancora da avvisare; quelli già avvisati non costano nulla.

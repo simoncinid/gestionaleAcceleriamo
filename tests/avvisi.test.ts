@@ -6,6 +6,7 @@ import { avvisa, chiudiAvvisi } from "../worker/avvisi/service";
 import { controllaAvvisi, controllaMeta48 } from "../worker/avvisi/controlli";
 import { COSTO_AVVISI } from "../worker/avvisi/controlli";
 import { contaD1 } from "../worker/lib/bilancio";
+import { segnaErrore, segnaOk } from "../worker/integrazioni/stato";
 import { daRoma } from "../worker/lib/roma";
 import { call, createUser, loginCookie } from "./helpers";
 
@@ -83,6 +84,26 @@ describe("controllaAvvisi", () => {
     expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE closed_at IS NULL").first<{ n: number }>())?.n).toBe(0);
   });
 
+  it("integrazione che resta rotta: un avviso per episodio, non uno a ogni giro", async () => {
+    const aperti = async () => (await env.DB.prepare("SELECT count(*) n FROM notifications WHERE evento='integrazione_rotta' AND closed_at IS NULL").first<{ n: number }>())?.n;
+    const tutte = async () => (await env.DB.prepare("SELECT count(*) n FROM notifications WHERE evento='integrazione_rotta'").first<{ n: number }>())?.n;
+    await segnaErrore(db(), "foglio", "giù", lun(10));
+    await controllaAvvisi(env, lun(10), 10);
+    await segnaErrore(db(), "foglio", "ancora giù", lun(10, 5));
+    await controllaAvvisi(env, lun(10, 5), 10);
+    expect(await aperti()).toBe(2);
+    expect(await tutte()).toBe(2);
+    // Torna verde: gli avvisi si chiudono. Si riguasta: nasce un episodio nuovo con il suo avviso.
+    await segnaOk(db(), "foglio", lun(10, 10));
+    await controllaAvvisi(env, lun(10, 10), 10);
+    expect(await aperti()).toBe(0);
+    await segnaErrore(db(), "foglio", "di nuovo giù", lun(10, 15));
+    await controllaAvvisi(env, lun(10, 15), 10);
+    await controllaAvvisi(env, lun(10, 20), 10);
+    expect(await aperti()).toBe(2);
+    expect(await tutte()).toBe(4);
+  });
+
   it("rispetta il limite di avvisi per giro", async () => {
     for (const id of ["A", "B", "C", "D"]) await lead(id);
     const r = await controllaAvvisi(env, lun(11, 1), 2);
@@ -141,6 +162,19 @@ describe("costo del lavoro", () => {
     expect(c.query).toBeLessThanOrEqual(COSTO_AVVISI.fisse + COSTO_AVVISI.max * COSTO_AVVISI.perUnita);
     // Tre pause chiuse in questo giro, ognuna col suo avviso; la quarta al giro dopo.
     expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE evento = 'fine_pausa'").first<{ n: number }>())?.n).toBe(3);
+  });
+
+  it("12 utenti attivi: avviso a tutti in una query, sotto i 100 parametri", async () => {
+    for (let i = 0; i < 10; i++) await createUser(`u${i}`, "password-lunga-1", `Utente ${i}`);
+    const ids = (await env.DB.prepare("SELECT id FROM users").all<{ id: string }>()).results.map((u) => u.id);
+    expect(ids).toHaveLength(12);
+    const c = { query: 0 };
+    const n = await avvisa(getDb(contaD1(env.DB, c)), { evento: "sla_scaduto", entityId: "L12", titolo: "x" }, lun(10), ids);
+    expect(n).toBe(12);
+    expect(c.query).toBe(1);
+    await lead("S12");
+    const r = await controllaAvvisi(env, lun(11, 1), COSTO_AVVISI.max);
+    expect(r.creati).toBe(12);
   });
 
   it("Meta 48 ore: 3 query", async () => {

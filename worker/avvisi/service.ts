@@ -19,6 +19,8 @@ export async function destinatari(db: Db, a: Pick<NuovoAvviso, "evento" | "respo
   return (await db.select({ id: users.id }).from(users).where(eq(users.active, true))).map((u) => u.id);
 }
 
+const ID_PER_BLOCCO = 90;
+
 // Una riga per persona; la chiave unica rende innocuo ripetere lo stesso avviso a ogni giro.
 // Una sola query in ogni caso: con "tutti" l'INSERT legge gli utenti attivi da sé (la catena del lead nuovo
 // gira dentro il budget del foglio e di Meta, ogni query in meno conta).
@@ -27,29 +29,20 @@ export async function avvisa(db: Db, a: NuovoAvviso, now: number, chi?: string[]
   const pushAt = ev.push ? null : now;
   const telegramAt = ev.telegram ? null : now;
   const persone = chi ?? (soloResponsabile(a) ? [soloResponsabile(a)!] : null);
-  if (persone) {
-    if (!persone.length) return 0;
-    const righe = persone.map((userId) => ({
-      id: crypto.randomUUID(),
-      chiave: chiaveAvviso(a.evento, a.entityId, userId, a.turno),
-      userId,
-      evento: a.evento,
-      entityId: a.entityId,
-      titolo: a.titolo,
-      testo: a.testo ?? null,
-      href: a.href ?? null,
-      createdAt: now,
-      pushAt,
-      telegramAt,
-    }));
-    const r = await db.insert(notifications).values(righe).onConflictDoNothing({ target: notifications.chiave }).returning({ id: notifications.id });
-    return r.length;
+  if (persone && !persone.length) return 0;
+  // Una query per blocco: 9 parametri fissi più gli id, sotto il tetto di 100 di D1. Con l'elenco esplicito
+  // l'INSERT legge le persone da users per id (90 per blocco), quindi resta una query sola per ogni squadra reale.
+  const blocchi = persone ? Array.from({ length: Math.ceil(persone.length / ID_PER_BLOCCO) }, (_, i) => persone.slice(i * ID_PER_BLOCCO, (i + 1) * ID_PER_BLOCCO)) : [null];
+  let creati = 0;
+  for (const ids of blocchi) {
+    const filtro = ids ? sql`u.id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})` : sql`u.active = 1`;
+    const r = await db.all<{ id: string }>(sql`INSERT INTO notifications (id, chiave, user_id, evento, entity_id, titolo, testo, href, created_at, push_at, telegram_at)
+      SELECT lower(hex(randomblob(16))), ${a.turno ? `${a.evento}:${a.entityId}@${a.turno}:` : `${a.evento}:${a.entityId}:`} || u.id, u.id, ${a.evento}, ${a.entityId}, ${a.titolo}, ${a.testo ?? null}, ${a.href ?? null}, ${now}, ${pushAt}, ${telegramAt}
+      FROM users u WHERE ${filtro}
+      ON CONFLICT (chiave) DO NOTHING RETURNING id`);
+    creati += r.length;
   }
-  const r = await db.all<{ id: string }>(sql`INSERT INTO notifications (id, chiave, user_id, evento, entity_id, titolo, testo, href, created_at, push_at, telegram_at)
-    SELECT lower(hex(randomblob(16))), ${a.turno ? `${a.evento}:${a.entityId}@${a.turno}:` : `${a.evento}:${a.entityId}:`} || u.id, u.id, ${a.evento}, ${a.entityId}, ${a.titolo}, ${a.testo ?? null}, ${a.href ?? null}, ${now}, ${pushAt}, ${telegramAt}
-    FROM users u WHERE u.active = 1
-    ON CONFLICT (chiave) DO NOTHING RETURNING id`);
-  return r.length;
+  return creati;
 }
 
 export async function chiudiAvvisi(db: Db, eventi: EventoAvviso[], entityId: string, now: number) {
