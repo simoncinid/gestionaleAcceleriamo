@@ -16,7 +16,9 @@
     // Nome utente del bot di Telegram (senza @): vuoto finché Tommaso non crea il bot. Il token è un segreto.
     "TELEGRAM_BOT": "",
     // Indirizzo dell'app per i link nei messaggi di Telegram.
-    "APP_URL": "https://acceleriamo-os.acceleriamo-os.workers.dev"
+    "APP_URL": "https://acceleriamo-os.acceleriamo-os.workers.dev",
+    // Indirizzo dello spazio demo: vuoto finché il Task 13 non lo pubblica.
+    "DEMO_URL": ""
   },
   "triggers": { "crons": ["*/5 * * * *"] },
   "observability": { "enabled": true }

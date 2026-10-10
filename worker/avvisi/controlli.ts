@@ -107,6 +107,6 @@ export async function controllaMeta48(env: Env, now: number): Promise<boolean> {
   if (!ultimo) return false;
   await env.DB.prepare("UPDATE notifications SET closed_at = ?1 WHERE closed_at IS NULL AND evento = 'meta_48h' AND entity_id <> ?2").bind(now, `meta:${ultimo.id}`).run();
   if (now - ultimo.createdAt < 48 * 3_600_000) return false;
-  await avvisa(db, { evento: "meta_48h", entityId: `meta:${ultimo.id}`, titolo: "Meta non manda lead da 48 ore", testo: "Controlla campagne e modulo in Gestione inserzioni.", href: "/impostazioni/integrazioni#meta" }, now);
+  await avvisa(db, { evento: "meta_48h", entityId: `meta:${ultimo.id}`, titolo: "Meta non manda lead da 48 ore", testo: "Controlla campagne e modulo in Gestione inserzioni.", href: "/impostazioni/integrazioni/meta" }, now);
   return true;
 }

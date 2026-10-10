@@ -35,6 +35,8 @@ const PROTETTE: [string, string][] = [
   ["GET", "/api/numeri/funnel"], ["GET", "/api/numeri/campagne"], ["GET", "/api/numeri/previsione"], ["PUT", "/api/campaign-spend"],
   ["GET", "/api/weekly-reviews/corrente"], ["PATCH", "/api/weekly-reviews/x"], ["POST", "/api/weekly-reviews/x/commento"], ["GET", "/api/diario"],
   ["POST", "/api/integrations/telegram/collega"], ["POST", "/api/integrations/telegram/prova"], ["DELETE", "/api/integrations/telegram"],
+  ["GET", "/api/me/profilo"], ["PATCH", "/api/me"], ["POST", "/api/me/password"],
+  ["POST", "/api/import/leads"], ["GET", "/api/export/leads"], ["GET", "/api/audit"], ["GET", "/api/dati/riepilogo"], ["GET", "/api/search"],
   // Percorsi che non esistono: anche loro chiedono la sessione, non dicono cosa c'è.
   ["GET", "/api/qualcosa"], ["POST", "/api/hooks/altro"],
 ];

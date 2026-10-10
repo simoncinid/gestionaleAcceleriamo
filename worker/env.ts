@@ -24,6 +24,8 @@ export type Env = {
   APP_URL?: string; // indirizzo dell'app, per i link nei messaggi di Telegram
   // "demo" nello spazio demo (Task 13): niente cron, niente segreti, integrazioni "Spazio demo".
   SPAZIO?: string;
+  // Indirizzo dello spazio demo (Task 13), mostrato in Impostazioni > Dati. Vuoto: "arriva quando è pubblicato".
+  DEMO_URL?: string;
 };
 
 export type SessionUser = { id: string; username: string; name: string };

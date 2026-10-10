@@ -281,6 +281,7 @@ export const weeklyReviews = sqliteTable("weekly_reviews", {
   updatedAt: integer("updated_at").notNull(),
 });
 
+// Indice su created_at (Task 12): il Registro delle modifiche va a pagine per data senza scorrere tutta la tabella.
 export const auditLog = sqliteTable("audit_log", {
   id: text("id").primaryKey(),
   userId: text("user_id"),
@@ -289,7 +290,7 @@ export const auditLog = sqliteTable("audit_log", {
   action: text("action").notNull(),
   changes: text("changes"),
   createdAt: integer("created_at").notNull(),
-});
+}, (t) => [index("idx_audit_log_created").on(t.createdAt)]);
 
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),

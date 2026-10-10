@@ -64,6 +64,13 @@
       "when": 1791590280064,
       "tag": "0008_indice_telegram",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791595835039,
+      "tag": "0009_indice_registro",
+      "breakpoints": true
     }
   ]
 }

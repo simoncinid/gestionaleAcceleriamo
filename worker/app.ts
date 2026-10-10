@@ -26,6 +26,9 @@ import { pushRoutes } from "./push/routes";
 import { aiJobsRoutes, claudeRoutes } from "./claude/routes";
 import "./claude/tipi";
 import { schedeRoutes } from "./schede/routes";
+import { meRoutes } from "./me/routes";
+import { datiRoutes } from "./dati/routes";
+import { ricercaRoutes } from "./ricerca/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -73,6 +76,9 @@ app.route("/api/numeri", numeriRoutes);
 app.route("/api/campaign-spend", spesaRoutes);
 app.route("/api/weekly-reviews", lunediRoutes);
 app.route("/api/diario", diarioRoutes);
+app.route("/api/me", meRoutes);
+app.route("/api", datiRoutes);
+app.route("/api", ricercaRoutes);
 app.route("/api", statsAlias);
 app.route("/api", todayRoutes);
 

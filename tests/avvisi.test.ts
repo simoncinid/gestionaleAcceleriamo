@@ -158,6 +158,12 @@ describe("Meta 48 ore", () => {
     await controllaMeta48(env, lun(11));
     expect((await env.DB.prepare("SELECT count(*) n FROM notifications WHERE evento='meta_48h'").first<{ n: number }>())?.n).toBe(2);
   });
+  it("porta al dettaglio dell'integrazione Meta (Task 12)", async () => {
+    await lead("M1", { created_at: lun(9) - 49 * 3_600_000 });
+    await controllaMeta48(env, lun(10));
+    const n = await env.DB.prepare("SELECT DISTINCT href FROM notifications WHERE evento='meta_48h'").all<{ href: string }>();
+    expect(n.results).toEqual([{ href: "/impostazioni/integrazioni/meta" }]);
+  });
 });
 
 describe("rotte degli avvisi", () => {
