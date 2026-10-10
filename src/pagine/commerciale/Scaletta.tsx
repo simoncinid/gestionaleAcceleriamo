@@ -42,7 +42,8 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const etichetta = useMemo(() => new Map(tutte.map((f) => [f.id, f.label])), [tutte]);
   const gruppi = useMemo(() => perFase(leads.data ?? []), [leads.data]);
 
-  // PV6: la lente della testata porta qui con ?cerca=1: campo aperto, fuoco, parametro tolto.
+  // PV6: con ?cerca=1 il campo si apre col fuoco e il parametro si toglie. Oggi nessun link lo usa più
+  // (la lente della testata apre il foglio di ricerca): resta per gli indirizzi salvati e per il test PV6.
   useEffect(() => {
     if (applicaCerca(params, ricerca.current, (p) => setParams(p, { replace: true }))) setCercaAperta(true);
   }, [params, setParams]);
@@ -71,15 +72,17 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const nAperti = aperte.reduce((n, f) => n + (gruppi.get(f.id)?.length ?? 0), 0);
   const conFiltri = filtriAttivi(filtri);
   const vuoto = <StatoVuoto titolo="Nessun lead con questi filtri" testo={conFiltri || filtri.q ? "Togli qualche filtro o cambia la ricerca." : "I lead nuovi arrivano da Meta, dal Foglio Andrea o dal +."} />;
+  const nomeDi = new Map((utenti.data ?? []).map((u) => [u.id, u.name]));
+  const assegnato = (l: LeadListItem) => (l.ownerId ? nomeDi.get(l.ownerId) ?? null : null);
   const card = (l: LeadListItem) => (
     <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: [l.id] })}>
-      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni />
+      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni assegnato={assegnato(l)} />
     </MenuRapido>
   );
   // Sul telefono (Q12): ordine per urgenza, riga "fonte · fase" e Chiama su ogni card (secondario: la Scaletta non ha primario).
   const cardTelefono = (l: LeadListItem) => (
     <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: [l.id] })}>
-      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni
+      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni assegnato={assegnato(l)}
         fonteFase={fonteFase(SOURCE_LABELS[l.source] ?? l.source, etichetta.get(l.stageId) ?? "")}
         azione={<Contatto tipo="chiama" lead={l} senzaNome onAvvio={() => avviaContatto(l.id, "chiamata")} />} />
     </MenuRapido>

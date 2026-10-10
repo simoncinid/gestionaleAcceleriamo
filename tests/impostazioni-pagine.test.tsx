@@ -96,7 +96,7 @@ describe("Impostazioni", () => {
     expect(html).not.toMatch(LINEETTE);
   });
 
-  it("QA 11: le fasi sono un elenco in sola lettura, una riga per fase, niente moduli né riordino nella pagina", () => {
+  it("QA 11: le fasi sono un elenco in sola lettura, una riga per fase, niente moduli nella pagina; il riordino sta nel suo foglio", () => {
     const html = render(<Fasi />, { dati: [[["stages"], fasi], [["stage-rules"], regole], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], utenti]] });
     const righe = [...html.matchAll(/<button [^>]*data-fase="([^"]+)"[^>]*>(.*?)<\/button>/gs)];
     expect(righe.map((r) => r[1])).toEqual(["da-chiamare-prima-volta", "perso"]);
@@ -112,7 +112,9 @@ describe("Impostazioni", () => {
     }
     expect(html).not.toContain('value="Da chiamare"');
     expect(html).not.toContain("Sposta su");
-    expect(html).not.toContain("Riordina");
+    // Task 14: "Riordina" apre il foglio delle frecce; le frecce non stanno nella pagina.
+    expect(html).toContain(">Riordina<");
+    expect(html).not.toContain("più su");
   });
 
   it("QA 11: il foglio della fase ha solo i suoi tre campi e Salva la fase come unica azione", () => {

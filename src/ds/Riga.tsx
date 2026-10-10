@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 import type { ReactNode } from "react";
 import { euro, fermoDa, quando } from "../format";
-import { Punto } from "./Segni";
+import { Avatar, Punto } from "./Segni";
 
 // peso: il titolo è in semibold; "medio" e "normale" servono agli elenchi letti e non letti (Avvisi).
 const PESO = { forte: "font-semibold", medio: "font-medium", normale: "font-normal" } as const;
@@ -30,8 +30,9 @@ export type CardLeadDati = {
 
 // Sei righe in ordine fisso (DS 6.4): azienda, referente, azione, quando, prezzo, fermo.
 // spazioAzioni: lascia libero l'angolo in alto a destra per il pulsante DotsThree del menu rapido.
-export function CardLead({ lead, ora = Date.now(), spazioAzioni = false, fonteFase, azione }: {
-  lead: CardLeadDati; ora?: number; spazioAzioni?: boolean; fonteFase?: string; azione?: ReactNode;
+// assegnato: chi segue il lead (QA 12 del Piano A), con l'avatar piccolo accanto alla riga "fonte · fase".
+export function CardLead({ lead, ora = Date.now(), spazioAzioni = false, fonteFase, azione, assegnato }: {
+  lead: CardLeadDati; ora?: number; spazioAzioni?: boolean; fonteFase?: string; azione?: ReactNode; assegnato?: string | null;
 }) {
   const fermo = fermoDa(lead.stageChangedAt, ora);
   const scaduta = lead.nextActionAt != null && lead.nextActionAt < ora;
@@ -42,7 +43,12 @@ export function CardLead({ lead, ora = Date.now(), spazioAzioni = false, fonteFa
         <span className="truncate">{lead.company}</span>
       </p>
       {lead.contactName && <p className="text-secondaria text-grigio">{lead.contactName}</p>}
-      {fonteFase && <p className="text-meta text-grigio">{fonteFase}</p>}
+      {(fonteFase || assegnato) && (
+        <p className="flex items-center gap-2 text-meta text-grigio">
+          {assegnato && <><Avatar nome={assegnato} piccolo /><span className="sr-only">{`Segue ${assegnato}`}</span></>}
+          {fonteFase && <span>{fonteFase}</span>}
+        </p>
+      )}
       {lead.nextAction && <p className="text-secondaria">{lead.nextAction}</p>}
       {lead.nextActionAt != null && <p className={scaduta ? "text-meta font-semibold text-errore tabular-nums" : "text-meta text-grigio tabular-nums"}>{quando(lead.nextActionAt, ora)}</p>}
       {(lead.setupCents != null || lead.feeCents != null) && <p className="text-meta text-grigio tabular-nums">Setup {euro(lead.setupCents ?? 0)}, canone {euro(lead.feeCents ?? 0)}</p>}

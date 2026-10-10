@@ -66,3 +66,42 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
     </div>
   );
 }
+
+// Scelta di più valori (giorni di lavoro): stessa riga chiusa del Selettore, aperta mostra le opzioni una per riga
+// con la spunta; ogni tocco accende o spegne una voce e l'elenco resta aperto finché non si richiude la riga.
+export function SelettoreMultiplo<T extends string>({ etichetta, opzioni, valori, onCambia, testoValore, segnaposto = "Nessuno" }: {
+  etichetta: string; opzioni: Opzione<T>[]; valori: T[]; onCambia: (v: T[]) => void; testoValore?: string; segnaposto?: string;
+}) {
+  const [aperto, setAperto] = useState(false);
+  const id = useId();
+  const mostrato = testoValore ?? opzioni.filter((o) => valori.includes(o.valore)).map((o) => o.etichetta).join(", ");
+  return (
+    <div data-selettore={etichetta} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
+      <button type="button" aria-expanded={aperto} aria-controls={id} onClick={() => setAperto((a) => !a)}
+        className="flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left">
+        <span className="shrink-0 text-secondaria font-medium">{etichetta}</span>
+        <span className={cx("min-w-0 flex-1 break-words text-right text-corpo", !mostrato && "text-grigio")}>{mostrato || segnaposto}</span>
+        <CaretDown size={18} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperto && "rotate-180")} />
+      </button>
+      {aperto && (
+        <div className="border-t border-sabbia p-1">
+          <ul id={id} role="listbox" aria-label={etichetta} aria-multiselectable="true" className="flex flex-col">
+            {opzioni.map((o) => {
+              const scelto = valori.includes(o.valore);
+              return (
+                <li key={o.valore} role="none">
+                  <button type="button" role="option" aria-selected={scelto}
+                    onClick={() => onCambia(scelto ? valori.filter((v) => v !== o.valore) : [...valori, o.valore])}
+                    className="flex min-h-11 w-full items-center gap-3 rounded-controllo px-3 py-2 text-left text-corpo hover:bg-crema focus-visible:bg-crema">
+                    <span className="min-w-0 flex-1 break-words">{o.etichetta}</span>
+                    <span className="flex w-5 justify-end">{scelto && <Check data-spunta size={18} weight="bold" aria-hidden className="text-ink" />}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
