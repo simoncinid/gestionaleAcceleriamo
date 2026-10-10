@@ -55,7 +55,10 @@ export async function controlla(page: Page, misura: "tel" | "desk"): Promise<str
     for (const e of document.querySelectorAll("button, a[href], [role=button], [role=switch], input[type=checkbox], input[type=radio]")) {
       if (!visibile(e) || e.closest("p")) continue;
       const etichetta = e.matches("input") ? e.closest("label") : null;
-      const r = (etichetta ?? e).getBoundingClientRect();
+      // Link "a tutta card" (after:absolute after:inset-0): il bersaglio vero è il riquadro che lo contiene.
+      const dopo = getComputedStyle(e, "::after");
+      const tutto = dopo.content !== "none" && dopo.position === "absolute" && e instanceof HTMLElement ? e.offsetParent : null;
+      const r = (etichetta ?? tutto ?? e).getBoundingClientRect();
       const riga = e.closest("li");
       const minimo = misura === "desk" ? 24 : riga && riga.getBoundingClientRect().height >= 60 ? 40 : 44;
       if (r.width < minimo - 0.5 || r.height < minimo - 0.5) problemi.push(`bersaglio piccolo ${Math.round(r.width)}×${Math.round(r.height)}: ${nome(e)}`);
@@ -112,7 +115,7 @@ export async function controlla(page: Page, misura: "tel" | "desk"): Promise<str
 
     // 8. Niente lineette lunghe o medie né emoji nel testo.
     const tutto = document.body.innerText;
-    const lineette = tutto.match(/.{0,20}[–—].{0,20}/g);
+    const lineette = tutto.match(/.{0,20}[\u2013\u2014].{0,20}/g);
     if (lineette) problemi.push(`lineette: ${lineette.slice(0, 3).join(" / ")}`);
     const emoji = tutto.match(/\p{Extended_Pictographic}/gu);
     if (emoji) problemi.push(`emoji: ${[...new Set(emoji)].join(" ")}`);

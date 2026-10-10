@@ -27,7 +27,7 @@ export function RigaTask({ t, ora, nomeResponsabile, senzaCliente = false }: { t
       </button>
       <div className="min-w-0 flex-1 py-2">
         <p className={cx("text-corpo font-semibold break-words", !!t.doneAt && "text-grigio line-through")}>{t.title}</p>
-        {!senzaCliente && t.cliente && t.clientId && <Link to={`/commerciale/clienti/${t.clientId}`} className="block text-secondaria text-grigio hover:underline">{t.cliente}</Link>}
+        {!senzaCliente && t.cliente && t.clientId && <Link to={`/commerciale/clienti/${t.clientId}`} className="-my-3 block w-fit py-3 text-secondaria text-grigio hover:underline">{t.cliente}</Link>}
         {nomeResponsabile && <p className="text-secondaria text-grigio">{nomeResponsabile}</p>}
       </div>
       <p className={cx("shrink-0 text-secondaria tabular-nums", scaduta ? "font-semibold text-errore" : "text-grigio")}>{t.dueAt != null ? giorno(t.dueAt, ora) : "Senza scadenza"}</p>

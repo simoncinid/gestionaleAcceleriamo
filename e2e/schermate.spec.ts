@@ -20,6 +20,8 @@ const SCHERMATE: Schermata[] = [
   { nome: "numeri-previsione", percorso: "/commerciale/numeri?vista=previsione" },
   { nome: "pannello", percorso: "/automazioni" },
   { nome: "pannello-anonimo", percorso: "/automazioni", prima: async (p) => { await p.getByRole("switch", { name: "Nomi dei clienti nascosti" }).click(); } },
+  { nome: "lavori", percorso: "/automazioni/lavori" },
+  { nome: "scheda-automazione", percorso: "/automazioni/demo-auto-1" },
   { nome: "cruscotto", percorso: "/economia" },
   { nome: "canoni", percorso: "/economia/canoni" },
   { nome: "fatture", percorso: "/economia/fatture" },
@@ -29,6 +31,7 @@ const SCHERMATE: Schermata[] = [
   { nome: "impostazioni-integrazioni", percorso: "/impostazioni/integrazioni" },
   { nome: "impostazioni-utenti", percorso: "/impostazioni/utenti" },
   { nome: "impostazioni-dati", percorso: "/impostazioni/dati" },
+  { nome: "impostazioni-lavori-tipo", percorso: "/impostazioni/lavori-tipo" },
 ];
 
 // Errori in console e risposte 4xx/5xx: il 401 di /api/auth/me prima dell'accesso è atteso.

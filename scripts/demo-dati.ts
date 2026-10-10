@@ -5,15 +5,33 @@ import { getTableColumns } from "drizzle-orm";
 import { getTableConfig, type SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { CoachSalvato } from "../worker/claude/coach";
 import {
-  activities, automations, callAnalyses, calls, clients, companyProfiles, fees, invoices, leads, proposals, users,
+  activities, automationSteps, automations, callAnalyses, calls, clients, companyProfiles, fees, invoices, jobs, leads, proposals, tasks, users,
 } from "../worker/db/schema";
+import { primoMeseRicorrenti, scadenzaRicorrente, scadenzaUnaTantum } from "../worker/lavori/calcoli";
+import { daRoma, meseRoma, partiRoma } from "../worker/lib/roma";
 
 type Riga<T extends SQLiteTable> = T["$inferInsert"];
 export type DatiDemo = {
   users: Riga<typeof users>[]; leads: Riga<typeof leads>[]; calls: Riga<typeof calls>[]; proposals: Riga<typeof proposals>[];
   clients: Riga<typeof clients>[]; automations: Riga<typeof automations>[]; fees: Riga<typeof fees>[]; invoices: Riga<typeof invoices>[];
   companyProfiles: Riga<typeof companyProfiles>[]; callAnalyses: Riga<typeof callAnalyses>[]; activities: Riga<typeof activities>[];
+  jobs: Riga<typeof jobs>[]; tasks: Riga<typeof tasks>[]; automationSteps: Riga<typeof automationSteps>[];
 };
+
+// Lavoro tipo predefinito (migrazione 0008_dati_lavori): le cinque una tantum con i giorni dall'avvio e le due ricorrenti.
+const MODELLO_DEMO = "lt-automazione-su-misura";
+const UNA_TANTUM_DEMO: [string, string, number][] = [
+  ["ltt-1", "Onboarding", 3], ["ltt-2", "Raccolta requisiti", 7], ["ltt-3", "Sviluppo della soluzione", 30],
+  ["ltt-4", "Collaudo con il cliente", 40], ["ltt-5", "Messa in produzione", 45],
+];
+const RICORRENTI_DEMO: [string, string][] = [["ltt-6", "Manda la fattura del mese"], ["ltt-7", "Controlla che l'automazione funzioni"]];
+// Passaggi del flusso della prima automazione finta: generici, senza nomi di clienti o strumenti veri.
+const PASSAGGI_DEMO: [string, string, string | null, string][] = [
+  ["Arriva una richiesta", "Le richieste dal sito e dalle email finiscono in un unico punto.", null, "envelope"],
+  ["Lettura della richiesta", "Il testo viene letto e ordinato: chi scrive, cosa chiede, quanto è urgente.", null, "sparkle"],
+  ["Smistamento", "La richiesta va alla persona giusta del team.", null, "shuffle"],
+  ["Risposta di cortesia", "Chi ha scritto riceve subito una conferma.", "Se la richiesta è urgente", "paperplane"],
+];
 
 const GIORNO = 86_400_000;
 // Nomi d'azienda chiaramente inventati (giochi di parole sul mestiere), per non somigliare ad aziende vere della zona.
@@ -77,7 +95,7 @@ const coach = (prossimaAzioneAt: number): CoachSalvato => ({
 });
 
 export function datiDemo(ora: number, hashDemo: string): DatiDemo {
-  const d: DatiDemo = { users: [], leads: [], calls: [], proposals: [], clients: [], automations: [], fees: [], invoices: [], companyProfiles: [], callAnalyses: [], activities: [] };
+  const d: DatiDemo = { users: [], leads: [], calls: [], proposals: [], clients: [], automations: [], fees: [], invoices: [], companyProfiles: [], callAnalyses: [], activities: [], jobs: [], tasks: [], automationSteps: [] };
   d.users.push({ id: "demo", username: "demo", name: "Utente demo", passwordHash: hashDemo, active: true, failedLogins: 0, createdAt: ora - 90 * GIORNO });
   const aziende = SETTORI.flatMap(([settore, nomi]) => nomi.map((n) => ({ settore, nome: n }))).slice(0, 40);
   const fasi = FASI.flatMap(([id, n]) => Array.from({ length: n }, () => id));
@@ -150,6 +168,32 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
     d.fees.push({ id: fee, clientId: cid, automationId: `demo-auto-${k + 1}`, amountCents: l.feeCents ?? 20_000, billingDay: 1, status: k === 2 ? "in_attesa" : "attivo", startAt: k === 2 ? null : ora - 20 * GIORNO });
     d.invoices.push({ id: `demo-fattura-${k + 1}a`, clientId: cid, kind: "acconto", number: `D${k + 1}01`, amountCents: Math.round((l.setupCents ?? 200_000) / 2), issuedAt: ora - 30 * GIORNO, dueAt: ora - 15 * GIORNO, paidAt: k === 1 ? null : ora - 16 * GIORNO });
     if (k !== 2) d.invoices.push({ id: `demo-fattura-${k + 1}c`, clientId: cid, feeId: fee, kind: "canone", number: `D${k + 1}02`, amountCents: l.feeCents ?? 20_000, period: new Date(ora).toISOString().slice(0, 7), issuedAt: ora - 10 * GIORNO, dueAt: ora + 20 * GIORNO, paidAt: null });
+    // Lavori (dal ramo dei lavori): i due clienti attivi hanno il lavoro tipo predefinito con le sue task, assegnate
+    // all'utente demo così Oggi e Lavori non restano vuoti. Il primo parte il primo del mese scorso (ricorrenti già
+    // nate questo mese), il secondo 20 giorni fa (ricorrenti dal mese dopo l'avvio).
+    if (k !== 2) {
+      const p = partiRoma(ora);
+      const avvio = k === 0 ? daRoma(p.mese === 1 ? p.anno - 1 : p.anno, p.mese === 1 ? 12 : p.mese - 1, 1) : ora - 20 * GIORNO;
+      const jobId = `demo-lavoro-${k + 1}`;
+      const daMese = primoMeseRicorrenti(avvio);
+      d.jobs.push({ id: jobId, clientId: cid, templateId: MODELLO_DEMO, name: "Automazione su misura", startAt: avvio, automationId: `demo-auto-${k + 1}`, feeCents: l.feeCents ?? 20_000, recurringFromMonth: daMese, status: "attivo", createdAt: avvio });
+      UNA_TANTUM_DEMO.forEach(([mid, titolo, giorni], n) => {
+        const dueAt = scadenzaUnaTantum(avvio, giorni);
+        const fatta = dueAt < ora - 2 * GIORNO;
+        d.tasks.push({ id: `demo-task-${k + 1}-${n + 1}`, title: titolo, clientId: cid, jobId, templateTaskId: mid, assigneeId: "demo", dueAt, doneAt: fatta ? dueAt : null, doneBy: fatta ? "demo" : null, createdAt: avvio });
+      });
+      const mese = meseRoma(ora);
+      if (mese >= daMese) {
+        RICORRENTI_DEMO.forEach(([mid, titolo], n) => {
+          d.tasks.push({ id: `demo-task-${k + 1}-r${n + 1}`, title: titolo, clientId: cid, jobId, templateTaskId: mid, month: mese, assigneeId: "demo", dueAt: scadenzaRicorrente(mese, 1), createdAt: scadenzaRicorrente(mese, 1) });
+        });
+      }
+    }
+    if (k === 0) {
+      PASSAGGI_DEMO.forEach(([titolo, riassunto, ramo, icona], n) => {
+        d.automationSteps.push({ id: `demo-passo-${n + 1}`, automationId: "demo-auto-1", position: n + 1, title: titolo, summary: riassunto, branch: ramo, icon: icona, confirmed: n < 2 });
+      });
+    }
   });
   return d;
 }
@@ -158,6 +202,7 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
 const ORDINE = [
   ["users", users], ["leads", leads], ["activities", activities], ["calls", calls], ["proposals", proposals], ["companyProfiles", companyProfiles],
   ["callAnalyses", callAnalyses], ["clients", clients], ["automations", automations], ["fees", fees], ["invoices", invoices],
+  ["jobs", jobs], ["tasks", tasks], ["automationSteps", automationSteps],
 ] as const satisfies readonly (readonly [keyof DatiDemo, SQLiteTable])[];
 // Tabelle svuotate al ripristino oltre a quelle seminate (stati, avvisi, registri).
 const SOLO_DA_SVUOTARE = ["documents", "audit_log", "notifications", "ai_jobs", "claude_usage", "campaign_spend", "weekly_reviews", "push_subscriptions", "costs", "sessions", "hook_log", "integration_status"];
@@ -174,7 +219,8 @@ const letterale = (v: unknown): string => {
 // Impostazioni, regole, modelli e fasi: un visitatore della demo può cambiarli, il ripristino li rimette come
 // dopo le migrazioni. Si svuotano (dopo i lead, che citano le fasi) e si rieseguono, in ordine, le INSERT e le
 // UPDATE delle migrazioni su queste tabelle. Le impostazioni non hanno righe di partenza: vuote valgono i default.
-export const TABELLE_BASE = ["settings", "stage_rules", "message_templates", "stages"] as const;
+// Anche il lavoro tipo predefinito con le sue task torna come dopo la migrazione 0008_dati_lavori.
+export const TABELLE_BASE = ["settings", "stage_rules", "message_templates", "stages", "job_templates", "job_template_tasks"] as const;
 const SU_BASE = new RegExp(`^\\s*(INSERT INTO|UPDATE)\\s+[\`"]?(${TABELLE_BASE.join("|")})[\`"]?[\\s(]`, "i");
 
 // Una riga sola per istruzione: fuori dalle stringhe gli a capo diventano spazi, dentro diventano char(10)

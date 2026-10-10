@@ -27,6 +27,15 @@ describe("dati della demo", () => {
     expect(d.callAnalyses.length).toBeGreaterThanOrEqual(2);
     expect(datiDemo(ORA, "hash")).toEqual(d);
   });
+  it("lavori finti dei clienti attivi: task dell'utente demo, ricorrenti del mese e passaggi dell'automazione", () => {
+    const d = datiDemo(ORA, "hash");
+    expect(d.jobs).toHaveLength(2);
+    expect(d.jobs.every((j) => d.clients.some((c) => c.id === j.clientId) && j.templateId === "lt-automazione-su-misura")).toBe(true);
+    expect(d.tasks.every((t) => t.assigneeId === "demo" && d.jobs.some((j) => j.id === t.jobId))).toBe(true);
+    expect(d.tasks.some((t) => t.doneAt == null)).toBe(true);
+    expect(d.tasks.filter((t) => t.month === "2026-10").length).toBeGreaterThanOrEqual(2);
+    expect(d.automationSteps.length).toBeGreaterThan(0);
+  });
   it("valori ammessi dallo schema: fonti, motivi di perdita, siti su esempio.invalid", () => {
     const d = datiDemo(ORA, "hash");
     expect(d.leads.every((l) => (LEAD_SOURCES as readonly string[]).includes(l.source!))).toBe(true);
