@@ -17,44 +17,81 @@ const MAX_BLOCCO = 20;
 const BLOCCO_QUERY = 45; // D1 accetta 100 parametri per query: 45 email più 45 telefoni
 const PAGINA_AUDIT = 50;
 
-// Doppioni con il database: una query ogni 45 righe (al massimo 12 per 500 righe), sempre sotto le 50 della richiesta.
-async function giaPresenti(db: D1Database, righe: { email: string | null; phone: string | null }[]) {
+// Un solo schema dei campi per anteprima e import: stessi limiti, stessi messaggi.
+// Una riga che li supera è "errore" in anteprima e un 400 con riga e motivo all'import.
+const testo = (max: number, messaggio: string) => z.string().max(max, messaggio).nullable();
+const campiRiga = z.object({
+  company: z.string().max(200, "Azienda troppo lunga: al massimo 200 caratteri"),
+  contactName: testo(200, "Referente troppo lungo: al massimo 200 caratteri"),
+  email: testo(200, "Email troppo lunga: al massimo 200 caratteri"),
+  phone: testo(50, "Telefono troppo lungo: al massimo 50 caratteri"),
+  website: testo(300, "Sito troppo lungo: al massimo 300 caratteri"),
+  notes: testo(2000, "Note troppo lunghe: al massimo 2000 caratteri"),
+});
+const rigaImport = campiRiga.extend({ riga: z.number().int().min(1).max(100_000), esito: z.enum(["nuovo", "doppione", "errore"]), motivo: z.string().max(300).nullable() });
+// Solo i messaggi dei limiti sono scritti per l'utente; gli altri (tipi sbagliati) diventano una frase sola.
+const messaggio = (e: z.ZodError) => (e.issues[0]?.code === "too_big" ? e.issues[0].message : "valori non validi");
+const motivoCampi = (r: unknown) => {
+  const p = campiRiga.safeParse(r);
+  return p.success ? null : messaggio(p.error);
+};
+
+// Azienda confrontabile: minuscole, spazi compressi. Serve solo quando mancano email e telefono.
+const aziendaNorm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+// Lato SQL: lower() più spazi doppi tolti tre volte (fino a 8 spazi di fila); gli accenti maiuscoli restano come sono.
+const AZIENDA_SQL = "replace(replace(replace(lower(trim(company)), '  ', ' '), '  ', ' '), '  ', ' ')";
+
+type PerDoppioni = { company: string; email: string | null; phone: string | null };
+const soloAzienda = (r: PerDoppioni) => !normalizeEmail(r.email) && !normalizePhone(r.phone) && !!r.company.trim();
+
+// Doppioni con il database: una query ogni 45 righe (al massimo 12 per 500 righe), più una per blocco
+// solo se ci sono righe con la sola azienda. Sempre sotto le 50 della richiesta.
+async function giaPresenti(db: D1Database, righe: PerDoppioni[]) {
   const email = new Set<string>();
   const tel = new Set<string>();
+  const aziende = new Set<string>();
+  const segnaposti = (n: number, da: number) => Array.from({ length: n }, (_, k) => `?${da + k}`).join(", ") || "NULL";
   for (let i = 0; i < righe.length; i += BLOCCO_QUERY) {
     const pezzo = righe.slice(i, i + BLOCCO_QUERY);
     const e = pezzo.map((r) => normalizeEmail(r.email)).filter((x): x is string => !!x);
     const t = pezzo.map((r) => normalizePhone(r.phone)).filter((x): x is string => !!x);
-    if (!e.length && !t.length) continue;
-    const segnaposti = (n: number, da: number) => Array.from({ length: n }, (_, k) => `?${da + k}`).join(", ") || "NULL";
-    const r = await db.prepare(`SELECT email_norm AS e, phone_norm AS t FROM leads WHERE deleted_at IS NULL AND (email_norm IN (${segnaposti(e.length, 1)}) OR phone_norm IN (${segnaposti(t.length, e.length + 1)}))`)
-      .bind(...e, ...t).all<{ e: string | null; t: string | null }>();
-    for (const x of r.results) { if (x.e) email.add(x.e); if (x.t) tel.add(x.t); }
+    if (e.length || t.length) {
+      const r = await db.prepare(`SELECT email_norm AS e, phone_norm AS t FROM leads WHERE deleted_at IS NULL AND (email_norm IN (${segnaposti(e.length, 1)}) OR phone_norm IN (${segnaposti(t.length, e.length + 1)}))`)
+        .bind(...e, ...t).all<{ e: string | null; t: string | null }>();
+      for (const x of r.results) { if (x.e) email.add(x.e); if (x.t) tel.add(x.t); }
+    }
+    const a = [...new Set(pezzo.filter(soloAzienda).map((r) => aziendaNorm(r.company)))];
+    if (a.length) {
+      const r = await db.prepare(`SELECT ${AZIENDA_SQL} AS a FROM leads WHERE deleted_at IS NULL AND ${AZIENDA_SQL} IN (${segnaposti(a.length, 1)})`)
+        .bind(...a).all<{ a: string }>();
+      for (const x of r.results) aziende.add(aziendaNorm(x.a));
+    }
   }
-  return { email, tel };
+  return { email, tel, aziende };
 }
 
 async function valuta(db: D1Database, righe: Omit<RigaImport, "esito" | "motivo">[]): Promise<RigaImport[]> {
-  const presenti = await giaPresenti(db, righe);
+  const valide = righe.filter((r) => r.company.trim() && !motivoCampi(r));
+  const presenti = await giaPresenti(db, valide);
   const visteE = new Set<string>();
   const visteT = new Set<string>();
+  const visteA = new Set<string>();
   return righe.map((r): RigaImport => {
     if (!r.company.trim()) return { ...r, esito: "errore", motivo: "Manca l'azienda" };
+    const problema = motivoCampi(r);
+    if (problema) return { ...r, esito: "errore", motivo: problema };
     const e = normalizeEmail(r.email);
     const t = normalizePhone(r.phone);
+    const a = soloAzienda(r) ? aziendaNorm(r.company) : null;
     if ((e && presenti.email.has(e)) || (t && presenti.tel.has(t))) return { ...r, esito: "doppione", motivo: "C'è già un lead con la stessa email o lo stesso telefono" };
-    if ((e && visteE.has(e)) || (t && visteT.has(t))) return { ...r, esito: "doppione", motivo: "Ripetuto nel file" };
+    if (a && presenti.aziende.has(a)) return { ...r, esito: "doppione", motivo: "C'è già un lead con la stessa azienda" };
+    if ((e && visteE.has(e)) || (t && visteT.has(t)) || (a && visteA.has(a))) return { ...r, esito: "doppione", motivo: "Ripetuto nel file" };
     if (e) visteE.add(e);
     if (t) visteT.add(t);
+    if (a) visteA.add(a);
     return { ...r, esito: "nuovo", motivo: null };
   });
 }
-
-const rigaImport = z.object({
-  riga: z.number().int(), company: z.string().max(200), contactName: z.string().max(200).nullable(), email: z.string().max(200).nullable(),
-  phone: z.string().max(50).nullable(), website: z.string().max(300).nullable(), notes: z.string().max(2000).nullable(),
-  esito: z.enum(["nuovo", "doppione", "errore"]), motivo: z.string().nullable(),
-});
 
 export const datiRoutes = new Hono<AppEnv>();
 
@@ -76,10 +113,20 @@ datiRoutes.post("/import/leads", async (c) => {
     const out: AnteprimaImport = { righe, nuovi: righe.filter((r) => r.esito === "nuovo").length, doppioni: righe.filter((r) => r.esito === "doppione").length, errori: righe.filter((r) => r.esito === "errore").length };
     return c.json(out);
   }
-  const p = z.object({ righe: z.array(rigaImport).max(MAX_BLOCCO) }).safeParse(corpo);
-  if (!p.success) return c.json({ error: `Al massimo ${MAX_BLOCCO} righe per volta` }, 400);
+  // Due errori distinti: troppe righe nella chiamata, oppure una riga che non rispetta i limiti (con il suo numero).
+  const blocco = z.object({ righe: z.array(z.unknown()) }).safeParse(corpo);
+  if (!blocco.success) return c.json({ error: "Manda le righe dell'anteprima" }, 400);
+  if (blocco.data.righe.length > MAX_BLOCCO) return c.json({ error: `Al massimo ${MAX_BLOCCO} righe per volta` }, 400);
+  const righe: z.infer<typeof rigaImport>[] = [];
+  for (const grezza of blocco.data.righe) {
+    const r = rigaImport.safeParse(grezza);
+    if (r.success) { righe.push(r.data); continue; }
+    const n = (grezza as { riga?: unknown } | null)?.riga;
+    const quale = typeof n === "number" && Number.isInteger(n) ? `Riga ${n}` : "Una riga";
+    return c.json({ error: `${quale}: ${messaggio(r.error)}` }, 400);
+  }
   // Il server ricontrolla: l'esito mandato dalla pagina non fa testo.
-  const valutate = await valuta(c.env.DB, p.data.righe);
+  const valutate = await valuta(c.env.DB, righe);
   const nuove = valutate.filter((r) => r.esito === "nuovo");
   if (!nuove.length) return c.json({ creati: 0, saltati: valutate.length });
   const now = Date.now();

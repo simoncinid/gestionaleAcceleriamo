@@ -13,7 +13,7 @@ export function Dati() {
   const [esporta, setEsporta] = useState(false);
   const [demo, setDemo] = useState(false);
   const r = q.data;
-  const cestino = !r ? undefined : r.cestino === 0 ? "Vuoto" : `${r.cestino} lead, si svuota dopo 30 giorni`;
+  const cestino = !r ? undefined : r.cestino === 0 ? "Vuoto" : `${r.cestino} lead: restano lì finché non li ripristini`;
   return (
     <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">
       <Intestazione eyebrow="Impostazioni" titolo="Dati" />

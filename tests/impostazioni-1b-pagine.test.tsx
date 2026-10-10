@@ -44,6 +44,8 @@ describe("Impostazioni della 1B", () => {
   it("Dati: cestino, importa, esporta, registro, spazio demo", () => {
     const html = render(<Dati />, { percorso: "/impostazioni/dati", dati: [[["dati", "riepilogo"], { cestino: 3, ultimaModifica: ORA, demoUrl: "https://demo.esempio.it" }]] });
     for (const t of ["Cestino", "Importa lead da CSV", "Esporta", "Registro delle modifiche", "Spazio demo"]) expect(html).toContain(t);
+    expect(html).toContain("3 lead: restano lì finché non li ripristini");
+    expect(html).not.toContain("30 giorni");
     expect(contaPrimari(html)).toBe(0);
   });
   it("FoglioCerca aperto: campo e comandi", () => {

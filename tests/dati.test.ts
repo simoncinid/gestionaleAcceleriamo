@@ -149,3 +149,41 @@ describe("export e registro: casi in più", () => {
     expect(p2.prossimo).toBeNull();
   });
 });
+
+describe("import: stessi limiti in anteprima e import (revisione Task 12)", () => {
+  const riga = (n: number, extra: Record<string, unknown> = {}) => ({ riga: n, company: `Pulita ${n}`, contactName: null, email: null, phone: null, website: null, notes: null, esito: "nuovo", motivo: null, ...extra });
+  it("anteprima: telefono di 51 caratteri e note di 2001 sono errori col motivo, non nuovi", async () => {
+    const csv = `Azienda;Telefono;Note\nAlfa;${"3".repeat(51)};\nBeta;;${"n".repeat(2001)}\nGamma;3331234567;breve\n`;
+    const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { riga: number; esito: string; motivo: string | null }[]; nuovi: number; errori: number }>();
+    expect(a.righe.map((r) => r.esito)).toEqual(["errore", "errore", "nuovo"]);
+    expect(a.righe[0].motivo).toBe("Telefono troppo lungo: al massimo 50 caratteri");
+    expect(a.righe[1].motivo).toBe("Note troppo lunghe: al massimo 2000 caratteri");
+    expect(a).toMatchObject({ nuovi: 1, errori: 2 });
+  });
+  it("import: la riga troppo lunga dà 400 con riga e motivo, un blocco pulito passa", async () => {
+    const r = await call("/api/import/leads", { method: "POST", json: { righe: [riga(2), riga(3, { phone: "3".repeat(51) })] } }, cookie);
+    expect(r.status).toBe(400);
+    expect((await r.json<{ error: string }>()).error).toBe("Riga 3: Telefono troppo lungo: al massimo 50 caratteri");
+    const note = await call("/api/import/leads", { method: "POST", json: { righe: [riga(4, { notes: "n".repeat(2001) })] } }, cookie);
+    expect((await note.json<{ error: string }>()).error).toBe("Riga 4: Note troppo lunghe: al massimo 2000 caratteri");
+    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: [riga(2), riga(5)] } }, cookie)).json()).toEqual({ creati: 2, saltati: 0 });
+  });
+  it("più di 20 righe: messaggio diverso da quello della riga non valida", async () => {
+    const r = await call("/api/import/leads", { method: "POST", json: { righe: Array.from({ length: 21 }, (_, i) => riga(i + 2)) } }, cookie);
+    expect(r.status).toBe(400);
+    expect((await r.json<{ error: string }>()).error).toBe("Al massimo 20 righe per volta");
+  });
+  it("riga con la sola azienda importata due volte: la seconda è un doppione", async () => {
+    const csv = "Azienda\nSolo  Nome Srl\n";
+    const prima = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { esito: string }[] }>();
+    expect(prima.righe[0].esito).toBe("nuovo");
+    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: prima.righe } }, cookie)).json()).toEqual({ creati: 1, saltati: 0 });
+    const seconda = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv: "Azienda\nsolo nome SRL\n" } }, cookie)).json<{ righe: { esito: string; motivo: string | null }[] }>();
+    expect(seconda.righe[0]).toEqual(expect.objectContaining({ esito: "doppione", motivo: "C'è già un lead con la stessa azienda" }));
+    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: [riga(2, { company: "SOLO NOME srl" })] } }, cookie)).json()).toEqual({ creati: 0, saltati: 1 });
+  });
+  it("sola azienda ripetuta nel file: la seconda è un doppione", async () => {
+    const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv: "Azienda\nDelta\ndelta\n" } }, cookie)).json<{ righe: { esito: string }[] }>();
+    expect(a.righe.map((r) => r.esito)).toEqual(["nuovo", "doppione"]);
+  });
+});
