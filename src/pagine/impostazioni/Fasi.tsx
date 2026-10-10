@@ -230,7 +230,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
       </Sezione>
 
       {!faseAperta && !riordina && (
-        <div className="sticky bottom-20 md:bottom-4">
+        <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva le regole</Pulsante>
         </div>
       )}

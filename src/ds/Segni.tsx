@@ -19,8 +19,9 @@ export function Punto({ colore, etichetta }: { colore: keyof typeof COLORI; etic
   );
 }
 
+// Voce 49: la chip resta su una riga ("in attesa di attivazione" in Canoni), è il titolo accanto ad andare a capo.
 export const Tag = ({ children }: { children: ReactNode }) => (
-  <span className="inline-flex h-6 items-center rounded-full bg-sabbia px-2.5 text-etichetta text-ink">{children}</span>
+  <span className="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full bg-sabbia px-2.5 text-etichetta text-ink">{children}</span>
 );
 
 // piccolo: dentro una card (chi segue il lead), alto come una riga di meta.

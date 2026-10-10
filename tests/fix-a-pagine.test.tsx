@@ -11,7 +11,9 @@ const CHIUSO: Stage = { id: "chiuso", label: "Chiuso", sortOrder: 90, kind: "won
 const LEAD = { id: "abc", stageId: "da-richiamare", company: "Ferri Srl", setupCents: 100_000, feeCents: 10_000 };
 
 describe("Q5: invito senza Resend", () => {
-  it("la casella dice che l'invito va in coda", () => {
+  it("la casella dice che l'invito va in coda, senza checkbox nativo", () => {
+    expect(render(<CasellaInvito attiva onCambia={() => {}} />)).not.toContain('type="checkbox"');
+    expect(render(<CasellaInvito attiva onCambia={() => {}} senzaEmail />)).toContain("Manca l&#x27;email del referente");
     const html = render(<CasellaInvito attiva onCambia={() => {}} inCoda />);
     expect(html).toContain(TESTO_IN_CODA);
     expect(render(<CasellaInvito attiva onCambia={() => {}} />)).not.toContain(TESTO_IN_CODA);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api";
-import { CampoGiorno, CampoQuando, CardLead, Errore, PRIMO_CAMPO } from "../src/ds";
+import { CampoGiorno, CampoQuando, CardLead, Errore, PRIMO_CAMPO, Tag } from "../src/ds";
 import { presetPassato } from "../src/format";
 import { FoglioFattura } from "../src/pagine/economia/Fogli";
 import { scorciatoiaRicerca } from "../src/guscio/scorciatoie";
@@ -170,5 +170,15 @@ describe("Date: voci 33, 48 e minore 3", () => {
     const html = render(<CampoQuando etichetta="Giorno e ora" valore={null} onCambia={() => {}} ora={ORA} errore={e.message} />);
     expect(html).toContain('role="alert"');
     expect(html).toContain("La call è nel passato");
+  });
+});
+
+describe("Voci 47 e 49", () => {
+  it("49: la chip resta su una riga", () => {
+    expect(render(<Tag>in attesa di attivazione</Tag>)).toContain("whitespace-nowrap");
+  });
+  it("47: la barra in fondo ha il fondo della pagina e non copre il contenuto", () => {
+    const html = render(<Fasi />, { percorso: "/impostazioni/fasi", dati: [[["stages"], FASI], [["stage-rules"], []], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], []]] });
+    expect(html).toMatch(/sticky bottom-20[^"]*bg-crema/);
   });
 });

@@ -78,7 +78,7 @@ export function SchedaAutomazione({ id }: { id: string }) {
         <AreaTesto etichetta="Note" rows={4} defaultValue={a.notes ?? ""} onBlur={(e) => alBlur("notes", e.target.value)} />
       </Sezione>
       {a.status === "in_costruzione" && (
-        <div className="sticky bottom-20 md:bottom-4">
+        <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full" inCorso={attiva.isPending} onClick={() => attiva.mutate()}>Segna attiva</Pulsante>
         </div>
       )}

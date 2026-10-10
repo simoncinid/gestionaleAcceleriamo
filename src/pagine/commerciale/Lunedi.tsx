@@ -128,7 +128,7 @@ export function Lunedi() {
       {chiusa ? (
         <p className="text-meta text-grigio">Chiusa da {nomeDi(r.chiusaDa)} {momento(r.chiusaAt!)}</p>
       ) : (
-        <div className="sticky bottom-20 md:bottom-4">
+        <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full md:w-auto" inCorso={salva.isPending && salva.variables?.chiudi === true}
             onClick={() => void ordine(() => salva.mutateAsync({ decisioni, chiudi: true })).catch(() => undefined)}>Chiudi la revisione</Pulsante>
         </div>
