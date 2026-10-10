@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb } from "../db/client";
 import type { AppEnv } from "../env";
+import { AZIENDA_SQL, aziendaNorm } from "../lib/azienda";
 import { FINE, dopoCursore, leggiCursore, scriviCursore } from "../lib/cursore";
 import { DEFAULT_NEXT_ACTION, firstOpenStage } from "../leads/service";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
@@ -36,11 +37,6 @@ const motivoCampi = (r: unknown) => {
   const p = campiRiga.safeParse(r);
   return p.success ? null : messaggio(p.error);
 };
-
-// Azienda confrontabile: minuscole, spazi compressi. Serve solo quando mancano email e telefono.
-const aziendaNorm = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
-// Lato SQL: lower() più spazi doppi tolti tre volte (fino a 8 spazi di fila); gli accenti maiuscoli restano come sono.
-const AZIENDA_SQL = "replace(replace(replace(lower(trim(company)), '  ', ' '), '  ', ' '), '  ', ' ')";
 
 type PerDoppioni = { company: string; email: string | null; phone: string | null };
 const soloAzienda = (r: PerDoppioni) => !normalizeEmail(r.email) && !normalizePhone(r.phone) && !!r.company.trim();
@@ -133,16 +129,17 @@ datiRoutes.post("/import/leads", async (c) => {
   const now = Date.now();
   const chi = c.get("user").id;
   const fase = await firstOpenStage(getDb(c.env.DB));
-  const istruzioni = nuove.flatMap((r) => {
-    const id = crypto.randomUUID();
-    return [
-      c.env.DB.prepare(`INSERT INTO leads (id, company, contact_name, email, email_norm, phone, phone_norm, website, notes, source, stage_id, stage_changed_at, next_action, next_action_at, created_by, created_at, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'manuale', ?10, ?11, ?12, ?11, ?13, ?11, ?11)`)
-        .bind(id, r.company.trim(), r.contactName, r.email, normalizeEmail(r.email), r.phone, normalizePhone(r.phone), r.website, r.notes, fase.id, now, DEFAULT_NEXT_ACTION, chi),
-      c.env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES (?1, ?2, 'migrazione', ?3, ?4, ?5)")
-        .bind(crypto.randomUUID(), id, `Importato da CSV (riga ${r.riga})`, chi, now),
-    ];
-  });
+  const ids = nuove.map(() => crypto.randomUUID());
+  const istruzioni = nuove.map((r, i) =>
+    c.env.DB.prepare(`INSERT INTO leads (id, company, contact_name, email, email_norm, phone, phone_norm, website, notes, source, stage_id, stage_changed_at, next_action, next_action_at, created_by, created_at, updated_at)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'manuale', ?10, ?11, ?12, ?11, ?13, ?11, ?11)`)
+      .bind(ids[i], r.company.trim(), r.contactName, r.email, normalizeEmail(r.email), r.phone, normalizePhone(r.phone), r.website, r.notes, fase.id, now, DEFAULT_NEXT_ACTION, chi));
+  // Le voci "Importato da CSV" in un'istruzione sola (3 parametri a riga più 2, al massimo 62 dei 100 di D1):
+  // il blocco da 20 righe resta lontano dal tetto delle 50 query anche nel caso misto.
+  const n = nuove.length;
+  istruzioni.push(c.env.DB.prepare(`INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES
+      ${nuove.map((_, i) => `(?${3 * i + 1}, ?${3 * i + 2}, 'migrazione', ?${3 * i + 3}, ?${3 * n + 1}, ?${3 * n + 2})`).join(", ")}`)
+    .bind(...nuove.flatMap((r, i) => [crypto.randomUUID(), ids[i], `Importato da CSV (riga ${r.riga})`]), chi, now));
   istruzioni.push(c.env.DB.prepare("INSERT INTO audit_log (id, user_id, entity, entity_id, action, created_at) VALUES (?1, ?2, 'import', 'csv', ?3, ?4)")
     .bind(crypto.randomUUID(), chi, `importa ${nuove.length} lead`, now));
   await c.env.DB.batch(istruzioni);

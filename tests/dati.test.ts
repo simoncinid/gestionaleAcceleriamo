@@ -93,9 +93,23 @@ describe("import: limiti e casi in più", () => {
     const righe = Array.from({ length: 20 }, (_, i) => ({ riga: i + 2, company: `Azienda ${i}`, contactName: null, email: `a${i}@x.it`, phone: `33300000${String(i).padStart(2, "0")}`, website: null, notes: null, esito: "nuovo", motivo: null }));
     const { r, query } = await conQuery("/api/import/leads", { method: "POST", json: { righe } });
     expect(await r.json()).toEqual({ creati: 20, saltati: 0 });
-    expect(query).toBeLessThanOrEqual(45);
+    expect(query).toBeLessThanOrEqual(30);
     const att = await env.DB.prepare("SELECT COUNT(*) AS n FROM activities WHERE type = 'migrazione'").first<{ n: number }>();
     expect(att?.n).toBe(20);
+  });
+  it("20 righe miste (email e sola azienda), tutte da controllare: al massimo 30 query", async () => {
+    const righe = Array.from({ length: 20 }, (_, i) => ({ riga: i + 2, company: `Mista ${i}`, contactName: null, email: i % 2 ? `m${i}@x.it` : null, phone: null, website: null, notes: null, esito: "nuovo", motivo: null }));
+    const { r, query } = await conQuery("/api/import/leads", { method: "POST", json: { righe } });
+    expect(await r.json()).toEqual({ creati: 20, saltati: 0 });
+    expect(query).toBeLessThanOrEqual(30);
+    const att = await env.DB.prepare("SELECT COUNT(*) AS n FROM activities WHERE type = 'migrazione' AND body LIKE 'Importato da CSV (riga %)'").first<{ n: number }>();
+    expect(att?.n).toBe(20);
+  });
+  it("doppione per azienda anche con le maiuscole accentate (È ed è)", async () => {
+    await env.DB.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at) VALUES ('ACC', 'ÈDILE  ÒMBRA', 'manuale', 'da-richiamare', 0, 0, 0)").run();
+    const csv = "Azienda\nèdile ombra\nèdile òmbra\n";
+    const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { esito: string }[] }>();
+    expect(a.righe.map((r) => r.esito)).toEqual(["nuovo", "doppione"]);
   });
   it("anteprima di 500 righe: sotto le 50 query", async () => {
     const csv = ["Azienda;Email;Telefono", ...Array.from({ length: 500 }, (_, i) => `A${i};a${i}@x.it;3331${String(i).padStart(6, "0")}`)].join("\n");

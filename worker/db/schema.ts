@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { AZIENDA_SQL } from "../lib/azienda";
 
 export const LEAD_SOURCES = ["meta", "manuale", "sito", "passaparola", "altro", "migrazione", "foglio_andrea"] as const;
 export const ACTIVITY_TYPES = [
@@ -106,6 +107,8 @@ export const leads = sqliteTable(
     index("idx_leads_paused").on(t.pausedUntil),
     // Coda delle email di conferma da ritentare: errore registrato e non ancora partita (anche "chiave mancante", che non conta tentativi).
     index("idx_leads_conferma").on(t.confirmationAttempts).where(sql`confirmation_sent_at IS NULL AND confirmation_error IS NOT NULL`),
+    // Doppione per sola azienda nell'import (worker/lib/azienda.ts): stessa espressione della query.
+    index("idx_leads_azienda").on(sql.raw(AZIENDA_SQL)).where(sql`deleted_at IS NULL`),
   ],
 );
 
@@ -123,7 +126,8 @@ export const activities = sqliteTable(
     callId: text("call_id"),
     requestId: text("request_id"),
   },
-  (t) => [index("idx_activities_lead").on(t.leadId, t.createdAt), uniqueIndex("uq_activities_request").on(t.requestId)],
+  // idx_activities_created: Diario dal più recente, cursore (created_at, id).
+  (t) => [index("idx_activities_lead").on(t.leadId, t.createdAt), uniqueIndex("uq_activities_request").on(t.requestId), index("idx_activities_created").on(t.createdAt, t.id)],
 );
 
 export const documents = sqliteTable(
@@ -412,7 +416,8 @@ export const clients = sqliteTable("clients", {
   originLeadId: text("origin_lead_id"),
   createdAt: integer("created_at").notNull(),
   deletedAt: integer("deleted_at"),
-});
+// Un lead diventa al massimo un cliente vivo (anche due chiusure insieme); un cliente nel cestino non conta.
+}, (t) => [uniqueIndex("uq_clients_origin_lead").on(t.originLeadId).where(sql`origin_lead_id IS NOT NULL AND deleted_at IS NULL`)]);
 
 export const automations = sqliteTable("automations", {
   id: text("id").primaryKey(),

@@ -1,7 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { getDb } from "../db/client";
+import { getDb, violaUnico } from "../db/client";
 import { automations, clients, fees, leads, type Client, type Fee } from "../db/schema";
 import { canonePrincipale, statoCliente, type StatoCliente } from "../economia/calcoli";
 import { elencoFatture, type FatturaRiga } from "../economia/service";
@@ -56,7 +56,12 @@ clientiRoutes.post("/", async (c) => {
   const db = getDb(c.env.DB);
   const b = z.object({ ...campiCliente, scope: campiCliente.scope.default("acceleriamo"), originLeadId: z.string().nullish() }).strict().parse(await c.req.json());
   const cliente = { id: crypto.randomUUID(), name: b.name, sector: b.sector || null, city: b.city || null, scope: b.scope, originLeadId: b.originLeadId ?? null, createdAt: Date.now() };
-  await db.insert(clients).values(cliente);
+  try {
+    await db.insert(clients).values(cliente);
+  } catch (err) {
+    if (violaUnico(err)) return c.json({ error: "Questo lead ha già un cliente" }, 409);
+    throw err;
+  }
   await audit(db, c.get("user").id, "clients", cliente.id, "create", cliente);
   return c.json({ cliente }, 201);
 });
