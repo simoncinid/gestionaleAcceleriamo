@@ -71,6 +71,8 @@ export type Funnel = Stats1A & {
   tempi: TempoFase[];
   motivi: { id: string; etichetta: string; numero: number }[];
   call: { conoscenza: number; presentazione: number; rapporto: number | null };
+  // Prima risposta sulla coorte (senza doppioni, solo lead da Meta e dal foglio): a differenza di firstResponse della 1A.
+  primaRisposta: { mediaMs: number | null; numero: number };
 };
 
 export async function calcolaFunnel(db: D1Database, from: number, until: number): Promise<Funnel> {
@@ -101,6 +103,8 @@ export async function calcolaFunnel(db: D1Database, from: number, until: number)
   const tappa = (chiave: Tappa["chiave"], nome: string, numero: number, su = arrivati): Tappa => ({ chiave, nome, numero, percentuale: percentualeOnesta(numero, su) });
   const conoscenza = conta((x) => !!x.conoscenza);
   const presentazione = conta((x) => !!x.presentazione);
+  const risposte = conSla.filter((x) => x.primaRisposta != null).map((x) => x.primaRisposta! - x.createdAt);
+  const mediaMs = risposte.length === 0 ? null : Math.round(risposte.reduce((a, b) => a + b, 0) / risposte.length);
   const etichette = new Map(imp.motivi.map((m) => [m.id, m.etichetta]));
   return {
     ...stats,
@@ -116,5 +120,6 @@ export async function calcolaFunnel(db: D1Database, from: number, until: number)
     tempi: tempiPerFase(eventi.results, fasi.results),
     motivi: motivi.results.map((m) => ({ id: m.id, etichetta: etichette.get(m.id) ?? m.id, numero: m.numero })),
     call: { conoscenza, presentazione, rapporto: percentualeOnesta(presentazione, conoscenza) },
+    primaRisposta: { mediaMs, numero: risposte.length },
   };
 }

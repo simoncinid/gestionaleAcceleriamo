@@ -23,7 +23,7 @@ export async function calcolaPrevisione(db: D1Database): Promise<Previsione> {
       FROM leads l JOIN stages s ON s.id = l.stage_id
       LEFT JOIN proposals p ON p.id = (
         SELECT p2.id FROM proposals p2 WHERE p2.lead_id = l.id AND p2.status IN ('registrata', 'presentata') AND p2.deleted_at IS NULL
-        ORDER BY p2.created_at DESC LIMIT 1)
+        ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1)
       WHERE l.stage_id IN (SELECT id FROM stages WHERE kind = 'open') AND l.deleted_at IS NULL AND l.duplicate_of_id IS NULL`)
       .all<{ stageId: string; label: string; probabilita: number | null; ordine: number; setupCents: number | null; feeCents: number | null; estimatedValue: number | null; pOption: "standard" | "proprieta" | null; pSetup: number | null; pFee: number | null }>(),
     db.prepare("SELECT COALESCE(SUM(amount_cents), 0) AS cents FROM fees WHERE status = 'attivo'").first<{ cents: number }>(),

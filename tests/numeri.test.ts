@@ -89,6 +89,21 @@ describe("GET /api/numeri/funnel", () => {
     expect(Array.isArray(f.bySource)).toBe(true);
   });
 
+  it("prima risposta sulla coorte: niente doppioni né lead manuali", async () => {
+    await lead("L1"); await lead("L2");
+    await lead("D1", { duplicate_of_id: "L1" });
+    await lead("M1", { source: "manuale" });
+    await attivita("L1", "chiamata", T0 + 30 * 60_000);
+    await attivita("L2", "chiamata", T0 + 90 * 60_000);
+    await attivita("D1", "chiamata", T0 + 10 * ORA);
+    await attivita("M1", "chiamata", T0 + 10 * ORA);
+    const f = await (await call(`/api/numeri/funnel?from=${T0 - ORA}&until=${T0 + ORA}`, {}, cookie)).json<{
+      primaRisposta: { mediaMs: number | null; numero: number }; firstResponse: { count: number };
+    }>();
+    expect(f.primaRisposta).toEqual({ mediaMs: 60 * 60_000, numero: 2 });
+    expect(f.firstResponse.count).toBe(4);
+  });
+
   it("/api/stats è un alias con la stessa risposta", async () => {
     await lead("L1");
     const a = await (await call(`/api/stats?from=${T0 - ORA}&until=${T0 + ORA}`, {}, cookie)).json();
