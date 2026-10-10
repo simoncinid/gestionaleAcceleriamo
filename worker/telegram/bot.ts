@@ -81,6 +81,7 @@ export async function leggiCollegamenti(env: Env, attesa: InAttesa[], giaCollega
   const scritture: D1PreparedStatement[] = [];
   const daRispondere: string[] = [];
   const usati = new Set<string>();
+  const collegateNelGiro = new Set<string>();
   let conferma = 0;
   for (const u of [...j.result].sort((a, b) => a.update_id - b.update_id)) {
     const m = /^\/start\s+(\S+)/.exec(u.message?.text ?? "");
@@ -89,6 +90,7 @@ export async function leggiCollegamenti(env: Env, attesa: InAttesa[], giaCollega
       // Oltre i collegamenti del giro: l'aggiornamento resta a Telegram e torna al giro dopo.
       if (scritture.length >= COLLEGAMENTI_PER_GIRO) break;
       usati.add(chi.id);
+      collegateNelGiro.add(String(u.message.chat.id));
       scritture.push(env.DB.prepare("UPDATE users SET telegram_chat_id = ?1, telegram_codice = NULL, telegram_codice_at = NULL WHERE id = ?2")
         .bind(String(u.message.chat.id), chi.id));
     } else if (m && u.message) {
@@ -98,7 +100,9 @@ export async function leggiCollegamenti(env: Env, attesa: InAttesa[], giaCollega
     }
     conferma = u.update_id + 1;
   }
-  return { scritture, daRispondere, conferma, sottorichieste: 1 };
+  // Una chat collegata in questo giro non riceve "Codice non riconosciuto", né per un codice sbagliato prima
+  // né per un /start ripetuto dopo (review del Task 14a, minore c).
+  return { scritture, daRispondere: daRispondere.filter((c) => !collegateNelGiro.has(c)), conferma, sottorichieste: 1 };
 }
 
 type Riga = {

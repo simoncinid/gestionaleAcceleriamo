@@ -98,6 +98,22 @@ describe("collegamento", () => {
     expect(url.some((u) => u.includes("sendMessage"))).toBe(false);
   });
 
+  it("una chat collegata nello stesso giro non riceve \"Codice non riconosciuto\" (codice sbagliato prima o ripetuto dopo)", async () => {
+    const codice = await nuovoCodice(env.DB, "tommaso", 1000);
+    const risposte: { chat_id: string; text: string }[] = [];
+    setTelegramFetch(async (u, init) => {
+      if (u.includes("sendMessage")) { risposte.push(JSON.parse(String(init?.body))); return Response.json({ ok: true, result: {} }); }
+      if (u.includes("offset=")) return Response.json({ ok: true, result: [] });
+      return Response.json({ ok: true, result: [
+        { update_id: 3, message: { chat: { id: 77 }, text: "/start sbagliato" } },
+        { update_id: 4, message: { chat: { id: 77 }, text: `/start ${codice}` } },
+        { update_id: 5, message: { chat: { id: 77 }, text: `/start ${codice}` } },
+      ] });
+    });
+    expect(await giroTelegram(env, 2000, 5)).toMatchObject({ collegati: 1 });
+    expect(risposte.filter((r) => r.text.startsWith("Codice non riconosciuto"))).toHaveLength(0);
+  });
+
   it("la conferma a Telegram parte dopo la batch: se la scrittura fallisce il messaggio torna al giro dopo", async () => {
     const codice = await nuovoCodice(env.DB, "tommaso", 1000);
     let chatAllaConferma: unknown = "mai";
