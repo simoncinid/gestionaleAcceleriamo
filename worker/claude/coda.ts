@@ -23,6 +23,14 @@ export function registraTipo(t: AiTipo, d: DefTipo) {
 
 const BLOCCATO_DOPO = 20 * 60_000; // un lavoro "in corso" da 20 minuti è morto con l'invocazione (un cron dura al massimo 15)
 const MAX_TENTATIVI = 2;
+// Nessun lavoro nuovo dopo 9 minuti dall'ingresso nella coda: con al massimo 4 minuti di chiamata
+// (DURATA_MAX_MS) l'ultimo finisce entro 13, sotto i 15 minuti del Cron Trigger. Il resto aspetta il giro dopo.
+export const AVVIO_MAX_MS = 9 * 60_000;
+// Il tempo trascorso si misura con l'orologio vero (non con "now" del cron); nei test si sostituisce.
+let orologio: () => number = () => Date.now();
+export function setOrologioCoda(f: (() => number) | null) {
+  orologio = f ?? (() => Date.now());
+}
 
 const euroTondi = (cents: number) => `€ ${String(Math.round(cents / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
 
@@ -43,15 +51,26 @@ export async function spesoDelMese(db: D1Database, mese: string): Promise<number
   return (await db.prepare(`SELECT (${SPESO}) AS s`).bind(mese).first<{ s: number }>())?.s ?? 0;
 }
 
-const registraUso = (db: D1Database, job: LavoroAi, uso: Uso, modello: string, costo: number, stimato: boolean, mese: string, now: number) =>
+// Prenotazione: all'avvio il lavoro conta già il costo massimo (stimato = 1). Se l'invocazione muore a metà
+// la riga resta così, e il mese non sottostima mai. A fine lavoro diventa il costo vero.
+// "changes() = 1" lega l'inserimento all'aggiornamento appena fatto nella stessa batch: se un altro giro ha già
+// preso il lavoro, non si prenota niente.
+const prenota = (db: D1Database, idUso: string, job: LavoroAi, modello: string, massimo: number, mese: string, now: number) =>
   db.prepare(`INSERT INTO claude_usage (id, job_id, tipo, modello, mese, ingresso, uscita, cache_lettura, cache_scrittura, ricerche, costo_micros, stimato, created_at)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`)
-    .bind(crypto.randomUUID(), job.id, job.tipo, modello, mese, uso.ingresso, uso.uscita, uso.cacheLettura, uso.cacheScrittura, uso.ricerche, costo, stimato ? 1 : 0, now);
+    SELECT ?1, ?2, ?3, ?4, ?5, 0, 0, 0, 0, 0, ?6, 1, ?7 WHERE changes() = 1`)
+    .bind(idUso, job.id, job.tipo, modello, mese, massimo, now);
+
+const chiudiUso = (db: D1Database, idUso: string, uso: Uso, modello: string, costo: number, stimato: boolean) =>
+  db.prepare(`UPDATE claude_usage SET modello = ?2, ingresso = ?3, uscita = ?4, cache_lettura = ?5, cache_scrittura = ?6, ricerche = ?7,
+      costo_micros = ?8, stimato = ?9 WHERE id = ?1`)
+    .bind(idUso, modello, uso.ingresso, uso.uscita, uso.cacheLettura, uso.cacheScrittura, uso.ricerche, costo, stimato ? 1 : 0);
 
 // Spec 7.5: prima di ogni lavoro, speso del mese + costo massimo sotto il tetto. Al primo fermo del mese,
 // avviso a tutti e due (in app, push, Telegram): la chiave dell'avviso è il mese, quindi nasce una volta sola.
 // Query, misurate con contaD1 nel test del giro: fisse al massimo 7 (riapertura dei fermi e dei bloccati in una
-// batch da 2, coda con lo speso del mese, impostazioni, fermi, avviso, stato), per lavoro 3 più quelle del gestore.
+// batch da 2, coda con lo speso del mese, impostazioni, fermi, avviso, stato), per lavoro 4 (presa con prenotazione
+// e chiusura, due batch da 2) più quelle del gestore (al massimo 7, vedi tipi.ts). Un lavoro preso da un altro giro
+// costa 2 query e conta lo stesso come unità del giro.
 // Senza chiave o senza tipi registrati non tocca D1.
 export async function lavoraCoda(env: Env, now: number, limite: number): Promise<{ fatti: number; fermi: number; errori: number }> {
   const esito = { fatti: 0, fermi: 0, errori: 0 };
@@ -78,8 +97,11 @@ export async function lavoraCoda(env: Env, now: number, limite: number): Promise
   const tetto = microsDaCents(imp.tettoCents);
   const quanti = Math.min(limite, imp.lavoriPerGiro);
   const fermi: string[] = [];
+  const inizio = orologio();
+  let presi = 0;
   for (const job of righe.map(daRiga)) {
-    if (esito.fatti + esito.errori >= quanti) break;
+    if (presi >= quanti) break;
+    if (orologio() - inizio > AVVIO_MAX_MS) break;
     const def = TIPI[job.tipo]!;
     const stima = def.stima(imp);
     const massimo = costoMassimoMicros(stima, imp);
@@ -87,24 +109,35 @@ export async function lavoraCoda(env: Env, now: number, limite: number): Promise
       fermi.push(job.id);
       continue;
     }
-    await db.prepare("UPDATE ai_jobs SET stato = 'in_corso', started_at = ?1 WHERE id = ?2").bind(now, job.id).run();
+    presi++;
+    const idUso = crypto.randomUUID();
+    const presa = await db.batch([
+      db.prepare("UPDATE ai_jobs SET stato = 'in_corso', started_at = ?1 WHERE id = ?2 AND stato = 'in_coda'").bind(now, job.id),
+      prenota(db, idUso, job, stima.modello, massimo, mese, now),
+    ]);
+    if (!presa[0].meta.changes) continue; // un altro giro l'ha già preso
+    speso += massimo;
     try {
       const r = await def.esegui(env, job, imp, now);
       const costo = costoMicros(r.uso, r.modello, imp);
-      speso += costo;
+      speso += costo - massimo;
       await db.batch([
-        registraUso(db, job, r.uso, r.modello, costo, false, mese, now),
+        chiudiUso(db, idUso, r.uso, r.modello, costo, false),
         db.prepare("UPDATE ai_jobs SET stato = 'pronto', errore = NULL, finished_at = ?1 WHERE id = ?2").bind(now, job.id),
       ]);
       esito.fatti++;
     } catch (e) {
-      const err = e instanceof ErroreClaude ? e : new ErroreClaude((e as Error).message, usoVuoto(), stima.modello, false);
-      // Una chiamata interrotta non dice quanto è costata: si conta il costo massimo, mai zero.
+      // Un errore che non viene da Claude (per esempio la validazione dopo una risposta riuscita) non dice quanto
+      // è costato: come una chiamata interrotta, conta il costo massimo, mai zero.
+      const generico = !(e instanceof ErroreClaude);
+      const err = generico ? new ErroreClaude((e as Error).message, usoVuoto(), stima.modello, false, true) : (e as ErroreClaude);
       const costo = err.interrotta ? massimo : costoMicros(err.uso, err.modello, imp);
-      const ancora = err.ritentabile && job.tentativi + 1 < MAX_TENTATIVI;
-      speso += costo;
+      const ancora = !generico && err.ritentabile && job.tentativi + 1 < MAX_TENTATIVI;
+      speso += costo - massimo;
       await db.batch([
-        ...(costo > 0 ? [registraUso(db, job, err.uso, err.interrotta ? stima.modello : err.modello, costo, err.interrotta, mese, now)] : []),
+        costo > 0
+          ? chiudiUso(db, idUso, err.uso, err.interrotta ? stima.modello : err.modello, costo, err.interrotta)
+          : db.prepare("DELETE FROM claude_usage WHERE id = ?1").bind(idUso),
         db.prepare("UPDATE ai_jobs SET stato = ?1, tentativi = tentativi + 1, errore = ?2, finished_at = ?3 WHERE id = ?4")
           .bind(ancora ? "in_coda" : "errore", err.message.slice(0, 500), now, job.id),
       ]);

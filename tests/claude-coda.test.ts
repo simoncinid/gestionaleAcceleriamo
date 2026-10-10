@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ErroreClaude } from "../worker/claude/client";
-import { accoda, lavoraCoda, registraTipo, spesoDelMese, TIPI } from "../worker/claude/coda";
+import { accoda, AVVIO_MAX_MS, lavoraCoda, registraTipo, setOrologioCoda, spesoDelMese, TIPI } from "../worker/claude/coda";
 import { usoVuoto } from "../worker/claude/costo";
 import { emailRidotta, bloccoDatiLead, risposteModulo } from "../worker/claude/dati-lead";
 import { daRoma } from "../worker/lib/roma";
@@ -27,6 +27,7 @@ beforeEach(async () => {
   });
 });
 afterEach(() => {
+  setOrologioCoda(null);
   for (const k of Object.keys(TIPI)) delete (TIPI as Record<string, unknown>)[k];
   Object.assign(TIPI, salvati);
 });
@@ -141,6 +142,76 @@ describe("coda di Claude", () => {
     expect(segnato).toBe("Risposta non leggibile");
     expect((await env.DB.prepare("SELECT costo_micros c FROM claude_usage WHERE job_id = ?1").bind(id).first<{ c: number }>())?.c).toBe(1_500);
     expect((await env.DB.prepare("SELECT ok FROM integration_status WHERE key = 'claude'").first<{ ok: number }>())?.ok).toBe(0);
+  });
+
+  it("errore generico del gestore (per esempio la validazione dopo la risposta): conta il massimo stimato", async () => {
+    TIPI.classificazione!.esegui = async () => { throw new Error("schema non rispettato"); };
+    const { id } = await accoda(env.DB, { tipo: "classificazione", entityId: "L1" }, ott);
+    await lavoraCoda(env, ott, 3);
+    expect(await stato(id)).toBe("errore");
+    const u = await env.DB.prepare("SELECT costo_micros AS c, stimato, modello FROM claude_usage WHERE job_id = ?1").bind(id).first();
+    expect(u).toEqual({ c: 1_500 * 1 + 300 * 5, stimato: 1, modello: "claude-haiku-4-5" });
+  });
+
+  it("errore senza costo (429 prima di partire): la prenotazione sparisce", async () => {
+    TIPI.classificazione!.esegui = async () => { throw new ErroreClaude("Claude ha risposto 429", usoVuoto(), "claude-haiku-4-5", true); };
+    const { id } = await accoda(env.DB, { tipo: "classificazione", entityId: "L1" }, ott);
+    await lavoraCoda(env, ott, 3);
+    expect(await stato(id)).toBe("in_coda");
+    expect((await env.DB.prepare("SELECT count(*) n FROM claude_usage WHERE job_id = ?1").bind(id).first<{ n: number }>())?.n).toBe(0);
+  });
+
+  it("prenotazione: mentre il lavoro gira il costo massimo è già contato, a fine lavoro diventa quello vero", async () => {
+    let durante: unknown = null;
+    TIPI.scheda!.esegui = async () => {
+      durante = await env.DB.prepare("SELECT costo_micros AS c, stimato FROM claude_usage").first();
+      return { uso: { ...usoVuoto(), ingresso: 20_000, uscita: 3_000, ricerche: 2 }, modello: "claude-sonnet-5-5" };
+    };
+    const { id } = await accoda(env.DB, { tipo: "scheda", entityId: "L1" }, ott);
+    await lavoraCoda(env, ott, 3);
+    expect(durante).toEqual({ c: 450_000, stimato: 1 });
+    expect(await env.DB.prepare("SELECT count(*) n, sum(costo_micros) c, max(stimato) stimato FROM claude_usage WHERE job_id = ?1").bind(id).first()).toEqual({ n: 1, c: 90_000, stimato: 0 });
+  });
+
+  it("giro ucciso a metà: il lavoro rimasto in corso resta contato al massimo e torna in coda", async () => {
+    TIPI.scheda!.esegui = async () => new Promise(() => undefined); // non finisce mai: l'invocazione muore qui
+    const { id } = await accoda(env.DB, { tipo: "scheda", entityId: "L1" }, ott);
+    void lavoraCoda(env, ott, 3);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await stato(id)).toBe("in_corso");
+    TIPI.scheda!.esegui = async () => ({ uso: { ...usoVuoto(), ingresso: 20_000, uscita: 3_000, ricerche: 2 }, modello: "claude-sonnet-5-5" });
+    await lavoraCoda(env, ott + 21 * 60_000, 3);
+    expect(await stato(id)).toBe("pronto");
+    const righe = await env.DB.prepare("SELECT costo_micros c, stimato FROM claude_usage WHERE job_id = ?1 ORDER BY stimato").bind(id).all();
+    expect(righe.results).toEqual([{ c: 90_000, stimato: 0 }, { c: 450_000, stimato: 1 }]);
+  });
+
+  it("due giri sovrapposti: ogni lavoro parte una volta sola", async () => {
+    const chiamate: string[] = [];
+    TIPI.classificazione!.esegui = async (_e, job) => {
+      chiamate.push(job.entityId);
+      await new Promise((r) => setTimeout(r, 20));
+      return { uso: { ...usoVuoto(), ingresso: 800, uscita: 60 }, modello: "claude-haiku-4-5" };
+    };
+    for (const e of ["A", "B", "C"]) await accoda(env.DB, { tipo: "classificazione", entityId: e }, ott);
+    const [a, b] = await Promise.all([lavoraCoda(env, ott, 3), lavoraCoda(env, ott + 300_000, 3)]);
+    expect(chiamate.sort()).toEqual(["A", "B", "C"]);
+    expect(a.fatti + b.fatti).toBe(3);
+    expect((await env.DB.prepare("SELECT count(*) n FROM claude_usage").first<{ n: number }>())?.n).toBe(3);
+  });
+
+  it("nessun lavoro nuovo dopo il tempo massimo del giro: il resto aspetta in coda", async () => {
+    let ora = 1_000_000;
+    setOrologioCoda(() => ora);
+    TIPI.classificazione!.esegui = async () => {
+      ora += AVVIO_MAX_MS + 1; // il primo lavoro si mangia il tempo del giro
+      return { uso: { ...usoVuoto(), ingresso: 800, uscita: 60 }, modello: "claude-haiku-4-5" };
+    };
+    const a = await accoda(env.DB, { tipo: "classificazione", entityId: "A" }, ott);
+    const b = await accoda(env.DB, { tipo: "classificazione", entityId: "B" }, ott + 1);
+    expect((await lavoraCoda(env, ott, 3)).fatti).toBe(1);
+    expect(await stato(a.id)).toBe("pronto");
+    expect(await stato(b.id)).toBe("in_coda");
   });
 
   it("un lavoro rimasto in corso da più di 20 minuti torna in coda", async () => {

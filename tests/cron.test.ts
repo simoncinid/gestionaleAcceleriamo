@@ -614,7 +614,7 @@ describe("giro con Claude", () => {
   }
   const fatti = async () => (await env.DB.prepare("SELECT count(*) n FROM ai_jobs WHERE stato = 'pronto'").first<{ n: number }>())?.n ?? 0;
 
-  it("misura: 3 lavori, un fermo e l'avviso del tetto stanno in 7 fisse più 10 a lavoro", async () => {
+  it("misura: 3 lavori, un fermo e l'avviso del tetto stanno in 7 fisse più 11 a lavoro", async () => {
     await createUser();
     tipoFinto();
     registraTipo("scheda", { stima: () => ({ modello: "claude-sonnet-5-5", ingresso: 160_000, maxTokens: 8_000, ricerche: 5 }), esegui: async () => { throw new Error("non deve partire"); }, alErrore: async () => undefined });
@@ -638,7 +638,7 @@ describe("giro con Claude", () => {
     expect(c2.query).toBe(0);
   });
 
-  // Con le fisse degli altri lavori del giro (circa 13 query) a Claude ne restano 31: 2 lavori (7 + 2 x 10).
+  // Con le fisse degli altri lavori del giro (circa 13 query) a Claude ne restano 31: 2 lavori (7 + 2 x 11).
   // Il terzo parte al giro dopo.
   it("giro senza altro da fare: 2 lavori di Claude in questo giro, il terzo al giro dopo", async () => {
     await createUser();

@@ -74,6 +74,36 @@ describe("chiamaClaude", () => {
     expect(e.ritentabile).toBe(false);
   });
 
+  it("una sola scadenza per tutta la chiamata, continuazioni comprese: oltre si interrompe", async () => {
+    let n = 0;
+    setClaudeFetch(async (_u, init) => {
+      n++;
+      if (n === 1) {
+        await new Promise((r) => setTimeout(r, 40));
+        return rispostaClaude({ testo: "", stop: "pause_turn" });
+      }
+      // La continuazione aspetta più del tempo che resta: deve arrivare l'interruzione.
+      return new Promise<Response>((_res, rej) => {
+        const t = setTimeout(() => _res(rispostaClaude({ testo: "tardi" })), 2_000);
+        init?.signal?.addEventListener("abort", () => { clearTimeout(t); rej(new DOMException("interrotta", "AbortError")); });
+      });
+    });
+    const inizio = Date.now();
+    const e = await chiamaClaude(env, { modello: "claude-sonnet-5-5", sistema: "s", testo: "t", maxTokens: 100, ricerche: 5, durataMaxMs: 100 }).catch((x) => x);
+    expect(e).toBeInstanceOf(ErroreClaude);
+    expect(e.interrotta).toBe(true);
+    expect(Date.now() - inizio).toBeLessThan(1_000);
+    expect(n).toBe(2);
+  });
+
+  it("tempo finito prima della continuazione: interrotta senza un'altra richiesta", async () => {
+    let n = 0;
+    setClaudeFetch(async () => { n++; await new Promise((r) => setTimeout(r, 60)); return rispostaClaude({ testo: "", stop: "pause_turn" }); });
+    const e = await chiamaClaude(env, { modello: "claude-sonnet-5-5", sistema: "s", testo: "t", maxTokens: 100, ricerche: 5, durataMaxMs: 50 }).catch((x) => x);
+    expect(e.interrotta).toBe(true);
+    expect(n).toBe(1);
+  });
+
   it("429 è ritentabile, 400 no, rete caduta è interrotta", async () => {
     setClaudeFetch(async () => new Response(JSON.stringify({ type: "error", error: { type: "rate_limit_error", message: "piano" } }), { status: 429 }));
     const a = await chiamaClaude(env, { modello: "claude-haiku-4-5", sistema: "s", testo: "t", maxTokens: 100 }).catch((x) => x);

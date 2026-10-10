@@ -6,13 +6,13 @@ import { claudeFetch } from "./fetcher";
 // Pagina "Limits" di Cloudflare Workers (letta il 10/10/2026): un Cron Trigger dura al massimo 15 minuti di orologio,
 // sia sul piano gratuito sia su quello a pagamento (il tetto di 10 ms riguarda la CPU, l'attesa della rete non conta).
 // Il giro fa fino a 3 lavori Claude in fila: 3 x 4 minuti = 12 minuti, dentro i 15 con margine per il resto del giro.
-// Una chiamata più lunga si interrompe e conta il costo massimo.
+// La scadenza è una sola per tutta la chiamata, continuazioni comprese: oltre si interrompe e conta il costo massimo.
 export const DURATA_MAX_MS = 240_000;
 const FALLBACK_SONNET = true; // beta solo sulla Claude API: se un giorno dà 400, si mette a false
 const BETA_FALLBACK = "server-side-fallback-2026-07-01";
 const MAX_CONTINUAZIONI = 2;
 
-export type RichiestaClaude = { modello: string; sistema: string; testo: string; maxTokens: number; schema?: Record<string, unknown>; ricerche?: number };
+export type RichiestaClaude = { modello: string; sistema: string; testo: string; maxTokens: number; schema?: Record<string, unknown>; ricerche?: number; durataMaxMs?: number };
 export type Fonte = { url: string; titolo: string };
 export type RispostaClaude = { testo: string; json: unknown; uso: Uso; modello: string; fonti: Fonte[] };
 
@@ -45,13 +45,15 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
     apiKey: env.ANTHROPIC_API_KEY!,
     fetch: ((url: RequestInfo | URL, init?: RequestInit) => claudeFetch(String(url), init)) as typeof fetch,
     maxRetries: 0,
-    timeout: DURATA_MAX_MS,
   });
+  const scadenza = Date.now() + (r.durataMaxMs ?? DURATA_MAX_MS);
   const fallback = FALLBACK_SONNET && r.modello.startsWith("claude-sonnet-5-5");
   const uso = usoVuoto();
   let modello = r.modello;
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: r.testo }];
   for (let i = 0; i <= MAX_CONTINUAZIONI; i++) {
+    const resta = scadenza - Date.now();
+    if (resta <= 0) throw new ErroreClaude("Chiamata interrotta", uso, modello, true, true);
     // Il pensiero resta quello predefinito del modello: su Sonnet 5.5 "disabled" dà 400.
     const params = {
       model: r.modello,
@@ -64,7 +66,7 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
     } as unknown as Anthropic.MessageCreateParamsNonStreaming;
     let res: Anthropic.Message;
     try {
-      res = await client.messages.create(params, fallback ? { headers: { "anthropic-beta": BETA_FALLBACK } } : undefined);
+      res = await client.messages.create(params, { timeout: resta, ...(fallback ? { headers: { "anthropic-beta": BETA_FALLBACK } } : {}) });
     } catch (e) {
       if (e instanceof Anthropic.APIError && e.status) {
         const ritentabile = e.status === 429 || e.status === 529 || e.status >= 500;
