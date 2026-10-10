@@ -74,8 +74,8 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
     esegui: async (e, n, l) => ({ sottorichieste: (await consegnaPush(e, n, l)).inviate }),
   },
   // Telegram (spec 8.4): solo "Lead nuovo", "SLA scaduto" e "Claude al tetto", subito dopo le push per lo stesso
-  // motivo. Misura con contaD1: una lettura (codici, avvisi e coda in una query) più una batch con una scrittura
-  // a unità e una di pulizia, quindi 2 fisse e una a unità; una sottorichiesta a unità (un messaggio, oppure
+  // motivo. Misura con contaD1: una lettura (codici, avvisi, coda e stato in una query) più una batch con una
+  // scrittura a unità (lo stato in Integrazioni usa un'unità) e una di pulizia, quindi 2 fisse e una a unità; una sottorichiesta a unità (un messaggio, oppure
   // getUpdates e la sua conferma come 2 unità quando qualcuno sta collegando la chat). Al massimo 5 per giro.
   // Senza token del bot costa zero e restituisce tutte le sottorichieste prenotate.
   telegram: {

@@ -251,6 +251,8 @@ export const notifications = sqliteTable("notifications", {
   index("idx_notifications_aperte").on(t.userId, t.closedAt),
   index("idx_notifications_evento").on(t.evento, t.entityId),
   index("idx_notifications_consegna").on(t.pushAt).where(sql`closed_at IS NULL`),
+  // Lettura e pulizia di Telegram a ogni giro (Task 5).
+  index("idx_notifications_telegram").on(t.telegramAt),
 ]);
 
 export const pushSubscriptions = sqliteTable("push_subscriptions", {

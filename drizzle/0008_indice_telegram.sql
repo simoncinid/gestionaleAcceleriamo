@@ -1,0 +1,1 @@
+CREATE INDEX `idx_notifications_telegram` ON `notifications` (`telegram_at`);

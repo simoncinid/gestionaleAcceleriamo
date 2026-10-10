@@ -66,7 +66,7 @@ integrazioniRoutes.get("/status", async (c) => {
     telegramCollegato(c.env) ? conta("SELECT count(*) n FROM users WHERE telegram_chat_id IS NOT NULL AND active = 1") : Promise.resolve(0),
   ]);
   const segreti = segretiDi(c.env);
-  const collegato = (key: string) => (key === "resend" ? segreti.resend : key === "aggancio" ? segreti.aggancio : true);
+  const collegato = (key: string) => (key === "resend" ? segreti.resend : key === "aggancio" ? segreti.aggancio : key === "telegram" ? telegramCollegato(c.env) : true);
   const daRiga = (key: string, spento: string | null): Integrazione => {
     const r = righe.find((x) => x.key === key);
     const base = { key, etichetta: ETICHETTE[key], ultimaOk: r?.lastOkAt ?? null };
@@ -86,10 +86,14 @@ integrazioniRoutes.get("/status", async (c) => {
   const push: Integrazione = pushCollegate(c.env)
     ? { key: "push", etichetta: "Push", stato: "ok", ultimaOk: null, nota: dispositivi === 1 ? "1 dispositivo" : `${dispositivi} dispositivi` }
     : { key: "push", etichetta: "Push", stato: "spento", ultimaOk: null, nota: SENZA_CHIAVI_PUSH };
-  // Telegram: senza token del bot "Non collegato"; con il token il numero delle chat collegate.
-  const telegram: Integrazione = telegramCollegato(c.env)
-    ? { key: "telegram", etichetta: "Telegram", stato: "ok", ultimaOk: null, nota: chat === 1 ? "1 chat collegata" : `${chat} chat collegate` }
-    : { key: "telegram", etichetta: "Telegram", stato: "spento", ultimaOk: null, nota: c.env.TELEGRAM_BOT_TOKEN ? SENZA_NOME_BOT : SENZA_BOT_TELEGRAM };
+  // Telegram: senza token del bot "Non collegato"; token rifiutato dal giro: rosso con l'errore;
+  // altrimenti il numero delle chat collegate.
+  const rigaTelegram = righe.find((x) => x.key === "telegram");
+  const telegram: Integrazione = !telegramCollegato(c.env)
+    ? { key: "telegram", etichetta: "Telegram", stato: "spento", ultimaOk: null, nota: c.env.TELEGRAM_BOT_TOKEN ? SENZA_NOME_BOT : SENZA_BOT_TELEGRAM }
+    : rigaTelegram && !rigaTelegram.ok
+      ? { key: "telegram", etichetta: "Telegram", stato: "errore", ultimaOk: rigaTelegram.lastOkAt ?? null, nota: rigaTelegram.lastError }
+      : { key: "telegram", etichetta: "Telegram", stato: "ok", ultimaOk: rigaTelegram?.lastOkAt ?? null, nota: chat === 1 ? "1 chat collegata" : `${chat} chat collegate` };
   const foglioSpento = !imp.foglio.spreadsheetId.trim() ? SENZA_LINK_FOGLIO : !imp.foglio.attivo ? "Lettura spenta" : null;
   const out: StatoSistema = {
     integrazioni: [

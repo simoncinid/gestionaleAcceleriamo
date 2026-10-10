@@ -17,8 +17,11 @@ export const telegramCollegato = (env: Env) => Boolean(env.TELEGRAM_BOT_TOKEN &&
 const api = (env: Env, metodo: string) => `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/${metodo}`;
 
 // "ok" consegnato; "ritenta" Telegram giù, 429 o rete: si riprova al giro dopo (entro le 6 ore);
-// "rifiutato" chat bloccata o sparita (4xx): riprovare non serve, l'avviso si segna.
-type Esito = "ok" | "ritenta" | "rifiutato";
+// "token" token sbagliato o revocato (401, 404 per formato errato): gli avvisi restano in coda e lo stato diventa rosso;
+// "bloccato" la persona ha bloccato il bot (403): la sua chat si scollega;
+// "rifiutato" altri 4xx (chat sparita, testo rifiutato): riprovare non serve, l'avviso si segna.
+type Esito = "ok" | "ritenta" | "token" | "bloccato" | "rifiutato";
+export const TOKEN_NON_VALIDO = "Token del bot non valido";
 
 async function invia(env: Env, chatId: string, testo: string): Promise<Esito> {
   try {
@@ -29,6 +32,8 @@ async function invia(env: Env, chatId: string, testo: string): Promise<Esito> {
       body: JSON.stringify({ chat_id: chatId, text: testo, disable_web_page_preview: true }),
     });
     if (r.ok) return "ok";
+    if (r.status === 401 || r.status === 404) return "token";
+    if (r.status === 403) return "bloccato";
     return r.status === 429 || r.status >= 500 ? "ritenta" : "rifiutato";
   } catch {
     return "ritenta";
@@ -86,6 +91,8 @@ export async function leggiCollegamenti(env: Env, attesa: InAttesa[]): Promise<{
 
 type Riga = {
   codici: string;
+  statoOk: number | null;
+  userId: string;
   id: string | null;
   evento: EventoAvviso;
   titolo: string;
@@ -102,17 +109,20 @@ type Riga = {
 // e quanti sono in coda, tutto in una query) più una batch con una scrittura per collegamento, una per avviso
 // trattato e una di pulizia (avvisi che su Telegram non partiranno mai: chiusi, letti, vecchi, eventi fuori
 // dai tre, persone senza chat). Quindi 2 fisse e una query a unità; una sottorichiesta a unità.
+// Lo stato in Integrazioni (rosso con un token non valido, verde al primo invio riuscito) usa un'unità del limite:
+// il rosso prende il posto della scrittura dell'avviso non mandato, il verde si scrive solo se avanza un'unità.
 // Unità: un messaggio, oppure (2 unità) getUpdates più conferma quando c'è un codice in attesa.
 // Se il limite è stretto vince il messaggio: il codice vale 15 minuti e il collegamento aspetta un giro.
 export async function giroTelegram(env: Env, now: number, limite: number): Promise<{ collegati: number; inviati: number; sottorichieste: number }> {
   if (!telegramCollegato(env) || limite < 1) return { collegati: 0, inviati: 0, sottorichieste: 0 }; // tutto resta in coda
   const vecchio = now - VECCHIO;
   // La tabella di una riga tiene i codici e il conteggio anche quando non c'è niente da mandare (LEFT JOIN).
-  const righe = (await env.DB.prepare(`SELECT c.codici, c.inCoda, n.* FROM (SELECT
+  const righe = (await env.DB.prepare(`SELECT c.codici, c.inCoda, c.statoOk, n.* FROM (SELECT
         (SELECT json_group_array(json_object('id', id, 'codice', telegram_codice)) FROM users
           WHERE telegram_codice IS NOT NULL AND telegram_codice_at > ?1 AND active = 1) AS codici,
-        (SELECT count(*) FROM notifications WHERE telegram_at IS NULL) AS inCoda) c
-      LEFT JOIN (SELECT n.id, n.evento, n.titolo, n.testo, n.href, n.created_at AS createdAt,
+        (SELECT count(*) FROM notifications WHERE telegram_at IS NULL) AS inCoda,
+        (SELECT ok FROM integration_status WHERE key = 'telegram') AS statoOk) c
+      LEFT JOIN (SELECT n.id, n.user_id AS userId, n.evento, n.titolo, n.testo, n.href, n.created_at AS createdAt,
           u.telegram_chat_id AS chat, u.quiet_hours AS quiet, u.notify_prefs AS prefs
         FROM notifications n JOIN users u ON u.id = n.user_id
         WHERE n.telegram_at IS NULL AND n.closed_at IS NULL AND n.read_at IS NULL AND n.created_at > ?2
@@ -138,17 +148,41 @@ export async function giroTelegram(env: Env, now: number, limite: number): Promi
   }
 
   let inviati = 0;
+  let trattati = 0;
+  let tokenRotto = false;
+  const bloccati = new Set<string>();
   const base = (env.APP_URL ?? "").replace(/\/$/, "");
   for (const p of pendenti.slice(0, messaggi)) {
-    const salta = inSilenzio(p.quiet, now) || !canaleAcceso(p.prefs, p.evento);
+    trattati++;
+    const salta = bloccati.has(p.userId) || inSilenzio(p.quiet, now) || !canaleAcceso(p.prefs, p.evento);
     if (!salta) {
       const testo = [p.titolo, p.testo, p.href && base ? base + p.href : null].filter(Boolean).join("\n");
       sottorichieste++;
       const esito = await invia(env, p.chat, testo);
       if (esito === "ritenta") continue; // resta in coda per il giro dopo
+      if (esito === "token") {
+        // Con il token rotto non parte niente: tutto resta in coda (fino a 6 ore) e lo stato diventa rosso.
+        tokenRotto = true;
+        break;
+      }
+      if (esito === "bloccato") {
+        // Bot bloccato: la chat si scollega, così i prossimi avvisi non sprecano sottorichieste.
+        bloccati.add(p.userId);
+        scritture.push(env.DB.prepare("UPDATE users SET telegram_chat_id = NULL WHERE id = ?1 AND telegram_chat_id = ?2").bind(p.userId, p.chat));
+      }
       if (esito === "ok") inviati++;
     }
     scritture.push(env.DB.prepare("UPDATE notifications SET telegram_at = ?1 WHERE id = ?2").bind(now, p.id));
+  }
+  if (tokenRotto) {
+    scritture.push(env.DB.prepare(`INSERT INTO integration_status (key, ok, last_error_at, last_error, error_id) VALUES ('telegram', 0, ?1, ?2, ?3)
+      ON CONFLICT (key) DO UPDATE SET ok = 0, last_error_at = excluded.last_error_at, last_error = excluded.last_error, error_id = excluded.error_id`)
+      .bind(now, TOKEN_NON_VALIDO, crypto.randomUUID().replace(/-/g, "").slice(0, 8)));
+  } else if (inviati > 0 && righe[0]?.statoOk !== 1 && (collega ? 2 : 0) + trattati < limite) {
+    // Primo invio riuscito (o dopo un errore): lo stato torna verde. Negli altri giri nessuna scrittura;
+    // senza un'unità libera il verde aspetta un giro con più spazio.
+    scritture.push(env.DB.prepare(`INSERT INTO integration_status (key, ok, last_ok_at) VALUES ('telegram', 1, ?1)
+      ON CONFLICT (key) DO UPDATE SET ok = 1, last_ok_at = excluded.last_ok_at`).bind(now));
   }
   // Pulizia solo se in coda c'è più di quello che il giro ha letto.
   if (inCoda > pendenti.length) {

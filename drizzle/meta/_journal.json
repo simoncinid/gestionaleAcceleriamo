@@ -57,6 +57,13 @@
       "when": 1791586354924,
       "tag": "0007_piano_b",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791590280064,
+      "tag": "0008_indice_telegram",
+      "breakpoints": true
     }
   ]
 }

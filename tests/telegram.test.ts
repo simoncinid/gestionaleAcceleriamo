@@ -170,10 +170,47 @@ describe("consegna", () => {
     expect((await giroTelegram(env, 2000, 5)).inviati).toBe(0);
     const resta = await env.DB.prepare("SELECT user_id AS u FROM notifications WHERE telegram_at IS NULL").all<{ u: string }>();
     expect(resta.results).toEqual([{ u: "tommaso" }]);
+    // 403: diego ha bloccato il bot, la sua chat si scollega.
+    expect((await env.DB.prepare("SELECT telegram_chat_id AS c FROM users WHERE id = 'diego'").first<{ c: string | null }>())?.c).toBeNull();
     setTelegramFetch(async () => { throw new Error("rete giù"); });
     expect((await giroTelegram(env, 3000, 5)).inviati).toBe(0);
     expect(await inCoda()).toBe(1);
   });
+
+  it("bot bloccato (403): gli altri avvisi della stessa persona nel giro non chiamano Telegram", async () => {
+    await collegaChat("diego", "4343");
+    const db = getDb(env.DB);
+    for (let i = 0; i < 3; i++) await avvisa(db, { evento: "lead_nuovo", entityId: `B${i}`, titolo: `Lead ${i}` }, 1000 + i, ["diego"]);
+    let chiamate = 0;
+    setTelegramFetch(async () => { chiamate++; return new Response("{}", { status: 403 }); });
+    expect(await giroTelegram(env, 2000, 5)).toMatchObject({ inviati: 0, sottorichieste: 1 });
+    expect(chiamate).toBe(1);
+    expect(await inCoda()).toBe(0);
+  });
+
+  for (const stato of [401, 404]) {
+    it(`token non valido (${stato}): niente perso, stato rosso, di nuovo verde al primo invio riuscito`, async () => {
+      await collegaChat("tommaso", "4242");
+      const db = getDb(env.DB);
+      for (let i = 0; i < 3; i++) await avvisa(db, { evento: "sla_scaduto", entityId: `K${i}`, titolo: `SLA ${i}` }, 1000 + i, ["tommaso"]);
+      let chiamate = 0;
+      setTelegramFetch(async () => { chiamate++; return new Response("{}", { status: stato }); });
+      expect(await giroTelegram(env, 2000, 5)).toMatchObject({ inviati: 0, sottorichieste: 1 });
+      expect(chiamate).toBe(1); // al primo rifiuto del token il giro si ferma
+      expect(await inCoda()).toBe(3);
+      expect((await env.DB.prepare("SELECT telegram_chat_id AS c FROM users WHERE id = 'tommaso'").first<{ c: string }>())?.c).toBe("4242");
+      const cookie = await loginCookie("tommaso", "password-lunga-1");
+      const leggi = async () => (await (await call("/api/integrations/status", {}, cookie)).json<{ integrazioni: { key: string; stato: string; nota: string | null }[] }>()).integrazioni.find((i) => i.key === "telegram");
+      expect(await leggi()).toMatchObject({ stato: "errore", nota: "Token del bot non valido" });
+      setTelegramFetch(async () => Response.json({ ok: true, result: {} }));
+      // Limite pieno (3 messaggi su 3): il verde aspetta un giro con un'unità libera.
+      expect((await giroTelegram(env, 3000, 3)).inviati).toBe(3);
+      expect(await leggi()).toMatchObject({ stato: "errore" });
+      await avvisa(db, { evento: "sla_scaduto", entityId: "K9", titolo: "SLA 9" }, 3500, ["tommaso"]);
+      expect((await giroTelegram(env, 4000, 5)).inviati).toBe(1);
+      expect(await leggi()).toMatchObject({ stato: "ok", nota: "1 chat collegata" });
+    });
+  }
 
   it("rispetta il limite: i messaggi in più partono al giro dopo", async () => {
     await collegaChat("tommaso", "4242");
