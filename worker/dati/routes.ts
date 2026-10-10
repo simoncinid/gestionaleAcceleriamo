@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getDb } from "../db/client";
 import type { AppEnv } from "../env";
+import { FINE, dopoCursore, leggiCursore, scriviCursore } from "../lib/cursore";
 import { DEFAULT_NEXT_ACTION, firstOpenStage } from "../leads/service";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { cellaCsv, colonneImport, leggiCsv } from "./csv";
@@ -184,11 +185,12 @@ datiRoutes.get("/export/:tipo", async (c) => {
 });
 
 datiRoutes.get("/audit", async (c) => {
-  const prima = Number(c.req.query("prima") ?? Number.MAX_SAFE_INTEGER);
+  const cur = leggiCursore(c.req.query("prima")) ?? FINE;
   const r = await c.env.DB.prepare(`SELECT a.id, a.created_at AS at, COALESCE(u.name, 'Sistema') AS chi, a.entity AS entita, a.action AS azione, a.entity_id AS entityId
-    FROM audit_log a LEFT JOIN users u ON u.id = a.user_id WHERE a.created_at < ?1 ORDER BY a.created_at DESC LIMIT ${PAGINA_AUDIT}`).bind(Number.isFinite(prima) ? prima : Number.MAX_SAFE_INTEGER)
+    FROM audit_log a LEFT JOIN users u ON u.id = a.user_id WHERE ${dopoCursore("a.created_at", "a.id", "?1", "?2")}
+    ORDER BY a.created_at DESC, a.id DESC LIMIT ${PAGINA_AUDIT}`).bind(cur.at, cur.id)
     .all<VoceAudit>();
-  return c.json({ voci: r.results, prossimo: r.results.length === PAGINA_AUDIT ? r.results[PAGINA_AUDIT - 1].at : null });
+  return c.json({ voci: r.results, prossimo: r.results.length === PAGINA_AUDIT ? scriviCursore(r.results[PAGINA_AUDIT - 1]) : null });
 });
 
 datiRoutes.get("/dati/riepilogo", async (c) => {

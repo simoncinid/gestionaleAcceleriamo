@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../env";
+import { dopoCursore, leggiCursore, piuRecente, scriviCursore } from "../lib/cursore";
 import { accorcia } from "../lib/testo";
 
 export type VoceDiario = { id: string; at: number; chi: string; testo: string; dettaglio: string | null; area: "commerciale" | "economia" | "automazioni"; href: string | null };
@@ -25,7 +26,7 @@ const filtri = z.object({
   chi: z.string().max(60).default("tutti"),
   area: z.enum(["tutte", "commerciale", "economia", "automazioni"]).default("tutte"),
   tipo: z.string().max(40).default("tutti"),
-  prima: z.coerce.number().int().positive().optional(),
+  prima: z.string().max(140).optional(),
 });
 const PAGINA = 50;
 
@@ -35,25 +36,27 @@ diarioRoutes.get("/", async (c) => {
   const f = filtri.safeParse(c.req.query());
   if (!f.success) return c.json({ error: "Filtri non validi" }, 400);
   const { chi, area, tipo, prima } = f.data;
-  const fino = prima ?? Number.MAX_SAFE_INTEGER;
+  const cur = leggiCursore(prima);
+  if (!cur) return c.json({ error: "Filtri non validi" }, 400);
   const db = c.env.DB;
   const chiAtt = chi === "tutti" ? "" : chi === "sistema" ? "AND a.author_id IS NULL" : "AND a.author_id = ?2";
   const chiAud = chi === "tutti" ? "" : chi === "sistema" ? "AND 0" : "AND u.user_id = ?2";
   const entita = Object.keys(ENTITA).filter((e) => area === "tutte" || ENTITA[e].area === area);
   const conAttivita = (area === "tutte" || area === "commerciale") && (tipo === "tutti" || Object.hasOwn(ETICHETTA_ATTIVITA, tipo));
   const conModifiche = entita.length > 0 && (tipo === "tutti" || tipo === "modifiche");
-  const legame = chi === "tutti" || chi === "sistema" ? [fino] : [fino, chi];
+  // ?1 e ?3 sono il cursore, ?2 la persona (legata sempre, anche quando la query non la usa).
+  const legame = [cur.at, chi, cur.id];
   const [att, aud, utenti] = await Promise.all([
     conAttivita
       ? db.prepare(`SELECT a.id, a.type, a.body, a.author_id AS autore, a.created_at AS at, a.lead_id AS leadId, l.company
           FROM activities a JOIN leads l ON l.id = a.lead_id
-          WHERE a.created_at < ?1 ${chiAtt} ${tipo === "tutti" ? "" : `AND a.type = '${tipo}'`}
-          ORDER BY a.created_at DESC LIMIT ${PAGINA}`).bind(...legame).all<{ id: string; type: string; body: string; autore: string | null; at: number; leadId: string; company: string }>()
+          WHERE ${dopoCursore("a.created_at", "a.id", "?1", "?3")} ${chiAtt} ${tipo === "tutti" ? "" : `AND a.type = '${tipo}'`}
+          ORDER BY a.created_at DESC, a.id DESC LIMIT ${PAGINA}`).bind(...legame).all<{ id: string; type: string; body: string; autore: string | null; at: number; leadId: string; company: string }>()
       : { results: [] },
     conModifiche
       ? db.prepare(`SELECT u.id, u.entity, u.action, u.changes, u.user_id AS autore, u.created_at AS at FROM audit_log u
-          WHERE u.created_at < ?1 ${chiAud} AND u.entity IN (${entita.map((e) => `'${e}'`).join(", ")})
-          ORDER BY u.created_at DESC LIMIT ${PAGINA}`).bind(...legame).all<{ id: string; entity: string; action: string; changes: string | null; autore: string | null; at: number }>()
+          WHERE ${dopoCursore("u.created_at", "u.id", "?1", "?3")} ${chiAud} AND u.entity IN (${entita.map((e) => `'${e}'`).join(", ")})
+          ORDER BY u.created_at DESC, u.id DESC LIMIT ${PAGINA}`).bind(...legame).all<{ id: string; entity: string; action: string; changes: string | null; autore: string | null; at: number }>()
       : { results: [] },
     db.prepare("SELECT id, name FROM users").all<{ id: string; name: string }>(),
   ]);
@@ -75,6 +78,6 @@ diarioRoutes.get("/", async (c) => {
         dettaglio: importo == null ? null : `${(importo / 100).toLocaleString("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} euro`,
       };
     }),
-  ].sort((x, y) => y.at - x.at).slice(0, PAGINA);
-  return c.json({ voci, prossimo: voci.length === PAGINA ? voci[PAGINA - 1].at : null });
+  ].sort(piuRecente).slice(0, PAGINA);
+  return c.json({ voci, prossimo: voci.length === PAGINA ? scriviCursore(voci[PAGINA - 1]) : null });
 });

@@ -159,10 +159,24 @@ describe("rotte della revisione", () => {
     expect(d).toMatchObject({ commento: null, commentoStato: "errore" });
   });
 
+  it("Riscrivi: il commento pronto resta finché il nuovo non arriva, e anche se il nuovo va in errore", async () => {
+    const { id } = await revisioneCorrente(env.DB, Date.now());
+    await env.DB.prepare("UPDATE weekly_reviews SET commento = 'Commento già pagato.' WHERE id = ?1").bind(id).run();
+    const r = await (await call(`/api/weekly-reviews/${id}/commento`, { method: "POST" }, cookie)).json<{ commento: string | null; commentoStato: string }>();
+    expect(r).toMatchObject({ commento: "Commento già pagato.", commentoStato: "in_coda" });
+    setClaudeFetch(async () => rispostaClaude({ testo: "   " }));
+    await lavoraCoda(env, Date.now(), 1);
+    const d = await (await call("/api/weekly-reviews/corrente", {}, cookie)).json<{ commento: string | null; commentoStato: string }>();
+    expect(d).toMatchObject({ commento: "Commento già pagato.", commentoStato: "errore" });
+  });
+
   it("revisione chiusa: 409 alle modifiche; id sconosciuto: 404", async () => {
     const { id } = await revisioneCorrente(env.DB, Date.now());
     await call(`/api/weekly-reviews/${id}`, { method: "PATCH", json: { chiudi: true } }, cookie);
     expect((await call(`/api/weekly-reviews/${id}`, { method: "PATCH", json: { decisioni: ["a", "b", "c"] } }, cookie)).status).toBe(409);
+    const scrivi = await call(`/api/weekly-reviews/${id}/commento`, { method: "POST" }, cookie);
+    expect(scrivi.status).toBe(409);
+    expect(await scrivi.json()).toEqual({ error: "La revisione è già chiusa" });
     expect((await call("/api/weekly-reviews/nessuna", { method: "PATCH", json: {} }, cookie)).status).toBe(404);
     expect((await call("/api/weekly-reviews/nessuna/commento", { method: "POST" }, cookie)).status).toBe(404);
     expect((await call(`/api/weekly-reviews/${id}`, { method: "PATCH", json: { decisioni: ["solo una"] } }, cookie)).status).toBe(400);

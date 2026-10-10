@@ -143,10 +143,18 @@ describe("export e registro: casi in più", () => {
     await env.DB.prepare(`INSERT INTO audit_log (id, user_id, entity, entity_id, action, created_at) VALUES ${valori}`).run();
     const p1 = await (await call("/api/audit", {}, cookie)).json<{ voci: { at: number }[]; prossimo: number | null }>();
     expect(p1.voci).toHaveLength(50);
-    expect(p1.prossimo).toBe(1005);
+    expect(p1.prossimo).toBe("1005:A5");
     const p2 = await (await call(`/api/audit?prima=${p1.prossimo}`, {}, cookie)).json<{ voci: { at: number }[]; prossimo: number | null }>();
     expect(p2.voci.map((v) => v.at)).toEqual([1004, 1003, 1002, 1001, 1000]);
     expect(p2.prossimo).toBeNull();
+  });
+  it("registro: voci nello stesso millisecondo a cavallo di pagina non si perdono", async () => {
+    const valori = Array.from({ length: 55 }, (_, i) => `('B${String(i).padStart(2, "0")}', 'tommaso', 'lead', 'L1', 'update', 7000)`).join(", ");
+    await env.DB.prepare(`INSERT INTO audit_log (id, user_id, entity, entity_id, action, created_at) VALUES ${valori}`).run();
+    const p1 = await (await call("/api/audit", {}, cookie)).json<{ voci: { id: string }[]; prossimo: string | null }>();
+    const p2 = await (await call(`/api/audit?prima=${encodeURIComponent(p1.prossimo!)}`, {}, cookie)).json<{ voci: { id: string }[] }>();
+    const ids = [...p1.voci, ...p2.voci].map((v) => v.id).filter((id) => id.startsWith("B"));
+    expect(new Set(ids).size).toBe(55);
   });
 });
 

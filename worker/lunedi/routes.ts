@@ -27,7 +27,9 @@ async function leggi(db: D1Database, id: string): Promise<RevisioneApi | null> {
     ...r,
     numeri: JSON.parse(r.numeri) as NumeriSettimana,
     decisioni: JSON.parse(r.decisioni) as [string, string, string],
-    commentoStato: r.commento ? "pronto" : ((job?.stato ?? "nessuno") as RevisioneApi["commentoStato"]),
+    // Conta l'ultimo lavoro: con "Riscrivi" il commento di prima resta (già pagato) e si vede sotto lo stato
+    // del lavoro nuovo; se il nuovo va in errore o al tetto, il vecchio non è perso.
+    commentoStato: job ? (job.stato as RevisioneApi["commentoStato"]) : r.commento ? "pronto" : "nessuno",
   };
 }
 
@@ -53,8 +55,8 @@ lunediRoutes.patch("/:id", async (c) => {
 lunediRoutes.post("/:id/commento", async (c) => {
   const r = await leggi(c.env.DB, c.req.param("id"));
   if (!r) return c.json({ error: "Revisione non trovata" }, 404);
+  if (r.chiusaAt) return c.json({ error: "La revisione è già chiusa" }, 409);
   if (r.commentoStato !== "in_coda" && r.commentoStato !== "in_corso") {
-    await c.env.DB.prepare("UPDATE weekly_reviews SET commento = NULL WHERE id = ?1").bind(r.id).run();
     await accoda(c.env.DB, { tipo: "commento", entityId: r.id, chi: c.get("user").id, forzato: true }, Date.now());
   }
   return c.json(await leggi(c.env.DB, r.id));

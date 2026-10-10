@@ -46,10 +46,23 @@ describe("GET /api/diario", () => {
     const p1 = await (await call("/api/diario", {}, cookie)).json<{ voci: { id: string }[]; prossimo: number | null }>();
     expect(p1.voci).toHaveLength(50);
     expect(p1.voci[0].id).toBe("N59");
-    expect(p1.prossimo).toBe(10_010);
+    expect(p1.prossimo).toBe("10010:N10");
     const p2 = await (await call(`/api/diario?prima=${p1.prossimo}`, {}, cookie)).json<{ voci: { id: string }[]; prossimo: number | null }>();
     expect(p2.voci.map((v) => v.id)).toEqual([...Array.from({ length: 10 }, (_, i) => `N${9 - i}`), "A1", "U1", "A2"]);
     expect(p2.prossimo).toBeNull();
+  });
+  it("60 voci nello stesso istante (scadiProposte): nessuna persa né ripetuta al confine di pagina", async () => {
+    const righe = Array.from({ length: 60 }, (_, i) => `('S${String(i).padStart(2, "0")}', 'L1', 'proposta', 'scaduta', NULL, 20000)`).join(", ");
+    await env.DB.prepare(`INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES ${righe}`).run();
+    const p1 = await (await call("/api/diario", {}, cookie)).json<{ voci: { id: string }[]; prossimo: string | null }>();
+    expect(p1.voci).toHaveLength(50);
+    const p2 = await (await call(`/api/diario?prima=${encodeURIComponent(p1.prossimo!)}`, {}, cookie)).json<{ voci: { id: string }[]; prossimo: string | null }>();
+    const visti = [...p1.voci, ...p2.voci].map((v) => v.id).filter((id) => id.startsWith("S"));
+    expect(visti).toHaveLength(60);
+    expect(new Set(visti).size).toBe(60);
+  });
+  it("cursore non valido: 400", async () => {
+    expect((await call("/api/diario?prima=abc", {}, cookie)).status).toBe(400);
   });
   it("401 senza sessione", async () => {
     expect((await call("/api/diario")).status).toBe(401);
