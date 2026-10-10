@@ -69,10 +69,13 @@ export async function calcolaCampagne(db: D1Database, mese: string): Promise<Cam
   const spesa = new Map(spese.results.map((s) => [s.campagna, s.cents]));
   const campagne = [...perCampagna.entries()].map(([campagna, g]): RigaCampagna => {
     const spesaCents = spesa.get(campagna) ?? null;
-    const costoPerLeadCents = spesaCents == null ? null : g.tot.lead === 0 ? spesaCents : Math.round(spesaCents / g.tot.lead);
+    // Spesa zero: niente costo per lead (non è un "€ 0,00" col punto verde) e livello senza_spesa;
+    // la schermata distingue "nessuna spesa" (spesaCents 0) da "spesa da scrivere" (null).
+    const conSpesa = spesaCents != null && spesaCents > 0 ? spesaCents : null;
+    const costoPerLeadCents = conSpesa == null ? null : g.tot.lead === 0 ? conSpesa : Math.round(conSpesa / g.tot.lead);
     return {
       campagna, ...g.tot, spesaCents, costoPerLeadCents,
-      costoPerClienteCents: spesaCents == null || g.tot.vinti === 0 ? null : Math.round(spesaCents / g.tot.vinti),
+      costoPerClienteCents: conSpesa == null || g.tot.vinti === 0 ? null : Math.round(conSpesa / g.tot.vinti),
       livello: livelloCosto(costoPerLeadCents, soglie),
       inserzioni: [...g.ins.entries()].map(([inserzione, c]) => ({ inserzione, ...c })).sort((x, y) => y.lead - x.lead),
     };

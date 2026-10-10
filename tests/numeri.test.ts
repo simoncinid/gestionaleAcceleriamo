@@ -127,6 +127,23 @@ describe("GET /api/numeri/campagne", () => {
     expect(c.campagne.find((x) => x.campagna === "Campagna B")).toMatchObject({ lead: 1, spesaCents: null, livello: "senza_spesa" });
   });
 
+  it("spesa zero: nessun costo per lead e niente punto verde", async () => {
+    await lead("L1");
+    await call("/api/campaign-spend", { method: "PUT", json: { campagna: "Campagna A", mese: "2026-10", amountCents: 0 } }, cookie);
+    const c = await (await call("/api/numeri/campagne?mese=2026-10", {}, cookie)).json<{ campagne: { campagna: string; spesaCents: number | null; costoPerLeadCents: number | null; livello: string }[] }>();
+    expect(c.campagne.find((x) => x.campagna === "Campagna A")).toMatchObject({ spesaCents: 0, costoPerLeadCents: null, livello: "senza_spesa" });
+  });
+
+  it("confine del mese a Roma: un lead alle 00:30 del 1 novembre (23:30 UTC del 31 ottobre) conta in novembre", async () => {
+    const t = daRoma(2026, 11, 1, 0, 30);
+    expect(new Date(t).toISOString()).toBe("2026-10-31T23:30:00.000Z");
+    await lead("NOV", { created_at: t, stage_changed_at: t, meta_campaign: "Campagna Confine" });
+    const leggi = async (mese: string) =>
+      (await (await call(`/api/numeri/campagne?mese=${mese}`, {}, cookie)).json<{ campagne: { campagna: string; lead: number }[] }>()).campagne.find((x) => x.campagna === "Campagna Confine");
+    expect(await leggi("2026-10")).toBeUndefined();
+    expect(await leggi("2026-11")).toMatchObject({ lead: 1 });
+  });
+
   it("la spesa si aggiorna, non si duplica", async () => {
     for (const amountCents of [1_000, 1_500]) await call("/api/campaign-spend", { method: "PUT", json: { campagna: "Campagna A", mese: "2026-10", amountCents } }, cookie);
     const n = await env.DB.prepare("SELECT COUNT(*) AS n, MAX(amount_cents) AS v FROM campaign_spend").first<{ n: number; v: number }>();
