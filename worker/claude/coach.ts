@@ -4,6 +4,7 @@ import { getDb } from "../db/client";
 import type { Env } from "../env";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { daRoma, partiRoma } from "../lib/roma";
+import { callPerFase } from "../regole/fasi-call";
 import type { DefTipo } from "./coda";
 import { chiamaClaude, ErroreClaude } from "./client";
 import { usoVuoto } from "./costo";
@@ -105,7 +106,9 @@ export const TIPO_COACH: DefTipo = {
     const storico = await db.prepare(`SELECT type, body, created_at AS at FROM activities WHERE lead_id = ?1 AND type IN ${TIPI_STORICO}
         ORDER BY created_at DESC LIMIT 20`).bind(job.leadId).all<{ type: string; body: string; at: number }>();
     // Chiuso non si propone: si segna dalla scheda lead con setup, canone e inizio (come nel Foglio Esito).
-    const fasi = await db.prepare("SELECT id, label FROM stages WHERE kind != 'won' OR id = ?1 ORDER BY sort_order").bind(x.stageId).all<{ id: string; label: string }>();
+    // Le fasi che esistono solo con una call fissata (callPerFase) nemmeno: il coach non fissa call. La fase attuale resta.
+    const tutte = await db.prepare("SELECT id, label FROM stages WHERE kind != 'won' OR id = ?1 ORDER BY sort_order").bind(x.stageId).all<{ id: string; label: string }>();
+    const fasi = { results: tutte.results.filter((f) => f.id === x.stageId || !callPerFase(f.id)) };
     const prezzi = (await leggiImpostazioni(getDb(db))).prezzi;
     const etichetta = new Map(NOTE_CALL[x.kind].map((n) => [n.chiave, n.etichetta]));
     let note: Record<string, unknown> = {};
@@ -118,7 +121,7 @@ export const TIPO_COACH: DefTipo = {
     const campiNote = Object.fromEntries(
       Object.entries(note).filter(([, v]) => typeof v === "string" && v.trim()).map(([k, v]) => [`Note, ${etichetta.get(k) ?? k}`, v as string]),
     );
-    const faseAttuale = fasi.results.find((f) => f.id === x.stageId)?.label ?? x.stageId;
+    const faseAttuale = tutte.results.find((f) => f.id === x.stageId)?.label ?? x.stageId;
     const testoRichiesta = [
       bloccoDatiLead({ "Azienda": x.company, "Fase attuale": faseAttuale, "Tipo di call": x.kind, ...campiNote }),
       x.scheda ? blocco("scheda_azienda", x.scheda, 6000) : "",

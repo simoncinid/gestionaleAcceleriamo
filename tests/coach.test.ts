@@ -8,6 +8,7 @@ import { getDb } from "../worker/db/client";
 import { leggiImpostazioni } from "../worker/impostazioni/service";
 import { contaD1 } from "../worker/lib/bilancio";
 import { daRoma } from "../worker/lib/roma";
+import { applicaProposta, corpoEsito, statoIniziale } from "../src/pagine/commerciale/esito";
 import { call, createUser, loginCookie } from "./helpers";
 import { rispostaClaude } from "./claude-fixture";
 
@@ -40,16 +41,19 @@ describe("coach", () => {
     const r = await call("/api/calls/C1/coach", { method: "POST" }, cookie);
     expect((await r.json<{ stato: string }>()).stato).toBe("in_coda");
     let corpo: Record<string, unknown> = {};
-    setClaudeFetch(async (_u, init) => { corpo = JSON.parse(String(init!.body)); return rispostaClaude({ testo: risultato("presentazione-confermata"), modello: "claude-sonnet-5-5" }); });
+    setClaudeFetch(async (_u, init) => { corpo = JSON.parse(String(init!.body)); return rispostaClaude({ testo: risultato("in-attesa-preventivo"), modello: "claude-sonnet-5-5" }); });
     await lavoraCoda(env, ora, 3);
     const g = await (await call("/api/calls/C1/coach", {}, cookie)).json<Coach>();
     expect(g.stato).toBe("pronto");
-    expect(g.risultato!.faseSuggerita).toBe("presentazione-confermata");
+    expect(g.risultato!.faseSuggerita).toBe("in-attesa-preventivo");
     expect(g.risultato!.prossimaAzioneAt).toBe(daRoma(2026, 10, 22, 9, 0));
     const schema = (corpo.output_config as { format: { schema: { properties: { faseSuggerita: { enum: string[] } } } } }).format.schema;
     expect(schema.properties.faseSuggerita.enum).toContain("in-attesa-preventivo");
     // Chiuso si segna dalla scheda lead: il coach non lo propone.
     expect(schema.properties.faseSuggerita.enum).not.toContain("chiuso");
+    // Le fasi che esistono solo con una call fissata non si propongono (salvo quella attuale del lead).
+    expect(schema.properties.faseSuggerita.enum).not.toContain("presentazione-confermata");
+    expect(schema.properties.faseSuggerita.enum).toContain("appuntamento-confermato");
     expect(String(corpo.system)).toContain("call di presentazione");
     expect(corpo.model).toBe("claude-sonnet-5-5");
     expect(corpo).not.toHaveProperty("thinking");
@@ -73,7 +77,7 @@ describe("coach", () => {
 
   it("uscita fuori formato (campo in più, HTML): errore con il costo vero, niente suggerimenti", async () => {
     await call("/api/calls/C1/coach", { method: "POST" }, cookie);
-    setClaudeFetch(async () => rispostaClaude({ testo: risultato("presentazione-confermata", { html: "<script>alert(1)</script>" }) }));
+    setClaudeFetch(async () => rispostaClaude({ testo: risultato("in-attesa-preventivo", { html: "<script>alert(1)</script>" }) }));
     await lavoraCoda(env, ora, 3);
     const g = await (await call("/api/calls/C1/coach", {}, cookie)).json<Coach>();
     expect(g.stato).toBe("errore");
@@ -85,7 +89,7 @@ describe("coach", () => {
 
   it("testi troppo lunghi e liste oltre sei voci si accorciano, i giorni restano entro 60", async () => {
     await call("/api/calls/C1/coach", { method: "POST" }, cookie);
-    setClaudeFetch(async () => rispostaClaude({ testo: risultato("presentazione-confermata", { riassunto: "a".repeat(3000), controlli: Array.from({ length: 9 }, (_, i) => `c${i}`), prossimaAzione: { testo: "Richiamare", entroGiorni: 90 } }) }));
+    setClaudeFetch(async () => rispostaClaude({ testo: risultato("in-attesa-preventivo", { riassunto: "a".repeat(3000), controlli: Array.from({ length: 9 }, (_, i) => `c${i}`), prossimaAzione: { testo: "Richiamare", entroGiorni: 90 } }) }));
     await lavoraCoda(env, ora, 3);
     const g = await (await call("/api/calls/C1/coach", {}, cookie)).json<{ stato: string; risultato: { riassunto: string; controlli: string[]; prossimaAzione: { entroGiorni: number } } }>();
     expect(g.stato).toBe("pronto");
@@ -109,15 +113,33 @@ describe("coach", () => {
   it("applica: restituisce il precompilato e registra chi l'ha aperto, senza toccare il lead", async () => {
     const { id } = await (await call("/api/calls/C1/coach", { method: "POST" }, cookie)).json<{ id: string }>();
     expect((await call(`/api/call-analyses/${id}/applica`, { method: "POST" }, cookie)).status).toBe(409);
-    setClaudeFetch(async () => rispostaClaude({ testo: risultato("presentazione-confermata") }));
+    setClaudeFetch(async () => rispostaClaude({ testo: risultato("in-attesa-preventivo") }));
     await lavoraCoda(env, ora, 3);
     const a = await (await call(`/api/call-analyses/${id}/applica`, { method: "POST" }, cookie)).json<{ precompilato: { stageId: string; nextAction: string; nextActionAt: number; note: string } }>();
-    expect(a.precompilato).toMatchObject({ stageId: "presentazione-confermata", nextAction: "Fissare la call di presentazione", nextActionAt: daRoma(2026, 10, 22, 9, 0) });
+    expect(a.precompilato).toMatchObject({ stageId: "in-attesa-preventivo", nextAction: "Fissare la call di presentazione", nextActionAt: daRoma(2026, 10, 22, 9, 0) });
     expect(a.precompilato.note).toContain("Preventivi fatti a mano.");
     const l = await env.DB.prepare("SELECT stage_id FROM leads WHERE id = 'L1'").first<{ stage_id: string }>();
     expect(l?.stage_id).toBe("appuntamento-confermato");
     const c = await env.DB.prepare("SELECT confirmed_by FROM call_analyses WHERE id = ?1").bind(id).first<{ confirmed_by: string }>();
     expect(c?.confirmed_by).toBe("tommaso");
+  });
+
+  it("Applica e poi esito Non interessato: fase, prossima azione e motivo vengono dalle regole", async () => {
+    const { id } = await (await call("/api/calls/C1/coach", { method: "POST" }, cookie)).json<{ id: string }>();
+    setClaudeFetch(async () => rispostaClaude({ testo: risultato("in-attesa-preventivo") }));
+    await lavoraCoda(env, ora, 3);
+    const { precompilato } = await (await call(`/api/call-analyses/${id}/applica`, { method: "POST" }, cookie)).json<{ precompilato: { stageId: string | null; nextAction: string; nextActionAt: number; note: string } }>();
+    const iniziale = { ...precompilato, stageId: precompilato.stageId ?? undefined };
+    let s = statoIniziale(crypto.randomUUID(), { stageId: "appuntamento-confermato" }, iniziale);
+    // Come nel Foglio Esito: si sceglie l'esito, arriva la proposta delle regole, poi si salva.
+    const p = await (await call("/api/leads/L1/proposta?esito=non_interessato", {}, cookie)).json<{ stageId: string | null; nextAction: string | null; nextActionAt: number | null; lostReason?: string }>();
+    s = applicaProposta({ ...s, esito: "non_interessato" }, p, iniziale);
+    expect(s.stageId).toBe("non-chiuso");
+    expect(s.lostReason).toBe("non_interessato");
+    const r = await call("/api/leads/L1/esito", { method: "PATCH", json: corpoEsito(s) }, cookie);
+    expect(r.status).toBe(200);
+    const l = await env.DB.prepare("SELECT stage_id, lost_reason FROM leads WHERE id = 'L1'").first<{ stage_id: string; lost_reason: string }>();
+    expect(l).toEqual({ stage_id: "non-chiuso", lost_reason: "non_interessato" });
   });
 
   it("401 senza sessione", async () => {
@@ -134,7 +156,7 @@ describe("misura del gestore", () => {
     const imp = (await leggiImpostazioni(getDb(env.DB))).claude;
     let fetch = 0;
     let corpo = "";
-    setClaudeFetch(async (_u, init) => { fetch++; corpo = String(init!.body); return rispostaClaude({ testo: risultato("presentazione-confermata"), modello: "claude-sonnet-5-5" }); });
+    setClaudeFetch(async (_u, init) => { fetch++; corpo = String(init!.body); return rispostaClaude({ testo: risultato("in-attesa-preventivo"), modello: "claude-sonnet-5-5" }); });
     const job: LavoroAi = {
       id: "jA1", tipo: "coach", entityId: "A1", leadId: "L1", stato: "in_corso", tentativi: 0, errore: null, erroreId: null, fermoMese: null,
       forzato: false, richiestoDa: null, createdAt: ora, startedAt: ora, finishedAt: null,

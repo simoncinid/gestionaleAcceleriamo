@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { CoachCall } from "../src/pagine/commerciale/CoachCall";
-import { statoIniziale } from "../src/pagine/commerciale/esito";
+import { applicaProposta, statoIniziale } from "../src/pagine/commerciale/esito";
 import { contaPrimari, render } from "./render";
 
 const lead = { id: "L1", company: "Officina Prova", contactName: null, stageId: "appuntamento-confermato", attemptCount: 0 };
@@ -61,5 +61,28 @@ describe("statoIniziale con i suggerimenti del coach", () => {
   });
   it("senza fase suggerita resta quella del lead", () => {
     expect(statoIniziale("r", { stageId: "appuntamento-confermato" }, { nextAction: "x" }).stageId).toBe("appuntamento-confermato");
+  });
+});
+
+describe("applicaProposta: chi vince tra coach e regole", () => {
+  const iniziale = { stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: 5, note: "Dal coach: x" };
+  const regole = { stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: 9 };
+  it("esito qualsiasi: restano fase e prossima azione del coach", () => {
+    const s = applicaProposta({ ...statoIniziale("r", { stageId: "appuntamento-confermato" }, iniziale), esito: "risposto" }, regole, iniziale);
+    expect(s).toMatchObject({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: 5 });
+  });
+  it("appuntamento, non interessato, fuori target: vincono le regole", () => {
+    for (const esito of ["appuntamento", "non_interessato", "fuori_target"] as const) {
+      const s = applicaProposta({ ...statoIniziale("r", { stageId: "appuntamento-confermato" }, iniziale), esito }, { ...regole, lostReason: "motivo" }, iniziale);
+      expect(s).toMatchObject({ stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: 9, lostReason: "motivo" });
+    }
+  });
+  it("tornando a un altro esito dopo le regole, il coach torna", () => {
+    const base = { ...statoIniziale("r", { stageId: "appuntamento-confermato" }, iniziale), stageId: "non-chiuso", nextAction: "", nextActionAt: null, lostReason: "x", esito: "occupato" as const };
+    expect(applicaProposta(base, { stageId: null, nextAction: null, nextActionAt: null }, iniziale)).toMatchObject({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: 5, lostReason: null });
+  });
+  it("senza coach: come prima, decidono le regole", () => {
+    const s = applicaProposta({ ...statoIniziale("r", { stageId: "appuntamento-confermato" }), esito: "risposto" }, regole);
+    expect(s).toMatchObject({ stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: 9 });
   });
 });

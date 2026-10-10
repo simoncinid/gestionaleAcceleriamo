@@ -43,6 +43,29 @@ export const statoIniziale = (
   lostReason: null, note: iniziale?.note ?? "", callAt: null, meetLink: "",
 });
 
+// Gli esiti che decidono da soli fase e prossima azione: una call fissata o un lead perso. Con questi vincono le regole
+// anche quando il foglio arriva dal coach; con gli altri restano i suggerimenti del coach.
+export const ESITI_DELLE_REGOLE: Esito[] = ["appuntamento", "non_interessato", "fuori_target"];
+
+// Unisce la proposta delle regole (arrivata dopo la scelta dell'esito) allo stato del foglio.
+export function applicaProposta(
+  prima: StatoEsito,
+  p: { stageId: string | null; nextAction: string | null; nextActionAt: number | null; lostReason?: string | null },
+  iniziale?: Partial<Pick<StatoEsito, "stageId" | "nextAction" | "nextActionAt" | "note">>,
+): StatoEsito {
+  const lostReason = p.lostReason ?? null;
+  if (!iniziale || (prima.esito && ESITI_DELLE_REGOLE.includes(prima.esito))) {
+    return { ...prima, stageId: p.stageId ?? prima.stageId, nextAction: p.nextAction ?? "", nextActionAt: p.nextActionAt, lostReason };
+  }
+  return {
+    ...prima,
+    stageId: iniziale.stageId || (p.stageId ?? prima.stageId),
+    nextAction: iniziale.nextAction ?? "",
+    nextActionAt: iniziale.nextActionAt ?? null,
+    lostReason,
+  };
+}
+
 export const testoTentativo = (attemptCount: number, massimo = 5) => `Tentativo ${Math.min(attemptCount + 1, massimo)} di ${massimo}`;
 
 export function validaEsito(s: StatoEsito, motivoObbligatorio: boolean): string | null {

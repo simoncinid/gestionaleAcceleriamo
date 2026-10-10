@@ -7,7 +7,7 @@ import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
 import type { Precompilato } from "../../../worker/calls/coach-routes";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
-import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
+import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, applicaProposta, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
 
 // Foglio "Com'è andata?": l'esito propone fase e prossima azione (le regole propongono, la persona salva).
 // "iniziale": i suggerimenti del coach. Il lead cambia solo con "Salva esito".
@@ -15,8 +15,8 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
   const qc = useQueryClient();
   const fasi = useStages();
   const motivi = useQuery({ queryKey: ["settings"], queryFn: () => api<{ motivi: { id: string; etichetta: string }[] }>("/settings") });
-  const [s, setS] = useState<StatoEsito>(() =>
-    statoIniziale(crypto.randomUUID(), lead, iniziale ? { ...iniziale, stageId: iniziale.stageId ?? undefined } : undefined));
+  const coach = iniziale ? { ...iniziale, stageId: iniziale.stageId ?? undefined } : undefined;
+  const [s, setS] = useState<StatoEsito>(() => statoIniziale(crypto.randomUUID(), lead, coach));
   // Solo l'ultima proposta chiesta vale: un esito cambiato in fretta non viene sovrascritto da una risposta vecchia.
   const ultimaRichiesta = useRef(0);
   const senzaEmail = lead.email === null;
@@ -38,15 +38,8 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
     try {
       const p = await api<Proposta>(`/leads/${lead.id}/proposta?${q}`);
       if (n !== ultimaRichiesta.current) return;
-      // Con i suggerimenti del coach le regole non li sovrascrivono: fase e prossima azione restano quelle
-      // del coach (la fase solo se il coach ne ha proposta una), e la persona può sempre cambiarle.
-      setS((prima) => ({
-        ...prima,
-        stageId: iniziale?.stageId ? prima.stageId : p.stageId ?? prima.stageId,
-        nextAction: iniziale ? prima.nextAction : p.nextAction ?? "",
-        nextActionAt: iniziale ? prima.nextActionAt : p.nextActionAt,
-        lostReason: p.lostReason ?? null,
-      }));
+      // Con i suggerimenti del coach vincono loro, salvo appuntamento, non interessato e fuori target (vedi applicaProposta).
+      setS((prima) => applicaProposta(prima, p, coach));
     } catch {
       if (n === ultimaRichiesta.current) toast("Nessuna proposta dalle regole: scegli fase e prossima azione a mano");
     }
