@@ -7,7 +7,7 @@ import { BarraBasso } from "./BarraBasso";
 import { BarraLaterale } from "./BarraLaterale";
 import { FoglioCerca } from "./FoglioCerca";
 import { FoglioCrea } from "./FoglioCrea";
-import { leggiScorciatoia } from "./scorciatoie";
+import { leggiScorciatoia, scorciatoiaRicerca } from "./scorciatoie";
 import { Testata } from "./Testata";
 import { useAzzeraAnonimoFuoriArea } from "../pagine/automazioni/anonimo";
 
@@ -25,8 +25,9 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
   useEffect(() => {
     const suTasto = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      // Cmd K o Ctrl K aprono la ricerca anche da dentro un campo.
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return setCerca(true); }
+      // Cmd K o Ctrl K aprono la ricerca anche da dentro un campo, mai sopra un altro foglio (voce 65).
+      const k = scorciatoiaRicerca(e, document.querySelector("dialog[open]") != null);
+      if (k !== "no") { e.preventDefault(); if (k === "si") setCerca(true); return; }
       if (t.closest("input, textarea, select, [contenteditable], dialog[open]") || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); return setCerca(true); }
       if (e.key === "n" && attesa.current === null) return setCrea(creazioneDelPiu(pathname));

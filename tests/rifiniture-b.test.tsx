@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api";
-import { CardLead, Errore } from "../src/ds";
+import { CardLead, Errore, PRIMO_CAMPO } from "../src/ds";
+import { scorciatoiaRicerca } from "../src/guscio/scorciatoie";
 import { eBloccoDemo, messaggioImportInterrotto, testoBloccoDemo } from "../src/errori";
 import { CorpoEsporta } from "../src/pagine/impostazioni/Dati";
 import { Fasi, FoglioFase } from "../src/pagine/impostazioni/Fasi";
@@ -109,5 +110,18 @@ describe("Impostazioni: voci 46, 59, 60, 63, 64 e toast demo", () => {
     expect(testoBloccoDemo(e).titolo).toBe("Password e nome dell'utente non si cambiano");
     expect(eBloccoDemo(new ApiError(409, "Questo lead ha già un cliente"))).toBe(false);
     expect(eBloccoDemo(new ApiError(409, "Nello spazio demo il foglio non si legge"))).toBe(true);
+  });
+});
+
+describe("Guscio e Foglio: voci 43 e 65", () => {
+  it("Cmd K non apre la ricerca sopra un altro foglio", () => {
+    expect(scorciatoiaRicerca({ metaKey: true, ctrlKey: false, key: "k" }, false)).toBe("si");
+    expect(scorciatoiaRicerca({ metaKey: false, ctrlKey: true, key: "K" }, true)).toBe("ignora");
+    expect(scorciatoiaRicerca({ metaKey: false, ctrlKey: false, key: "k" }, false)).toBe("no");
+  });
+  it("il primo campo comprende campi, interruttori e selettori, non Annulla", () => {
+    expect(PRIMO_CAMPO).toContain("input");
+    expect(PRIMO_CAMPO).toContain("[role=switch]");
+    expect(PRIMO_CAMPO).toContain("button[aria-expanded]");
   });
 });
