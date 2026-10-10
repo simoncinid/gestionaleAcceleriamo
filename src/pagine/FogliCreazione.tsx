@@ -8,6 +8,7 @@ import type { LeadListItem } from "../types";
 import { FoglioEsito } from "./commerciale/FoglioEsito";
 import { FoglioNuovoLead } from "./commerciale/FoglioNuovoLead";
 import { CercaLead, FoglioPropostaManuale } from "./commerciale/FoglioProposta";
+import { FoglioNuovaTask } from "./lavori/FoglioNuovaTask";
 import { FoglioNuovaAutomazione } from "./automazioni/FoglioAutomazione";
 import { FoglioNuovoCliente } from "./commerciale/FoglioCliente";
 import { FoglioNuovaFattura, FoglioNuovoCanone, FoglioNuovoCosto } from "./economia/Fogli";
@@ -40,7 +41,7 @@ function FoglioNota({ lead, onChiudi }: { lead: LeadListItem; onChiudi: () => vo
   );
 }
 
-// Un foglio per ogni creazione del "+": lo switch copre tutte le nove Creazione.
+// Un foglio per ogni creazione del "+": lo switch copre tutte le Creazione.
 export function FogliCreazione({ crea, chiudi }: { crea: Creazione | null; chiudi: () => void }) {
   const [lead, setLead] = useState<LeadListItem | null>(null);
   const fine = () => { setLead(null); chiudi(); };
@@ -63,6 +64,8 @@ export function FogliCreazione({ crea, chiudi }: { crea: Creazione | null; chiud
       return <FoglioNuovoCosto onChiudi={fine} />;
     case "automazione":
       return <FoglioNuovaAutomazione onChiudi={fine} />;
+    case "task":
+      return <FoglioNuovaTask onChiudi={fine} />;
   }
   return null;
 }

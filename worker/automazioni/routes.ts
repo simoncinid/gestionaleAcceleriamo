@@ -1,13 +1,13 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, notInArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, type Db } from "../db/client";
-import { automations, clients, proposals, type Automation } from "../db/schema";
+import { automationSteps, automations, clients, proposals, type Automation, type AutomationStep } from "../db/schema";
 import { FAMIGLIE } from "../economia/calcoli";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
 
-export type AutomazioneRiga = Omit<Automation, "deletedAt"> & { cliente: string; settore: string | null; citta: string | null; scope: "acceleriamo" | "fuori_perimetro"; proposta: string | null };
+export type AutomazioneRiga = Omit<Automation, "deletedAt"> & { cliente: string; settore: string | null; citta: string | null; logo?: string | null; passaggi?: number; scope: "acceleriamo" | "fuori_perimetro"; proposta: string | null };
 
 const FAMIGLIA = z.enum(FAMIGLIE.map((f) => f.valore) as [string, ...string[]]);
 const campi = {
@@ -27,16 +27,19 @@ const campi = {
 
 async function elenco(db: Db, automationId?: string): Promise<AutomazioneRiga[]> {
   const righe = await db
-    .select({ a: automations, cliente: clients.name, settore: clients.sector, citta: clients.city, scope: clients.scope, proposta: proposals.number })
+    .select({ a: automations, cliente: clients.name, settore: clients.sector, citta: clients.city, logo: clients.logo, scope: clients.scope, proposta: proposals.number })
     .from(automations)
     .innerJoin(clients, eq(clients.id, automations.clientId))
     .leftJoin(proposals, eq(proposals.id, automations.proposalId))
     .where(and(isNull(automations.deletedAt), automationId ? eq(automations.id, automationId) : undefined))
     .orderBy(desc(automations.updatedAt));
+  const conti = righe.length
+    ? await db.select({ id: automationSteps.automationId, n: sql<number>`count(*)` }).from(automationSteps).where(inArray(automationSteps.automationId, righe.map((r) => r.a.id))).groupBy(automationSteps.automationId)
+    : [];
   return righe.map(({ a, ...r }) => {
     const { deletedAt, ...campiA } = a;
     void deletedAt;
-    return { ...campiA, ...r };
+    return { ...campiA, ...r, passaggi: conti.find((x) => x.id === a.id)?.n ?? 0 };
   });
 }
 
@@ -98,5 +101,48 @@ automazioniRoutes.post("/:id/attiva", async (c) => {
     return c.json({ error: "L'automazione non è in costruzione" }, 409);
   }
   await audit(db, c.get("user").id, "automations", c.req.param("id"), "attiva", { activatedAt: now });
+  return c.json({ ok: true });
+});
+
+// ---- Passaggi del flusso ----
+const passo = z.object({
+  id: z.string().optional(),
+  title: z.string().trim().min(1, "Ogni passaggio ha bisogno di un titolo").max(120),
+  summary: z.string().trim().max(400).default(""),
+  branch: z.string().trim().max(80).nullish(),
+  icon: z.string().trim().max(30).nullish(),
+  tool: z.string().trim().max(200).nullish(),
+  trigger: z.string().trim().max(300).nullish(),
+  receives: z.string().trim().max(300).nullish(),
+  produces: z.string().trim().max(300).nullish(),
+  runsOn: z.string().trim().max(200).nullish(),
+  risks: z.string().trim().max(600).nullish(),
+  confirmed: z.boolean().default(false),
+}).strict();
+
+automazioniRoutes.get("/:id/steps", async (c) => {
+  const passi: AutomationStep[] = await getDb(c.env.DB).select().from(automationSteps).where(eq(automationSteps.automationId, c.req.param("id"))).orderBy(asc(automationSteps.position));
+  return c.json({ passi });
+});
+
+// Sostituisce l'elenco intero: chi ha un id lo tiene, gli altri nascono, quelli assenti spariscono.
+automazioniRoutes.put("/:id/steps", async (c) => {
+  const db = getDb(c.env.DB);
+  const id = c.req.param("id");
+  const b = z.object({ passi: z.array(passo).max(30) }).strict().parse(await c.req.json());
+  const esiste = await db.select({ id: automations.id }).from(automations).where(and(eq(automations.id, id), isNull(automations.deletedAt))).get();
+  if (!esiste) return c.json({ error: "Automazione inesistente" }, 404);
+  const righe = b.passi.map((p, i) => {
+    const { id: _id, ...resto } = p;
+    return { ...resto, id: p.id ?? crypto.randomUUID(), automationId: id, position: i + 1, branch: p.branch || null, icon: p.icon || null, tool: p.tool || null, trigger: p.trigger || null, receives: p.receives || null, produces: p.produces || null, runsOn: p.runsOn || null, risks: p.risks || null };
+  });
+  const tieni = righe.map((r) => r.id);
+  const passi = [
+    tieni.length ? db.delete(automationSteps).where(and(eq(automationSteps.automationId, id), notInArray(automationSteps.id, tieni))) : db.delete(automationSteps).where(eq(automationSteps.automationId, id)),
+    ...righe.map(({ id: rid, ...r }) => db.insert(automationSteps).values({ id: rid, ...r }).onConflictDoUpdate({ target: automationSteps.id, set: r })),
+  ];
+  await db.batch(passi as unknown as [(typeof passi)[number], ...(typeof passi)[number][]]);
+  await db.update(automations).set({ updatedAt: Date.now() }).where(eq(automations.id, id));
+  await audit(db, c.get("user").id, "automations", id, "passaggi", { n: righe.length });
   return c.json({ ok: true });
 });

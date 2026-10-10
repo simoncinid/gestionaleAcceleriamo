@@ -114,7 +114,8 @@ describe("Automazioni", () => {
     expect(html).toMatch(/Automazioni(<!-- -->)?, <strong[^>]*>2<\/strong>/);
     expect(html).toContain("Studio Prova");
     expect(html).toContain("Fuori perimetro");
-    expect(html).toContain("Leggere e riscrivere documenti");
+    expect(html).toContain("Flusso da descrivere");
+    expect(html).toContain('href="/commerciale/clienti/c1"');
     expect(html).toContain("€ 40 di costi vivi al mese");
     expect(html).toContain('role="switch"');
     expect(contaPrimari(html)).toBe(0);

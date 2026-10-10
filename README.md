@@ -31,6 +31,7 @@ Un solo Cron Trigger gira ogni 5 minuti (`wrangler.jsonc`, `*/5 * * * *`) e deci
 - terzo blocco: lead Meta rimasti incompleti (al massimo 3 per giro).
 
 Così ogni lavoro torna ogni 15 minuti. Alle 6:00 di Roma il giro del foglio lascia il posto alle proposte scadute (al massimo 20 per volta, le altre il giorno dopo); il foglio riprende alle 6:15.
+Alle 7:00 e alle 7:30 il giro del foglio lascia il posto alle task ricorrenti dei lavori: per ogni lavoro attivo crea la task del mese se oggi è il giorno indicato o dopo (una sola per mese, indice unico su lavoro, modello e mese). Tetto `LIMITI.lavori` = 12 task per giro: 2 letture più al massimo 12 scritture, misurato in `tests/lavori.test.ts`.
 
 Il motivo della rotazione e dei tetti: sul piano gratuito una invocazione del Worker può fare al massimo 50 query D1 (e restiamo sotto le 15 sottorichieste esterne per giro). Un lead nuovo dal foglio costa circa 17 query con tutta la sua catena, uno da Meta circa 13: due lavori insieme sforerebbero. I numeri sono misurati in `tests/cron.test.ts`; se si cambiano i tetti (`LIMITI` in `worker/cron.ts`) va rifatta la misura. Un lavoro che fallisce non ferma gli altri e il giro diventa rosso in Impostazioni.
 

@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState, type InputHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { giorno, presetInizio, presetQuando, quando } from "../format";
 import { daRoma } from "../../worker/lib/roma";
 import { cx } from "./cx";
@@ -17,12 +17,16 @@ export function Campo({ etichetta, aiuto, className, ...p }: InputHTMLAttributes
   );
 }
 
-export function AreaTesto({ etichetta, className, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { etichetta: string }) {
+// Con `cresce` l'area si allunga con il contenuto, senza barra di scorrimento interna.
+export function AreaTesto({ etichetta, className, cresce = false, ...p }: TextareaHTMLAttributes<HTMLTextAreaElement> & { etichetta: string; cresce?: boolean }) {
   const id = useId();
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const adatta = () => { const t = ref.current; if (t && cresce) { t.style.height = "auto"; t.style.height = `${t.scrollHeight + 2}px`; } };
+  useLayoutEffect(adatta);
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-secondaria font-medium">{etichetta}</label>
-      <textarea id={id} rows={3} {...p} className={cx(campo, "h-auto py-2", className)} />
+      <textarea id={id} ref={ref} rows={3} {...p} onInput={(e) => { adatta(); p.onInput?.(e); }} className={cx(campo, "h-auto py-2", cresce && "resize-none overflow-hidden", className)} />
     </div>
   );
 }

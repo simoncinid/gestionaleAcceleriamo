@@ -1,13 +1,19 @@
 import { useMutation } from "@tanstack/react-query";
+import { useState } from "react";
+import { Link } from "react-router";
 import { toast } from "sonner";
-import { ETICHETTE_AUTOMAZIONE, FAMIGLIE, etichettaFamiglia, type Famiglia } from "../../../worker/economia/calcoli";
+import { ETICHETTE_AUTOMAZIONE, FAMIGLIE, type Famiglia } from "../../../worker/economia/calcoli";
 import { api } from "../../api";
-import { AreaTesto, Campo, Errore, Intestazione, Pulsante, Riga, Selettore, Skeleton, Tag } from "../../ds";
+import { AreaTesto, Campo, Errore, Intestazione, LogoCliente, Pulsante, Punto, Riga, Selettore, Skeleton, Tag } from "../../ds";
 import { useUsers } from "../../hooks";
 import { centesimi } from "../commerciale/scheda";
+import type { AutomationStep } from "../../types";
+import { usePassi } from "../lavori/dati";
 import { useAutomazione, useRicarica } from "../dati-gestione";
 import { Sezione } from "../impostazioni/parti";
 import { useAnonimo } from "./anonimo";
+import { Flusso, FoglioPasso } from "./Flusso";
+import { FoglioPassaggi } from "./FoglioPassaggi";
 import { nomeCliente } from "./Pannello";
 
 type Testo = "description" | "runsOn" | "stack" | "notes";
@@ -18,6 +24,9 @@ export function SchedaAutomazione({ id }: { id: string }) {
   const utenti = useUsers();
   const anonimo = useAnonimo();
   const ricarica = useRicarica();
+  const passiQ = usePassi(id);
+  const [passo, setPasso] = useState<AutomationStep | null>(null);
+  const [modifica, setModifica] = useState(false);
   const patch = useMutation({
     mutationFn: (campi: Record<string, unknown>) => api(`/automations/${id}`, { method: "PATCH", json: campi }),
     onSuccess: () => { toast.success("Salvato"); ricarica(); },
@@ -47,16 +56,25 @@ export function SchedaAutomazione({ id }: { id: string }) {
     if (c !== a.monthlyCostCents) patch.mutate({ monthlyCostCents: c });
   };
   return (
-    <div key={a.updatedAt} className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">
+    <div key={a.updatedAt} className="mx-auto grid max-w-[1100px] gap-6 p-4 pb-28">
       <Intestazione titolo={a.name} eyebrow="Automazione">
-        <p className="text-corpo">{nomeCliente(a, anonimo)}</p>
+        {anonimo ? <p className="text-corpo">{nomeCliente(a, true)}</p> : (
+          <Link to={`/commerciale/clienti/${a.clientId}`} className="flex min-h-11 w-fit items-center gap-2 text-corpo hover:underline">
+            <LogoCliente logo={a.logo} nome={a.cliente} misura={32} />{a.cliente}
+          </Link>
+        )}
         {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
-        <p className="text-secondaria">{etichettaFamiglia(a.family)}</p>
-        <p className="text-secondaria text-grigio">{ETICHETTE_AUTOMAZIONE[a.status]}</p>
+        <p className="flex items-center gap-2 text-secondaria"><Punto colore={a.status === "attiva" ? "verde" : a.status === "in_costruzione" ? "giallo" : "grigio"} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
       </Intestazione>
+      <Sezione titolo="Flusso" coda={passiQ.data?.length ? `${passiQ.data.length} passaggi` : undefined}>
+        {passiQ.data && passiQ.data.length > 0
+          ? <Flusso passi={passiQ.data} onApri={setPasso} />
+          : <p className="text-secondaria text-grigio">Il flusso non è ancora descritto.</p>}
+        <Pulsante variante="secondario" className="self-start" onClick={() => setModifica(true)}>Modifica passaggi</Pulsante>
+      </Sezione>
+      <div className="grid max-w-[720px] gap-6">
       <Sezione titolo="Cosa fa">
         <Selettore<Famiglia> etichetta="Famiglia" opzioni={[...FAMIGLIE]} valore={(a.family as Famiglia | null) ?? null} onCambia={(v) => patch.mutate({ family: v })} />
-        <AreaTesto etichetta="Descrizione" rows={4} defaultValue={a.description ?? ""} onBlur={(e) => alBlur("description", e.target.value)} />
       </Sezione>
       <Sezione titolo="Dove gira">
         <Campo etichetta="Dove gira" aiuto="Per esempio: Cloudflare, Make, il computer del cliente" defaultValue={a.runsOn ?? ""} onBlur={(e) => alBlur("runsOn", e.target.value)} />
@@ -75,8 +93,12 @@ export function SchedaAutomazione({ id }: { id: string }) {
         </Sezione>
       )}
       <Sezione titolo="Note">
-        <AreaTesto etichetta="Note" rows={4} defaultValue={a.notes ?? ""} onBlur={(e) => alBlur("notes", e.target.value)} />
+        {a.description && <AreaTesto etichetta="Descrizione" cresce defaultValue={a.description} onBlur={(e) => alBlur("description", e.target.value)} />}
+        <AreaTesto etichetta="Note" cresce defaultValue={a.notes ?? ""} onBlur={(e) => alBlur("notes", e.target.value)} />
       </Sezione>
+      </div>
+      {passo && passiQ.data && <FoglioPasso passo={passo} numero={passiQ.data.indexOf(passo) + 1} onChiudi={() => setPasso(null)} />}
+      {modifica && <FoglioPassaggi automazioneId={id} iniziali={passiQ.data ?? []} onChiudi={() => setModifica(false)} />}
       {a.status === "in_costruzione" && (
         <div className="sticky bottom-20 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full" inCorso={attiva.isPending} onClick={() => attiva.mutate()}>Segna attiva</Pulsante>

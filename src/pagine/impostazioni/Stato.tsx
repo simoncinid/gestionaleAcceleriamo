@@ -5,6 +5,7 @@ import { COLORE, ETICHETTA_STATO, Sezione, conGiroInRitardo, testoUltima, useSta
 const VOCI = [
   { titolo: "Fasi e regole", href: "/impostazioni/fasi" },
   { titolo: "Modelli", href: "/impostazioni/modelli" },
+  { titolo: "Lavori tipo", href: "/impostazioni/lavori-tipo" },
   { titolo: "Integrazioni", href: "/impostazioni/integrazioni" },
   { titolo: "Cestino", href: "/impostazioni/dati/cestino" },
 ];

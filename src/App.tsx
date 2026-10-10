@@ -12,6 +12,8 @@ import { Call } from "./pagine/commerciale/Call";
 import { DettaglioProposta } from "./pagine/commerciale/DettaglioProposta";
 import { Proposte } from "./pagine/commerciale/Proposte";
 import { FogliCreazione } from "./pagine/FogliCreazione";
+import { Lavori } from "./pagine/lavori/Lavori";
+import { LavoriTipo } from "./pagine/lavori/LavoriTipo";
 import { Numeri } from "./pagine/commerciale/Numeri";
 import { Cestino } from "./pagine/impostazioni/Cestino";
 import { Fasi } from "./pagine/impostazioni/Fasi";
@@ -92,10 +94,12 @@ export function App() {
         <Route path="/economia/costi" element={<Costi />} />
         <Route path="/automazioni" element={<Pannello />} />
         <Route path="/automazioni/in-costruzione" element={<InCostruzione />} />
+        <Route path="/automazioni/lavori" element={<Lavori />} />
         <Route path="/automazioni/:id" element={<SchedaAutomazioneRotta />} />
         <Route path="/impostazioni/dati/cestino" element={<Cestino />} />
         <Route path="/impostazioni" element={<Stato onEsci={esci} />} />
         <Route path="/impostazioni/fasi" element={<Fasi />} />
+        <Route path="/impostazioni/lavori-tipo" element={<LavoriTipo />} />
         <Route path="/impostazioni/modelli" element={<Modelli />} />
         <Route path="/impostazioni/integrazioni" element={<Integrazioni />} />
         <Route path="*" element={<Navigate to="/commerciale/oggi" replace />} />

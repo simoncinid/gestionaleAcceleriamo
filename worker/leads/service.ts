@@ -191,7 +191,7 @@ export async function clienteDelLead(db: Db, leadId: string): Promise<{ id: stri
 
 // Alla chiusura vinta nasce il cliente con il suo canone in attesa. Idempotente:
 // se il lead ha già un cliente (anche dopo riapertura e nuova chiusura) non se ne crea un altro.
-async function creaClienteDaLead(db: Db, lead: Lead, nome: string | undefined, actorId: string | null, now: number) {
+export async function creaClienteDaLead(db: Db, lead: Lead, nome: string | undefined, actorId: string | null, now: number) {
   if (await clienteDelLead(db, lead.id)) return;
   const clientId = crypto.randomUUID();
   const nomeCliente = nome ?? lead.company;
