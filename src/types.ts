@@ -29,6 +29,9 @@ export type Stats = {
   firstResponse: { avgMs: number | null; count: number };
 };
 export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";
+export type { Funnel, Stats1A, Tappa, TempoFase } from "../worker/numeri/funnel";
+export type { Campagne, LivelloCosto, RigaCampagna, RigaInserzione } from "../worker/numeri/campagne";
+export type { LeadAperto, Previsione, PropostaAperta, RigaFase } from "../worker/numeri/previsione";
 
 export type { CallAgenda } from "../worker/calls/service";
 export type { PropostaRiga } from "../worker/proposte/service";

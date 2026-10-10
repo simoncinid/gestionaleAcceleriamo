@@ -6,6 +6,7 @@ import { requireAuth } from "./auth/session";
 import { authRoutes } from "./auth/routes";
 import { documentRoutes, leadRoutes } from "./leads/routes";
 import { todayRoutes } from "./today/routes";
+import { numeriRoutes, spesaRoutes, statsAlias } from "./numeri/routes";
 import { avvisiRoutes } from "./avvisi/routes";
 import { badgeRoutes } from "./badge/routes";
 import { analisiRoutes, coachRoutes } from "./calls/coach-routes";
@@ -66,6 +67,9 @@ app.route("/api/notifications", avvisiRoutes);
 app.route("/api/push-subscriptions", pushRoutes);
 app.route("/api/claude", claudeRoutes);
 app.route("/api/ai-jobs", aiJobsRoutes);
+app.route("/api/numeri", numeriRoutes);
+app.route("/api/campaign-spend", spesaRoutes);
+app.route("/api", statsAlias);
 app.route("/api", todayRoutes);
 
 app.get("/api/health", (c) => c.json({ ok: true }));

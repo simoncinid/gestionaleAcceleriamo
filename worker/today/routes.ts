@@ -11,7 +11,6 @@ import type { CallOggi, Oggi, PropostaOggi, RigaOggi } from "./tipi";
 type CallGrezza = Omit<CallOggi, "scheda"> & { schedaStato: string | null };
 
 const GIORNO = 86_400_000;
-const HUMAN_TYPES = "('nota','chiamata','email','cambio_fase')";
 const FROM = "FROM leads l JOIN stages s ON s.id = l.stage_id";
 
 // Colonne di RigaOggi (slaScadenza si calcola dopo).
@@ -23,10 +22,6 @@ const APERTI = "l.deleted_at IS NULL AND s.kind = 'open'";
 const oggiSchema = z.object({
   chi: z.enum(["mie", "tutte"]).default("mie"),
   now: z.coerce.number().int().optional(),
-});
-const statsSchema = z.object({
-  from: z.coerce.number().int().default(0),
-  until: z.coerce.number().int().default(Number.MAX_SAFE_INTEGER),
 });
 
 const parametro = (params: string | undefined, chiave: string): number | undefined => {
@@ -141,22 +136,4 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
 todayRoutes.get("/today", async (c) => {
   const q = oggiSchema.parse(c.req.query());
   return c.json(await calcolaOggi(c.env.DB, c.get("user").id, q.chi, q.now ?? Date.now()));
-});
-
-todayRoutes.get("/stats", async (c) => {
-  const { from, until } = statsSchema.parse(c.req.query());
-  const db = c.env.DB;
-  const range = "l.deleted_at IS NULL AND l.created_at BETWEEN ? AND ?";
-  const [bySource, byCampaign, byStage, firstResponse] = await Promise.all([
-    db.prepare(`SELECT l.source, COUNT(*) AS total, SUM(s.kind = 'won') AS won, SUM(s.kind = 'lost') AS lost ${FROM} WHERE ${range} GROUP BY l.source ORDER BY total DESC`).bind(from, until).all(),
-    db.prepare(`SELECT COALESCE(l.meta_campaign, '(senza campagna)') AS campaign, COUNT(*) AS total, SUM(s.kind = 'won') AS won, SUM(s.kind = 'lost') AS lost ${FROM} WHERE ${range} AND l.source = 'meta' GROUP BY campaign ORDER BY total DESC`).bind(from, until).all(),
-    db.prepare(`SELECT s.id AS stageId, s.label, COUNT(l.id) AS count FROM stages s LEFT JOIN leads l ON l.stage_id = s.id AND ${range} GROUP BY s.id ORDER BY s.sort_order`).bind(from, until).all(),
-    db.prepare(
-      `SELECT AVG(first_at - created_at) AS avgMs, COUNT(*) AS count FROM (
-         SELECT l.created_at, (SELECT MIN(a.created_at) FROM activities a WHERE a.lead_id = l.id AND a.type IN ${HUMAN_TYPES}) AS first_at
-         FROM leads l WHERE ${range}
-       ) WHERE first_at IS NOT NULL`,
-    ).bind(from, until).first<{ avgMs: number | null; count: number }>(),
-  ]);
-  return c.json({ bySource: bySource.results, byCampaign: byCampaign.results, byStage: byStage.results, firstResponse });
 });
