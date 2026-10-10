@@ -73,7 +73,7 @@ export function euro(cents?: number | null): string {
   if (cents == null) return "";
   const n = Math.round(Math.abs(cents) / 100);
   const testo = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${cents < 0 ? "-" : ""}€ ${testo}`;
+  return `${cents < 0 && n > 0 ? "-" : ""}€ ${testo}`;
 }
 
 export const conteggioBadge = (n: number) => (n <= 0 ? null : n > 9 ? "9+" : String(n));
@@ -133,6 +133,15 @@ export function giorno(ms: number, ora = Date.now()): string {
   return `${p.giorno} ${MESI[p.mese - 1]}${p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : ""}`;
 }
 
+// "il 15 ott", ma "l'8 ott" e "l'11 ott" (QA del Piano A): anche "dal" e "al" si elidono ("dall'8", "all'11").
+const ELISO = { il: "l'", dal: "dall'", al: "all'" } as const;
+export function ilGiorno(ms: number, ora = Date.now(), prep: keyof typeof ELISO = "il"): string {
+  const g = partiRoma(ms).giorno;
+  return `${g === 8 || g === 11 ? ELISO[prep] : `${prep} `}${giorno(ms, ora)}`;
+}
+export const conArticolo = (prep: keyof typeof ELISO, numeroDelGiorno: number, resto: string) =>
+  `${numeroDelGiorno === 8 || numeroDelGiorno === 11 ? ELISO[prep] : `${prep} `}${resto}`;
+
 // QA 16: scadenza di una fattura contata in giorni di Roma, non in ore UTC.
 // "scade oggi", "scade domani", "scaduta da N giorni", altrimenti "scade il 15 ott" (con l'apostrofo per 8 e 11).
 export function scadenzaFattura(dueAt: number, ora = Date.now()): string {
@@ -140,8 +149,7 @@ export function scadenzaFattura(dueAt: number, ora = Date.now()): string {
   if (giorni === 0) return "scade oggi";
   if (giorni === 1) return "scade domani";
   if (giorni < 0) return `scaduta da ${-giorni} ${giorni === -1 ? "giorno" : "giorni"}`;
-  const g = partiRoma(dueAt).giorno;
-  return `scade ${g === 8 || g === 11 ? "l'" : "il "}${giorno(dueAt, ora)}`;
+  return `scade ${ilGiorno(dueAt, ora)}`;
 }
 
 // Valore per <input type="date">, sul fuso di Roma.

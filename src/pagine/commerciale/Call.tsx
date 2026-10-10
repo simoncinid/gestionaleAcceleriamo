@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type ReactNode } from "react";
 import { api } from "../../api";
 import { Contatto, Errore, Intestazione, Pulsante, Skeleton, StatoVuoto } from "../../ds";
-import { momento } from "../../format";
+import { conArticolo, momento } from "../../format";
 import { useOra } from "../../hooks";
 import type { CallAgenda } from "../../types";
 import { daRoma, inizioGiornoRoma, partiRoma } from "../../../worker/lib/roma";
@@ -68,7 +68,7 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
     queryFn: () => api<{ calls: CallAgenda[] }>(`/calls?da=${lunedi - 14 * GIORNO_MS}&a=${lunedi + 7 * GIORNO_MS}`).then((r) => r.calls),
   });
   const intestazione = (n?: number) => (
-    <Intestazione titolo="Call" numero={n} coda="questa settimana" eyebrow={`Settimana dal ${partiRoma(lunedi).giorno} al ${domenica.giorno}`} />
+    <Intestazione titolo="Call" numero={n} coda="questa settimana" eyebrow={`Settimana ${conArticolo("dal", partiRoma(lunedi).giorno, String(partiRoma(lunedi).giorno))} ${conArticolo("al", domenica.giorno, String(domenica.giorno))}`} />
   );
   if (q.isLoading) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Skeleton righe={6} /></div>;
   if (q.error) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;

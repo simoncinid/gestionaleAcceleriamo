@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   conteggioBadge, daIsoGiorno, euro, fermoDa, linkTel, linkWhatsApp, momento, percentuale, presetQuando, quando, riempiModello,
-  giorno, isoGiorno, nomeMese, mesiRecenti, percentualeOppureNd, euroCentesimi, centesimiDaTesto, scadenzaFattura, telefonoMostrato, testoSla, trascorso,
+  giorno, ilGiorno, isoGiorno, nomeMese, mesiRecenti, percentualeOppureNd, euroCentesimi, centesimiDaTesto, scadenzaFattura, telefonoMostrato, testoSla, trascorso,
 } from "../src/format";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0); // martedì 13 ottobre 2026, 10:00 a Roma
@@ -150,5 +150,21 @@ describe("formati dei Numeri", () => {
     expect(centesimiDaTesto("-3")).toBeNull();
     expect(centesimiDaTesto("12,345")).toBeNull();
     expect(centesimiDaTesto("dieci")).toBeNull();
+  });
+});
+
+describe("euro", () => {
+  it("niente meno davanti allo zero", () => {
+    expect(euro(-10)).toBe("€ 0");
+    expect(euro(-150_000)).toBe("-€ 1.500");
+  });
+});
+
+describe("ilGiorno", () => {
+  it("elisione davanti a 8 e 11", () => {
+    expect(ilGiorno(Date.UTC(2026, 9, 8, 10), ORA)).toBe("l'8 ott");
+    expect(ilGiorno(Date.UTC(2026, 10, 11, 10), ORA, "dal")).toBe("dall'11 nov");
+    expect(ilGiorno(Date.UTC(2026, 9, 15, 10), ORA, "al")).toBe("al 15 ott");
+    expect(ilGiorno(Date.UTC(2026, 9, 15, 10), ORA)).toBe("il 15 ott");
   });
 });

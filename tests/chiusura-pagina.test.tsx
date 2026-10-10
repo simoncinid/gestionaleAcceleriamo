@@ -30,8 +30,8 @@ describe("Q6: foglio di Chiuso precompilato", () => {
   });
   it("prima la proposta accettata, poi i soldi del lead, il nome dall'azienda", () => {
     const lead = { company: "Ferri Srl", setupCents: 100_000, feeCents: 10_000 };
-    const accettata = { status: "accettata", option: "canone", setupCents: 250_000, feeCents: 30_000 };
-    const rifiutata = { status: "rifiutata", option: "canone", setupCents: 900_000, feeCents: 90_000 };
+    const accettata = { status: "accettata", option: "standard", setupCents: 250_000, feeCents: 30_000 };
+    const rifiutata = { status: "rifiutata", option: "standard", setupCents: 900_000, feeCents: 90_000 };
     expect(precompilaChiusura(lead, [rifiutata, accettata])).toEqual({ setup: "2.500", canone: "300", nome: "Ferri Srl" });
     expect(precompilaChiusura(lead, [rifiutata])).toEqual({ setup: "1.000", canone: "100", nome: "Ferri Srl" });
     expect(precompilaChiusura({ ...lead, setupCents: null, feeCents: null })).toEqual({ setup: "", canone: "", nome: "Ferri Srl" });

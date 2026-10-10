@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { AreaTesto, Errore, Intestazione, Pulsante, Riga, Skeleton } from "../../ds";
-import { euro, momento, SOURCE_LABELS } from "../../format";
+import { conArticolo, euro, momento, SOURCE_LABELS } from "../../format";
+import { partiRoma } from "../../../worker/lib/roma";
 import { useUsers } from "../../hooks";
 import type { RevisioneApi } from "../../types";
 import { Gruppo, Voce } from "./numeri/righe";
@@ -53,7 +54,7 @@ export function Lunedi() {
   const scrivendo = r.commentoStato === "in_coda" || r.commentoStato === "in_corso";
   return (
     <div className="mx-auto flex max-w-[720px] flex-col gap-6 p-4">
-      <Intestazione titolo="Lunedì" numero={n.arrivati} coda="lead" eyebrow={`Settimana dal ${GIORNO_MESE.format(n.da)} al ${GIORNO_MESE.format(n.a - 1)}`} />
+      <Intestazione titolo="Lunedì" numero={n.arrivati} coda="lead" eyebrow={`Settimana ${conArticolo("dal", partiRoma(n.da).giorno, GIORNO_MESE.format(n.da))} ${conArticolo("al", partiRoma(n.a - 1).giorno, GIORNO_MESE.format(n.a - 1))}`} />
       <SegmentiOggi attivo="lunedi" />
       <Gruppo titolo="Numeri della settimana">
         <Voce nome="Lead arrivati" numero={n.arrivati} />
