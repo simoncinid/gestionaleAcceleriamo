@@ -5,18 +5,18 @@ import { api } from "../../api";
 import { AreaTesto, Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
+import type { Precompilato } from "../../../worker/calls/coach-routes";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
-import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type StatoEsito } from "./esito";
-
-// email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
-type LeadEsito = { id: string; company: string; contactName: string | null; stageId: string; attemptCount: number; email?: string | null };
+import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
 
 // Foglio "Com'è andata?": l'esito propone fase e prossima azione (le regole propongono, la persona salva).
-export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () => void }) {
+// "iniziale": i suggerimenti del coach. Il lead cambia solo con "Salva esito".
+export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onChiudi: () => void; iniziale?: Precompilato }) {
   const qc = useQueryClient();
   const fasi = useStages();
   const motivi = useQuery({ queryKey: ["settings"], queryFn: () => api<{ motivi: { id: string; etichetta: string }[] }>("/settings") });
-  const [s, setS] = useState<StatoEsito>(() => statoIniziale(crypto.randomUUID(), lead));
+  const [s, setS] = useState<StatoEsito>(() =>
+    statoIniziale(crypto.randomUUID(), lead, iniziale ? { ...iniziale, stageId: iniziale.stageId ?? undefined } : undefined));
   // Solo l'ultima proposta chiesta vale: un esito cambiato in fretta non viene sovrascritto da una risposta vecchia.
   const ultimaRichiesta = useRef(0);
   const senzaEmail = lead.email === null;
@@ -38,11 +38,13 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
     try {
       const p = await api<Proposta>(`/leads/${lead.id}/proposta?${q}`);
       if (n !== ultimaRichiesta.current) return;
+      // Con i suggerimenti del coach le regole non li sovrascrivono: fase e prossima azione restano quelle
+      // del coach (la fase solo se il coach ne ha proposta una), e la persona può sempre cambiarle.
       setS((prima) => ({
         ...prima,
-        stageId: p.stageId ?? prima.stageId,
-        nextAction: p.nextAction ?? "",
-        nextActionAt: p.nextActionAt,
+        stageId: iniziale?.stageId ? prima.stageId : p.stageId ?? prima.stageId,
+        nextAction: iniziale ? prima.nextAction : p.nextAction ?? "",
+        nextActionAt: iniziale ? prima.nextActionAt : p.nextActionAt,
         lostReason: p.lostReason ?? null,
       }));
     } catch {

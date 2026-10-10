@@ -4,13 +4,16 @@ import { api } from "../../api";
 import { Riga } from "../../ds";
 import { momento } from "../../format";
 import type { CallAgenda } from "../../types";
+import { CoachCall } from "./CoachCall";
+import type { LeadEsito } from "./esito";
 import { FoglioCall } from "./FoglioCall";
 import { leggiNote } from "./note-call";
 
 const STATO = { fatta: "Fatta", saltata: "Saltata", rimandata: "Rimandata" } as const;
 
 // Call del lead nella scheda: una riga per call, il tocco apre il foglio con esito e note.
-export function SezioneCall({ leadId, ora }: { leadId: string; ora?: number }) {
+// Sotto ogni call fatta c'è il coach (spec 6.7), se la scheda passa il lead per il Foglio Esito.
+export function SezioneCall({ leadId, ora, lead }: { leadId: string; ora?: number; lead?: LeadEsito }) {
   const q = useQuery({ queryKey: ["lead", leadId, "calls"], queryFn: () => api<{ calls: CallAgenda[] }>(`/leads/${leadId}/calls`).then((r) => r.calls) });
   const [aperta, setAperta] = useState<CallAgenda | null>(null);
   if (!q.data?.length) return null;
@@ -27,6 +30,7 @@ export function SezioneCall({ leadId, ora }: { leadId: string; ora?: number }) {
           return (
             <li key={k.id}>
               <Riga titolo={`Call di ${k.kind}, ${momento(k.scheduledAt, ora)}`} secondaria={k.outcome ? STATO[k.outcome] : "In programma"} meta={sintesi || undefined} onClick={() => setAperta(k)} />
+              {lead && k.outcome === "fatta" && <CoachCall callId={k.id} leadId={leadId} lead={lead} />}
             </li>
           );
         })}

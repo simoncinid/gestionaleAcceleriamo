@@ -29,9 +29,18 @@ export type EsitoBody = {
   note?: string; call?: { kind: "conoscenza"; scheduledAt: number; meetLink: string | null };
 };
 
+// email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
+export type LeadEsito = { id: string; company: string; contactName: string | null; stageId: string; attemptCount: number; email?: string | null };
+
 // Il requestId nasce quando il foglio si apre e resta lo stesso fino alla chiusura: il doppio tocco non duplica.
-export const statoIniziale = (requestId: string, lead: { stageId: string }): StatoEsito => ({
-  requestId, esito: null, stageId: lead.stageId, nextAction: "", nextActionAt: null, lostReason: null, note: "", callAt: null, meetLink: "",
+// "iniziale" arriva da "Applica i suggerimenti" del coach: fase, prossima azione e note già scritte, l'esito resta da scegliere.
+export const statoIniziale = (
+  requestId: string,
+  lead: { stageId: string },
+  iniziale?: Partial<Pick<StatoEsito, "stageId" | "nextAction" | "nextActionAt" | "note">>,
+): StatoEsito => ({
+  requestId, esito: null, stageId: iniziale?.stageId || lead.stageId, nextAction: iniziale?.nextAction ?? "", nextActionAt: iniziale?.nextActionAt ?? null,
+  lostReason: null, note: iniziale?.note ?? "", callAt: null, meetLink: "",
 });
 
 export const testoTentativo = (attemptCount: number, massimo = 5) => `Tentativo ${Math.min(attemptCount + 1, massimo)} di ${massimo}`;

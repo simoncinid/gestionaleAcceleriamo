@@ -161,7 +161,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       </div>
 
       <div className="flex min-w-0 flex-col gap-3">
-        <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} /></div>
+        <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} lead={lead} /></div>
         <div data-sezione="proposta"><SezioneProposta leadId={lead.id} /></div>
         <div data-sezione="scheda-azienda"><SezioneSchedaAzienda leadId={lead.id} manuale={lead.source === "manuale"} /></div>
 
