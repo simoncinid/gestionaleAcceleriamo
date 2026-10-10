@@ -40,14 +40,18 @@ export function CercaLead({ onScelto }: { onScelto: (l: LeadListItem) => void })
 
 export function FoglioAbbina({ proposta, onChiudi }: { proposta: PropostaRiga; onChiudi: () => void }) {
   const qc = useQueryClient();
+  const [lead, setLead] = useState<LeadListItem | null>(null);
   const salva = useMutation({
     mutationFn: (leadId: string) => api(`/proposals/${proposta.id}/abbina`, { method: "POST", json: { leadId } }),
     onSuccess: (_, leadId) => { toast.success(`Proposta ${proposta.number} abbinata`); aggiornaDopoProposta(qc, proposta.id, leadId); onChiudi(); },
     onError: (e) => toast.error(e.message),
   });
+  // Voce 44: scegliere il lead non abbina subito; si conferma col pulsante, "Cambia" torna alla ricerca.
   return (
-    <Foglio aperto titolo={`Abbina ${proposta.number}`} onChiudi={onChiudi}>
-      <CercaLead onScelto={(l) => salva.mutate(l.id)} />
+    <Foglio aperto titolo={`Abbina ${proposta.number}`} onChiudi={onChiudi}
+      principale={<Pulsante variante="primario" misura="lg" className="w-full" motivoSpento={lead ? undefined : "Scegli il lead"} inCorso={salva.isPending}
+        onClick={() => lead && salva.mutate(lead.id)}>{lead ? `Abbina a ${lead.company}` : "Abbina"}</Pulsante>}>
+      {lead ? <Riga titolo={lead.company} secondaria="Lead" destra={<Pulsante variante="fantasma" onClick={() => setLead(null)}>Cambia</Pulsante>} /> : <CercaLead onScelto={setLead} />}
     </Foglio>
   );
 }

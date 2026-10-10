@@ -1,3 +1,4 @@
+import { RigaLead } from "../src/pagine/commerciale/RigaOggi";
 import { describe, expect, it, vi } from "vitest";
 import { CLASSI_AVVISI } from "../src/avvisi";
 import { testoSla } from "../src/format";
@@ -46,10 +47,11 @@ describe("pagina Oggi", () => {
   it("niente da fare: stato vuoto e numeri del giorno, una informazione per riga", () => {
     const html = pagina(base);
     expect(html).toContain("Niente da fare adesso");
-    expect(html).toContain("Lead nuovi oggi: 3");
-    expect(html).toContain("Prima risposta media: 42 min");
-    expect(html).toContain("Call questa settimana: 2");
-    expect(html).toContain("Proposte aperte: 1");
+    expect(html).toMatch(/Lead nuovi oggi<\/span>.*>3<\/span>/);
+    expect(html).not.toContain("Lead nuovi oggi:");
+    expect(html).toMatch(/Prima risposta media<\/span>.*>42 min<\/span>/);
+    expect(html).toMatch(/Call questa settimana<\/span>.*>2<\/span>/);
+    expect(html).toMatch(/Proposte aperte<\/span>.*>1<\/span>/);
     expect(contaPrimari(html)).toBe(0);
   });
 
@@ -91,5 +93,14 @@ describe("avvisi", () => {
     expect(CLASSI_AVVISI.toast).toContain("text-ink!");
     expect(CLASSI_AVVISI.error).toContain("bg-avorio!");
     expect(JSON.stringify(CLASSI_AVVISI)).not.toMatch(/#[0-9a-f]{3,8}/i);
+  });
+});
+
+describe("Riga di Oggi: voce 40", () => {
+  it("sopra chi è e cosa fare, sotto contatti, Esito e Rimanda", () => {
+    const html = render(<ul><RigaLead l={riga("x")} ora={ORA} onEsito={() => {}} onRimanda={() => {}} /></ul>);
+    const link = html.indexOf("</a>");
+    expect(html.indexOf(">Esito<")).toBeGreaterThan(link);
+    expect(html.indexOf('aria-label="Rimanda"')).toBeGreaterThan(link);
   });
 });

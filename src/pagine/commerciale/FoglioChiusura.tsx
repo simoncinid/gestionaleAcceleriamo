@@ -47,7 +47,7 @@ export function FoglioChiusura({ lead, fase, onChiudi }: { lead: LeadChiusura; f
   });
   return (
     <Foglio aperto titolo={vinto ? "Chiuso: i dati del cliente" : `${fase.label}: perché`} onChiudi={onChiudi}
-      principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>{vinto && cambia ? "Chiudi e crea il cliente" : "Salva"}</Pulsante>}>
+      principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>{vinto && cambia ? "Chiudi e crea il cliente" : "Salva la chiusura"}</Pulsante>}>
       <div className="flex flex-col gap-3">
         {vinto ? (
           <>

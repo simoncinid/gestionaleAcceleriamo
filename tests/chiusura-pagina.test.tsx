@@ -56,3 +56,22 @@ describe("Q15: scheda di un lead chiuso", () => {
     expect(contaPrimari(html)).toBe(1);
   });
 });
+
+describe("Scheda lead: voci 30 e 41", () => {
+  const scheda = (stageId: string, cliente: LeadDetail["cliente"], lead: object = {}) => {
+    const d = dettaglio(stageId, cliente);
+    return render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], { ...d, lead: { ...d.lead, ...lead } }], [["stages"], FASI]] });
+  };
+  it("30: vinto senza cliente, l'unica azione in accento è Crea il cliente", () => {
+    const html = scheda("chiuso", null);
+    expect(html).toContain(">Crea il cliente<");
+    expect(html).not.toContain("Apri cliente");
+    expect(contaPrimari(html)).toBe(1);
+  });
+  it("41: freccia per tornare indietro, telefono ed email come link", () => {
+    const html = scheda("da-richiamare", null, { email: "luca@esempio.it" });
+    expect(html).toContain('aria-label="Torna indietro"');
+    expect(html).toContain('href="tel:+393330000001"');
+    expect(html).toContain('href="mailto:luca@esempio.it"');
+  });
+});

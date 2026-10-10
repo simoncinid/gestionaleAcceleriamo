@@ -1,4 +1,5 @@
 import { CaretDown } from "@phosphor-icons/react";
+import { Voce } from "./numeri/righe";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type ReactNode } from "react";
 import { api } from "../../api";
@@ -153,12 +154,13 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
           </div>
           <section aria-label="Numeri del giorno" className="flex flex-col gap-3">
             <h2 className="font-display text-titolo-card">Numeri del giorno</h2>
-            <div className={`${elenco} text-corpo tabular-nums [&>p]:px-4 [&>p]:py-3`}>
-              <p>Lead nuovi oggi: {d.numeri.leadNuovi}</p>
-              <p>Prima risposta media: {d.numeri.primaRispostaMinuti == null ? "nessun dato" : `${d.numeri.primaRispostaMinuti} min`}</p>
-              <p>Call questa settimana: {d.numeri.callSettimana}</p>
-              <p>Proposte aperte: {d.numeri.proposteAperte}</p>
-            </div>
+            {/* Voce 40: nome a sinistra e numero a destra, come in Numeri. */}
+            <ul className="flex flex-col divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio">
+              <Voce nome="Lead nuovi oggi" numero={d.numeri.leadNuovi} />
+              <Voce nome="Prima risposta media" numero={d.numeri.primaRispostaMinuti == null ? "nessun dato" : `${d.numeri.primaRispostaMinuti} min`} />
+              <Voce nome="Call questa settimana" numero={d.numeri.callSettimana} />
+              <Voce nome="Proposte aperte" numero={d.numeri.proposteAperte} />
+            </ul>
           </section>
         </div>
       </div>

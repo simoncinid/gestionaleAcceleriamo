@@ -41,14 +41,15 @@ function Gruppo({ titolo, n, children }: { titolo: string; n: number; children: 
   );
 }
 
+// Voce 34: il nome dell'azienda va a capo invece di troncarsi a 390 px.
 // Blocco di una call: ora a sinistra, azienda e tipo al centro (il tocco apre il foglio), azione a destra.
 function BloccoCall({ k, secondaria, meta, azione, onApri }: { k: CallAgenda; secondaria: string; meta?: string; azione: ReactNode; onApri: () => void }) {
   return (
     <li className="flex min-h-[72px] items-center gap-3 rounded-blocco border border-sabbia bg-avorio py-3 pl-4 pr-3">
       <span className="w-14 shrink-0 font-display text-titolo-card text-accento-testo tabular-nums">{ore(k.scheduledAt)}</span>
       <button type="button" onClick={onApri} className="min-w-0 flex-1 text-left">
-        <p className="truncate text-corpo font-semibold">{k.company}</p>
-        <p className="truncate text-secondaria text-grigio">{secondaria}</p>
+        <p className="break-words text-corpo font-semibold">{k.company}</p>
+        <p className="break-words text-secondaria text-grigio">{secondaria}</p>
         {meta && <p className="text-meta text-grigio">{meta}</p>}
       </button>
       <div className="flex shrink-0">{azione}</div>

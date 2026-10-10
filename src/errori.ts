@@ -30,3 +30,6 @@ export function messaggioImportInterrotto(messaggio: string, righeDelFile: numbe
     ? `${messaggio}. Entrate tutte le righe fino alla ${ultima} del file`
     : `${messaggio}. Entrate le righe fino alla ${ultima} del file; dalla riga ${prossima} in poi no`;
 }
+
+// Minore 3 della review: il server rifiuta con 422 una call nel passato; il messaggio va sotto la data, non in un toast.
+export const eCallNelPassato = (e: unknown): e is ApiError => e instanceof ApiError && e.status === 422 && e.message.startsWith("La call è nel passato");

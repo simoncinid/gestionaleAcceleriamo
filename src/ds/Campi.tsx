@@ -34,7 +34,7 @@ const perInput = (ms: number) => {
 
 // "Quando" è un selettore: i preset di presetQuando (senza quelli già passati), poi "Altro giorno e ora" che apre il campo data e ora.
 // L'istante di riferimento si congela al primo rendering: i preset relativi ("Tra 1 ora") non devono scivolare a ogni render.
-export function CampoQuando({ etichetta, valore, onCambia, ora, apertoAllInizio = false }: { etichetta: string; valore: number | null; onCambia: (ms: number | null) => void; ora?: number; apertoAllInizio?: boolean }) {
+export function CampoQuando({ etichetta, valore, onCambia, ora, apertoAllInizio = false, errore }: { etichetta: string; valore: number | null; onCambia: (ms: number | null) => void; ora?: number; apertoAllInizio?: boolean; errore?: string | null }) {
   const [base] = useState(() => ora ?? Date.now());
   const preset = useMemo(() => presetQuando(base).filter((p) => p.ms > base), [base]);
   const [scelta, setScelta] = useState<string | null>(() => {
@@ -53,15 +53,21 @@ export function CampoQuando({ etichetta, valore, onCambia, ora, apertoAllInizio 
         <input aria-label={`${etichetta}: giorno e ora`} type="datetime-local" className={campo} value={valore ? perInput(valore) : ""}
           onChange={(e) => onCambia(e.target.value ? new Date(e.target.value).getTime() : null)} />
       )}
+      {/* Minore 3 della review: il 422 della call nel passato si legge accanto alla data, non in un toast. */}
+      {errore && <p role="alert" className="text-secondaria text-errore">{errore}</p>}
     </div>
   );
 }
 
 // Giorno senza ora (data di inizio del contratto): "Oggi", "Lunedì prossimo", "Primo del mese prossimo",
 // poi "Scegli una data" che apre il campo data. Il valore è la mezzanotte di Roma del giorno scelto.
-export function CampoGiorno({ etichetta, valore, onCambia, ora }: { etichetta: string; valore: number | null; onCambia: (ms: number | null) => void; ora?: number }) {
+// Voce 33: finché il valore coincide con una scorciatoia la riga mostra la sua etichetta ("Oggi"), non la data.
+// `scorciatoie` cambia le voci (Segna incassata: "Oggi" e "Ieri").
+export function CampoGiorno({ etichetta, valore, onCambia, ora, scorciatoie = presetInizio }: {
+  etichetta: string; valore: number | null; onCambia: (ms: number | null) => void; ora?: number; scorciatoie?: (ora: number) => { etichetta: string; ms: number }[];
+}) {
   const [base] = useState(() => ora ?? Date.now());
-  const preset = useMemo(() => presetInizio(base), [base]);
+  const preset = useMemo(() => scorciatoie(base), [base, scorciatoie]);
   const [scelta, setScelta] = useState<string | null>(() => {
     if (valore == null) return null;
     const i = preset.findIndex((p) => p.ms === valore);
@@ -72,7 +78,7 @@ export function CampoGiorno({ etichetta, valore, onCambia, ora }: { etichetta: s
   return (
     <div className="flex flex-col gap-2">
       <Selettore etichetta={etichetta} opzioni={opzioni} valore={scelta}
-        testoValore={valore != null ? giorno(valore, base) : altra ? "Scegli una data" : undefined}
+        testoValore={valore != null ? (!altra && preset.find((p) => p.ms === valore)?.etichetta) || giorno(valore, base) : altra ? "Scegli una data" : undefined}
         onCambia={(v) => { setScelta(v); if (v !== "altra") onCambia(preset[Number(v)].ms); }} />
       {altra && (
         <input aria-label={`${etichetta}: giorno`} type="date" className={campo} value={valore ? giornoPerInput(valore) : ""}

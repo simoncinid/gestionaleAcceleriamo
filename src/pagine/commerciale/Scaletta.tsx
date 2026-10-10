@@ -52,6 +52,11 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
 
   // Cambiando vista o filtri la selezione si azzera: niente azioni su lead che non si vedono.
   useEffect(() => setScelti(new Set()), [chiave]);
+  // Voce 44: le azioni in blocco chiedono conferma (responsabile e fase scelti, poi il pulsante; cestino col secondo tocco).
+  const [nuovoResponsabile, setNuovoResponsabile] = useState<string | null>(null);
+  const [chiedeCestino, setChiedeCestino] = useState(false);
+  const [faseScelta, setFaseScelta] = useState<string | null>(null);
+  useEffect(() => { setNuovoResponsabile(null); setChiedeCestino(false); }, [scelti]);
 
   const multipla = useMutation({
     mutationFn: (corpo: Corpo) => api<{ fatti: number }>("/leads/bulk", { method: "POST", json: corpo }),
@@ -59,6 +64,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
       const n = `${r.fatti} lead`;
       toast.success(corpo.azione === "cestino" ? `${n} nel cestino` : corpo.azione === "fase" ? `${n} ${r.fatti === 1 ? "spostato" : "spostati"} di fase` : `Responsabile cambiato a ${n}`);
       setScelti(new Set());
+      setAperti({});
       for (const k of ["leads", "today", "badge"]) void qc.invalidateQueries({ queryKey: [k] });
     },
     onError: (e) => toast.error(e.message),
@@ -154,11 +160,24 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
               <span className="text-secondaria font-semibold tabular-nums">{scelti.size === 1 ? "1 selezionato" : `${scelti.size} selezionati`}</span>
               {pieno && <span className="text-meta text-grigio">Al massimo {MAX_SELEZIONE} per volta</span>}
               <div className="min-w-64">
-                <Selettore etichetta="Responsabile" segnaposto="Cambia" valore={null} onCambia={(id) => multipla.mutate({ ids: [...scelti], azione: "responsabile", valore: id })}
+                <Selettore etichetta="Responsabile" segnaposto="Cambia" valore={nuovoResponsabile} onCambia={setNuovoResponsabile}
                   opzioni={(utenti.data ?? []).map((u) => ({ valore: u.id, etichetta: u.name }))} />
               </div>
-              <Pulsante variante="secondario" onClick={() => setAperti({ sposta: [...scelti] })}>Sposta in fase</Pulsante>
-              <Pulsante variante="distruttivo" inCorso={multipla.isPending && multipla.variables?.azione === "cestino"} onClick={() => multipla.mutate({ ids: [...scelti], azione: "cestino" })}>Metti nel cestino</Pulsante>
+              {nuovoResponsabile && (
+                <>
+                  <Pulsante variante="secondario" inCorso={multipla.isPending && multipla.variables?.azione === "responsabile"}
+                    onClick={() => multipla.mutate({ ids: [...scelti], azione: "responsabile", valore: nuovoResponsabile })}>
+                    {`Assegna ${scelti.size} a ${nomeDi.get(nuovoResponsabile) ?? "chi hai scelto"}`}
+                  </Pulsante>
+                  <Pulsante variante="fantasma" onClick={() => setNuovoResponsabile(null)}>Annulla</Pulsante>
+                </>
+              )}
+              <Pulsante variante="secondario" onClick={() => { setFaseScelta(null); setAperti({ sposta: [...scelti] }); }}>Sposta in fase</Pulsante>
+              <Pulsante variante={chiedeCestino ? "distruttivo" : "secondario"} inCorso={multipla.isPending && multipla.variables?.azione === "cestino"}
+                onBlur={() => setChiedeCestino(false)}
+                onClick={() => (chiedeCestino ? multipla.mutate({ ids: [...scelti], azione: "cestino" }) : setChiedeCestino(true))}>
+                {chiedeCestino ? `Tocca di nuovo: ${scelti.size} nel cestino` : "Metti nel cestino"}
+              </Pulsante>
             </div>
           )}
           {righe.length === 0 ? vuoto : (
@@ -199,11 +218,16 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
       {aperti.filtri && <FoglioFiltri filtri={filtri} onApplica={setFiltri} onChiudi={() => setAperti({})} />}
       {aperti.esito && <FoglioEsito lead={aperti.esito} onChiudi={() => setAperti({})} />}
       {aperti.sposta && (
-        <Foglio aperto titolo={aperti.sposta.length === 1 ? "Sposta in fase" : `Sposta ${aperti.sposta.length} lead`} onChiudi={() => setAperti({})}>
+        <Foglio aperto titolo={aperti.sposta.length === 1 ? "Sposta in fase" : `Sposta ${aperti.sposta.length} lead`} onChiudi={() => setAperti({})}
+          principale={<Pulsante variante="primario" misura="lg" className="w-full" motivoSpento={faseScelta ? undefined : "Scegli la fase"}
+            inCorso={multipla.isPending && multipla.variables?.azione === "fase"}
+            onClick={() => faseScelta && multipla.mutate({ ids: aperti.sposta!, azione: "fase", valore: faseScelta })}>
+            {faseScelta ? `Sposta in ${tutte.find((f) => f.id === faseScelta)?.label ?? "fase"}` : "Sposta"}
+          </Pulsante>}>
           <div className="flex flex-col gap-3">
-            <Selettore etichetta="Fase" apertoAllInizio valore={null}
+            <Selettore etichetta="Fase" apertoAllInizio valore={faseScelta}
               opzioni={tutte.filter((f) => !f.requiresReason && f.kind !== "won" && !callPerFase(f.id)).map((f) => ({ valore: f.id, etichetta: f.label }))}
-              onCambia={(id) => { multipla.mutate({ ids: aperti.sposta!, azione: "fase", valore: id }); setAperti({}); }} />
+              onCambia={setFaseScelta} />
             <p className="text-meta text-grigio">Chiuso, le fasi perse e quelle con una call si scelgono dalla scheda del lead: chiedono il motivo, i dati del vinto o la data della call.</p>
           </div>
         </Foglio>

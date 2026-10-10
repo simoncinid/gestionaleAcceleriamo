@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
+import { eCallNelPassato } from "../../errori";
 import { Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
 
@@ -18,6 +19,7 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase }: {
   const [meet, setMeet] = useState("");
   const [invito, setInvito] = useState(haEmail);
   const resend = useResendCollegato();
+  const [erroreData, setErroreData] = useState<string | null>(null);
   const salva = useMutation({
     mutationFn: () => api<Risposta>(`/leads/${leadId}/calls`, { method: "POST", json: { kind, scheduledAt: quando, meetLink: meet.trim() || null, invito } }),
     onSuccess: (r) => {
@@ -28,7 +30,7 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase }: {
       for (const k of [["lead", leadId], ["calls"], ["today"], ["leads"], ["badge"]]) void qc.invalidateQueries({ queryKey: k });
       onChiudi();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
   return (
     <Foglio aperto titolo={fase ? `${fase.label}: quando è la call` : "Fissa call"} onChiudi={onChiudi}
@@ -39,7 +41,7 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase }: {
       }>
       <div className="flex flex-col gap-3">
         {!fase && <Selettore etichetta="Tipo" opzioni={[{ valore: "conoscenza", etichetta: "Conoscenza" }, { valore: "presentazione", etichetta: "Presentazione del preventivo" }]} valore={kind} onCambia={setKind} />}
-        <CampoQuando etichetta="Giorno e ora" valore={quando} onCambia={setQuando} />
+        <CampoQuando etichetta="Giorno e ora" valore={quando} onCambia={(ms) => { setQuando(ms); setErroreData(null); }} errore={erroreData} />
         <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={meet} onChange={(e) => setMeet(e.target.value)} />
         <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
         <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={!haEmail} inCoda={!resend} />

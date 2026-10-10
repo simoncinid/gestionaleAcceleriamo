@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
+import { eCallNelPassato } from "../../errori";
 import { AreaTesto, Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
@@ -45,6 +46,7 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
     }
   };
 
+  const [erroreData, setErroreData] = useState<string | null>(null);
   const salva = useMutation({
     mutationFn: () => api<{ callId: string | null }>(`/leads/${lead.id}/esito`, { method: "PATCH", json: corpoEsito(s) }),
     onSuccess: (r) => {
@@ -58,7 +60,7 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
       for (const k of [["today"], ["badge"], ["lead", lead.id], ["leads"], ["calls"]]) void qc.invalidateQueries({ queryKey: k });
       onChiudi();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
   const errore =
     validaEsito(s, motivoObbligatorio) ??
@@ -95,7 +97,7 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
           <div className="flex flex-col gap-3 pt-1">
             <p className="text-secondaria font-medium">Call di conoscenza</p>
             <CampoQuando etichetta="Data della call" valore={s.callAt}
-              onCambia={(ms) => { setS((p) => ({ ...p, callAt: ms })); if (ms != null) void scegli("appuntamento", ms); }} />
+              onCambia={(ms) => { setErroreData(null); setS((p) => ({ ...p, callAt: ms })); if (ms != null) void scegli("appuntamento", ms); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={s.meetLink} onChange={(e) => setS((p) => ({ ...p, meetLink: e.target.value }))} />
             <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
             <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} inCoda={!resend} />

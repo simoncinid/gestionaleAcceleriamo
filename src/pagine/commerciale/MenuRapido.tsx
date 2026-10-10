@@ -8,14 +8,15 @@ import { compila, modelloPer } from "./modelli";
 
 const TOCCO_LUNGO = 500;
 
+// Voce 42: tutte le voci allineate a sinistra, contatti compresi.
 // Voci del menu: montate solo quando il menu è aperto, così i modelli si leggono solo quando servono.
-function Voci({ lead, chiudi, onEsito, onSposta }: { lead: LeadListItem; chiudi: () => void; onEsito: () => void; onSposta: () => void }) {
+export function Voci({ lead, chiudi, onEsito, onSposta }: { lead: LeadListItem; chiudi: () => void; onEsito: () => void; onSposta: () => void }) {
   const wa = modelloPer(useModelli().data, "whatsapp", lead.stageId, "non_ti_ho_trovato");
   return (
     <div role="group" aria-label={`Azioni rapide su ${lead.company}`}
       className="absolute right-2 top-14 z-10 grid w-56 gap-1 rounded-blocco border border-sabbia bg-avorio p-2 shadow-galleggiante">
-      <Contatto tipo="chiama" lead={lead} variante="fantasma" onAvvio={() => { avviaContatto(lead.id, "chiamata"); chiudi(); }} />
-      <Contatto tipo="whatsapp" lead={lead} variante="fantasma" testo={compila(wa?.body, lead)} onAvvio={() => { avviaContatto(lead.id, "whatsapp", wa?.id); chiudi(); }} />
+      <Contatto tipo="chiama" lead={lead} variante="fantasma" className="justify-start" onAvvio={() => { avviaContatto(lead.id, "chiamata"); chiudi(); }} />
+      <Contatto tipo="whatsapp" lead={lead} variante="fantasma" className="justify-start" testo={compila(wa?.body, lead)} onAvvio={() => { avviaContatto(lead.id, "whatsapp", wa?.id); chiudi(); }} />
       <Pulsante variante="fantasma" className="justify-start" onClick={() => { chiudi(); onEsito(); }}>Segna esito</Pulsante>
       <Pulsante variante="fantasma" className="justify-start" onClick={() => { chiudi(); onSposta(); }}>Sposta in fase</Pulsante>
     </div>
