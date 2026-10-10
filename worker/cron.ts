@@ -5,7 +5,7 @@ import { COSTO_AVVISI, controllaAvvisi, controllaMeta48 } from "./avvisi/control
 import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
 import { mandaInvitiInCoda } from "./calls/service";
-import { lavoraCoda } from "./claude/coda";
+import { lavoraCoda, orologioCoda } from "./claude/coda";
 import "./claude/tipi";
 import { ritentaConferme } from "./email/conferma";
 import type { Env } from "./env";
@@ -36,7 +36,9 @@ export type DefLavoro = {
   // da quello che resta tolta la riserva. Vale solo se le push sono collegate.
   riserva?: { query: number; sotto: number };
   // Un lavoro può restituire { sottorichieste: n } con quelle usate davvero: le altre prenotate tornano al giro.
-  esegui: (env: Env, now: number, limite: number) => Promise<unknown>;
+  // inizio: l'ora vera di partenza del giro (orologio della coda di Claude), per i lavori che devono
+  // smettere di avviare cose nuove dopo un certo tempo di giro.
+  esegui: (env: Env, now: number, limite: number, inizio?: number) => Promise<unknown>;
 };
 
 // Spec 16, frequenze. Il blocco è di 5 minuti: un giro partito in ritardo di qualche secondo resta il suo.
@@ -113,8 +115,9 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // Al massimo 3 per giro (lavoriPerGiro in Impostazioni può abbassarlo). Senza chiave o senza tipi costa zero.
   claude: {
     quando: sempre, fisse: 8, perUnita: 11, sottoPerUnita: 3, max: 3,
-    esegui: async (e, n, l) => {
-      const r = await lavoraCoda(e, n, l);
+    esegui: async (e, n, l, inizio) => {
+      // I 9 minuti senza lavori nuovi contano dall'inizio del giro, non dall'ingresso nella coda.
+      const r = await lavoraCoda(e, n, l, inizio);
       return { ...r, sottorichieste: (r.fatti + r.errori) * 3 };
     },
   },
@@ -161,6 +164,7 @@ export async function scadiProposte(db: Db, now: number): Promise<number> {
 // Le query si contano davvero (contaD1); le sottorichieste si prenotano dalla stima del lavoro.
 export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; saltati: Lavoro[]; errori: string[]; query: number }> {
   if (env.SPAZIO === "demo") return { fatti: [], saltati: [], errori: [], query: 0 };
+  const inizio = orologioCoda();
   const contatore = { query: 0 };
   const envContato: Env = { ...env, DB: contaD1(env.DB, contatore) };
   const p = partiRoma(now);
@@ -179,7 +183,7 @@ export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; sa
     }
     sotto -= limite * def.sottoPerUnita;
     try {
-      const esito = await def.esegui(envContato, now, limite);
+      const esito = await def.esegui(envContato, now, limite, inizio);
       const usate = (esito as { sottorichieste?: unknown } | null)?.sottorichieste;
       if (typeof usate === "number") sotto += Math.max(0, limite * def.sottoPerUnita - usate);
       fatti.push(nome);

@@ -51,16 +51,22 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
   const uso = usoVuoto();
   let modello = r.modello;
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: r.testo }];
+  // Testo e citazioni di tutte le risposte, comprese quelle in pausa (pause_turn): niente va perso.
+  const testi: Anthropic.TextBlock[] = [];
   for (let i = 0; i <= MAX_CONTINUAZIONI; i++) {
     const resta = scadenza - Date.now();
     if (resta <= 0) throw new ErroreClaude("Chiamata interrotta", uso, modello, true, true);
+    // max_uses vale per richiesta: le continuazioni chiedono solo le ricerche rimaste, così il totale resta quello
+    // stimato nella prenotazione. Se non ne resta nessuna ci si ferma (si paga quello che è stato usato).
+    const ricerche = r.ricerche ? r.ricerche - uso.ricerche : 0;
+    if (r.ricerche && ricerche < 1) throw new ErroreClaude("Ricerca troppo lunga", uso, modello, false);
     // Il pensiero resta quello predefinito del modello: su Sonnet 5.5 "disabled" dà 400.
     const params = {
       model: r.modello,
       max_tokens: r.maxTokens,
       system: r.sistema,
       messages,
-      ...(r.ricerche ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: r.ricerche }] } : {}),
+      ...(r.ricerche ? { tools: [{ type: "web_search_20260209", name: "web_search", max_uses: ricerche }] } : {}),
       ...(r.schema ? { output_config: { format: { type: "json_schema", schema: r.schema } } } : {}),
       ...(fallback ? { fallbacks: "default" } : {}),
     } as unknown as Anthropic.MessageCreateParamsNonStreaming;
@@ -77,6 +83,8 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
     }
     somma(uso, res.usage);
     modello = res.model;
+    const testiQui = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text");
+    testi.push(...testiQui);
     if (res.stop_reason === "pause_turn") {
       // La ricerca web si è fermata a metà: si rimanda il turno dell'assistente così com'è e il server riprende.
       messages.push({ role: "assistant", content: res.content as unknown as Anthropic.ContentBlockParam[] });
@@ -84,7 +92,6 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
     }
     if (res.stop_reason === "refusal") throw new ErroreClaude("Claude ha rifiutato la richiesta", uso, modello, false);
     if (res.stop_reason === "max_tokens") throw new ErroreClaude("Risposta troncata", uso, modello, false);
-    const testi = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text");
     const testo = testi.map((b) => b.text).join("");
     const fonti = new Map<string, Fonte>();
     for (const b of testi) {
@@ -94,8 +101,9 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
     }
     let json: unknown = null;
     if (r.schema) {
+      // Il JSON è nell'ultima risposta; il testo delle risposte in pausa (per esempio "Cerco...") non ne fa parte.
       try {
-        json = JSON.parse(testo);
+        json = JSON.parse(testiQui.map((b) => b.text).join(""));
       } catch {
         throw new ErroreClaude("Risposta non leggibile", uso, modello, false);
       }

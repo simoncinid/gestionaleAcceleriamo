@@ -13,7 +13,7 @@ import { b64u } from "../worker/push/cifra";
 import { setPushFetch } from "../worker/push/fetcher";
 import { setTelegramFetch } from "../worker/telegram/fetcher";
 import { chiamaClaude } from "../worker/claude/client";
-import { accoda, lavoraCoda, registraTipo, TIPI } from "../worker/claude/coda";
+import { accoda, AVVIO_MAX_MS, lavoraCoda, registraTipo, setOrologioCoda, TIPI } from "../worker/claude/coda";
 import { setClaudeFetch } from "../worker/claude/fetcher";
 import { contaD1 } from "../worker/lib/bilancio";
 import { rispostaClaude } from "./claude-fixture";
@@ -656,6 +656,47 @@ describe("giro con Claude", () => {
     expect(dopo.errori).toEqual([]);
     expect(await fatti()).toBe(3);
     expect(chiamateClaude).toBe(3);
+  });
+
+  // Al primo giro del lunedì la revisione costa 14 query e a Claude ne restano 16 (gliene servono 19): il lavoro
+  // aspetta in coda senza errori. Dal giro dopo la revisione costa 1 query e lunedì e Claude girano insieme.
+  it("lunedì 7:00 e 7:05 con un lavoro Claude e il foglio vuoto: la revisione nasce, Claude entra al giro dopo insieme al lunedì, sotto le 45 query", async () => {
+    await createUser();
+    tipoFinto();
+    const lun7 = daRoma(2026, 10, 12, 7, 0);
+    await accoda(env.DB, { tipo: "classificazione", entityId: "L1", leadId: "L1" }, lun7 - 60_000);
+    const c = contaQuery();
+    const primo = await giro(c.env, lun7);
+    expect(primo.errori).toEqual([]);
+    expect(primo.fatti).toContain("lunedi");
+    expect(primo.saltati).toContain("claude");
+    expect(primo.query).toBeLessThanOrEqual(45);
+    expect(await env.DB.prepare("SELECT count(*) n FROM weekly_reviews").first<{ n: number }>()).toEqual({ n: 1 });
+    const c2 = contaQuery();
+    const secondo = await giro(c2.env, lun7 + 5 * 60_000);
+    expect(secondo.errori).toEqual([]);
+    expect(secondo.fatti).toEqual(expect.arrayContaining(["lunedi", "claude"]));
+    expect(await fatti()).toBe(1);
+    expect(secondo.query).toBeLessThanOrEqual(45);
+    expect(c2.n()).toBeLessThanOrEqual(45);
+  });
+
+  it("i 9 minuti senza lavori nuovi contano dall'inizio del giro: un lavoro lento prima di Claude li consuma", async () => {
+    await createUser();
+    tipoFinto();
+    await treLavori(r(11, 10));
+    let ora = 5_000_000;
+    setOrologioCoda(() => ora);
+    const salvato = LAVORI.meta_48h!;
+    try {
+      registraLavoro("meta_48h", { ...salvato, quando: () => true, esegui: async () => { ora += AVVIO_MAX_MS + 1; } });
+      const esito = await giro(env, r(11, 10));
+      expect(esito.fatti).toContain("claude");
+      expect(await fatti()).toBe(0);
+    } finally {
+      registraLavoro("meta_48h", salvato);
+      setOrologioCoda(null);
+    }
   });
 
   // Review Focus 2: 2 lead dal foglio, 3 da Meta, conferme e inviti, 3 lavori Claude e 12 push in attesa.

@@ -26,14 +26,17 @@ export function registraTipo(t: AiTipo, d: DefTipo) {
 
 const BLOCCATO_DOPO = 20 * 60_000; // un lavoro "in corso" da 20 minuti è morto con l'invocazione (un cron dura al massimo 15)
 const MAX_TENTATIVI = 2;
-// Nessun lavoro nuovo dopo 9 minuti dall'ingresso nella coda: con al massimo 4 minuti di chiamata
-// (DURATA_MAX_MS) l'ultimo finisce entro 13, sotto i 15 minuti del Cron Trigger. Il resto aspetta il giro dopo.
+// Nessun lavoro nuovo dopo 9 minuti dall'inizio del giro (il giro passa la sua ora di partenza; chiamata da sola,
+// l'ingresso nella coda): con al massimo 4 minuti di chiamata (DURATA_MAX_MS) l'ultimo finisce entro 13, sotto i
+// 15 minuti del Cron Trigger. Il resto aspetta il giro dopo.
 export const AVVIO_MAX_MS = 9 * 60_000;
 // Il tempo trascorso si misura con l'orologio vero (non con "now" del cron); nei test si sostituisce.
 let orologio: () => number = () => Date.now();
 export function setOrologioCoda(f: (() => number) | null) {
   orologio = f ?? (() => Date.now());
 }
+// L'ora vera di adesso, sullo stesso orologio della coda: il giro la legge alla partenza.
+export const orologioCoda = () => orologio();
 
 const euroTondi = (cents: number) => `€ ${String(Math.round(cents / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
 
@@ -60,11 +63,12 @@ export async function spesoDelMese(db: D1Database, mese: string): Promise<number
 // Prenotazione: all'avvio il lavoro conta già il costo massimo (stimato = 1). Se l'invocazione muore a metà
 // la riga resta così, e il mese non sottostima mai. A fine lavoro diventa il costo vero.
 // "changes() = 1" lega l'inserimento all'aggiornamento appena fatto nella stessa batch: se un altro giro ha già
-// preso il lavoro, non si prenota niente.
-const prenota = (db: D1Database, idUso: string, job: LavoroAi, modello: string, massimo: number, mese: string, now: number) =>
+// preso il lavoro, non si prenota niente. Il tetto si ricontrolla qui, sullo speso scritto in D1 in questo istante:
+// due giri sovrapposti hanno letto lo speso all'inizio, ma solo il primo che prenota passa (la batch è atomica).
+const prenota = (db: D1Database, idUso: string, job: LavoroAi, modello: string, massimo: number, mese: string, now: number, tetto: number) =>
   db.prepare(`INSERT INTO claude_usage (id, job_id, tipo, modello, mese, ingresso, uscita, cache_lettura, cache_scrittura, ricerche, costo_micros, stimato, created_at)
-    SELECT ?1, ?2, ?3, ?4, ?5, 0, 0, 0, 0, 0, ?6, 1, ?7 WHERE changes() = 1`)
-    .bind(idUso, job.id, job.tipo, modello, mese, massimo, now);
+    SELECT ?1, ?2, ?3, ?4, ?5, 0, 0, 0, 0, 0, ?6, 1, ?7 WHERE changes() = 1 AND (SELECT coalesce(sum(costo_micros), 0) FROM claude_usage WHERE mese = ?5) + ?6 <= ?8`)
+    .bind(idUso, job.id, job.tipo, modello, mese, massimo, now, tetto);
 
 const chiudiUso = (db: D1Database, idUso: string, uso: Uso, modello: string, costo: number, stimato: boolean) =>
   db.prepare(`UPDATE claude_usage SET modello = ?2, ingresso = ?3, uscita = ?4, cache_lettura = ?5, cache_scrittura = ?6, ricerche = ?7,
@@ -79,7 +83,7 @@ const chiudiUso = (db: D1Database, idUso: string, uso: Uso, modello: string, cos
 // del gestore (al massimo 7, vedi tipi.ts). Un lavoro preso da un altro giro costa 2 query e conta lo stesso come
 // unità del giro.
 // Senza chiave o senza tipi registrati non tocca D1.
-export async function lavoraCoda(env: Env, now: number, limite: number): Promise<{ fatti: number; fermi: number; errori: number }> {
+export async function lavoraCoda(env: Env, now: number, limite: number, inizio = orologio()): Promise<{ fatti: number; fermi: number; errori: number }> {
   const esito = { fatti: 0, fermi: 0, errori: 0 };
   if (!env.ANTHROPIC_API_KEY) return esito; // "Non collegato": i lavori aspettano in coda
   const tipi = Object.keys(TIPI) as AiTipo[];
@@ -106,7 +110,6 @@ export async function lavoraCoda(env: Env, now: number, limite: number): Promise
   const tetto = microsDaCents(imp.tettoCents);
   const quanti = Math.min(limite, imp.lavoriPerGiro);
   const fermi: string[] = [];
-  const inizio = orologio();
   let presi = 0;
   for (const job of righe.map(daRiga)) {
     if (presi >= quanti) break;
@@ -122,9 +125,16 @@ export async function lavoraCoda(env: Env, now: number, limite: number): Promise
     const idUso = crypto.randomUUID();
     const presa = await db.batch([
       db.prepare("UPDATE ai_jobs SET stato = 'in_corso', started_at = ?1 WHERE id = ?2 AND stato = 'in_coda'").bind(now, job.id),
-      prenota(db, idUso, job, stima.modello, massimo, mese, now),
+      prenota(db, idUso, job, stima.modello, massimo, mese, now, tetto),
     ]);
     if (!presa[0].meta.changes) continue; // un altro giro l'ha già preso
+    if (!presa[1].meta.changes) {
+      // Preso, ma un giro sovrapposto ha speso nel frattempo: il tetto non c'è più. Il lavoro diventa fermo
+      // (l'aggiornamento dei fermi qui sotto non guarda lo stato) e il giro non spende niente. I lavori dopo
+      // ripassano dallo stesso controllo in D1: un Haiku che sta ancora sotto il tetto parte lo stesso.
+      fermi.push(job.id);
+      continue;
+    }
     speso += massimo;
     try {
       const r = await def.esegui(env, job, imp, now);

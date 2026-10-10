@@ -55,6 +55,38 @@ describe("chiamaClaude", () => {
     expect(r.uso.ingresso).toBe(1200);
   });
 
+  it("pause_turn: il testo e le fonti delle risposte in pausa non si perdono", async () => {
+    let n = 0;
+    setClaudeFetch(async () => (++n === 1
+      ? rispostaClaude({ testo: "## Chi è\n", stop: "pause_turn", citazioni: [{ url: "https://a.example", title: "A" }] })
+      : rispostaClaude({ testo: "Officina", citazioni: [{ url: "https://b.example", title: "B" }] })));
+    const r = await chiamaClaude(env, { modello: "claude-sonnet-5-5", sistema: "s", testo: "t", maxTokens: 100, ricerche: 5 });
+    expect(r.testo).toBe("## Chi è\nOfficina");
+    expect(r.fonti.map((f) => f.url)).toEqual(["https://a.example", "https://b.example"]);
+  });
+
+  it("pause_turn con lo schema: il JSON si legge dall'ultima risposta anche se prima c'era del testo", async () => {
+    let n = 0;
+    setClaudeFetch(async () => (++n === 1 ? rispostaClaude({ testo: "Cerco.", stop: "pause_turn" }) : rispostaClaude({ testo: '{"ok":true}' })));
+    const r = await chiamaClaude(env, { modello: "claude-sonnet-5-5", sistema: "s", testo: "t", maxTokens: 100, ricerche: 5, schema: { type: "object" } });
+    expect(r.json).toEqual({ ok: true });
+  });
+
+  it("max_uses: le continuazioni chiedono solo le ricerche rimaste; senza ricerche rimaste la chiamata si ferma", async () => {
+    const usi: number[] = [];
+    let n = 0;
+    setClaudeFetch(async (_u, init) => {
+      usi.push((JSON.parse(String(init!.body)) as { tools: { max_uses: number }[] }).tools[0].max_uses);
+      n++;
+      return rispostaClaude({ testo: "", stop: "pause_turn", ricerche: n === 1 ? 3 : 2 });
+    });
+    const e = await chiamaClaude(env, { modello: "claude-sonnet-5-5", sistema: "s", testo: "t", maxTokens: 100, ricerche: 5 }).catch((x) => x);
+    expect(usi).toEqual([5, 2]);
+    expect(e).toBeInstanceOf(ErroreClaude);
+    expect((e as ErroreClaude).message).toBe("Ricerca troppo lunga");
+    expect((e as ErroreClaude).uso.ricerche).toBe(5);
+  });
+
   it("rifiuto e risposta troncata diventano ErroreClaude non ritentabili con l'uso dentro", async () => {
     setClaudeFetch(async () => rispostaClaude({ testo: "", stop: "refusal", ingresso: 300 }));
     const e = await chiamaClaude(env, { modello: "claude-haiku-4-5", sistema: "s", testo: "t", maxTokens: 100 }).catch((x) => x);

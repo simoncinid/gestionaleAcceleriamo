@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
-import { TIPO_COACH } from "../worker/claude/coach";
+import { schemaCoach, taglia, TIPO_COACH } from "../worker/claude/coach";
 import { lavoraCoda, type LavoroAi } from "../worker/claude/coda";
 import { setClaudeFetch } from "../worker/claude/fetcher";
 import "../worker/claude/tipi";
@@ -94,8 +94,34 @@ describe("coach", () => {
     const g = await (await call("/api/calls/C1/coach", {}, cookie)).json<{ stato: string; risultato: { riassunto: string; controlli: string[]; prossimaAzione: { entroGiorni: number } } }>();
     expect(g.stato).toBe("pronto");
     expect(g.risultato.riassunto).toHaveLength(2000);
+    expect(g.risultato.riassunto.endsWith("...")).toBe(true);
     expect(g.risultato.controlli).toHaveLength(6);
     expect(g.risultato.prossimaAzione.entroGiorni).toBe(60);
+  });
+
+  it("taglio a fine parola con i puntini; i testi corti restano come sono", () => {
+    expect(taglia("Fissare la call di presentazione", 20)).toBe("Fissare la call...");
+    expect(taglia("Fissare la call", 20)).toBe("Fissare la call");
+    expect(taglia("a".repeat(30), 20)).toBe(`${"a".repeat(17)}...`);
+    expect(taglia("parola ".repeat(400), 2000).length).toBeLessThanOrEqual(2000);
+    expect(taglia("parola ".repeat(400), 2000).endsWith("parola...")).toBe(true);
+  });
+
+  it("zero fasi possibili: lo schema non ha un enum vuoto, la fase è sempre nulla", () => {
+    const s = schemaCoach([]) as { properties: { faseSuggerita: Record<string, unknown> } };
+    expect(s.properties.faseSuggerita).toEqual({ type: "null" });
+    expect((schemaCoach(["a"]) as { properties: { faseSuggerita: Record<string, unknown> } }).properties.faseSuggerita).toEqual({ type: "string", enum: ["a"] });
+  });
+
+  it("note della call lunghissime: verso Claude ne va al massimo un tetto fisso", async () => {
+    await env.DB.prepare("UPDATE calls SET notes = ?1 WHERE id = 'C1'").bind(JSON.stringify({ problema: "lungo ".repeat(1600), decide: "titolare ".repeat(1000) })).run();
+    await call("/api/calls/C1/coach", { method: "POST" }, cookie);
+    let msg = "";
+    setClaudeFetch(async (_u, init) => { msg = String((JSON.parse(String(init!.body)) as { messages: { content: string }[] }).messages[0].content); return rispostaClaude({ testo: risultato("in-attesa-preventivo") }); });
+    await lavoraCoda(env, ora, 3);
+    const note = (msg.match(/(lungo|titolare)/g) ?? []).join(" ");
+    expect(note.length).toBeGreaterThan(0);
+    expect(msg.length).toBeLessThan(9_000);
   });
 
   it("una richiesta già in coda non si raddoppia; una call non fatta non si manda al coach", async () => {

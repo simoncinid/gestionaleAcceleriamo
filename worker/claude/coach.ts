@@ -14,7 +14,15 @@ import { bloccoDatiLead } from "./dati-lead";
 // e cose da sistemare. Il coach non cambia niente da solo: "Applica i suggerimenti" apre il Foglio Esito già compilato.
 // Lo schema JSON non limita lunghezze e quantità: i testi troppo lunghi e le liste oltre sei voci si accorciano
 // invece di buttare la risposta; tutto il resto fuori forma (campi in più, tipi sbagliati) viene rifiutato.
-const testo = (max: number) => z.string().transform((s) => s.slice(0, max));
+// Il taglio cade sull'ultimo spazio e chiude con "...": mai una parola a metà (se lo spazio è troppo indietro, o non
+// c'è, si taglia al limite).
+export function taglia(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const corto = s.slice(0, max - 3);
+  const spazio = corto.lastIndexOf(" ");
+  return `${(spazio > max / 2 ? corto.slice(0, spazio) : corto).trimEnd()}...`;
+}
+const testo = (max: number) => z.string().transform((s) => taglia(s, max));
 const lista = <T extends z.ZodTypeAny>(voce: T) => z.array(voce).transform((a) => a.slice(0, 6));
 
 export const RisultatoCoach = z.object({
@@ -36,7 +44,8 @@ export function schemaCoach(fasi: string[]): Record<string, unknown> {
     type: "object",
     properties: {
       riassunto: { type: "string" },
-      faseSuggerita: { type: "string", enum: fasi },
+      // Con zero fasi un enum vuoto renderebbe lo schema non valido: la fase può essere solo nulla.
+      faseSuggerita: fasi.length ? { type: "string", enum: fasi } : { type: "null" },
       prossimaAzione: {
         type: "object",
         properties: { testo: { type: "string" }, entroGiorni: { type: "integer" } },
@@ -71,6 +80,9 @@ export const SISTEMA_PRESENTAZIONE = `${COMUNE}
 ricontattare e con quale testo; per ogni obiezione scrivi la risposta.`;
 
 const MAX_TOKENS = 3_000;
+// Tetto esplicito alle note della call verso Claude (la rotta ne accetta fino a 20.000 caratteri): con scheda (6.000)
+// e storico (4.000) l'ingresso resta sotto i 12.000 token della stima.
+export const NOTE_MAX = 6_000;
 // Solo le voci dello storico che raccontano il rapporto: niente documenti, cestino, unioni, migrazioni.
 const TIPI_STORICO = "('creazione','nota','chiamata','email','email_auto','cambio_fase','esito','call','proposta','contatto','meta')";
 
@@ -118,8 +130,14 @@ export const TIPO_COACH: DefTipo = {
     } catch {
       note = { libero: x.notes ?? "" };
     }
+    let restano = NOTE_MAX;
     const campiNote = Object.fromEntries(
-      Object.entries(note).filter(([, v]) => typeof v === "string" && v.trim()).map(([k, v]) => [`Note, ${etichetta.get(k) ?? k}`, v as string]),
+      Object.entries(note).filter(([, v]) => typeof v === "string" && v.trim()).flatMap(([k, v]) => {
+        if (restano < 20) return [];
+        const t = taglia(v as string, restano);
+        restano -= t.length;
+        return [[`Note, ${etichetta.get(k) ?? k}`, t]];
+      }),
     );
     const faseAttuale = tutte.results.find((f) => f.id === x.stageId)?.label ?? x.stageId;
     const testoRichiesta = [

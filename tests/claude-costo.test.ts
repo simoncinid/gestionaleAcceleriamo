@@ -19,7 +19,7 @@ describe("costo di Claude", () => {
     expect(prezzoDi(finto, "claude-sonnet-5-5").uscita).toBe(10);
   });
   it("modello sconosciuto: si usa il prezzo più alto del listino, mai zero", () => {
-    expect(prezzoDi(imp, "claude-nuovo")).toEqual({ ingresso: 4, uscita: 20, cacheLettura: 0.4, cacheScrittura: 5 });
+    expect(prezzoDi(imp, "claude-nuovo")).toEqual({ ingresso: 4, uscita: 20, cacheLettura: 0.2, cacheScrittura: 5 });
   });
   it("costo massimo: tutto il max_tokens in uscita e le ricerche piene", () => {
     expect(costoMassimoMicros({ modello: "claude-sonnet-5-5", ingresso: 160_000, maxTokens: 8_000, ricerche: 5 }, imp)).toBe(160_000 * 2 + 8_000 * 10 + 5 * 10_000);

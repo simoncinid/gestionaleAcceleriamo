@@ -93,8 +93,9 @@ export const IMPOSTAZIONI_DEFAULT: Impostazioni = {
       "claude-sonnet-5-5": { ingresso: 2, uscita: 10, cacheLettura: 0.2, cacheScrittura: 2.5 },
       // Il fallback del server per Sonnet 5.5 risponde con Sonnet 5: il costo segue il modello che ha risposto.
       "claude-sonnet-5": { ingresso: 2, uscita: 10, cacheLettura: 0.2, cacheScrittura: 2.5 },
-      // Lettura dalla cache di Opus tenuta a 0,4 (il listino dice 0,20): prezzo prudente, il tetto non sottostima.
-      "claude-opus-5-5": { ingresso: 4, uscita: 20, cacheLettura: 0.4, cacheScrittura: 5 },
+      // Listino Anthropic per Opus 5.5 (letto il 10/10/2026): 4 e 20 dollari per milione, lettura dalla cache 0,20,
+      // scrittura 1,25 volte l'ingresso. Le richieste di oggi non usano la cache: la voce conta solo se un giorno la useranno.
+      "claude-opus-5-5": { ingresso: 4, uscita: 20, cacheLettura: 0.2, cacheScrittura: 5 },
     },
     ricercaMicros: 10_000,
     tettoCents: 2000,

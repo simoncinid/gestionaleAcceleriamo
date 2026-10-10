@@ -214,6 +214,30 @@ describe("coda di Claude", () => {
     expect(await stato(b.id)).toBe("in_coda");
   });
 
+  it("due giri sovrapposti non sforano il tetto: la prenotazione ricontrolla lo speso in D1", async () => {
+    await spendi(19_300_000); // 19,30 + 0,45 passa una volta sola
+    TIPI.scheda!.esegui = async () => {
+      await new Promise((r) => setTimeout(r, 20));
+      return { uso: { ...usoVuoto(), ingresso: 160_000, uscita: 8_000, ricerche: 5 }, modello: "claude-sonnet-5-5" };
+    };
+    const a = await accoda(env.DB, { tipo: "scheda", entityId: "L1" }, ott);
+    const b = await accoda(env.DB, { tipo: "scheda", entityId: "L2" }, ott + 1);
+    // Il secondo giro legge lo speso prima che il primo prenoti: crede di avere margine per L2.
+    const [x, y] = await Promise.all([lavoraCoda(env, ott, 3), lavoraCoda(env, ott + 300_000, 3)]);
+    expect(x.fatti + y.fatti).toBe(1);
+    expect(await spesoDelMese(env.DB, "2026-10")).toBeLessThanOrEqual(20_000_000);
+    expect([await stato(a.id), await stato(b.id)].sort()).toEqual(["fermo_tetto", "pronto"]);
+  });
+
+  it("i 9 minuti contano dall'inizio del giro, non dall'ingresso nella coda", async () => {
+    const ora = 1_000_000;
+    setOrologioCoda(() => ora);
+    const a = await accoda(env.DB, { tipo: "classificazione", entityId: "A" }, ott);
+    expect((await lavoraCoda(env, ott, 3, ora - AVVIO_MAX_MS - 1)).fatti).toBe(0);
+    expect(await stato(a.id)).toBe("in_coda");
+    expect((await lavoraCoda(env, ott, 3, ora - 60_000)).fatti).toBe(1);
+  });
+
   it("un lavoro rimasto in corso da più di 20 minuti torna in coda", async () => {
     const { id } = await accoda(env.DB, { tipo: "classificazione", entityId: "L1" }, ott);
     await env.DB.prepare("UPDATE ai_jobs SET stato = 'in_corso', started_at = ?1 WHERE id = ?2").bind(ott - 21 * 60_000, id).run();
@@ -289,6 +313,14 @@ describe("rotte", () => {
     await env.DB.prepare("UPDATE ai_jobs SET stato = 'errore', tentativi = 2, errore = 'x' WHERE id = ?1").bind(id).run();
     expect((await call(`/api/ai-jobs/${id}/riprova`, { method: "POST" }, cookie)).status).toBe(200);
     expect(await env.DB.prepare("SELECT stato, tentativi, errore FROM ai_jobs WHERE id = ?1").bind(id).first()).toEqual({ stato: "in_coda", tentativi: 0, errore: null });
+    // Con un altro lavoro attivo per lo stesso oggetto la riprova non crea un doppione.
+    await env.DB.prepare("UPDATE ai_jobs SET stato = 'errore' WHERE id = ?1").bind(id).run();
+    const nuovo = await accoda(env.DB, { tipo: "scheda", entityId: "L1" }, ott + 1);
+    const doppio = await call(`/api/ai-jobs/${id}/riprova`, { method: "POST" }, cookie);
+    expect(doppio.status).toBe(409);
+    expect((await doppio.json<{ error: string }>()).error).toBe("C'è già un lavoro in corso per questo oggetto");
+    expect(await stato(id)).toBe("errore");
+    expect(await stato(nuovo.id)).toBe("in_coda");
     const no = await call("/api/ai-jobs/nessuno/riprova", { method: "POST" }, cookie);
     expect(no.status).toBe(404);
     expect(await no.json()).toEqual({ error: "Lavoro non trovato" });
