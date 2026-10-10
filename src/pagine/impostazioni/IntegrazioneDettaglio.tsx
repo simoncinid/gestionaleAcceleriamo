@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 import { Navigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../../api";
+import { mostraErrore } from "../../errori";
 import { Errore, Intestazione, Pulsante, Punto, Skeleton } from "../../ds";
 import { euroCentesimi, momento } from "../../format";
 import type { Integrazione, StatoSistema } from "../../types";
+import { ScollegaTelegram } from "./Profilo";
 import { SezioneAggancio, SezioneFoglio, SezioneResend } from "./integrazioni-sezioni";
 import { COLORE, ETICHETTA_STATO, rigaStato, useImpostazioni, useProfilo, useStatoSistema } from "./parti";
 import { EVENTI_TELEGRAM, LinkTelegram, useTelegram } from "./Profilo";
@@ -23,7 +25,7 @@ function Prova({ percorso, testo, fatto }: { percorso: string; testo: string; fa
   const m = useMutation({
     mutationFn: () => api(percorso, { method: "POST" }),
     onSuccess: () => { toast.success(fatto); void qc.invalidateQueries({ queryKey: ["integrazioni"] }); },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => mostraErrore(e),
   });
   return <div><Pulsante variante="secondario" inCorso={m.isPending} onClick={() => m.mutate()}>{testo}</Pulsante></div>;
 }
@@ -74,7 +76,7 @@ function Telegram({ i }: { i: Integrazione }) {
         {mia ? (
           <>
             <Prova percorso="/integrations/telegram/prova" testo="Manda un messaggio di prova" fatto="Messaggio di prova mandato sulla tua chat" />
-            <Pulsante variante="distruttivo" inCorso={scollega.isPending} onClick={() => scollega.mutate()}>Scollega la tua chat</Pulsante>
+            <ScollegaTelegram scollega={scollega} testo="Scollega la tua chat" />
           </>
         ) : (
           <Pulsante variante="secondario" inCorso={collega.isPending} onClick={() => collega.mutate()}>{link ? "Chiedi un codice nuovo" : "Collega la tua chat"}</Pulsante>

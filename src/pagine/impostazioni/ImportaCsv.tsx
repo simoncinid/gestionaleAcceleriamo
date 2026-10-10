@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { Intestazione, Pulsante, Riga } from "../../ds";
+import { messaggioImportInterrotto } from "../../errori";
 import type { AnteprimaImport } from "../../types";
 
 const BLOCCO = 20; // come il server: 20 righe per richiesta restano sotto le 50 query
@@ -15,7 +16,8 @@ export function ImportaCsv() {
   const qc = useQueryClient();
   const [anteprima, setAnteprima] = useState<AnteprimaImport | null>(null);
   const [fatti, setFatti] = useState(0);
-  const entrati = useRef(0); // il toast di errore legge il conteggio vero, non quello del render
+  const entrati = useRef(0); // righe dei blocchi riusciti: il toast di errore legge il conteggio vero, non quello del render
+  const righeDelFile = useRef<number[]>([]);
   const leggi = useMutation({
     mutationFn: async (file: File) => api<AnteprimaImport>("/import/leads?anteprima=1", { method: "POST", json: { csv: await file.text() } }),
     onSuccess: (a) => { setAnteprima(a); setFatti(0); },
@@ -26,17 +28,18 @@ export function ImportaCsv() {
       const nuove = anteprima!.righe.filter((r) => r.esito === "nuovo");
       let creati = 0;
       entrati.current = 0;
+      righeDelFile.current = nuove.map((r) => r.riga);
       for (let i = 0; i < nuove.length; i += BLOCCO) {
         const r = await api<{ creati: number }>("/import/leads", { method: "POST", json: { righe: nuove.slice(i, i + BLOCCO) } });
         creati += r.creati;
-        entrati.current = creati;
+        entrati.current = Math.min(i + BLOCCO, nuove.length);
         setFatti(creati);
       }
       return creati;
     },
     onSuccess: (n) => { toast.success(`${n} lead importati: li trovi in Scaletta`); setAnteprima(null); void qc.invalidateQueries({ queryKey: ["leads"] }); },
-    // Un blocco fallito lascia importati quelli prima: il toast dice quanti sono entrati, rileggere il file li segna come doppioni.
-    onError: (e) => { toast.error(`${e.message}. Importati ${entrati.current}: rileggi il file per vedere cosa manca`); void qc.invalidateQueries({ queryKey: ["leads"] }); },
+    // Un blocco fallito lascia importati quelli prima: il toast dice fino a quale riga del file (voce 59), rileggere il file li segna come doppioni.
+    onError: (e) => { toast.error(messaggioImportInterrotto(e.message, righeDelFile.current, entrati.current)); void qc.invalidateQueries({ queryKey: ["leads"] }); },
   });
   return (
     <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">

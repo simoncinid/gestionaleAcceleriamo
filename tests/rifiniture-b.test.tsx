@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api";
 import { CardLead, Errore } from "../src/ds";
+import { eBloccoDemo, messaggioImportInterrotto, testoBloccoDemo } from "../src/errori";
+import { CorpoEsporta } from "../src/pagine/impostazioni/Dati";
 import { Fasi, FoglioFase } from "../src/pagine/impostazioni/Fasi";
+import { IntegrazioneDettaglio } from "../src/pagine/impostazioni/IntegrazioneDettaglio";
+import { Utenti } from "../src/pagine/impostazioni/Utenti";
 import { RiordinaFasi, spostaFase } from "../src/pagine/impostazioni/RiordinaFasi";
 import type { Stage } from "../src/types";
 import { IMPOSTAZIONI_DEFAULT } from "../worker/impostazioni/default";
@@ -60,5 +64,50 @@ describe("Errore", () => {
     const e = new ApiError(500, "Errore del server (codice ab12cd34)", { error: "Errore del server", errorId: "ab12cd34" });
     const html = render(<Errore errore={e} onRiprova={() => {}} />, { percorso: "/" });
     expect(html.match(/ab12cd34/g)).toHaveLength(1);
+  });
+});
+
+describe("Impostazioni: voci 46, 59, 60, 63, 64 e toast demo", () => {
+  const ORA = Date.UTC(2026, 9, 12, 9);
+  const stato = {
+    integrazioni: [{ key: "foglio", etichetta: "Foglio di Andrea", stato: "spento", ultimaOk: null, nota: null }, { key: "resend", etichetta: "Resend", stato: "spento", ultimaOk: null, nota: null }, { key: "telegram", etichetta: "Telegram", stato: "ok", ultimaOk: ORA, nota: null }],
+    settimana: { meta: 0, foglio: 0, aggancio: 0 }, errori: [], segreti: { meta: false, resend: false, google: false, aggancio: false }, foglio: { ultimaRiga: 1, ultimaLettura: null },
+  };
+  const dettaglio = (k: string, extra: [unknown[], unknown][] = []) => render(<IntegrazioneDettaglio ora={ORA} />, { percorso: `/impostazioni/integrazioni/${k}`, rotta: "/impostazioni/integrazioni/:key", dati: [[["integrazioni"], stato], [["settings"], IMPOSTAZIONI_DEFAULT], ...extra] });
+  it("46: senza letture non c'è \"Ultima riga letta\"", () => {
+    const html = dettaglio("foglio");
+    expect(html).not.toContain("Ultima riga letta");
+    expect(html).toContain("Il foglio non è ancora stato letto");
+    expect(html).not.toContain('type="checkbox"');
+    expect(html).toContain('role="switch"');
+  });
+  it("Resend: interruttore al posto della casella", () => {
+    const html = dettaglio("resend");
+    expect(html).not.toContain('type="checkbox"');
+    expect(html).toContain("Email di conferma ai lead nuovi");
+  });
+  it("64: scollega è secondario finché non si tocca di nuovo", () => {
+    const profilo = { id: "tommaso", name: "Tommaso", email: "t@esempio.it", telegram: true, avvisi: {}, quiete: null };
+    const html = dettaglio("telegram", [[["me", "profilo"], profilo]]);
+    expect(html).toMatch(/data-variante="secondario"[^>]*>(<[^>]+>)*Scollega la tua chat/);
+    expect(html).not.toContain('data-variante="distruttivo"');
+  });
+  it("63: se l'elenco degli utenti non arriva c'è l'errore con Riprova", () => {
+    const html = render(<Utenti />, { percorso: "/impostazioni/utenti", errori: [[["users"], new ApiError(500, "Errore del server (codice ab12cd34)")]] });
+    expect(html).toContain("Riprova");
+  });
+  it("60: nel foglio Esporta una riga spiega l'apostrofo davanti a +39", () => {
+    expect(render(<CorpoEsporta />)).toContain("Davanti ai telefoni come +39 trovi un apostrofo");
+  });
+  it("59: l'import interrotto dice fino a quale riga del file", () => {
+    expect(messaggioImportInterrotto("Errore del server", [2, 3, 5, 8], 2)).toBe("Errore del server. Entrate le righe fino alla 3 del file; dalla riga 5 in poi no");
+    expect(messaggioImportInterrotto("Errore del server", [2, 3], 0)).toBe("Errore del server. Nessuna riga importata: riprova");
+  });
+  it("toast demo: il 409 dello spazio demo è un blocco spiegato, non un errore", () => {
+    const e = new ApiError(409, "Spazio demo: password e nome dell'utente non si cambiano");
+    expect(eBloccoDemo(e)).toBe(true);
+    expect(testoBloccoDemo(e).titolo).toBe("Password e nome dell'utente non si cambiano");
+    expect(eBloccoDemo(new ApiError(409, "Questo lead ha già un cliente"))).toBe(false);
+    expect(eBloccoDemo(new ApiError(409, "Nello spazio demo il foglio non si legge"))).toBe(true);
   });
 });

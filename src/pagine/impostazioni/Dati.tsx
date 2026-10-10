@@ -24,12 +24,7 @@ export function Dati() {
         <li><Riga titolo="Registro delle modifiche" secondaria={r?.ultimaModifica ? `Ultima voce ${momento(r.ultimaModifica)}` : r ? "Nessuna voce" : undefined} href="/impostazioni/dati/registro" /></li>
         <li><Riga titolo="Spazio demo" secondaria="Dati finti per le presentazioni" onClick={() => setDemo(true)} /></li>
       </ul>
-      <Foglio aperto={esporta} titolo="Esporta in CSV" onChiudi={() => setEsporta(false)}>
-        <ul className="grid gap-1">
-          {ESPORTAZIONI.map(([k, t]) => <li key={k}><a className="flex min-h-11 items-center text-corpo font-semibold underline-offset-4 hover:underline" href={`/api/export/${k}`} download>{t}</a></li>)}
-        </ul>
-        <p className="text-secondaria text-grigio">Il file si apre con Excel o Google Fogli. Ogni scaricamento finisce nel registro.</p>
-      </Foglio>
+      <Foglio aperto={esporta} titolo="Esporta in CSV" onChiudi={() => setEsporta(false)}><CorpoEsporta /></Foglio>
       <Foglio aperto={demo} titolo="Spazio demo" onChiudi={() => setDemo(false)}>
         <p className="text-corpo">È una copia dell'app con dati finti, per le presentazioni ai clienti. Non tocca mai i lead veri e non manda email, notifiche o messaggi.</p>
         {r?.demoUrl
@@ -38,5 +33,18 @@ export function Dati() {
         <p className="text-secondaria text-grigio">Si entra con l'utente demo. I dati tornano come all'inizio ogni volta che chi gestisce il server rilancia il ripristino.</p>
       </Foglio>
     </div>
+  );
+}
+
+// Corpo del foglio Esporta, a parte per il test. Voce 60: una riga spiega l'apostrofo davanti ai "+39".
+export function CorpoEsporta() {
+  return (
+    <>
+      <ul className="grid gap-1">
+        {ESPORTAZIONI.map(([k, t]) => <li key={k}><a className="flex min-h-11 items-center text-corpo font-semibold underline-offset-4 hover:underline" href={`/api/export/${k}`} download>{t}</a></li>)}
+      </ul>
+      <p className="text-secondaria text-grigio">Il file si apre con Excel o Google Fogli. Ogni scaricamento finisce nel registro.</p>
+      <p className="text-secondaria text-grigio">Davanti ai telefoni come +39 trovi un apostrofo: protegge il foglio dalle formule, il numero resta giusto.</p>
+    </>
   );
 }

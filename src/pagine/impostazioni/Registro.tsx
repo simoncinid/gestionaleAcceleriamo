@@ -14,8 +14,8 @@ const ENTITA: Record<string, string> = {
 export function Registro() {
   const q = useInfiniteQuery({
     queryKey: ["audit"],
-    initialPageParam: null as number | null,
-    queryFn: ({ pageParam }) => api<{ voci: VoceAudit[]; prossimo: number | null }>(`/audit${pageParam ? `?prima=${pageParam}` : ""}`),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => api<{ voci: VoceAudit[]; prossimo: string | null }>(`/audit${pageParam ? `?prima=${encodeURIComponent(pageParam)}` : ""}`),
     getNextPageParam: (p) => p.prossimo,
   });
   const voci = q.data?.pages.flatMap((p) => p.voci) ?? [];

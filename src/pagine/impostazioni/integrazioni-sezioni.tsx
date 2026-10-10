@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
-import { AreaTesto, Campo, Pulsante, Riga } from "../../ds";
+import { mostraErrore } from "../../errori";
+import { AreaTesto, Campo, Interruttore, Pulsante, Riga } from "../../ds";
 import { momento } from "../../format";
 import type { GiroFoglio, Impostazioni, RigaAnteprima, StatoSistema, VoceRegistro } from "../../types";
 import { daLinkFoglio, leggiFinoAllaFine, linkDelFoglio } from "./regole";
@@ -34,7 +35,7 @@ export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Imp
       await api("/settings", { method: "PUT", json: { key: "foglio", value: { ...f, ...letto } } });
     },
     onSuccess: () => { toast.success("Foglio salvato"); for (const k of [["settings"], ["integrazioni"]]) void qc.invalidateQueries({ queryKey: k }); },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => mostraErrore(e),
   });
   // Un solo avviso che si aggiorna: avanzamento mentre gira, esito alla fine.
   const leggi = useMutation({
@@ -54,15 +55,19 @@ export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Imp
   const vedi = useMutation({
     mutationFn: () => api<Anteprima>("/integrations/foglio/anteprima"),
     onSuccess: setAnteprima,
-    onError: (e) => toast.error(e.message),
+    onError: (e) => mostraErrore(e),
   });
   const senzaLink = !foglio.spreadsheetId ? "Incolla il link del foglio e salva" : undefined;
   return (
     <>
       <Riquadro>
         <p>{`Account di servizio: ${presente(d.segreti.google)}`}</p>
-        <p>{`Ultima riga letta: ${d.foglio.ultimaRiga}`}</p>
-        {d.foglio.ultimaLettura != null && <p className="text-meta text-grigio">{`Ultima lettura ${momento(d.foglio.ultimaLettura, ora)}`}</p>}
+        {d.foglio.ultimaLettura == null ? <p className="text-meta text-grigio">Il foglio non è ancora stato letto</p> : (
+          <>
+            <p>{`Ultima riga letta: ${d.foglio.ultimaRiga}`}</p>
+            <p className="text-meta text-grigio">{`Ultima lettura ${momento(d.foglio.ultimaLettura, ora)}`}</p>
+          </>
+        )}
       </Riquadro>
       <div className="flex flex-col gap-1.5">
         <Campo etichetta="Link della scheda" type="url" inputMode="url" placeholder="https://docs.google.com/spreadsheets/d/..." value={link}
@@ -75,10 +80,7 @@ export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Imp
       {d.segreti.google && (
         <Campo etichetta="Nome della scheda" aiuto="Serve all'account di servizio: il nome scritto sulla linguetta in basso" value={f.scheda} onChange={(e) => setF({ ...f, scheda: e.target.value })} />
       )}
-      <label className="flex min-h-11 items-center gap-3 text-corpo">
-        <input type="checkbox" className="size-5 accent-accento" checked={f.attivo} onChange={(e) => setF({ ...f, attivo: e.target.checked })} />
-        Lettura automatica ogni 15 minuti
-      </label>
+      <Interruttore etichetta="Lettura automatica ogni 15 minuti" acceso={f.attivo} onCambia={(v) => setF({ ...f, attivo: v })} />
       <details className="rounded-controllo border border-sabbia px-3">
         <summary className="flex min-h-11 cursor-pointer items-center text-corpo font-semibold">Mappa delle colonne</summary>
         <div className="grid gap-3 pb-3">
@@ -114,7 +116,7 @@ export function SezioneAggancio({ d, ora }: { d: StatoSistema; ora: number }) {
   const prova = useMutation({
     mutationFn: () => api("/integrations/aggancio/prova", { method: "POST" }),
     onSuccess: () => { toast.success("Prova registrata: nessun lead toccato"); void qc.invalidateQueries({ queryKey: ["aggancio-registro"] }); },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => mostraErrore(e),
   });
   const indirizzo = typeof window === "undefined" ? "/api/hooks/proposals" : `${window.location.origin}/api/hooks/proposals`;
   return (
@@ -144,20 +146,17 @@ export function SezioneResend({ d, conferma }: { d: StatoSistema; conferma: Impo
   const salva = useMutation({
     mutationFn: () => api("/settings", { method: "PUT", json: { key: "conferma", value: c } }),
     onSuccess: () => { toast.success("Email salvata"); void qc.invalidateQueries({ queryKey: ["settings"] }); },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => mostraErrore(e),
   });
   const prova = useMutation({
     mutationFn: () => api<{ a: string }>("/integrations/resend/prova", { method: "POST" }),
     onSuccess: (r) => { toast.success(`Email di prova mandata a ${r.a}`); void qc.invalidateQueries({ queryKey: ["integrazioni"] }); },
-    onError: (e) => { toast.error(e.message); void qc.invalidateQueries({ queryKey: ["integrazioni"] }); },
+    onError: (e) => { mostraErrore(e); void qc.invalidateQueries({ queryKey: ["integrazioni"] }); },
   });
   return (
     <>
       <Riquadro><p>{`Chiave: ${presente(d.segreti.resend)}`}</p></Riquadro>
-      <label className="flex min-h-11 items-center gap-3 text-corpo">
-        <input type="checkbox" className="size-5 accent-accento" checked={c.attiva} onChange={(e) => setC({ ...c, attiva: e.target.checked })} />
-        Email di conferma ai lead nuovi
-      </label>
+      <Interruttore etichetta="Email di conferma ai lead nuovi" acceso={c.attiva} onCambia={(v) => setC({ ...c, attiva: v })} />
       <Campo etichetta="Mittente" value={c.mittente} onChange={(e) => setC({ ...c, mittente: e.target.value })} />
       <Campo etichetta="Le risposte vanno a" type="email" value={c.rispondiA} onChange={(e) => setC({ ...c, rispondiA: e.target.value })} />
       <AreaTesto etichetta="Piede dell'email" rows={3} value={c.piede} onChange={(e) => setC({ ...c, piede: e.target.value })} />

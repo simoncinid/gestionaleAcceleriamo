@@ -23,11 +23,11 @@ export function Diario({ ora = Date.now() }: { ora?: number }) {
   const [tipo, setTipo] = useState("tutti");
   const q = useInfiniteQuery({
     queryKey: ["diario", chi, area, ...(tipo === "tutti" ? [] : [tipo])],
-    initialPageParam: null as number | null,
+    initialPageParam: null as string | null,
     queryFn: ({ pageParam }) => {
       const p = new URLSearchParams({ chi, area, tipo });
-      if (pageParam) p.set("prima", String(pageParam));
-      return api<{ voci: VoceDiario[]; prossimo: number | null }>(`/diario?${p}`);
+      if (pageParam) p.set("prima", pageParam);
+      return api<{ voci: VoceDiario[]; prossimo: string | null }>(`/diario?${p}`);
     },
     getNextPageParam: (p) => p.prossimo,
   });

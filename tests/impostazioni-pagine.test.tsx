@@ -26,7 +26,7 @@ const stato: StatoSistema = {
   settimana: { meta: 4, foglio: 2, aggancio: 1 },
   errori: [{ key: "resend", etichetta: "Resend", errore: "Resend 500: errore finto", errorId: "ab12cd34", at: ORA - 600_000 }],
   segreti: { meta: true, resend: true, google: false, aggancio: true },
-  foglio: { ultimaRiga: 41, ultimaLettura: null },
+  foglio: { ultimaRiga: 41, ultimaLettura: ORA - 15 * 60_000 },
 };
 // Niente segreti, niente foglio: tutto "non collegato", niente rosso.
 const scollegato: StatoSistema = {

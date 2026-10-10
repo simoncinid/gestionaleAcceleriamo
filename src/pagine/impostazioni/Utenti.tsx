@@ -1,4 +1,4 @@
-import { Intestazione, Riga, Skeleton } from "../../ds";
+import { Errore, Intestazione, Riga, Skeleton } from "../../ds";
 import { useMe, useUsers } from "../../hooks";
 import { IlMioProfilo } from "./Profilo";
 
@@ -11,7 +11,7 @@ export function Utenti() {
       <Intestazione eyebrow="Impostazioni" titolo="Utenti e profilo" />
       <section aria-label="Utenti" className="grid gap-3">
         <h2 className="font-display text-titolo-card">Utenti</h2>
-        {u.isLoading ? <Skeleton righe={2} /> : (
+        {u.isLoading ? <Skeleton righe={2} /> : u.error ? <Errore errore={u.error} onRiprova={() => void u.refetch()} /> : (
           <ul className="grid gap-2">
             {(u.data ?? []).map((x) => <li key={x.id}><Riga titolo={x.id === me?.id ? `${x.name} (tu)` : x.name} secondaria="Socio" /></li>)}
           </ul>

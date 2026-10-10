@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
+import { mostraErrore } from "../../errori";
 import { Campo, Foglio, Interruttore, Pulsante, Riga } from "../../ds";
 import type { Profilo } from "../../types";
 import { AttivaNotifiche } from "./AttivaNotifiche";
@@ -16,7 +17,7 @@ const EVENTI: [string, string][] = [
 export const EVENTI_TELEGRAM = "Lead nuovo, Prima chiamata scaduta, Claude al tetto del mese";
 const ORA_VALIDA = /^([01]\d|2[0-3]):[0-5]\d$/;
 type Aperto = null | "password" | "dispositivi" | "telegram" | "avvisi" | "silenzio";
-const errore = (e: Error) => toast.error(e.message);
+const errore = (e: Error) => mostraErrore(e);
 
 function useSalvaProfilo(onFatto?: () => void) {
   const qc = useQueryClient();
@@ -98,6 +99,17 @@ function FoglioSilenzio({ p, onChiudi }: { p: Profilo; onChiudi: () => void }) {
   );
 }
 
+// Voce 64: scollegare è reversibile ma toglie gli avvisi, quindi chiede il secondo tocco (mai confirm()).
+export function ScollegaTelegram({ scollega, testo }: { scollega: { isPending: boolean; mutate: () => void }; testo: string }) {
+  const [chiede, setChiede] = useState(false);
+  return (
+    <Pulsante variante={chiede ? "distruttivo" : "secondario"} inCorso={scollega.isPending} onBlur={() => setChiede(false)}
+      onClick={() => (chiede ? scollega.mutate() : setChiede(true))}>
+      {chiede ? "Tocca di nuovo per scollegare" : testo}
+    </Pulsante>
+  );
+}
+
 function FoglioTelegram({ p, onChiudi }: { p: Profilo; onChiudi: () => void }) {
   const stato = useStatoSistema();
   const { link, collega, scollega } = useTelegram();
@@ -113,7 +125,7 @@ function FoglioTelegram({ p, onChiudi }: { p: Profilo; onChiudi: () => void }) {
         <>
           <p className="text-corpo">La tua chat è collegata.</p>
           <p className="text-secondaria text-grigio">{`Arrivano solo tre avvisi: ${EVENTI_TELEGRAM}.`}</p>
-          <div><Pulsante variante="distruttivo" inCorso={scollega.isPending} onClick={() => scollega.mutate()}>Scollega Telegram</Pulsante></div>
+          <div><ScollegaTelegram scollega={scollega} testo="Scollega Telegram" /></div>
         </>
       ) : (
         <>

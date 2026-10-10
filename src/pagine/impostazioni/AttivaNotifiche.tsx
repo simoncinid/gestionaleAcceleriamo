@@ -61,7 +61,7 @@ export function AttivaNotifiche({ ambiente }: { ambiente?: Ambiente }) {
       salvaIdPush(id);
       setIdSalvato(id);
       toast.success("Notifiche attive su questo dispositivo");
-      qc.invalidateQueries({ queryKey: ["push-dispositivi"] });
+      for (const k of [["push-dispositivi"], ["me", "profilo"], ["integrazioni"]]) void qc.invalidateQueries({ queryKey: k });
     },
     onError: (e) => toast.error(messaggioErroreAttiva(e)),
   });
@@ -74,7 +74,7 @@ export function AttivaNotifiche({ ambiente }: { ambiente?: Ambiente }) {
     }),
     onSuccess: ({ eraQuesto }) => {
       if (eraQuesto) setIdSalvato(null);
-      qc.invalidateQueries({ queryKey: ["push-dispositivi"] });
+      for (const k of [["push-dispositivi"], ["me", "profilo"], ["integrazioni"]]) void qc.invalidateQueries({ queryKey: k });
     },
     onError: (e) => toast.error(e.message),
   });
