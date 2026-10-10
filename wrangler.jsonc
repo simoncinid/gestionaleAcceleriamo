@@ -28,8 +28,8 @@
     "demo": {
       "name": "acceleriamo-os-demo",
       "d1_databases": [
-        // database_id: da sostituire con l'id stampato da "npx wrangler d1 create acceleriamo-os-demo" (non è un segreto).
-        { "binding": "DB", "database_name": "acceleriamo-os-demo", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "drizzle" }
+        // database_id: id del database demo creato il 10/10/2026 con "npx wrangler d1 create acceleriamo-os-demo" (non è un segreto).
+        { "binding": "DB", "database_name": "acceleriamo-os-demo", "database_id": "9926c2ad-d2ae-4dc9-8113-391ea144df6d", "migrations_dir": "drizzle" }
       ],
       "vars": { "META_GRAPH_VERSION": "v23.0", "SPAZIO": "demo", "DEMO_URL": "", "APP_URL": "https://acceleriamo-os-demo.acceleriamo-os.workers.dev" },
       "triggers": { "crons": [] }
