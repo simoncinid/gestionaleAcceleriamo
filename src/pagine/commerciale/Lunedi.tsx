@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { AreaTesto, Errore, Intestazione, Pulsante, Riga, Skeleton } from "../../ds";
@@ -14,8 +14,24 @@ type Decisioni = [string, string, string];
 const GIORNO_MESE = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "long" });
 const COMMENTO: Record<RevisioneApi["commentoStato"], string> = {
   nessuno: "", in_coda: "Claude scrive il commento: qualche minuto", in_corso: "Claude sta scrivendo il commento", pronto: "",
-  errore: "Il commento non è arrivato: riprova", fermo_tetto: "Commento fermo: Claude ha raggiunto il tetto del mese",
+  errore: "Il commento non è arrivato: riprova", fermo_tetto: "Claude è al tetto del mese: il commento riparte il mese prossimo",
 };
+// Con "Riscrivi" il commento di prima resta (voce 23): lo stato parla del nuovo, il vecchio si legge sotto.
+const COMMENTO_NUOVO: Partial<Record<RevisioneApi["commentoStato"], string>> = {
+  in_coda: "Nuovo commento in preparazione", in_corso: "Nuovo commento in preparazione",
+  errore: "Il nuovo commento non è arrivato: riprova", fermo_tetto: "Nuovo commento fermo: Claude è al tetto del mese",
+};
+
+// Voce 26: le richieste partono una dopo l'altra, così la chiusura non supera il salvataggio delle decisioni al blur.
+export function fila() {
+  let coda: Promise<unknown> = Promise.resolve();
+  return <T,>(f: () => Promise<T>): Promise<T> => {
+    const p = coda.then(f, f);
+    coda = p.catch(() => undefined);
+    return p;
+  };
+}
+
 const SEGNAPOSTO = ["Scrivi la prima decisione", "Scrivi la seconda decisione", "Scrivi la terza decisione"];
 
 // Spec 6.4, scheda Lunedì: numeri della settimana chiusa, cosa è fermo, soldi, tre decisioni, commento facoltativo.
@@ -31,6 +47,7 @@ export function Lunedi() {
   const [decisioni, setDecisioni] = useState<Decisioni>(["", "", ""]);
   // Le decisioni si caricano una volta per revisione: i rinfreschi del commento non cancellano quello che si sta scrivendo.
   useEffect(() => { if (q.data) setDecisioni(q.data.decisioni); }, [q.data?.id]);
+  const ordine = useRef(fila()).current;
   const salva = useMutation({
     mutationFn: (corpo: { decisioni: Decisioni; chiudi?: true }) => api<RevisioneApi>(`/weekly-reviews/${q.data!.id}`, { method: "PATCH", json: corpo }),
     onSuccess: (d, v) => { qc.setQueryData(["lunedi", "corrente"], d); if (v.chiudi) toast.success("Revisione chiusa"); },
@@ -48,10 +65,12 @@ export function Lunedi() {
   const chiusa = r.chiusaAt != null;
   const nomeDi = (id: string | null) => utenti.data?.find((u) => u.id === id)?.name ?? id ?? "";
   const salvaDecisioni = () => {
-    if (!chiusa && decisioni.some((d, i) => d !== r.decisioni[i])) salva.mutate({ decisioni });
+    if (!chiusa && decisioni.some((d, i) => d !== r.decisioni[i])) void ordine(() => salva.mutateAsync({ decisioni })).catch(() => undefined);
   };
   const fermi = n.fermi.length + n.proposteFerme.length;
   const scrivendo = r.commentoStato === "in_coda" || r.commentoStato === "in_corso";
+  const precedente = r.commento != null && COMMENTO_NUOVO[r.commentoStato] != null;
+  const statoCommento = precedente ? COMMENTO_NUOVO[r.commentoStato] : COMMENTO[r.commentoStato];
   return (
     <div className="mx-auto flex max-w-[720px] flex-col gap-6 p-4">
       <Intestazione titolo="Lunedì" numero={n.arrivati} coda="lead" eyebrow={`Settimana ${conArticolo("dal", partiRoma(n.da).giorno, GIORNO_MESE.format(n.da))} ${conArticolo("al", partiRoma(n.a - 1).giorno, GIORNO_MESE.format(n.a - 1))}`} />
@@ -98,10 +117,11 @@ export function Lunedi() {
       </section>
       <section className="flex flex-col gap-2">
         <h2 className="font-display text-titolo-blocco">Commento di Claude</h2>
+        {statoCommento && <p className="text-secondaria text-grigio">{statoCommento}</p>}
+        {precedente && <p className="text-meta text-grigio">Commento precedente</p>}
         {r.commento && <p className="whitespace-pre-line text-corpo">{r.commento}</p>}
-        {COMMENTO[r.commentoStato] && <p className="text-secondaria text-grigio">{COMMENTO[r.commentoStato]}</p>}
-        {!r.commento && !COMMENTO[r.commentoStato] && <p className="text-secondaria text-grigio">Facoltativo: Claude legge solo i numeri e le decisioni.</p>}
-        {!chiusa && !scrivendo && (
+        {!r.commento && !statoCommento && <p className="text-secondaria text-grigio">Facoltativo: Claude legge solo i numeri e le decisioni.</p>}
+        {!chiusa && !scrivendo && r.commentoStato !== "fermo_tetto" && (
           <div><Pulsante variante="secondario" inCorso={commento.isPending} onClick={() => commento.mutate()}>{r.commento ? "Riscrivi il commento" : "Scrivi il commento"}</Pulsante></div>
         )}
       </section>
@@ -110,7 +130,7 @@ export function Lunedi() {
       ) : (
         <div className="sticky bottom-20 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full md:w-auto" inCorso={salva.isPending && salva.variables?.chiudi === true}
-            onClick={() => salva.mutate({ decisioni, chiudi: true })}>Chiudi la revisione</Pulsante>
+            onClick={() => void ordine(() => salva.mutateAsync({ decisioni, chiudi: true })).catch(() => undefined)}>Chiudi la revisione</Pulsante>
         </div>
       )}
     </div>

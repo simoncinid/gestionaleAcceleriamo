@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Diario } from "../src/pagine/commerciale/Diario";
-import { Lunedi } from "../src/pagine/commerciale/Lunedi";
+import { fila, Lunedi } from "../src/pagine/commerciale/Lunedi";
 import { Oggi } from "../src/pagine/commerciale/Oggi";
 import { daRoma } from "../worker/lib/roma";
 import { contaPrimari, render } from "./render";
@@ -56,5 +56,39 @@ describe("Lunedì e Diario", () => {
     expect(conRevisione(daRoma(2026, 10, 12, 12, 0))).not.toContain("La revisione della settimana è pronta");
     expect(conRevisione(daRoma(2026, 10, 13, 9, 0))).not.toContain("La revisione della settimana è pronta");
     expect(conRevisione(daRoma(2026, 10, 12, 9, 0), { ...revisione, chiusaAt: 1, chiusaDa: "diego" })).not.toContain("La revisione della settimana è pronta");
+  });
+});
+
+describe("Lunedì: voci 23, 25 e 26", () => {
+  const pagina = (r: object) => render(<Lunedi />, { percorso: "/commerciale/oggi/lunedi", dati: [[["lunedi", "corrente"], { ...revisione, ...r }]] });
+  it("23: con Riscrivi il commento di prima resta, sotto lo stato del nuovo", () => {
+    const html = pagina({ commento: "Settimana buona", commentoStato: "in_corso" });
+    expect(html).toContain("Nuovo commento in preparazione");
+    expect(html).toContain("Commento precedente");
+    expect(html).toContain("Settimana buona");
+    expect(html.indexOf("Nuovo commento in preparazione")).toBeLessThan(html.indexOf("Settimana buona"));
+    const errore = pagina({ commento: "Settimana buona", commentoStato: "errore" });
+    expect(errore).toContain("Il nuovo commento non è arrivato: riprova");
+    expect(errore).toContain("Riscrivi il commento");
+  });
+  it("25: al tetto niente pulsante del commento, lo stato lo dice", () => {
+    const html = pagina({ commentoStato: "fermo_tetto" });
+    expect(html).toContain("Claude è al tetto del mese");
+    expect(html).not.toContain("Scrivi il commento");
+  });
+  it("26: la fila fa partire la chiusura solo dopo il salvataggio in volo", async () => {
+    const ordine = fila();
+    const visti: string[] = [];
+    let sblocca!: () => void;
+    const primo = ordine(() => new Promise<void>((ok) => { sblocca = () => { visti.push("decisioni"); ok(); }; }));
+    const secondo = ordine(async () => { visti.push("chiusura"); });
+    await Promise.resolve();
+    expect(visti).toEqual([]);
+    sblocca();
+    await Promise.all([primo, secondo]);
+    expect(visti).toEqual(["decisioni", "chiusura"]);
+    await ordine(() => Promise.reject(new Error("409"))).catch(() => undefined);
+    await ordine(async () => { visti.push("dopo l'errore"); });
+    expect(visti).toContain("dopo l'errore");
   });
 });
