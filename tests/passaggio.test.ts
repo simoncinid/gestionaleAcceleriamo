@@ -7,7 +7,7 @@ import { call } from "./helpers";
 // (Piano A e 1A); "x" sta per un id qualsiasi: il controllo della sessione viene prima di tutto il resto.
 const PROTETTE: [string, string][] = [
   ["GET", "/api/auth/me"], ["POST", "/api/auth/logout"],
-  ["GET", "/api/today"], ["GET", "/api/stats"], ["GET", "/api/badge"],
+  ["GET", "/api/today"], ["GET", "/api/stats"], ["GET", "/api/badge"], ["GET", "/api/notifications"], ["POST", "/api/notifications/letti"],
   ["GET", "/api/leads"], ["POST", "/api/leads"], ["POST", "/api/leads/bulk"], ["GET", "/api/leads/trash"],
   ["GET", "/api/leads/x"], ["PATCH", "/api/leads/x"], ["DELETE", "/api/leads/x"], ["PATCH", "/api/leads/x/esito"],
   ["POST", "/api/leads/x/contatti"], ["GET", "/api/leads/x/calls"], ["POST", "/api/leads/x/calls"],
@@ -29,7 +29,17 @@ const PROTETTE: [string, string][] = [
   ["GET", "/api/economia/costi"], ["POST", "/api/economia/costi"],
   ["GET", "/api/clients"], ["POST", "/api/clients"], ["GET", "/api/clients/x"], ["PATCH", "/api/clients/x"],
   ["GET", "/api/automations"], ["POST", "/api/automations"], ["GET", "/api/automations/x"], ["PATCH", "/api/automations/x"],
-  ["POST", "/api/automations/x/attiva"],
+  ["POST", "/api/automations/x/attiva"], ["GET", "/api/automations/x/steps"], ["PUT", "/api/automations/x/steps"],
+  ["GET", "/api/job-templates"], ["POST", "/api/job-templates"], ["PUT", "/api/job-templates/x"], ["DELETE", "/api/job-templates/x"],
+  ["GET", "/api/jobs"], ["POST", "/api/jobs"],
+  ["GET", "/api/tasks"], ["POST", "/api/tasks"], ["PATCH", "/api/tasks/x"], ["POST", "/api/tasks/x/fatta"], ["DELETE", "/api/tasks/x/fatta"], ["DELETE", "/api/tasks/x"],
+  ["GET", "/api/push-subscriptions"], ["GET", "/api/push-subscriptions/chiave"], ["POST", "/api/push-subscriptions"],
+  ["DELETE", "/api/push-subscriptions/x"], ["POST", "/api/integrations/push/prova"],
+  ["GET", "/api/numeri/funnel"], ["GET", "/api/numeri/campagne"], ["GET", "/api/numeri/previsione"], ["PUT", "/api/campaign-spend"],
+  ["GET", "/api/weekly-reviews/corrente"], ["PATCH", "/api/weekly-reviews/x"], ["POST", "/api/weekly-reviews/x/commento"], ["GET", "/api/diario"],
+  ["POST", "/api/integrations/telegram/collega"], ["POST", "/api/integrations/telegram/prova"], ["DELETE", "/api/integrations/telegram"],
+  ["GET", "/api/me/profilo"], ["PATCH", "/api/me"], ["POST", "/api/me/password"],
+  ["POST", "/api/import/leads"], ["GET", "/api/export/leads"], ["GET", "/api/audit"], ["GET", "/api/dati/riepilogo"], ["GET", "/api/search"],
   // Percorsi che non esistono: anche loro chiedono la sessione, non dicono cosa c'è.
   ["GET", "/api/qualcosa"], ["POST", "/api/hooks/altro"],
 ];

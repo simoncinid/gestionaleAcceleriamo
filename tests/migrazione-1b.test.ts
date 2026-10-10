@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyD1Migrations, env } from "cloudflare:test";
+import { AZIENDA_SQL } from "../worker/lib/azienda";
 
 const NOW = 1_800_000_000_000;
 
@@ -73,7 +74,10 @@ describe("migrazioni del Piano A", () => {
   });
 
   it("le migrazioni solo aggiungono: nessun DROP né ricostruzione di tabelle", () => {
-    for (const m of env.TEST_MIGRATIONS.filter((m) => /^000[34]/.test(m.name))) {
+    // Dalla 0003 in poi (prima release con dati veri), comprese 0005, 0006, 0007, 0008 e 0012.
+    const dopo = env.TEST_MIGRATIONS.filter((m) => Number.parseInt(m.name, 10) >= 3);
+    expect(dopo.map((m) => m.name.slice(0, 4))).toEqual(expect.arrayContaining(["0005", "0006", "0007", "0008", "0009", "0012"]));
+    for (const m of dopo) {
       const sql = m.queries.join("\n");
       expect(sql).not.toMatch(/\bDROP\b/i);
       expect(sql).not.toMatch(/__new_/);
@@ -119,5 +123,20 @@ describe("migrazioni del Piano A", () => {
     expect(att).toEqual({ type: "nota", body: "testo 1A", created_at: 8, request_id: null, outcome: null });
     const stages = await db.prepare("SELECT COUNT(*) AS n, SUM(requires_reason) AS motivo FROM stages").first<{ n: number; motivo: number }>();
     expect(stages).toEqual({ n: 12, motivo: 3 });
+  });
+});
+
+describe("migrazione 0012: indici", () => {
+  it("l'indice del doppione per azienda usa la stessa espressione della query", () => {
+    const m = env.TEST_MIGRATIONS.find((x) => x.name.startsWith("0012"))!;
+    expect(m.queries.join("\n")).toContain(`ON \`leads\` (${AZIENDA_SQL}) WHERE deleted_at IS NULL`);
+  });
+
+  it("un lead ha al massimo un cliente vivo; uno nel cestino non conta", async () => {
+    await env.DB.prepare("INSERT INTO clients (id, name, origin_lead_id, created_at) VALUES ('C1', 'Uno', 'L1', 0)").run();
+    await expect(env.DB.prepare("INSERT INTO clients (id, name, origin_lead_id, created_at) VALUES ('C2', 'Due', 'L1', 0)").run()).rejects.toThrow(/UNIQUE/);
+    await env.DB.prepare("UPDATE clients SET deleted_at = 1 WHERE id = 'C1'").run();
+    await env.DB.prepare("INSERT INTO clients (id, name, origin_lead_id, created_at) VALUES ('C3', 'Tre', 'L1', 0)").run();
+    await env.DB.prepare("INSERT INTO clients (id, name, created_at) VALUES ('C4', 'Senza lead', 0), ('C5', 'Senza lead', 0)").run();
   });
 });

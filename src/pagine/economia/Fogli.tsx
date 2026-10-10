@@ -3,8 +3,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ETICHETTE_CANONE, ETICHETTE_COSTO, ETICHETTE_TIPO_FATTURA, type AzioneCanone } from "../../../worker/economia/calcoli";
 import { api } from "../../api";
-import { Campo, Foglio, Interruttore, Pulsante, Selettore, type Opzione } from "../../ds";
-import { daIsoGiorno, euro, giorno, isoGiorno } from "../../format";
+import { Campo, CampoGiorno, Foglio, Interruttore, Pulsante, Selettore, type Opzione } from "../../ds";
+import { daIsoGiorno, euro, ilGiorno, isoGiorno, presetPassato } from "../../format";
+import { daRoma } from "../../../worker/lib/roma";
 import type { CanoneRiga, FatturaRiga } from "../../types";
 import { centesimi } from "../commerciale/scheda";
 import { opzioniClienti, useAutomazioni, useClienti, useRicarica } from "../dati-gestione";
@@ -104,6 +105,9 @@ export function FoglioNuovoCosto({ onChiudi, ora = Date.now() }: { onChiudi: () 
 }
 
 // Spec 9.3: dalla fattura da emettere si chiede il numero; da quella emessa o in ritardo, la data di incasso.
+// Da "2026-10-13" alla mezzanotte di Roma, il valore dei CampoGiorno.
+const mezzanotte = (iso: string) => { const [a, m, g] = iso.split("-").map(Number); return daRoma(a, m, g); };
+
 export function FoglioFattura({ f, ora = Date.now(), onChiudi }: { f: FatturaRiga; ora?: number; onChiudi: () => void }) {
   const [numero, setNumero] = useState(f.number ?? "");
   const [data, setData] = useState(isoGiorno(ora));
@@ -122,12 +126,15 @@ export function FoglioFattura({ f, ora = Date.now(), onChiudi }: { f: FatturaRig
       <p className="font-display text-titolo-card tabular-nums">{euro(f.amountCents)}</p>
       {f.number && <p className="text-corpo">{`Numero ${f.number}`}</p>}
       {f.period && <p className="text-corpo">{`Periodo: ${f.period}`}</p>}
-      {f.issuedAt != null && <p className="text-corpo">{`Emessa il ${giorno(f.issuedAt, ora)}`}</p>}
-      {f.dueAt != null && <p className={f.stato === "in_ritardo" ? "text-corpo text-errore" : "text-corpo"}>{`${f.stato === "in_ritardo" ? "Scaduta il" : "Scade il"} ${giorno(f.dueAt, ora)}`}</p>}
-      {f.paidAt != null && <p className="text-corpo">{`Incassata il ${giorno(f.paidAt, ora)}`}</p>}
+      {f.issuedAt != null && <p className="text-corpo">{`Emessa ${ilGiorno(f.issuedAt, ora)}`}</p>}
+      {f.dueAt != null && <p className={f.stato === "in_ritardo" ? "text-corpo text-errore" : "text-corpo"}>{`${f.stato === "in_ritardo" ? "Scaduta" : "Scade"} ${ilGiorno(f.dueAt, ora)}`}</p>}
+      {f.paidAt != null && <p className="text-corpo">{`Incassata ${ilGiorno(f.paidAt, ora)}`}</p>}
       {f.pdfUrl && <a href={f.pdfUrl} target="_blank" rel="noreferrer" className="min-h-11 text-corpo font-semibold text-accento underline-offset-4 hover:underline">Apri il PDF</a>}
       {daEmettere && <Campo etichetta="Numero della fattura" aiuto="Quello del programma di fatturazione" value={numero} onChange={(e) => setNumero(e.target.value)} />}
-      {f.stato !== "incassata" && <Campo etichetta={daEmettere ? "Emessa il" : "Incassata il"} type="date" value={data} onChange={(e) => setData(e.target.value)} />}
+      {f.stato !== "incassata" && (
+        <CampoGiorno etichetta={daEmettere ? "Emessa il" : "Incassata il"} ora={ora} scorciatoie={presetPassato}
+          valore={data ? mezzanotte(data) : null} onCambia={(ms) => setData(ms == null ? "" : isoGiorno(ms))} />
+      )}
     </Foglio>
   );
 }
@@ -165,9 +172,9 @@ export function FoglioCanone({ c, ora = Date.now(), onChiudi }: { c: CanoneRiga;
       <p className="font-display text-titolo-card tabular-nums">{`${euro(c.amountCents)} al mese`}</p>
       <p className="text-corpo">{`Fatturazione il giorno ${c.billingDay}`}</p>
       <p className="text-corpo">{`Stato: ${ETICHETTE_CANONE[c.status]}`}</p>
-      {c.startAt != null && <p className="text-meta text-grigio">{`Attivo dal ${giorno(c.startAt, ora)}`}</p>}
-      {c.pausedAt != null && <p className="text-meta text-grigio">{`In pausa dal ${giorno(c.pausedAt, ora)}`}</p>}
-      {c.endAt != null && <p className="text-meta text-grigio">{`Cessato il ${giorno(c.endAt, ora)}`}</p>}
+      {c.startAt != null && <p className="text-meta text-grigio">{`Attivo ${ilGiorno(c.startAt, ora, "dal")}`}</p>}
+      {c.pausedAt != null && <p className="text-meta text-grigio">{`In pausa ${ilGiorno(c.pausedAt, ora, "dal")}`}</p>}
+      {c.endAt != null && <p className="text-meta text-grigio">{`Cessato ${ilGiorno(c.endAt, ora)}`}</p>}
       <div className="flex flex-wrap gap-2">
         {AZIONI[c.status].map((a) => (
           <Pulsante key={a.azione} variante={a.azione === "cessa" ? "fantasma" : "secondario"} onClick={() => setScelta(a)}>{a.etichetta}</Pulsante>

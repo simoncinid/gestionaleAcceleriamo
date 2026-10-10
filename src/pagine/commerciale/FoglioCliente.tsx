@@ -7,15 +7,16 @@ import { Campo, Foglio, Pulsante, Selettore } from "../../ds";
 import { useRicarica } from "../dati-gestione";
 import { PERIMETRI } from "./SchedaCliente";
 
-export function FoglioNuovoCliente({ onChiudi }: { onChiudi: () => void }) {
+// Voce 30: dalla scheda di un lead vinto il foglio parte col nome dell'azienda e lega il cliente al lead (originLeadId).
+export function FoglioNuovoCliente({ onChiudi, daLead }: { onChiudi: () => void; daLead?: { id: string; nome: string } }) {
   const ricarica = useRicarica();
   const vai = useNavigate();
-  const [nome, setNome] = useState("");
+  const [nome, setNome] = useState(daLead?.nome ?? "");
   const [settore, setSettore] = useState("");
   const [citta, setCitta] = useState("");
   const [scope, setScope] = useState<"acceleriamo" | "fuori_perimetro">("acceleriamo");
   const salva = useMutation({
-    mutationFn: () => api<{ cliente: { id: string } }>("/clients", { method: "POST", json: { name: nome.trim(), sector: settore.trim() || null, city: citta.trim() || null, scope } }),
+    mutationFn: () => api<{ cliente: { id: string } }>("/clients", { method: "POST", json: { name: nome.trim(), sector: settore.trim() || null, city: citta.trim() || null, scope, ...(daLead ? { originLeadId: daLead.id } : {}) } }),
     onSuccess: ({ cliente }) => { toast.success("Cliente salvato"); ricarica(); onChiudi(); void vai(`/commerciale/clienti/${cliente.id}`); },
     onError: (e) => toast.error(e.message),
   });

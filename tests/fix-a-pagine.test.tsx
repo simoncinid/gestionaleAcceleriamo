@@ -11,7 +11,9 @@ const CHIUSO: Stage = { id: "chiuso", label: "Chiuso", sortOrder: 90, kind: "won
 const LEAD = { id: "abc", stageId: "da-richiamare", company: "Ferri Srl", setupCents: 100_000, feeCents: 10_000 };
 
 describe("Q5: invito senza Resend", () => {
-  it("la casella dice che l'invito va in coda", () => {
+  it("la casella dice che l'invito va in coda, senza checkbox nativo", () => {
+    expect(render(<CasellaInvito attiva onCambia={() => {}} />)).not.toContain('type="checkbox"');
+    expect(render(<CasellaInvito attiva onCambia={() => {}} senzaEmail />)).toContain("Manca l&#x27;email del referente");
     const html = render(<CasellaInvito attiva onCambia={() => {}} inCoda />);
     expect(html).toContain(TESTO_IN_CODA);
     expect(render(<CasellaInvito attiva onCambia={() => {}} />)).not.toContain(TESTO_IN_CODA);
@@ -26,7 +28,7 @@ describe("Q5: invito senza Resend", () => {
 
 describe("Q6 e Q7: foglio di Chiuso", () => {
   it("precompilato con i soldi del lead e il nome, un solo primario", () => {
-    const html = render(<FoglioChiusura lead={LEAD} fase={CHIUSO} onChiudi={() => {}} />, { dati: [[["lead", "abc", "proposte"], [{ status: "accettata", option: "canone", setupCents: 250_000, feeCents: 30_000 }]]] });
+    const html = render(<FoglioChiusura lead={LEAD} fase={CHIUSO} onChiudi={() => {}} />, { dati: [[["lead", "abc", "proposte"], [{ status: "accettata", option: "standard", setupCents: 250_000, feeCents: 30_000 }]]] });
     expect(html).toContain('value="Ferri Srl"');
     expect(html).toContain('value="2.500"');
     expect(html).toContain('value="300"');

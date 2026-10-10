@@ -17,7 +17,7 @@ const RigaCliente = ({ c }: { c: ClienteRiga }) => (
 const Gruppo = ({ titolo, clienti }: { titolo: string; clienti: ClienteRiga[] }) => clienti.length === 0 ? null : (
   <section className="grid gap-2">
     <h2 className="text-etichetta uppercase text-grigio">{titolo}</h2>
-    <ul className="grid gap-2">{clienti.map((c) => <li key={c.id}><RigaCliente c={c} /></li>)}</ul>
+    <ul className="grid grid-cols-1 gap-2">{clienti.map((c) => <li key={c.id}><RigaCliente c={c} /></li>)}</ul>
   </section>
 );
 

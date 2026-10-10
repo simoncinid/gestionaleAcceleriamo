@@ -100,7 +100,7 @@ export function SchedaAutomazione({ id }: { id: string }) {
       {passo && passiQ.data && <FoglioPasso passo={passo} numero={ordinaFlusso(passiQ.data).sigle.get(passo.id) ?? ""} onChiudi={() => setPasso(null)} />}
       {modifica && <FoglioPassaggi automazioneId={id} iniziali={passiQ.data ?? []} onChiudi={() => setModifica(false)} />}
       {a.status === "in_costruzione" && (
-        <div className="sticky bottom-20 md:bottom-4">
+        <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full" inCorso={attiva.isPending} onClick={() => attiva.mutate()}>Segna attiva</Pulsante>
         </div>
       )}

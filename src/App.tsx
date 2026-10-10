@@ -8,6 +8,8 @@ import { Login } from "./pagine/Login";
 import { resetSession } from "./session";
 import { SchedaLeadRotta } from "./pagine/commerciale/SchedaLead";
 import { Oggi } from "./pagine/commerciale/Oggi";
+import { Lunedi } from "./pagine/commerciale/Lunedi";
+import { Diario } from "./pagine/commerciale/Diario";
 import { Call } from "./pagine/commerciale/Call";
 import { DettaglioProposta } from "./pagine/commerciale/DettaglioProposta";
 import { Proposte } from "./pagine/commerciale/Proposte";
@@ -15,11 +17,17 @@ import { FogliCreazione } from "./pagine/FogliCreazione";
 import { Lavori } from "./pagine/lavori/Lavori";
 import { LavoriTipo } from "./pagine/lavori/LavoriTipo";
 import { Numeri } from "./pagine/commerciale/Numeri";
+import { Avvisi } from "./pagine/avvisi/Avvisi";
 import { Cestino } from "./pagine/impostazioni/Cestino";
 import { Fasi } from "./pagine/impostazioni/Fasi";
+import { Dati } from "./pagine/impostazioni/Dati";
+import { ImportaCsv } from "./pagine/impostazioni/ImportaCsv";
+import { IntegrazioneDettaglio } from "./pagine/impostazioni/IntegrazioneDettaglio";
 import { Integrazioni } from "./pagine/impostazioni/Integrazioni";
 import { Modelli } from "./pagine/impostazioni/Modelli";
+import { Registro } from "./pagine/impostazioni/Registro";
 import { Stato } from "./pagine/impostazioni/Stato";
+import { Utenti } from "./pagine/impostazioni/Utenti";
 import { Scaletta } from "./pagine/commerciale/Scaletta";
 import { InCostruzione } from "./pagine/automazioni/InCostruzione";
 import { Pannello } from "./pagine/automazioni/Pannello";
@@ -80,6 +88,8 @@ export function App() {
       <Route element={<Guscio nome={me.data.name} onEsci={esci} fogli={(crea, chiudi) => <FogliCreazione crea={crea} chiudi={chiudi} />} />}>
         <Route index element={<Navigate to="/commerciale/oggi" replace />} />
         <Route path="/commerciale/oggi" element={<Oggi />} />
+        <Route path="/commerciale/oggi/lunedi" element={<Lunedi />} />
+        <Route path="/commerciale/oggi/diario" element={<Diario />} />
         <Route path="/commerciale/scaletta" element={<Scaletta />} />
         <Route path="/commerciale/call" element={<Call />} />
         <Route path="/commerciale/proposte" element={<Proposte />} />
@@ -98,10 +108,16 @@ export function App() {
         <Route path="/automazioni/:id" element={<SchedaAutomazioneRotta />} />
         <Route path="/impostazioni/dati/cestino" element={<Cestino />} />
         <Route path="/impostazioni" element={<Stato onEsci={esci} />} />
+        <Route path="/impostazioni/avvisi" element={<Avvisi />} />
         <Route path="/impostazioni/fasi" element={<Fasi />} />
         <Route path="/impostazioni/lavori-tipo" element={<LavoriTipo />} />
         <Route path="/impostazioni/modelli" element={<Modelli />} />
         <Route path="/impostazioni/integrazioni" element={<Integrazioni />} />
+        <Route path="/impostazioni/integrazioni/:key" element={<IntegrazioneDettaglio />} />
+        <Route path="/impostazioni/utenti" element={<Utenti />} />
+        <Route path="/impostazioni/dati" element={<Dati />} />
+        <Route path="/impostazioni/dati/importa" element={<ImportaCsv />} />
+        <Route path="/impostazioni/dati/registro" element={<Registro />} />
         <Route path="*" element={<Navigate to="/commerciale/oggi" replace />} />
       </Route>
     </Routes>

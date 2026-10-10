@@ -29,10 +29,42 @@ export type EsitoBody = {
   note?: string; call?: { kind: "conoscenza"; scheduledAt: number; meetLink: string | null };
 };
 
+// email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
+export type LeadEsito = { id: string; company: string; contactName: string | null; stageId: string; attemptCount: number; email?: string | null };
+
 // Il requestId nasce quando il foglio si apre e resta lo stesso fino alla chiusura: il doppio tocco non duplica.
-export const statoIniziale = (requestId: string, lead: { stageId: string }): StatoEsito => ({
-  requestId, esito: null, stageId: lead.stageId, nextAction: "", nextActionAt: null, lostReason: null, note: "", callAt: null, meetLink: "",
+// "iniziale" arriva da "Applica i suggerimenti" del coach: fase, prossima azione e note già scritte, l'esito resta da scegliere.
+export const statoIniziale = (
+  requestId: string,
+  lead: { stageId: string },
+  iniziale?: Partial<Pick<StatoEsito, "stageId" | "nextAction" | "nextActionAt" | "note">>,
+): StatoEsito => ({
+  requestId, esito: null, stageId: iniziale?.stageId || lead.stageId, nextAction: iniziale?.nextAction ?? "", nextActionAt: iniziale?.nextActionAt ?? null,
+  lostReason: null, note: iniziale?.note ?? "", callAt: null, meetLink: "",
 });
+
+// Gli esiti che decidono da soli fase e prossima azione: una call fissata o un lead perso. Con questi vincono le regole
+// anche quando il foglio arriva dal coach; con gli altri restano i suggerimenti del coach.
+export const ESITI_DELLE_REGOLE: Esito[] = ["appuntamento", "non_interessato", "fuori_target"];
+
+// Unisce la proposta delle regole (arrivata dopo la scelta dell'esito) allo stato del foglio.
+export function applicaProposta(
+  prima: StatoEsito,
+  p: { stageId: string | null; nextAction: string | null; nextActionAt: number | null; lostReason?: string | null },
+  iniziale?: Partial<Pick<StatoEsito, "stageId" | "nextAction" | "nextActionAt" | "note">>,
+): StatoEsito {
+  const lostReason = p.lostReason ?? null;
+  if (!iniziale || (prima.esito && ESITI_DELLE_REGOLE.includes(prima.esito))) {
+    return { ...prima, stageId: p.stageId ?? prima.stageId, nextAction: p.nextAction ?? "", nextActionAt: p.nextActionAt, lostReason };
+  }
+  return {
+    ...prima,
+    stageId: iniziale.stageId || (p.stageId ?? prima.stageId),
+    nextAction: iniziale.nextAction ?? "",
+    nextActionAt: iniziale.nextActionAt ?? null,
+    lostReason,
+  };
+}
 
 export const testoTentativo = (attemptCount: number, massimo = 5) => `Tentativo ${Math.min(attemptCount + 1, massimo)} di ${massimo}`;
 

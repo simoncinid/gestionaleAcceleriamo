@@ -1,18 +1,24 @@
+import { useQuery } from "@tanstack/react-query";
+import { api } from "../../api";
 import { Errore, Intestazione, Pulsante, Punto, Riga, Skeleton } from "../../ds";
 import { momento } from "../../format";
-import { COLORE, ETICHETTA_STATO, Sezione, conGiroInRitardo, testoUltima, useStatoSistema } from "./parti";
+import { COLORE, ETICHETTA_STATO, Sezione, conGiroInRitardo, rigaStato, useStatoSistema } from "./parti";
 
+// Avvisi sta già in testa con il conteggio: qui non si ripete.
 const VOCI = [
+  { titolo: "Utenti e profilo", href: "/impostazioni/utenti" },
   { titolo: "Fasi e regole", href: "/impostazioni/fasi" },
   { titolo: "Modelli", href: "/impostazioni/modelli" },
   { titolo: "Lavori tipo", href: "/impostazioni/lavori-tipo" },
   { titolo: "Integrazioni", href: "/impostazioni/integrazioni" },
-  { titolo: "Cestino", href: "/impostazioni/dati/cestino" },
+  { titolo: "Dati", href: "/impostazioni/dati" },
 ];
 
 // Spec 11.1: "funziona tutto?". Nessun pulsante pieno: ogni semaforo rosso porta alla sua integrazione.
 export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () => void }) {
   const s = useStatoSistema();
+  // Stessa chiave della pagina Avvisi: aprendola dopo, l'elenco è già in cache.
+  const avvisi = useQuery({ queryKey: ["notifications"], queryFn: () => api<{ avvisi: unknown[]; nonLetti: number }>("/notifications") });
   if (s.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
   if (s.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={s.error} onRiprova={() => void s.refetch()} /></div>;
   const d = { ...s.data!, integrazioni: conGiroInRitardo(s.data!.integrazioni, ora) };
@@ -20,14 +26,15 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
   return (
     <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-28">
       <Intestazione eyebrow="Impostazioni" titolo="Stato del sistema" />
+      <Riga titolo={avvisi.data?.avvisi.length ? `Avvisi (${avvisi.data.avvisi.length})` : "Avvisi"} href="/impostazioni/avvisi" />
       <Sezione titolo="Collegamenti" coda={rossi ? `${rossi} da controllare` : undefined}>
-        <ul className="grid gap-2">
+        <ul className="grid grid-cols-1 gap-2">
           {d.integrazioni.map((i) => (
             <li key={i.key}>
               <Riga
                 titolo={i.etichetta}
-                href={i.stato === "errore" && i.key !== "giro" ? `/impostazioni/integrazioni#${i.key}` : undefined}
-                secondaria={<span className="inline-flex items-center gap-2"><Punto colore={COLORE[i.stato]} etichetta={ETICHETTA_STATO[i.stato]} />{i.stato === "errore" ? (i.nota ?? "Errore") : testoUltima(i, ora)}</span>}
+                href={i.stato === "errore" && i.key !== "giro" ? `/impostazioni/integrazioni/${i.key}` : undefined}
+                secondaria={<span className="inline-flex items-center gap-2"><Punto colore={COLORE[i.stato]} etichetta={ETICHETTA_STATO[i.stato]} />{rigaStato(i, ora)}</span>}
                 meta={i.stato === "errore" && i.ultimaOk != null ? `Ultima volta ${momento(i.ultimaOk, ora)}` : undefined}
               />
             </li>
@@ -43,7 +50,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
       </Sezione>
       {d.errori.length > 0 && (
         <Sezione titolo="Ultimi errori">
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             {d.errori.map((e) => (
               <li key={e.key}>
                 <Riga titolo={e.etichetta} secondaria={e.errore}
@@ -54,7 +61,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
         </Sezione>
       )}
       <Sezione titolo="Configurazione">
-        <ul className="grid gap-2">{VOCI.map((v) => <li key={v.href}><Riga titolo={v.titolo} href={v.href} /></li>)}</ul>
+        <ul className="grid grid-cols-1 gap-2">{VOCI.map((v) => <li key={v.href}><Riga titolo={v.titolo} href={v.href} /></li>)}</ul>
         <Pulsante variante="fantasma" className="justify-self-start" onClick={onEsci}>Esci dall'account</Pulsante>
       </Sezione>
     </div>

@@ -4,7 +4,7 @@ Il gestionale interno di Acceleriamo: raccoglie i lead (da Meta, dal Foglio Andr
 
 Indirizzo: https://acceleriamo-os.acceleriamo-os.workers.dev
 
-## Cosa fa (rilascio 1B, Piano A)
+## Cosa fa (rilascio 1B)
 
 - Tre aree nella barra: Commerciale, Automazioni, Economia. Impostazioni si apre dall'avatar.
 - Ogni cosa nuova nasce dal "+" nella testata: lead, esito, nota, cliente, proposta, canone, fattura, costo, automazione.
@@ -16,7 +16,21 @@ Indirizzo: https://acceleriamo-os.acceleriamo-os.workers.dev
 - Economia leggera: cruscotto del ricorrente, canoni, fatture con il ritardo calcolato, costi. I clienti fuori perimetro non ci entrano.
 - Automazioni leggere: pannello con l'interruttore anonimo, in costruzione, scheda.
 
-Avvisi, push, Telegram, Claude, Numeri completi, Lunedì e Diario arrivano con il Piano B.
+Con il Piano B si aggiunge:
+
+**Avvisi e push.** La voce "Avvisi" raccoglie lead nuovo, SLA in scadenza o scaduto, Meta senza lead da 48 ore, Claude al tetto. Un avviso nasce una volta per persona e si chiude da solo quando la cosa è fatta (per esempio il lead viene chiamato). L'app si installa sul telefono (Safari, Condividi, "Aggiungi a Home") e manda le notifiche push, con le ore di silenzio scelte da ognuno.
+
+**Telegram.** Un bot manda solo tre messaggi: "Lead nuovo", "SLA scaduto", "Claude al tetto". Ognuno collega la sua chat da Utenti e profilo.
+
+**Claude.** Classifica da solo i lead nuovi del foglio e di Meta, prepara la scheda azienda (con ricerca sul web), fa da coach dopo una call e scrive il commento del lunedì. Spesa massima 20 euro al mese: oltre, i lavori si fermano fino al primo del mese.
+
+**Numeri.** Tre segmenti: Funnel, Campagne (con la spesa pubblicitaria scritta a mano ogni mese), Previsione.
+
+**Lunedì e Diario.** Ogni lunedì alle 7 l'app prepara la revisione della settimana chiusa, con il commento di Claude. Il Diario è la cronologia di quello che è successo.
+
+**Impostazioni.** Profilo con dispositivi push e Telegram, utenti, integrazioni con un dettaglio per ognuna, stato dei giri, dati (esporta e importa CSV, registro, cestino) e la ricerca dalla testata.
+
+**Spazio demo.** Una copia con dati finti da mostrare, su un indirizzo separato (sezione "Spazio demo").
 
 ## Come funziona (in breve)
 
@@ -24,16 +38,31 @@ Tutto gira su Cloudflare, piano gratuito: un Worker (il codice del server, carte
 
 ### Il controllo automatico (cron)
 
-Un solo Cron Trigger gira ogni 5 minuti (`wrangler.jsonc`, `*/5 * * * *`) e decide sull'ora di Roma cosa fare (`worker/cron.ts`). Fa **un solo lavoro pesante per giro, a rotazione**:
+Un solo Cron Trigger gira ogni 5 minuti (`wrangler.jsonc`, `*/5 * * * *`) e decide sull'ora di Roma cosa fare (`worker/cron.ts`). Dal Piano B ogni giro fa più lavori, in ordine di priorità, finché c'è budget:
 
-- primo blocco di 5 minuti: Foglio Andrea (al massimo 2 lead nuovi per giro);
-- secondo blocco: email di conferma da mandare o ritentare (al massimo 5 per giro);
-- terzo blocco: lead Meta rimasti incompleti (al massimo 3 per giro).
+1. proposte scadute (solo alle 6:00, da sole);
+2. Foglio Andrea (al massimo 2 lead nuovi; 1 se nel giro c'è altro, cioè quasi sempre: in pratica 12 lead l'ora);
+3. lead Meta rimasti incompleti (ogni 15 minuti, al massimo 2);
+4. avvisi in app;
+5. push (al massimo 10);
+6. Telegram (al massimo 5 messaggi);
+7. email di conferma e inviti alle call (al massimo 7);
+8. controllo "Meta senza lead da 48 ore" (una volta l'ora);
+9. task ricorrenti dei lavori (alle 7:00 e alle 7:30, al massimo 12 task);
+10. revisione del lunedì (lunedì dalle 7:00 alle 7:55);
+11. Claude, sempre per ultimo (al massimo 3 lavori).
 
-Così ogni lavoro torna ogni 15 minuti. Alle 6:00 di Roma il giro del foglio lascia il posto alle proposte scadute (al massimo 20 per volta, le altre il giorno dopo); il foglio riprende alle 6:15.
-Alle 7:00 e alle 7:30 il giro del foglio lascia il posto alle task ricorrenti dei lavori: per ogni lavoro attivo crea la task del mese se oggi è il giorno indicato o dopo (una sola per mese, indice unico su lavoro, modello e mese). Tetto `LIMITI.lavori` = 12 task per giro: 2 letture più al massimo 12 scritture, misurato in `tests/lavori.test.ts`.
+Il motivo dei tetti: sul piano gratuito una invocazione del Worker può fare al massimo 50 query D1 e 50 sottorichieste esterne. Il giro si tiene a 45 query e 15 sottorichieste. Ogni lavoro dichiara in `LAVORI` quanto costa (query fisse, query per unità, sottorichieste per unità) e prende solo le unità che il budget gli lascia; quello che non entra passa al giro dopo, senza errori. Foglio, Meta e avvisi lasciano sempre spazio ad almeno 2 push per giro. I costi sono misurati in `tests/cron.test.ts`: se si cambia un `max` va rifatta la misura. Un lavoro che fallisce non ferma gli altri e il giro diventa rosso in Impostazioni.
 
-Il motivo della rotazione e dei tetti: sul piano gratuito una invocazione del Worker può fare al massimo 50 query D1 (e restiamo sotto le 15 sottorichieste esterne per giro). Un lead nuovo dal foglio costa circa 17 query con tutta la sua catena, uno da Meta circa 13: due lavori insieme sforerebbero. I numeri sono misurati in `tests/cron.test.ts`; se si cambiano i tetti (`LIMITI` in `worker/cron.ts`) va rifatta la misura. Un lavoro che fallisce non ferma gli altri e il giro diventa rosso in Impostazioni.
+Task ricorrenti dei lavori: alle 7:00 e alle 7:30 di Roma il giro crea, per ogni lavoro attivo, la task del mese se oggi è il giorno indicato o dopo (una sola per mese, indice unico su lavoro, modello e mese). Costano 2 query fisse più una a task, al massimo 12 per giro; quelle che non entrano passano alla seconda passata delle 7:30 o al giorno dopo.
+
+Limiti noti, accettati:
+
+- Il giro può arrivare a 45 query esatte.
+- Con un arretrato nel foglio le conferme e il lavoro Meta del cron possono saltare un giro. I lead Meta entrano comunque dal webhook in pochi secondi: il cron ritenta solo quelli incompleti.
+- Con molti avvisi in un giro le conferme slittano al giro dopo.
+- Con un arretrato le push dello SLA possono ritardare fino a 30 minuti.
+- Claude non avvia lavori nuovi dopo 9 minuti dall'inizio del giro; ogni chiamata ha una scadenza di 240 secondi.
 
 ## Avvio in locale
 
@@ -54,9 +83,13 @@ npm run dev
 npm test          # test automatici
 npm run typecheck # controllo dei tipi
 npm run build     # compilazione
+npm run e2e       # controlli con Playwright sullo spazio demo in locale (schermate e flussi)
+npm run e2e:foto  # rifà le foto di confronto: guardarle prima del commit
 ```
 
 `tests/passaggio.test.ts` è la rete di sicurezza del rilascio: ogni rotta dell'API risponde 401 senza sessione, l'aggancio delle proposte risponde 401 senza la chiave giusta, sequenze e foglio partono spenti, le sette regole di partenza ci sono.
+
+`npm run e2e` gira sullo spazio demo locale con un'ora fissa, così le foto non cambiano da un giorno all'altro. Le foto approvate stanno nel repo: se una schermata cambia il controllo fallisce. Se il cambio è voluto si lancia `npm run e2e:foto`, si guardano le foto nuove una per una e solo dopo si committano.
 
 ## Mettere online
 
@@ -65,22 +98,141 @@ Servono due variabili d'ambiente con le credenziali Cloudflare (chiave API e ide
 ```bash
 export CLOUDFLARE_API_TOKEN=...
 export CLOUDFLARE_ACCOUNT_ID=...
-npm run db:migrate:remote   # solo se ci sono migrazioni nuove, e sempre dopo una copia del database
-npm run deploy
 ```
 
 La chiave non sta nel repo e non va mai scritta in un file del progetto.
 
+Prima di pubblicare: `npm test && npm run typecheck && npm run build && npm run e2e` tutti verdi.
+
+L'ordine è sempre lo stesso: **copia del database, controllo dei doppioni, migrazioni, pubblicazione**.
+
+1. **Copia del database**, prima di ogni migrazione:
+
+   ```bash
+   npx wrangler d1 export acceleriamo-os --remote --output backup-$(date +%Y-%m-%d).local.sql
+   ls -l backup-*.local.sql
+   ```
+
+   Il file deve essere non vuoto. Resta sul computer (i file `*.local.sql` sono esclusi da git) e il backup notturno lo copia nel Drive. In caso di guai si rimette su un database vuoto con `npx wrangler d1 execute acceleriamo-os --remote --file <copia>`.
+
+2. **Controllo dei doppioni**, solo la prima volta che si applica la migrazione `0012` (vincolo unico di un cliente per lead):
+
+   ```bash
+   npx wrangler d1 execute acceleriamo-os --remote --command "SELECT origin_lead_id, count(*) FROM clients WHERE origin_lead_id IS NOT NULL AND deleted_at IS NULL GROUP BY 1 HAVING count(*) > 1"
+   ```
+
+   Deve tornare vuoto. Se torna righe, la `0012` fallirebbe: prima si mette nel cestino il cliente doppione (dall'app), poi si rilancia il controllo.
+
+3. **Migrazioni** (con il Piano B sono la `0009`, la `0010` con l'indice di Telegram, la `0011` e la `0012`; la `0007` e la `0008` dei lavori sono già applicate):
+
+   ```bash
+   npm run db:migrate:remote
+   ```
+
+4. **Pubblicazione:**
+
+   ```bash
+   npm run deploy
+   curl -s https://acceleriamo-os.acceleriamo-os.workers.dev/api/health   # deve rispondere {"ok":true}
+   ```
+
+Dopo `npm run deploy:demo` la cartella `dist` contiene la build della demo: `npm run deploy` la rifà da solo, quindi la produzione esce giusta.
+
 ## Segreti
 
-I segreti stanno solo in Cloudflare, mai nel repo. Si impostano uno alla volta con `npx wrangler secret put <NOME>` e il valore si digita quando il comando lo chiede. In locale eventuali valori di prova vanno in `.dev.vars`, che è escluso da git; nei test ci sono solo valori finti dentro `vitest.config.ts`.
+I segreti stanno solo in Cloudflare, mai nel repo. Si impostano uno alla volta con `npx wrangler secret put <NOME>` e il valore si digita quando il comando lo chiede (non passa dalla chat né da un file). In locale eventuali valori di prova vanno in `.dev.vars`, che è escluso da git; nei test ci sono solo valori finti dentro `vitest.config.ts`.
 
 - `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_PAGE_TOKEN`: connessione con Meta (dal rilascio 1A).
 - `RESEND_API_KEY`: invio delle email (conferma al lead nuovo, invito alla call).
 - `PROPOSAL_HOOK_KEY`: chiave dell'aggancio delle proposte (`POST /api/hooks/proposals`). La stessa chiave sta nel Portachiavi del Mac, voce `acceleriamo-os-aggancio`, da cui la legge lo script `dopo-il-pdf` del wiki.
 - `GOOGLE_SA_EMAIL`, `GOOGLE_SA_PRIVATE_KEY` (facoltativi): account di servizio Google, via alternativa per leggere il Foglio Andrea. Si usano solo se ci sono tutti e due.
 
-Quando un segreto manca nessuno vede errori: Impostazioni > Integrazioni mostra il servizio in grigio come "Non collegato" (per esempio "Non collegato: manca la chiave di Resend") e il resto dell'app funziona. Senza `RESEND_API_KEY` le email di conferma restano in coda senza consumare tentativi e partono al primo giro dopo l'arrivo della chiave (vedi la regola delle 48 ore sotto); le call si salvano lo stesso, senza invito. Senza `PROPOSAL_HOOK_KEY` l'aggancio risponde sempre 401. Impostazioni > Integrazioni mostra solo se un segreto c'è o manca, mai il valore.
+Dal Piano B, tre segreti nuovi:
+
+```bash
+npx wrangler secret put ANTHROPIC_API_KEY   # chiave del workspace Acceleriamo su console.anthropic.com
+npx wrangler secret put VAPID_PRIVATE_KEY   # la "Private Key" stampata da npx web-push generate-vapid-keys
+npx wrangler secret put TELEGRAM_BOT_TOKEN  # il token che BotFather dà alla creazione del bot
+```
+
+Le chiavi VAPID si generano una volta con `npx web-push generate-vapid-keys` (nessuna installazione: `npx` lo scarica al volo). La privata va solo in `wrangler secret put`.
+
+Le variabili pubbliche stanno in `wrangler.jsonc`, sotto `vars`, e si committano:
+
+| Variabile | Cosa contiene |
+|---|---|
+| `VAPID_PUBLIC_KEY` | la "Public Key" della stessa coppia VAPID |
+| `VAPID_SOGGETTO` | contatto richiesto da VAPID: l'indirizzo dell'app (o un `mailto:`) |
+| `APP_URL` | l'indirizzo dell'app, usato nei link di push e Telegram |
+| `TELEGRAM_BOT` | il nome utente del bot, senza @ |
+| `DEMO_URL` | l'indirizzo dello spazio demo, mostrato in Impostazioni > Dati |
+
+**La coppia VAPID non si cambia più.** Se cambia, ogni telefono e computer va riattivato a mano da "Attiva le notifiche".
+
+`SPAZIO` esiste solo nell'ambiente `demo`. Nelle `vars` di produzione non deve mai comparire: spegnerebbe in silenzio tutti gli invii.
+
+Quando un segreto manca nessuno vede errori: Impostazioni > Integrazioni mostra il servizio in grigio come "Non collegato" (per esempio "Non collegato: manca la chiave di Resend") e il resto dell'app funziona. Senza `RESEND_API_KEY` le email di conferma restano in coda senza consumare tentativi e partono al primo giro dopo l'arrivo della chiave (vedi la regola delle 48 ore sotto); le call si salvano lo stesso, senza invito. Senza `PROPOSAL_HOOK_KEY` l'aggancio risponde sempre 401. Senza le chiavi VAPID non parte nessuna push; senza `TELEGRAM_BOT_TOKEN` nessun messaggio Telegram; gli avvisi restano comunque nell'app. Impostazioni > Integrazioni mostra solo se un segreto c'è o manca, mai il valore.
+
+## Claude
+
+Claude fa quattro lavori, tutti in una coda (`ai_jobs`) che il giro del cron smaltisce per ultima, al massimo 3 per giro:
+
+- classificazione del lead nuovo (Haiku);
+- scheda azienda, con ricerca sul web (Sonnet 5.5);
+- coach dopo una call (Sonnet 5.5);
+- commento della revisione del lunedì (Haiku).
+
+**Senza `ANTHROPIC_API_KEY`** l'app funziona lo stesso: in Impostazioni > Integrazioni la voce Claude dice "Non collegato: manca la chiave di Anthropic", i lavori restano in coda e nessuno vede errori. Partono quando arriva la chiave.
+
+**Lead non classificati dopo 2 giorni.** La classificazione parte da sola solo per i lead del foglio e di Meta entrati negli ultimi 2 giorni. Se Claude resta spento (o senza chiave) per più di 2 giorni, i lead più vecchi non si classificano più da soli: si apre il lead e si preme "Prepara la scheda". I lead scritti a mano non si classificano mai da soli.
+
+**Il coach si trova solo nella scheda del lead**, nella sezione della call. La sezione Call non lo offre.
+
+**Tetto di spesa: 20 euro al mese.** Il server conta lo speso in micro-dollari (1 centesimo = 10.000) e conta i dollari come euro, per prudenza. Il mese è quello di Roma. Prima di ogni lavoro il server prenota il costo massimo possibile: se `speso + costo massimo` supera il tetto il lavoro resta "fermo per il tetto" e l'avviso "Claude al tetto" arriva una volta sola nel mese (in app, push e Telegram). Un lavoro piccolo (Haiku) può passare anche quando uno grande (Sonnet con ricerca) resta fermo. Il primo del mese, ora di Roma, i lavori fermi tornano in coda. Una chiamata interrotta conta il costo massimo, non zero. Da 16 euro spesi compare un punto arancione sull'avatar, come preavviso.
+
+**Rete di sicurezza: 25 dollari sul workspace Anthropic.** Su console.anthropic.com il limite di spesa del workspace Acceleriamo resta a 25 dollari al mese. Se l'app sbagliasse i conti, Anthropic si ferma lì.
+
+Modelli, prezzi e tetto stanno nell'impostazione `claude` del database. Impostazioni non li modifica: si cambiano con un comando, per esempio il tetto (in centesimi):
+
+```bash
+npx wrangler d1 execute acceleriamo-os --remote --command "UPDATE settings SET value = json_set(value, '$.tettoCents', 2000) WHERE key = 'claude'"
+```
+
+Prezzi di partenza (dollari per milione di token, ingresso e uscita): Haiku 4.5 a 1 e 5, Sonnet 5 e 5.5 a 2 e 10, Opus 5.5 a 4 e 20 (lettura dalla cache 0,2, come da listino). Un modello che non è nel listino si conta al prezzo più alto. Se Anthropic cambia i prezzi si aggiorna il listino con lo stesso tipo di comando (`$.prezzi`). Il valore di partenza è in `worker/impostazioni/default.ts`.
+
+Il registro dei costi (speso del mese, lavori per tipo, lavori fermi) è in Impostazioni > Integrazioni > Claude.
+
+Dati verso Claude: solo quelli del lead (azienda, sito, email ridotta, risposte del modulo, testo LinkedIn; per il coach gli appunti della call e lo storico del lead). Mai clienti, fatture, canoni o costi.
+
+Limite noto della coda, raro e accettato: se un'invocazione muore a metà lavoro, il lavoro resta "in corso" e torna in coda dopo 20 minuti, con un tentativo consumato.
+
+## Avvisi, push e Telegram
+
+- **Avvisi SLA:** il controllo guarda i 20 lead in attesa più recenti per fase; oltre quelli l'avviso SLA non parte. Un avviso nasce una volta per persona, anche se il giro lo rilegge trenta volte, e si chiude da solo quando il lead viene chiamato.
+- **Ore di silenzio:** spengono push e Telegram, non l'avviso in app. La push saltata non viene rimandata.
+- **Push non consegnate:** con errori 429 o 5xx si ritenta fino a 6 ore, poi si lascia perdere. Un dispositivo che risponde 410 sparisce da solo.
+- **Telegram, collegamento:** da Utenti e profilo, "Collega Telegram", si preme Avvia nel bot. Il codice vale 15 minuti. Con un codice in attesa il collegamento passa prima degli avvisi, che slittano al giro dopo.
+- **Telegram, arretrato di 6 ore:** chi si collega riceve in blocco gli avvisi aperti delle ultime 6 ore (al massimo 5 per giro). È voluto.
+- **Telegram, codice sbagliato:** il bot risponde "Codice non riconosciuto", ma legge i messaggi solo quando qualcuno ha un codice valido in attesa. Chi scrive un codice a caso senza nessun collegamento aperto riceve la risposta più tardi o mai (Telegram tiene i messaggi 24 ore). Se nello stesso giro si scrive prima un codice sbagliato e poi quello giusto, la chat si collega e può ricevere anche "Codice non riconosciuto": non è un guasto.
+- **Telegram, errori:** se una persona blocca il bot (403) la sua chat si scollega. Un token sbagliato o revocato (401 o 404) lascia tutto in coda e la voce Telegram diventa rossa in Integrazioni.
+
+## Numeri, Lunedì e Diario
+
+- **Costo per lead:** i doppioni contano una volta. Il blocco del Funnel ereditato dalla 1A li conta ancora, di proposito.
+- **"n.d."** al posto dei numeri quando i lead sono meno di 5.
+- **SLA:** esclude i lead inseriti a mano.
+- **Tempi per fase:** solo sui lead arrivati nel periodo scelto.
+- **Previsione:** solo sulle fasi aperte, con la proposta aperta più recente di ogni lead. Senza setup si usa il valore stimato del lead.
+- **Spesa pubblicitaria:** si scrive a mano ogni mese ("Scrivi la spesa del mese"), accetta virgola e punto, massimo 100.000 euro. Con spesa 0 la riga dice "Nessuna spesa"; se manca dice "Spesa da scrivere".
+- **Lunedì:** una revisione a settimana, creata dal giro del lunedì alle 7 (ora di Roma). Il commento di Claude è un lavoro a parte e può arrivare un giro dopo.
+- **Diario e Registro:** si scorrono a pagine; il segno di pagina è una stringa `at:id`.
+
+## Impostazioni: ricerca, export e import
+
+- **Ricerca** (dalla testata): parte da 2 lettere e cerca con `LIKE '%testo%'` su lead, proposte, automazioni e fatture, cioè 4 query (5 con la sessione) che scorrono le tabelle intere. Oggi i volumi sono di centinaia di righe e va bene. Con 5.000 lead, oltre circa 1.000 richieste al giorno (circa 300 ricerche) ci si avvicina al tetto gratuito di 5 milioni di righe lette al giorno; con 25.000 lead bastano circa 200 richieste. Il rimedio, quando servirà: indice FTS5 oppure minimo 3 lettere. Vale anche per il conteggio del cestino.
+- **Esporta CSV:** legge l'intera tabella in una query e costruisce il file in memoria, senza tetto di righe. Nessun segreto né hash nelle colonne. Oggi va bene; con tabelle molto grandi andrà diviso.
+- **Importa CSV:** con anteprima, a blocchi di 20 righe per richiesta. I lead importati non ricevono l'email di conferma.
+- **Doppioni per azienda:** il confronto abbassa a mano solo le vocali accentate italiane: Ç, Ñ, Ü non vengono unificate. Un cliente nel cestino non blocca la creazione di un cliente nuovo dallo stesso lead.
 
 ## Foglio Andrea
 
@@ -91,7 +243,7 @@ Il foglio Google dove Andrea scrive i contatti diventa una porta dei lead, in so
 - **Via alternativa, account di servizio:** se il link pubblico non è accettabile, si crea un account di servizio Google, si mettono `GOOGLE_SA_EMAIL` e `GOOGLE_SA_PRIVATE_KEY`, si condivide il foglio in sola lettura con l'email dell'account e si scrive anche il "Nome della scheda" (quello sulla linguetta in basso). Il file JSON dell'account non entra mai nel repo né nel wiki.
 - **Colonna del telefono:** conviene impostarla come "Testo normale" (Formato, Numero, Testo normale) nel foglio, così Google non toglie il "+" o lo zero iniziale dei numeri.
 - **Accendere la lettura:** prima "Anteprima" sulle prime righe vere (azienda, referente, telefono ed email al posto giusto, nessuna "Colonna non trovata"; se una colonna non torna si corregge la mappa), poi si accende la lettura automatica e si salva.
-- **Arretrato:** il giro automatico crea al massimo 2 lead ogni 15 minuti. Per smaltire un arretrato si usa "Leggi adesso", che continua a leggere finché arriva in fondo al foglio. I lead già arrivati da Meta risultano già presenti, non doppioni.
+- **Arretrato:** il giro automatico crea 1 lead per giro quando nel giro c'è anche altro, cioè quasi sempre (12 lead l'ora), e fino a 2 quando è solo. Per smaltire un arretrato si usa "Leggi adesso", che continua a leggere finché arriva in fondo al foglio. I lead già arrivati da Meta risultano già presenti, non doppioni.
 
 ## Email di conferma
 
@@ -122,6 +274,114 @@ E, se si sanno, questi campi che lo script legge e manda: `azienda`, `opzione` (
 - **Indirizzo:** di default il Worker online; si cambia con la variabile `ACC_OS_URL`.
 - **Limiti dell'aggancio:** chiave `Authorization: Bearer <chiave>` (senza, 401 e nessuna scrittura), corpo al massimo 16 KB (413), al massimo 30 chiamate l'ora (429). Ogni chiamata con la chiave giusta finisce nel registro di Impostazioni > Integrazioni, Aggancio, che tiene 30 giorni.
 
+## Spazio demo
+
+Una copia dell'app con dati finti, da mostrare a clienti e collaboratori senza aprire i dati veri.
+
+Indirizzo: https://acceleriamo-os-demo.acceleriamo-os.workers.dev
+
+Utente: `demo`, con la password scelta al ripristino (almeno 12 caratteri).
+
+È un secondo Worker (`acceleriamo-os-demo`) con il suo database D1 (`acceleriamo-os-demo`): stesso codice, ambiente `demo` in `wrangler.jsonc` (con `SPAZIO: "demo"`), nessun cron. In testa a ogni pagina compare "Spazio demo, dati finti"; in Impostazioni > Integrazioni ogni servizio dice "Spazio demo"; il Foglio Andrea non si legge.
+
+**Regola: nessun segreto nella demo.** Non si lancia mai `wrangler secret put` con `--env demo`. In più il codice ha una guardia: nella demo push, Telegram, email, Claude, Meta e foglio non partono comunque. Le prove di invio, il cambio password e il cambio nome rispondono con un messaggio neutro ("Sei nello spazio demo..."); le preferenze del profilo restano libere; la prova delle push dà "errore".
+
+I dati (40 lead in sei settori, call, proposte, schede azienda, analisi del coach, tre clienti con automazioni, canoni e fatture) stanno in `scripts/demo-dati.ts`. Email e link della call solo su `esempio.invalid`, telefoni con prefisso `+39 000`: nessun messaggio può arrivare a una persona vera.
+
+Prima volta (con le credenziali Cloudflare esportate come sopra):
+
+```bash
+npx wrangler d1 create acceleriamo-os-demo   # copia l'id stampato in wrangler.jsonc, ambiente demo, al posto degli zeri
+npm run db:migrate:demo                      # crea le tabelle nel database della demo
+npm run demo:reset                           # semina i dati finti, chiede la password dell'utente demo
+npm run deploy:demo                          # pubblica la demo
+curl -s https://acceleriamo-os-demo.acceleriamo-os.workers.dev/api/health   # deve rispondere {"ok":true}
+```
+
+**Ripristino prima di ogni call** in cui si mostra la demo:
+
+```bash
+npm run demo:reset
+```
+
+Cosa rimette:
+
+- i dati finti di partenza (utente `demo`, lead, attività, call, proposte, schede azienda, analisi del coach, clienti, automazioni, canoni, fatture);
+- fasi, regole delle fasi, modelli dei messaggi e impostazioni come dopo le migrazioni.
+
+Cosa svuota e non rimette:
+
+- avvisi, coda e registro di Claude, registro delle modifiche e dell'aggancio, stato delle integrazioni;
+- spese delle campagne, revisioni del lunedì (la demo non ha cron, quindi restano vuote), costi;
+- dispositivi push e sessioni: chi era dentro deve rientrare.
+
+Non tocca mai il database di produzione e non cambia il codice pubblicato.
+
+**Pubblicare una versione nuova della demo** (dopo la produzione):
+
+```bash
+npm run db:migrate:demo && npm run deploy:demo
+```
+
+In locale: `npm run db:migrate:demo:locale` una volta, poi `npm run demo:locale`.
+
+## Schede dei lead
+
+Dal Piano B la scheda azienda di ogni lead nuovo la prepara l'app, con Claude, e si vede nella scheda del lead (si stampa da lì).
+
+Il vecchio server Python delle schede (`schede-lead.py`, nel wiki) resta acceso per due settimane dal collaudo con il lead di prova di Meta. **Finché è acceso, ogni lead nuovo ha due schede**: quella dell'app e quella del vecchio server. È previsto.
+
+Dopo le due settimane, se l'app ha fatto la scheda per ogni lead nuovo, Tommaso spegne l'avvio automatico di `schede-lead.py` sul server. Questo repo non lo tocca.
+
+- Collaudo con il lead di prova: da scrivere (giorno/mese/anno).
+- Spegnimento del vecchio server: da scrivere (due settimane dopo).
+
+## Scelte da sapere
+
+- **Sposta in fase e Abbina:** dopo aver scelto la fase o il lead serve il pulsante principale ("Sposta in X", "Abbina a X"), spento finché non c'è la scelta. Vale anche per un solo lead dal menu rapido e per "Assegna N a X" nelle azioni in blocco della Scaletta. Prima bastava il tocco.
+- **Call nel passato:** una call si registra o si fissa fino a 15 minuti nel passato. Oltre, la schermata scrive "La call è nel passato" sotto la data. Non c'è un modo per registrare una call già fatta e mai fissata.
+- **Telegram:** arretrato di 6 ore al collegamento (vedi "Avvisi, push e Telegram").
+- **Telefono ed email della scheda lead** sono link semplici: toccarli non registra il tentativo come "Chiama".
+- **Freccia indietro della scheda:** torna alla pagina di prima, o a Scaletta se la scheda è aperta da un link diretto.
+- **Campagne:** con una sola campagna il dettaglio parte aperto, con due o più tutte chiuse; cambiando mese si richiudono.
+- **Lunedì:** il "Commento precedente" sta sotto lo stato del commento nuovo.
+- **Conferma spenta:** i lead già in coda restano in coda e ripartono alla riaccensione, con il limite delle 48 ore.
+- **Template del preventivo del wiki:** non ha ancora i campi numero, lead, setup, canone e validità (vedi "Proposte dal wiki").
+
+## Font: licenza di Degular Display
+
+I tre file di Degular Display in `public/fonts/` (`DegularDisplay-Medium.otf`, `DegularDisplay-Semibold.otf`, `DegularDisplay-Bold.otf`) sono la **versione Demo di OH no Type**, con licenza solo per prove. Non si possono usare in produzione e mancano alcuni segni (€ ’ « » … °).
+
+Prima dell'uso vero:
+
+1. Tommaso compra la licenza web di Degular Display per i pesi 500, 600 e 700.
+2. Chi tiene il codice sostituisce i tre file in `public/fonts/` con quelli definitivi (stessi nomi, o si aggiornano i nomi nel CSS).
+3. In `public/sw.js` porta `VERSIONE` da `guscio-v2` a `guscio-v3`, così i telefoni buttano la copia vecchia dei font.
+4. `npm run e2e:foto`, si guardano le foto, poi commit e pubblicazione.
+
+Se un file manca, il CSS ripiega su Inter.
+
+## Chi fa cosa
+
+**Tommaso:**
+
+- dà la chiave di Anthropic e mette il limite di 25 dollari sul workspace su console.anthropic.com;
+- crea il bot con BotFather (token e nome utente);
+- compra la licenza di Degular Display;
+- sceglie la password dell'utente demo;
+- incolla i valori dei segreti quando `wrangler secret put` li chiede;
+- fa il collaudo con Diego (Telegram, push sull'iPhone, lead di prova, coach, tetto, lunedì);
+- spegne il vecchio server delle schede dopo due settimane.
+
+**Chi tiene il codice:**
+
+- genera le chiavi VAPID e scrive in `wrangler.jsonc` la pubblica e il nome del bot;
+- fa la copia del database, il controllo dei doppioni, le migrazioni e la pubblicazione, nell'ordine di "Mettere online";
+- pubblica e ripristina lo spazio demo;
+- sostituisce i font e porta il service worker a `guscio-v3`;
+- aggiorna il listino di Claude se Anthropic cambia i prezzi;
+- scrive in questo README le date del collaudo e dello spegnimento.
+
 ## Aggiungere un utente
 
 Come in locale, ma per il database online si usa `--remote` al posto di `--local` nel comando che lo script stampa:
@@ -134,11 +394,13 @@ Poi lancia il comando stampato (con `--remote`) e cancella il file `create-user-
 
 ## Cartelle
 
-- `worker/`: server (accesso, lead, regole, call, proposte, foglio, email, economia, automazioni, controllo automatico)
-- `src/`: interfaccia (design system in `src/ds/`, pagine in `src/pagine/`)
+- `worker/`: server (accesso, lead, regole, call, proposte, foglio, email, economia, automazioni, controllo automatico, avvisi, push, Telegram, Claude, numeri, lunedì, diario, dati, ricerca)
+- `src/`: interfaccia (design system in `src/ds/`, pagine in `src/pagine/`, guscio dell'app in `src/guscio/`)
+- `public/`: font, icone, `manifest.webmanifest` e service worker (`sw.js`) dell'app installabile
 - `drizzle/`: migrazioni del database
-- `scripts/`: creazione utenti e passaggio dati dal vecchio prototipo
+- `scripts/`: creazione utenti, passaggio dati dal vecchio prototipo, dati e ripristino dello spazio demo
 - `tests/`: test automatici
+- `e2e/`: controlli con Playwright e foto di confronto
 
 ## Passaggio alla 1B (fatto una volta)
 

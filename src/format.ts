@@ -59,7 +59,8 @@ export function trascorso(ms: number, ora = Date.now()): string {
   if (d < MIN) return "adesso";
   if (d < ORA_MS) return `${Math.floor(d / MIN)} min fa`;
   if (d < GIORNO_MS) return `${Math.floor(d / ORA_MS)} h fa`;
-  return `${Math.floor(d / GIORNO_MS)} giorni fa`;
+  const giorni = Math.floor(d / GIORNO_MS);
+  return giorni === 1 ? "1 giorno fa" : `${giorni} giorni fa`;
 }
 
 export function fermoDa(ms: number, ora = Date.now()): string | null {
@@ -73,7 +74,7 @@ export function euro(cents?: number | null): string {
   if (cents == null) return "";
   const n = Math.round(Math.abs(cents) / 100);
   const testo = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  return `${cents < 0 ? "-" : ""}€ ${testo}`;
+  return `${cents < 0 && n > 0 ? "-" : ""}€ ${testo}`;
 }
 
 export const conteggioBadge = (n: number) => (n <= 0 ? null : n > 9 ? "9+" : String(n));
@@ -115,6 +116,15 @@ export function presetInizio(ora = Date.now()) {
   ];
 }
 
+// Scorciatoie per i giorni passati (Segna incassata, Segna emessa): voce 48.
+export function presetPassato(ora = Date.now()) {
+  const p = partiRoma(ora);
+  return [
+    { etichetta: "Oggi", ms: daRoma(p.anno, p.mese, p.giorno) },
+    { etichetta: "Ieri", ms: daRoma(p.anno, p.mese, p.giorno - 1) },
+  ];
+}
+
 // Minuti interi in ore e minuti ("1 h 10 min"): diversa da durata(), che arrotonda all'unità più grande.
 const durataMinuti = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
 
@@ -133,6 +143,15 @@ export function giorno(ms: number, ora = Date.now()): string {
   return `${p.giorno} ${MESI[p.mese - 1]}${p.anno !== partiRoma(ora).anno ? ` ${p.anno}` : ""}`;
 }
 
+// "il 15 ott", ma "l'8 ott" e "l'11 ott" (QA del Piano A): anche "dal" e "al" si elidono ("dall'8", "all'11").
+const ELISO = { il: "l'", dal: "dall'", al: "all'" } as const;
+export function ilGiorno(ms: number, ora = Date.now(), prep: keyof typeof ELISO = "il"): string {
+  const g = partiRoma(ms).giorno;
+  return `${g === 8 || g === 11 ? ELISO[prep] : `${prep} `}${giorno(ms, ora)}`;
+}
+export const conArticolo = (prep: keyof typeof ELISO, numeroDelGiorno: number, resto: string) =>
+  `${numeroDelGiorno === 8 || numeroDelGiorno === 11 ? ELISO[prep] : `${prep} `}${resto}`;
+
 // QA 16: scadenza di una fattura contata in giorni di Roma, non in ore UTC.
 // "scade oggi", "scade domani", "scaduta da N giorni", altrimenti "scade il 15 ott" (con l'apostrofo per 8 e 11).
 export function scadenzaFattura(dueAt: number, ora = Date.now()): string {
@@ -140,8 +159,7 @@ export function scadenzaFattura(dueAt: number, ora = Date.now()): string {
   if (giorni === 0) return "scade oggi";
   if (giorni === 1) return "scade domani";
   if (giorni < 0) return `scaduta da ${-giorni} ${giorni === -1 ? "giorno" : "giorni"}`;
-  const g = partiRoma(dueAt).giorno;
-  return `scade ${g === 8 || g === 11 ? "l'" : "il "}${giorno(dueAt, ora)}`;
+  return `scade ${ilGiorno(dueAt, ora)}`;
 }
 
 // Valore per <input type="date">, sul fuso di Roma.
@@ -159,4 +177,36 @@ export function daIsoGiorno(s: string): number | null {
 export function nomeMese(mese: string): string {
   const [anno, m] = mese.split("-").map(Number);
   return `${MESI_LUNGHI[m - 1]} ${anno}`;
+}
+
+// Percentuale onesta già calcolata dal server: null diventa "n.d." (meno di 5 lead).
+export const percentualeOppureNd = (p: number | null) => (p == null ? "n.d." : `${p}%`);
+
+// Mese di Roma corrente e i precedenti, per il Selettore di Campagne ("ottobre 2026").
+export function mesiRecenti(ora: number, quanti: number): { valore: string; etichetta: string }[] {
+  const [a, m] = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit" }).format(ora).split("-").map(Number);
+  return Array.from({ length: quanti }, (_, i) => {
+    const t = a * 12 + (m - 1) - i;
+    const valore = `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+    return { valore, etichetta: nomeMese(valore) };
+  });
+}
+
+// Soldi in centesimi con due decimali, per i costi delle campagne: "€ 38,00", "€ 1.234,50".
+export function euroCentesimi(cents?: number | null): string {
+  if (cents == null) return "";
+  const n = Math.abs(Math.round(cents));
+  const interi = String(Math.floor(n / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${cents < 0 ? "-" : ""}€ ${interi},${String(n % 100).padStart(2, "0")}`;
+}
+
+// Importo scritto a mano in euro ("532", "532,40", "1.234,50", "€ 12.5") in centesimi interi; null se non è un importo.
+export function centesimiDaTesto(testo: string): number | null {
+  let s = testo.replace(/[€\s]/g, "");
+  if (s === "") return null;
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
+  const [interi, decimali = ""] = s.split(".");
+  return Number(interi) * 100 + Number(decimali.padEnd(2, "0"));
 }

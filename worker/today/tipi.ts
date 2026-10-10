@@ -7,7 +7,9 @@ export type RigaOggi = {
   setupCents: number | null; feeCents: number | null; slaScadenza: number | null;
 };
 
-export type CallOggi = { id: string; leadId: string; company: string; contactName: string | null; phone: string | null; kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null };
+export type CallOggi = { id: string; leadId: string; company: string; contactName: string | null; phone: string | null; kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null;
+  // Spec 6.4: stato della scheda azienda di Claude (ultima versione), mostrato sotto la call di conoscenza.
+  scheda: "pronta" | "in_preparazione" | null };
 
 export type PropostaOggi = { id: string; number: string; status: "registrata" | "presentata"; leadId: string; company: string; contactName: string | null; email: string | null; phone: string | null; setupCents: number | null; feeCents: number | null; nextActionAt: number | null };
 

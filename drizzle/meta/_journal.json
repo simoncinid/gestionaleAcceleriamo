@@ -64,6 +64,34 @@
       "when": 1791619762264,
       "tag": "0008_dati_lavori",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791619763264,
+      "tag": "0009_piano_b",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791619764264,
+      "tag": "0010_indice_telegram",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791619765264,
+      "tag": "0011_indice_registro",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791619766264,
+      "tag": "0012_indici_rifiniture",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,10 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { LIMITI, giro, lavoriDelGiro } from "../worker/cron";
+import { LAVORI, giro } from "../worker/cron";
 import { getDb } from "../worker/db/client";
 import { generaRicorrenti } from "../worker/lavori/service";
-import { daRoma } from "../worker/lib/roma";
+import { contaD1 } from "../worker/lib/bilancio";
+import { daRoma, partiRoma } from "../worker/lib/roma";
 import { authed, call } from "./helpers";
 
 const MODELLO = "lt-automazione-su-misura";
@@ -92,24 +93,34 @@ describe("task ricorrenti del giro", () => {
     expect(await generaRicorrenti(db, daRoma(2026, 12, 1, 7), 12)).toBe(2);
     expect(await conta("SELECT count(*) n FROM tasks WHERE client_id = 'c2'")).toBe(4);
   });
-  it("il giro dei lavori sta sotto il tetto di query D1 con il massimo di task e riprende al giro dopo", async () => {
+  it("misura con contaD1: 2 query fisse più una a task, come dichiara LAVORI.lavori", async () => {
+    for (let i = 0; i < 8; i++) await lavoroAttivo(`q${i}`, "2026-11");
+    const def = LAVORI.lavori!;
+    const c = { query: 0 };
+    const fatte = await generaRicorrenti(getDb(contaD1(env.DB, c)), daRoma(2026, 11, 3, 7), def.max);
+    expect(fatte).toBe(def.max);
+    expect(c.query).toBe(def.fisse + fatte * def.perUnita);
+    expect(def.sottoPerUnita).toBe(0);
+  });
+  it("il giro con le task ricorrenti sta sotto il tetto di query D1 e riprende al giro delle 7:30", async () => {
     for (let i = 0; i < 8; i++) await lavoroAttivo(`m${i}`, "2026-11");
     let n = 0;
     const db = new Proxy(env.DB, { get(t, k) { if (k === "prepare") return (q: string) => { n++; return t.prepare(q); }; const v = Reflect.get(t, k); return typeof v === "function" ? v.bind(t) : v; } });
     const adesso = daRoma(2026, 11, 3, 7);
     const esito = await giro({ ...env, DB: db } as typeof env, adesso);
     expect(esito.errori).toEqual([]);
-    expect(esito.fatti).toEqual(["lavori"]);
-    expect(await conta("SELECT count(*) n FROM tasks")).toBe(LIMITI.lavori);
-    expect(n).toBeLessThanOrEqual(2 + LIMITI.lavori + 6); // letture, scritture e il segno di giro riuscito
-    expect(n).toBeLessThan(50);
+    expect(esito.fatti).toContain("lavori");
+    expect(await conta("SELECT count(*) n FROM tasks")).toBe(LAVORI.lavori!.max);
+    expect(n).toBeLessThanOrEqual(45);
+    expect(esito.query).toBeLessThanOrEqual(45);
     await giro(env, daRoma(2026, 11, 3, 7, 30));
     expect(await conta("SELECT count(*) n FROM tasks")).toBe(16);
   });
   it("il lavoro programmato occupa 7:00 e 7:30 di Roma", () => {
-    expect(lavoriDelGiro(daRoma(2026, 11, 3, 7, 0))).toEqual(["lavori"]);
-    expect(lavoriDelGiro(daRoma(2026, 11, 3, 7, 30))).toEqual(["lavori"]);
-    expect(lavoriDelGiro(daRoma(2026, 11, 3, 7, 5))).toEqual(["conferme"]);
+    const q = (t: number) => LAVORI.lavori!.quando(partiRoma(t));
+    expect(q(daRoma(2026, 11, 3, 7, 0))).toBe(true);
+    expect(q(daRoma(2026, 11, 3, 7, 30))).toBe(true);
+    expect(q(daRoma(2026, 11, 3, 7, 5))).toBe(false);
   });
 });
 

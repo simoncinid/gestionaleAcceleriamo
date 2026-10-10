@@ -1,5 +1,6 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import { getDb, type Db } from "../db/client";
+import { avvisa } from "../avvisi/service";
 import { mandaConferma } from "../email/conferma";
 import { leads, users } from "../db/schema";
 import type { Env } from "../env";
@@ -34,6 +35,11 @@ export async function catenaLeadNuovo(env: Env, leadId: string, origine: "meta" 
   // La prima chiamata scade con lo SLA in orario di apertura (stessa funzione di Oggi e della Scaletta).
   const { nextActionAt } = conScadenzaSla(lead, await leggiSla(db));
   await db.update(leads).set({ ownerId, score, nextActionAt }).where(eq(leads.id, leadId));
+  // Spec 8: lead nuovo a tutti e due, solo dalle porte automatiche (un lead scritto a mano lo conosce chi lo scrive).
+  // Prima della conferma: se l'email fallisce l'avviso c'è già. Una query sola (INSERT con gli utenti attivi).
+  if (origine !== "manuale") {
+    await avvisa(db, { evento: "lead_nuovo", entityId: leadId, titolo: `Lead nuovo: ${lead.company || "senza nome"}`, testo: lead.contactName ?? undefined, href: `/commerciale/lead/${leadId}` }, now);
+  }
   // Passo 3 (spec 6.1): solo per i lead dalle porte automatiche. Se fallisce, lo riprende il giro.
   if (origine !== "manuale") await mandaConferma(env, leadId, now);
 }

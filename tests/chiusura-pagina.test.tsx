@@ -30,8 +30,8 @@ describe("Q6: foglio di Chiuso precompilato", () => {
   });
   it("prima la proposta accettata, poi i soldi del lead, il nome dall'azienda", () => {
     const lead = { company: "Ferri Srl", setupCents: 100_000, feeCents: 10_000 };
-    const accettata = { status: "accettata", option: "canone", setupCents: 250_000, feeCents: 30_000 };
-    const rifiutata = { status: "rifiutata", option: "canone", setupCents: 900_000, feeCents: 90_000 };
+    const accettata = { status: "accettata", option: "standard", setupCents: 250_000, feeCents: 30_000 };
+    const rifiutata = { status: "rifiutata", option: "standard", setupCents: 900_000, feeCents: 90_000 };
     expect(precompilaChiusura(lead, [rifiutata, accettata])).toEqual({ setup: "2.500", canone: "300", nome: "Ferri Srl" });
     expect(precompilaChiusura(lead, [rifiutata])).toEqual({ setup: "1.000", canone: "100", nome: "Ferri Srl" });
     expect(precompilaChiusura({ ...lead, setupCents: null, feeCents: null })).toEqual({ setup: "", canone: "", nome: "Ferri Srl" });
@@ -54,5 +54,24 @@ describe("Q15: scheda di un lead chiuso", () => {
   it("aperto: Chiama resta l'azione in accento", () => {
     const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], dettaglio("da-richiamare", null)], [["stages"], FASI]] });
     expect(contaPrimari(html)).toBe(1);
+  });
+});
+
+describe("Scheda lead: voci 30 e 41", () => {
+  const scheda = (stageId: string, cliente: LeadDetail["cliente"], lead: object = {}) => {
+    const d = dettaglio(stageId, cliente);
+    return render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], { ...d, lead: { ...d.lead, ...lead } }], [["stages"], FASI]] });
+  };
+  it("30: vinto senza cliente, l'unica azione in accento è Crea il cliente", () => {
+    const html = scheda("chiuso", null);
+    expect(html).toContain(">Crea il cliente<");
+    expect(html).not.toContain("Apri cliente");
+    expect(contaPrimari(html)).toBe(1);
+  });
+  it("41: freccia per tornare indietro, telefono ed email come link", () => {
+    const html = scheda("da-richiamare", null, { email: "luca@esempio.it" });
+    expect(html).toContain('aria-label="Torna indietro"');
+    expect(html).toContain('href="tel:+393330000001"');
+    expect(html).toContain('href="mailto:luca@esempio.it"');
   });
 });

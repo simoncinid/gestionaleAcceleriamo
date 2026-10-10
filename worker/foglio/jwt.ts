@@ -3,6 +3,7 @@ import type { Db } from "../db/client";
 import { sheetSyncState } from "../db/schema";
 import type { Env } from "../env";
 import { chiamaGoogle, SA_CREDENZIALI } from "./leggi";
+import { eDemo, NIENTE_IN_DEMO } from "../lib/demo";
 
 const b64url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const testo = (s: string) => b64url(new TextEncoder().encode(s));
@@ -27,6 +28,7 @@ const CACHE_MS = 55 * 60_000;
 
 // Il token dura un'ora: si firma una volta e si tiene in D1 per 55 minuti (spec 16.2).
 export async function tokenGoogle(env: Env, db: Db, now: number): Promise<string> {
+  if (eDemo(env)) throw new Error(NIENTE_IN_DEMO);
   const riga = await db.select({ cache: sheetSyncState.tokenCache }).from(sheetSyncState).where(eq(sheetSyncState.id, "foglio-andrea")).get();
   const cache = riga?.cache ? (JSON.parse(riga.cache) as { token: string; scade: number }) : null;
   if (cache && cache.scade > now) return cache.token;

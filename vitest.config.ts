@@ -6,6 +6,7 @@ export default defineWorkersConfig(async () => {
   return {
     test: {
       include: ["tests/**/*.test.{ts,tsx}"],
+      exclude: ["e2e/**", "node_modules/**"],
       setupFiles: ["./tests/apply-migrations.ts"],
       poolOptions: {
         workers: {
@@ -25,6 +26,11 @@ export default defineWorkersConfig(async () => {
               PROPOSAL_HOOK_KEY: "chiave-aggancio-test",
               GOOGLE_SA_EMAIL: "",
               GOOGLE_SA_PRIVATE_KEY: "",
+              ANTHROPIC_API_KEY: "sk-ant-test",
+              TELEGRAM_BOT_TOKEN: "123:test",
+              TELEGRAM_BOT: "acceleriamo_test_bot",
+              VAPID_SOGGETTO: "https://os.esempio.it",
+              APP_URL: "https://os.esempio.it",
             },
           },
         },

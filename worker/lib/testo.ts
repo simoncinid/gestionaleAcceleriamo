@@ -11,3 +11,11 @@ export function normalizzaAzienda(nome?: string | null): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+// Un testo troppo lungo si taglia all'ultimo spazio con "...", mai a metà parola.
+export function accorcia(testo: string, max: number): string {
+  if (testo.length <= max) return testo;
+  const taglio = testo.slice(0, max - 3);
+  const spazio = taglio.search(/\s\S*$/);
+  return `${(spazio > 0 ? taglio.slice(0, spazio) : taglio).trimEnd()}...`;
+}

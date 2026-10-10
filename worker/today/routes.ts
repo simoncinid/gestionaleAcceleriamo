@@ -8,8 +8,9 @@ import { leggiImpostazioni } from "../impostazioni/service";
 import { scegliAdesso } from "./adesso";
 import type { CallOggi, Oggi, PropostaOggi, RigaOggi } from "./tipi";
 
+type CallGrezza = Omit<CallOggi, "scheda"> & { schedaStato: string | null };
+
 const GIORNO = 86_400_000;
-const HUMAN_TYPES = "('nota','chiamata','email','cambio_fase')";
 const FROM = "FROM leads l JOIN stages s ON s.id = l.stage_id";
 
 // Colonne di RigaOggi (slaScadenza si calcola dopo).
@@ -21,10 +22,6 @@ const APERTI = "l.deleted_at IS NULL AND s.kind = 'open'";
 const oggiSchema = z.object({
   chi: z.enum(["mie", "tutte"]).default("mie"),
   now: z.coerce.number().int().optional(),
-});
-const statsSchema = z.object({
-  from: z.coerce.number().int().default(0),
-  until: z.coerce.number().int().default(Number.MAX_SAFE_INTEGER),
 });
 
 const parametro = (params: string | undefined, chiave: string): number | undefined => {
@@ -61,7 +58,7 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
   const minutiSla = parametro(regola("sla"), "minuti") ?? 120;
   const giorniFermo = parametro(regola("fermo"), "giorni") ?? 7;
 
-  const [nuoviGrezzi, dovuti, proposte, fermiGrezzi, callOggi, leadNuovi, primaRisposta, callSettimana, proposteAperte] = await Promise.all([
+  const [nuoviGrezzi, dovuti, proposte, fermiGrezzi, callGrezze, leadNuovi, primaRisposta, callSettimana, proposteAperte] = await Promise.all([
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM} WHERE ${APERTI} ${chi} AND l.stage_id = 'da-chiamare-prima-volta' ORDER BY l.created_at`),
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM}
       WHERE ${APERTI} ${chi} AND l.next_action_at IS NOT NULL AND l.next_action_at < ?2 ORDER BY l.next_action_at`, fine),
@@ -75,7 +72,10 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM}
       WHERE ${APERTI} ${chi} AND l.stage_id NOT IN ('probabilmente-bloccato', 'da-chiamare-prima-volta')
         AND l.stage_changed_at <= ?2 ORDER BY l.stage_changed_at LIMIT 20`, ora - giorniFermo * GIORNO),
-    tutti<CallOggi>(`SELECT k.id, k.lead_id AS leadId, l.company, l.contact_name AS contactName, l.phone, k.kind, k.scheduled_at AS scheduledAt, k.meet_link AS meetLink
+    tutti<CallGrezza>(`SELECT k.id, k.lead_id AS leadId, l.company, l.contact_name AS contactName, l.phone, k.kind, k.scheduled_at AS scheduledAt, k.meet_link AS meetLink,
+        -- Come statoScheda: durante "Rigenera" resta pronta se una versione pronta c'è già.
+        CASE WHEN EXISTS (SELECT 1 FROM company_profiles cp WHERE cp.lead_id = l.id AND cp.status = 'ready') THEN 'ready'
+          ELSE (SELECT cp.status FROM company_profiles cp WHERE cp.lead_id = l.id ORDER BY cp.version DESC LIMIT 1) END AS schedaStato
       FROM calls k JOIN leads l ON l.id = k.lead_id WHERE k.deleted_at IS NULL AND l.deleted_at IS NULL ${chi}
         AND k.scheduled_at >= ?2 AND k.scheduled_at < ?3 ORDER BY k.scheduled_at`, inizio, fine),
     uno<{ n: number }>("SELECT count(*) n FROM leads WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ?", inizio, fine),
@@ -84,7 +84,11 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
     uno<{ n: number }>("SELECT count(*) n FROM proposals p JOIN leads l ON l.id = p.lead_id AND l.deleted_at IS NULL WHERE p.deleted_at IS NULL AND p.status IN ('registrata', 'presentata')"),
   ]);
 
-  // Stessa scadenza della Scaletta, dell'Elenco e della scheda (worker/regole/sla.ts).
+  const callOggi: CallOggi[] = callGrezze.map(({ schedaStato, ...k }) => ({
+    ...k,
+    scheda: schedaStato === "ready" ? "pronta" : schedaStato === "queued" || schedaStato === "running" ? "in_preparazione" : null,
+  }));
+
   // Stessa scadenza della Scaletta, dell'Elenco e della scheda (worker/regole/sla.ts).
   const nuoviTutti = nuoviGrezzi.map((l) => {
     const allineato = conScadenzaSla(l, { minuti: minutiSla, orario: imp.orario });
@@ -134,22 +138,4 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
 todayRoutes.get("/today", async (c) => {
   const q = oggiSchema.parse(c.req.query());
   return c.json(await calcolaOggi(c.env.DB, c.get("user").id, q.chi, q.now ?? Date.now()));
-});
-
-todayRoutes.get("/stats", async (c) => {
-  const { from, until } = statsSchema.parse(c.req.query());
-  const db = c.env.DB;
-  const range = "l.deleted_at IS NULL AND l.created_at BETWEEN ? AND ?";
-  const [bySource, byCampaign, byStage, firstResponse] = await Promise.all([
-    db.prepare(`SELECT l.source, COUNT(*) AS total, SUM(s.kind = 'won') AS won, SUM(s.kind = 'lost') AS lost ${FROM} WHERE ${range} GROUP BY l.source ORDER BY total DESC`).bind(from, until).all(),
-    db.prepare(`SELECT COALESCE(l.meta_campaign, '(senza campagna)') AS campaign, COUNT(*) AS total, SUM(s.kind = 'won') AS won, SUM(s.kind = 'lost') AS lost ${FROM} WHERE ${range} AND l.source = 'meta' GROUP BY campaign ORDER BY total DESC`).bind(from, until).all(),
-    db.prepare(`SELECT s.id AS stageId, s.label, COUNT(l.id) AS count FROM stages s LEFT JOIN leads l ON l.stage_id = s.id AND ${range} GROUP BY s.id ORDER BY s.sort_order`).bind(from, until).all(),
-    db.prepare(
-      `SELECT AVG(first_at - created_at) AS avgMs, COUNT(*) AS count FROM (
-         SELECT l.created_at, (SELECT MIN(a.created_at) FROM activities a WHERE a.lead_id = l.id AND a.type IN ${HUMAN_TYPES}) AS first_at
-         FROM leads l WHERE ${range}
-       ) WHERE first_at IS NOT NULL`,
-    ).bind(from, until).first<{ avgMs: number | null; count: number }>(),
-  ]);
-  return c.json({ bySource: bySource.results, byCampaign: byCampaign.results, byStage: byStage.results, firstResponse });
 });

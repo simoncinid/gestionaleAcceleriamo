@@ -37,7 +37,7 @@ export function NextActionCard({ lead, kind, ora, seNonRisponde, onSave, pending
           <CampoQuando etichetta="Quando" valore={momento} onCambia={setMomento} />
           <div className="flex gap-2">
             <Pulsante variante="secondario" inCorso={pending} motivoSpento={!azione.trim() || momento == null ? "Scegli l'azione e quando" : undefined}
-              onClick={() => poiSeRiesce(onSave, () => setCambia(false))({ nextAction: azione.trim(), nextActionAt: momento })}>Salva</Pulsante>
+              onClick={() => poiSeRiesce(onSave, () => setCambia(false))({ nextAction: azione.trim(), nextActionAt: momento })}>Salva l'azione</Pulsante>
             <Pulsante variante="fantasma" onClick={() => setCambia(false)}>Annulla</Pulsante>
           </div>
         </div>

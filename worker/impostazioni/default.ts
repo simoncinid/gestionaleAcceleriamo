@@ -23,6 +23,28 @@ export const SCHEMI = {
   validita: z.object({ giorni: z.number().int().min(1).max(365) }).strict(),
   fatture: z.object({ scadenzaGiorni: z.number().int().min(0).max(120) }).strict(),
   obiettivo: z.object({ ricorrenteCents: z.number().int().min(0) }).strict(),
+  // Spec 7.5: prezzi in dollari per milione di token, che sono anche micro-dollari per token.
+  claude: z.object({
+    modelli: z.object({
+      classificazione: z.string().min(1),
+      scheda: z.string().min(1),
+      coach: z.string().min(1),
+      commento: z.string().min(1),
+    }).strict(),
+    prezzi: z.record(z.string(), z.object({
+      ingresso: z.number().min(0),
+      uscita: z.number().min(0),
+      cacheLettura: z.number().min(0),
+      cacheScrittura: z.number().min(0),
+    }).strict()),
+    ricercaMicros: z.number().int().min(0), // 10 dollari ogni 1.000 ricerche = 10.000 micro-dollari
+    tettoCents: z.number().int().min(1),
+    avvisoCents: z.number().int().min(0),
+    lavoriPerGiro: z.number().int().min(1).max(3),
+    ricercheScheda: z.number().int().min(0).max(5),
+  }).strict(),
+  // Spec 6.9: soglie del costo per lead; oltre l'ultima "Stop loss superato".
+  campagne: z.object({ soglieCents: z.tuple([z.number().int(), z.number().int(), z.number().int()]) }).strict(),
 };
 
 export type Impostazioni = { [K in keyof typeof SCHEMI]: z.infer<(typeof SCHEMI)[K]> };
@@ -59,4 +81,27 @@ export const IMPOSTAZIONI_DEFAULT: Impostazioni = {
   validita: { giorni: 30 },
   fatture: { scadenzaGiorni: 15 },
   obiettivo: { ricorrenteCents: 200_000 },
+  claude: {
+    modelli: {
+      classificazione: "claude-haiku-4-5",
+      scheda: "claude-sonnet-5-5",
+      coach: "claude-sonnet-5-5",
+      commento: "claude-haiku-4-5",
+    },
+    prezzi: {
+      "claude-haiku-4-5": { ingresso: 1, uscita: 5, cacheLettura: 0.1, cacheScrittura: 1.25 },
+      "claude-sonnet-5-5": { ingresso: 2, uscita: 10, cacheLettura: 0.2, cacheScrittura: 2.5 },
+      // Il fallback del server per Sonnet 5.5 risponde con Sonnet 5: il costo segue il modello che ha risposto.
+      "claude-sonnet-5": { ingresso: 2, uscita: 10, cacheLettura: 0.2, cacheScrittura: 2.5 },
+      // Listino Anthropic per Opus 5.5 (letto il 10/10/2026): 4 e 20 dollari per milione, lettura dalla cache 0,20,
+      // scrittura 1,25 volte l'ingresso. Le richieste di oggi non usano la cache: la voce conta solo se un giorno la useranno.
+      "claude-opus-5-5": { ingresso: 4, uscita: 20, cacheLettura: 0.2, cacheScrittura: 5 },
+    },
+    ricercaMicros: 10_000,
+    tettoCents: 2000,
+    avvisoCents: 1600,
+    lavoriPerGiro: 3,
+    ricercheScheda: 5,
+  },
+  campagne: { soglieCents: [800, 1300, 1600] },
 };

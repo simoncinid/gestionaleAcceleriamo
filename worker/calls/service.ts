@@ -75,7 +75,16 @@ type EsitoInvito = { ok: true } | { ok: false; errore: string; inCoda?: true };
 // Senza la chiave di Resend l'invito non si perde: resta in coda e lo manda il giro programmato.
 export async function mandaInvito(env: Env, db: Db, id: string, actorId: string | null, now: number): Promise<EsitoInvito> {
   const k = await unaCall(db, id);
-  if (!k.email) return { ok: false, errore: ERRORE_SENZA_EMAIL };
+  if (!k.email) {
+    // Un invito in coda senza indirizzo non partirà mai: esce dalla coda (con una voce nel diario del lead),
+    // altrimenti occupa per sempre i posti degli inviti nel giro.
+    const tolto = await db.update(calls).set({ inviteQueuedAt: null, updatedAt: now })
+      .where(and(eq(calls.id, id), isNotNull(calls.inviteQueuedAt), isNull(calls.inviteSentAt))).run();
+    if (tolto.meta.changes) {
+      await db.insert(activities).values({ id: crypto.randomUUID(), leadId: k.leadId, type: "email_auto", body: "Invito non mandato: il lead non ha un'email", authorId: actorId, createdAt: now, callId: id });
+    }
+    return { ok: false, errore: ERRORE_SENZA_EMAIL };
+  }
   if (!env.RESEND_API_KEY) {
     await db.update(calls).set({ inviteQueuedAt: now, updatedAt: now }).where(and(eq(calls.id, id), isNull(calls.inviteSentAt)));
     return { ok: false, errore: INVITO_IN_CODA, inCoda: true };
@@ -110,8 +119,16 @@ export async function mandaInvito(env: Env, db: Db, id: string, actorId: string 
   return { ok: true };
 }
 
+// Una call nuova o spostata non può stare nel passato. Tolleranza di 15 minuti: chi la fissa "adesso" mentre parla
+// col cliente, o con l'orologio del telefono un po' indietro, non riceve un errore.
+export const TOLLERANZA_CALL_MS = 15 * 60_000;
+export function assertCallFutura(scheduledAt: number, now: number) {
+  if (scheduledAt < now - TOLLERANZA_CALL_MS) throw new HTTPException(422, { message: "La call è nel passato: scegli giorno e ora da adesso in poi" });
+}
+
 // Fissare una call è un'azione esplicita: la proposta del motore (fase e prossima azione) si applica nello stesso batch.
 export async function fissaCall(env: Env, db: Db, leadId: string, input: z.infer<typeof callNuovaSchema>, actorId: string, now: number) {
+  assertCallFutura(input.scheduledAt, now);
   const id = crypto.randomUUID();
   const ctx = await contestoRegole(db, now);
   const passi = await passiProposta(db, leadId, propostaEvento({ tipo: "call_fissata", kind: input.kind, scheduledAt: input.scheduledAt }, ctx), actorId, now);
@@ -132,6 +149,8 @@ export async function fissaCall(env: Env, db: Db, leadId: string, input: z.infer
 
 export async function aggiornaCall(db: Db, id: string, input: z.infer<typeof callPatchSchema>, actorId: string, now: number) {
   const k = await unaCall(db, id);
+  if (input.scheduledAt !== undefined && input.scheduledAt !== k.scheduledAt) assertCallFutura(input.scheduledAt, now);
+  if (input.presentazione) assertCallFutura(input.presentazione.scheduledAt, now);
   const ctx = await contestoRegole(db, now);
   const passi: BatchItem<"sqlite">[] = [];
   const set: Partial<typeof calls.$inferInsert> = { updatedAt: now };

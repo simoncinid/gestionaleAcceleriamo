@@ -5,7 +5,7 @@ import type { AppEnv, SessionUser } from "../env";
 export const SESSION_COOKIE = "sid";
 export const SESSION_DAYS = 30;
 
-async function sha256Hex(value: string) {
+export async function idSessione(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -20,7 +20,7 @@ export async function createSession(db: D1Database, userId: string, now = Date.n
   const expiresAt = now + SESSION_DAYS * 86_400_000;
   await db
     .prepare("INSERT INTO sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)")
-    .bind(await sha256Hex(token), userId, expiresAt, now)
+    .bind(await idSessione(token), userId, expiresAt, now)
     .run();
   return { token, expiresAt };
 }
@@ -30,12 +30,12 @@ export async function readSession(db: D1Database, token: string, now = Date.now(
     .prepare(
       "SELECT u.id, u.username, u.name FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ? AND u.active = 1",
     )
-    .bind(await sha256Hex(token), now)
+    .bind(await idSessione(token), now)
     .first<SessionUser>();
 }
 
 export async function deleteSession(db: D1Database, token: string) {
-  await db.prepare("DELETE FROM sessions WHERE id = ?").bind(await sha256Hex(token)).run();
+  await db.prepare("DELETE FROM sessions WHERE id = ?").bind(await idSessione(token)).run();
 }
 
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {

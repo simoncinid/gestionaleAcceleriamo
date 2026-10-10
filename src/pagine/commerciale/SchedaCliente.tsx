@@ -64,18 +64,18 @@ export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number 
       </Sezione>
       <Sezione titolo="Canoni">
         {canoni.length === 0 ? <p className="text-secondaria text-grigio">Nessun canone</p> : (
-          <ul className="grid gap-2">{canoni.map((c) => <li key={c.id}><Riga titolo={`${euro(c.amountCents)} al mese`} secondaria={ETICHETTE_CANONE[c.status]} meta={`Fatturazione il giorno ${c.billingDay}`} /></li>)}</ul>
+          <ul className="grid grid-cols-1 gap-2">{canoni.map((c) => <li key={c.id}><Riga titolo={`${euro(c.amountCents)} al mese`} secondaria={ETICHETTE_CANONE[c.status]} meta={`Fatturazione il giorno ${c.billingDay}`} /></li>)}</ul>
         )}
       </Sezione>
       <Sezione titolo="Automazioni">
         {automazioni.length === 0 ? <p className="text-secondaria text-grigio">Nessuna automazione</p> : (
-          <ul className="grid gap-2">{automazioni.map((a) => <li key={a.id}><Riga titolo={a.name} secondaria={ETICHETTE_AUTOMAZIONE[a.status]} href={`/automazioni/${a.id}`} /></li>)}</ul>
+          <ul className="grid grid-cols-1 gap-2">{automazioni.map((a) => <li key={a.id}><Riga titolo={a.name} secondaria={ETICHETTE_AUTOMAZIONE[a.status]} href={`/automazioni/${a.id}`} /></li>)}</ul>
         )}
       </Sezione>
       {k.scope === "acceleriamo" && (
         <Sezione titolo="Ultime fatture">
           {fatture.length === 0 ? <p className="text-secondaria text-grigio">Nessuna fattura</p> : (
-            <ul className="grid gap-2">{fatture.map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} /></li>)}</ul>
+            <ul className="grid grid-cols-1 gap-2">{fatture.map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} /></li>)}</ul>
           )}
         </Sezione>
       )}

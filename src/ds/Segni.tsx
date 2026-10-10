@@ -19,12 +19,14 @@ export function Punto({ colore, etichetta }: { colore: keyof typeof COLORI; etic
   );
 }
 
+// Voce 49: la chip resta su una riga ("in attesa di attivazione" in Canoni), è il titolo accanto ad andare a capo.
 export const Tag = ({ children }: { children: ReactNode }) => (
-  <span className="inline-flex h-6 items-center rounded-full bg-sabbia px-2.5 text-etichetta text-ink">{children}</span>
+  <span className="inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full bg-sabbia px-2.5 text-etichetta text-ink">{children}</span>
 );
 
-export const Avatar = ({ nome }: { nome: string }) => (
-  <span className="inline-flex size-9 items-center justify-center rounded-full bg-accento font-display text-corpo font-semibold text-accento-inchiostro" aria-hidden>
+// piccolo: dentro una card (chi segue il lead), alto come una riga di meta.
+export const Avatar = ({ nome, piccolo = false }: { nome: string; piccolo?: boolean }) => (
+  <span className={cx("inline-flex shrink-0 items-center justify-center rounded-full bg-accento font-display font-semibold text-accento-inchiostro", piccolo ? "size-6 text-meta" : "size-9 text-corpo")} aria-hidden>
     {nome.trim().charAt(0).toUpperCase()}
   </span>
 );

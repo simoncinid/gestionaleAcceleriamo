@@ -4,6 +4,7 @@ import { Pulsante } from "../src/ds";
 import { AREE, REDIRECT_1A, SOTTOMENU, TUTTE_LE_CREAZIONI, areaDi, creazioneDelPiu, creazioneDellaBarra, creazioniDelPercorso } from "../src/guscio/aree";
 import { Guscio } from "../src/guscio/Guscio";
 import { BarraBasso } from "../src/guscio/BarraBasso";
+import { BannerDemo } from "../src/guscio/BannerDemo";
 import { BarraLaterale } from "../src/guscio/BarraLaterale";
 import { Testata } from "../src/guscio/Testata";
 import { leggiScorciatoia } from "../src/guscio/scorciatoie";
@@ -67,8 +68,8 @@ describe("BarraBasso", () => {
     expect(html).toMatch(/data-voce="economia"[^>]*aria-current="page"/);
     expect(html).not.toContain("Crea");
     expect(html).toContain(">3<");
-    // Icone 3D in PNG (decisione del controller: file copiati dai mockup come <area>.png).
-    expect(html).toContain('src="/icone/commerciale.png"');
+    // Icone 3D in WebP da 84 px (Task 13, spec 13.1): i PNG del prototipo sono stati convertiti.
+    expect(html).toContain('src="/icone/commerciale.webp"');
   });
   it("senza badge (la rotta /api/badge non c'è ancora) nessun numero", () => {
     const html = render(<BarraBasso badge={undefined} />, { percorso: "/commerciale/oggi" });
@@ -163,5 +164,13 @@ describe("scorciatoie", () => {
     expect(leggiScorciatoia(null, "g")).toEqual({ attesa: "g" });
     expect(leggiScorciatoia("g", "o")).toEqual({ percorso: "/commerciale/oggi", attesa: null });
     expect(leggiScorciatoia(null, "o")).toEqual({ attesa: null });
+  });
+});
+
+describe("BannerDemo", () => {
+  it("banner dello spazio demo", () => {
+    const html = render(<BannerDemo />, { percorso: "/commerciale/oggi", dati: [[["spazio"], { demo: true }]] });
+    expect(html).toContain("Spazio demo, dati finti");
+    expect(render(<BannerDemo />, { percorso: "/commerciale/oggi", dati: [[["spazio"], { demo: false }]] })).not.toContain("Spazio demo");
   });
 });

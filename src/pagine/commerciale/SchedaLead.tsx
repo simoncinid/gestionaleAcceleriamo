@@ -1,7 +1,7 @@
-import { CaretDown, DotsThree, EnvelopeSimple, WhatsappLogo } from "@phosphor-icons/react";
+import { ArrowLeft, CaretDown, DotsThree, EnvelopeSimple, WhatsappLogo } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { useRef, useState, type ReactNode } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { Proposta } from "../../../worker/regole/motore";
 import { api } from "../../api";
@@ -11,6 +11,7 @@ import { useOra, useStages, useUsers } from "../../hooks";
 import type { LeadDetail, Stage } from "../../types";
 import { avviaContatto } from "./chiamata";
 import { FoglioChiusura } from "./FoglioChiusura";
+import { FoglioNuovoCliente } from "./FoglioCliente";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFissaCall } from "./FoglioFissaCall";
 import { FoglioScrivi } from "./FoglioScrivi";
@@ -27,6 +28,7 @@ import { callPerFase } from "../../../worker/regole/fasi-call";
 import { FoglioAvvioLavoro } from "../lavori/FoglioAvvioLavoro";
 import { SezioneCall } from "./SezioneCall";
 import { SezioneProposta } from "./SezioneProposta";
+import { SezioneSchedaAzienda } from "./SezioneSchedaAzienda";
 
 const PUNTEGGIO = { verde: "Verde", giallo: "Giallo", grigio: "Grigio" } as const;
 
@@ -44,6 +46,10 @@ function Piega({ titolo, riassunto, aperta = false, children }: { titolo: string
   );
 }
 
+// Telefono ed email della scheda si riconoscono come link (voce 41).
+// QA Task 15: il link è alto 44 px (bersaglio del telefono), il testo resta sulla sua riga.
+const LINK_DATO = "inline-flex min-h-11 items-center break-all font-semibold text-ink underline decoration-sabbia-2 underline-offset-4 hover:decoration-ink";
+
 export function SchedaLeadRotta() {
   const { id = "" } = useParams();
   return <SchedaLead key={id} id={id} />;
@@ -52,12 +58,16 @@ export function SchedaLeadRotta() {
 export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) {
   const qc = useQueryClient();
   const vai = useNavigate();
+  const { key: chiaveStoria } = useLocation();
+  const [creaCliente, setCreaCliente] = useState(false);
   const ora = useOra(60_000, oraFissa);
   const fasi = useStages();
   const utenti = useUsers();
   const [foglio, setFoglio] = useState<null | "esito" | "altro" | "fissa" | "whatsapp" | "email" | "avvio" | { fase: Stage }>(null);
   // Le azioni che non si annullano chiedono un secondo tocco sullo stesso pulsante: niente confirm() del browser.
   const [chiede, setChiede] = useState<null | "unisci" | "cestino">(null);
+  // Fissa call si apre da "Altre azioni", un foglio che si chiude: alla fine il fuoco torna a quel pulsante.
+  const altre = useRef<HTMLButtonElement>(null);
   const [uscito, setUscito] = useState(false);
   // Il modulo dati si rimonta solo dopo un suo salvataggio riuscito: gli altri salvataggi non cancellano quello che si scrive.
   const [versione, setVersione] = useState(0);
@@ -103,6 +113,9 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
     <div className="mx-auto grid max-w-[1100px] gap-4 p-4 lg:grid-cols-2 lg:items-start lg:gap-6">
       <div className="flex min-w-0 flex-col gap-4">
         <header className="flex items-start gap-3">
+          {/* Voce 41: si torna da dove si è venuti; aperta da un link diretto, la scheda torna alla Scaletta. */}
+          <Pulsante variante="icona" aria-label="Torna indietro" title="Torna indietro" className="w-11 shrink-0 px-0!" icona={<ArrowLeft size={22} weight="bold" aria-hidden />}
+            onClick={() => (chiaveStoria === "default" ? vai("/commerciale/scaletta") : vai(-1))} />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <h1 className="break-words font-display text-titolo-pagina">{lead.company}</h1>
             {lead.contactName && <p className="text-corpo">{lead.contactName}</p>}
@@ -110,7 +123,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
             {responsabile && <p className="text-secondaria text-grigio">Responsabile: {responsabile}</p>}
             {soldi && <p className="text-secondaria text-grigio tabular-nums">Attesi: setup {euro(lead.setupCents ?? 0)}, canone {euro(lead.feeCents ?? 0)} al mese</p>}
           </div>
-          <Pulsante variante="icona" aria-label="Altre azioni" title="Altre azioni" className="w-11 shrink-0 px-0!" icona={<DotsThree size={22} weight="bold" aria-hidden />} onClick={() => setFoglio("altro")} />
+          <Pulsante ref={altre} variante="icona" aria-label="Altre azioni" title="Altre azioni" className="w-11 shrink-0 px-0!" icona={<DotsThree size={22} weight="bold" aria-hidden />} onClick={() => setFoglio("altro")} />
         </header>
 
         {lead.metaStatus && lead.metaStatus !== "ok" && (
@@ -141,6 +154,9 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
                 </>
               )
           )}
+          {fase?.kind === "won" && !d.data.cliente && (
+            <Pulsante variante="primario" misura="lg" onClick={() => setCreaCliente(true)}>Crea il cliente</Pulsante>
+          )}
           <div className="flex">
             <Contatto tipo="chiama" lead={lead} variante={fase && fase.kind !== "open" ? "secondario" : "primario"} misura="lg" onAvvio={() => avviaContatto(lead.id, "chiamata")} />
           </div>
@@ -154,8 +170,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         </div>
 
         <dl aria-label="Dati" className="flex flex-col divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio px-4">
-          <Dato etichetta="Telefono">{lead.phone ? telefonoMostrato(lead.phone) : <span className="text-grigio">manca</span>}</Dato>
-          <Dato etichetta="Email">{lead.email ?? <span className="text-grigio">manca</span>}</Dato>
+          <Dato etichetta="Telefono">{lead.phone ? <a className={LINK_DATO} href={`tel:${lead.phone}`}>{telefonoMostrato(lead.phone)}</a> : <span className="text-grigio">manca</span>}</Dato>
+          <Dato etichetta="Email">{lead.email ? <a className={LINK_DATO} href={`mailto:${lead.email}`}>{lead.email}</a> : <span className="text-grigio">manca</span>}</Dato>
           <Dato etichetta="Fonte">{SOURCE_LABELS[lead.source] ?? lead.source}</Dato>
           {lead.metaCampaign && <Dato etichetta="Campagna">{lead.metaCampaign}</Dato>}
           {lead.setupCents != null && <Dato etichetta="Setup">{euro(lead.setupCents)}</Dato>}
@@ -168,8 +184,9 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       </div>
 
       <div className="flex min-w-0 flex-col gap-3">
-        <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} /></div>
+        <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} lead={lead} /></div>
         <div data-sezione="proposta"><SezioneProposta leadId={lead.id} /></div>
+        <div data-sezione="scheda-azienda"><SezioneSchedaAzienda leadId={lead.id} manuale={lead.source === "manuale"} /></div>
 
         <Piega titolo="Storico" aperta riassunto={activities[0] ? `ultima voce ${momento(activities[0].createdAt, ora)}` : "nessuna voce"}>
           <Timeline leadId={lead.id} activities={activities} ora={ora} />
@@ -199,7 +216,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
 
       {foglio === "esito" && <FoglioEsito lead={lead} onChiudi={chiudi} />}
       {foglio === "avvio" && d.data.cliente && <FoglioAvvioLavoro leadId={lead.id} clientId={d.data.cliente.id} nomeCliente={d.data.cliente.name} canoneIniziale={lead.feeCents} documenti={d.data.documents} onChiudi={chiudi} />}
-      {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} />}
+      {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} ritorno={altre} />}
       {(foglio === "whatsapp" || foglio === "email") && <FoglioScrivi lead={lead} canale={foglio} onChiudi={chiudi} />}
       {foglio && typeof foglio === "object" && (() => {
         const kind = callPerFase(foglio.fase.id);
@@ -207,6 +224,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
           ? <FoglioFissaCall leadId={lead.id} haEmail={!!lead.email} fase={{ label: foglio.fase.label, kind }} onChiudi={chiudi} />
           : <FoglioChiusura lead={lead} fase={foglio.fase} onChiudi={chiudi} />;
       })()}
+      {creaCliente && <FoglioNuovoCliente daLead={{ id: lead.id, nome: lead.company }} onChiudi={() => { setCreaCliente(false); void d.refetch(); }} />}
       {foglio === "altro" && (
         <Foglio aperto titolo="Altre azioni" onChiudi={chiudi}>
           <ul className="flex flex-col gap-2">

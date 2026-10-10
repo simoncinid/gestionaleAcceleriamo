@@ -37,6 +37,17 @@ describe("chiusura vinta: nasce il cliente", () => {
     expect(n).toEqual({ n: 1, nome: "Gialli Spa" });
   });
 
+  it("cliente a mano per un lead che ne ha già uno: 409, nessun doppione", async () => {
+    const cookie = await authed();
+    const id = await nuovoLead(cookie, "Doppi Srl");
+    await call(`/api/leads/${id}`, { method: "PATCH", json: chiusura }, cookie);
+    const r = await call("/api/clients", { method: "POST", json: { name: "Doppi bis", originLeadId: id } }, cookie);
+    expect(r.status).toBe(409);
+    expect(await r.json()).toEqual({ error: "Questo lead ha già un cliente" });
+    const n = await env.DB.prepare("SELECT count(*) n FROM clients WHERE origin_lead_id = ?").bind(id).first<{ n: number }>();
+    expect(n?.n).toBe(1);
+  });
+
   it("canone a zero: cliente sì, canone no", async () => {
     const cookie = await authed();
     const id = await nuovoLead(cookie, "Zero Srl");

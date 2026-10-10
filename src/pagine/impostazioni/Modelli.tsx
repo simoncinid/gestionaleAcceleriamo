@@ -76,7 +76,7 @@ export function Modelli() {
     <div className="mx-auto grid max-w-[720px] gap-4 p-4">
       <Intestazione eyebrow="Impostazioni" titolo="Modelli" numero={m.data?.length || undefined} coda={m.data?.length === 1 ? "modello" : "modelli"} />
       {m.data?.length === 0 && <StatoVuoto titolo="Nessun modello" testo="Aggiungine uno qui sotto." />}
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {m.data?.map((t) => (
           <li key={t.id}>
             <Riga titolo={t.title} secondaria={t.channel === "email" ? "Email" : "WhatsApp"} meta={nomeFase(t.stageId) ? `Fase: ${nomeFase(t.stageId)}` : undefined} onClick={() => setAperto(bozzaModello(t))} />

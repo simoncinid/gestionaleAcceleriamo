@@ -2,21 +2,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
+import { eCallNelPassato } from "../../errori";
 import { AreaTesto, Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
+import type { Precompilato } from "../../../worker/calls/coach-routes";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
-import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type StatoEsito } from "./esito";
-
-// email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
-type LeadEsito = { id: string; company: string; contactName: string | null; stageId: string; attemptCount: number; email?: string | null };
+import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, applicaProposta, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
 
 // Foglio "Com'è andata?": l'esito propone fase e prossima azione (le regole propongono, la persona salva).
-export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () => void }) {
+// "iniziale": i suggerimenti del coach. Il lead cambia solo con "Salva esito".
+export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onChiudi: () => void; iniziale?: Precompilato }) {
   const qc = useQueryClient();
   const fasi = useStages();
   const motivi = useQuery({ queryKey: ["settings"], queryFn: () => api<{ motivi: { id: string; etichetta: string }[] }>("/settings") });
-  const [s, setS] = useState<StatoEsito>(() => statoIniziale(crypto.randomUUID(), lead));
+  const coach = iniziale ? { ...iniziale, stageId: iniziale.stageId ?? undefined } : undefined;
+  const [s, setS] = useState<StatoEsito>(() => statoIniziale(crypto.randomUUID(), lead, coach));
   // Solo l'ultima proposta chiesta vale: un esito cambiato in fretta non viene sovrascritto da una risposta vecchia.
   const ultimaRichiesta = useRef(0);
   const senzaEmail = lead.email === null;
@@ -38,18 +39,14 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
     try {
       const p = await api<Proposta>(`/leads/${lead.id}/proposta?${q}`);
       if (n !== ultimaRichiesta.current) return;
-      setS((prima) => ({
-        ...prima,
-        stageId: p.stageId ?? prima.stageId,
-        nextAction: p.nextAction ?? "",
-        nextActionAt: p.nextActionAt,
-        lostReason: p.lostReason ?? null,
-      }));
+      // Con i suggerimenti del coach vincono loro, salvo appuntamento, non interessato e fuori target (vedi applicaProposta).
+      setS((prima) => applicaProposta(prima, p, coach));
     } catch {
       if (n === ultimaRichiesta.current) toast("Nessuna proposta dalle regole: scegli fase e prossima azione a mano");
     }
   };
 
+  const [erroreData, setErroreData] = useState<string | null>(null);
   const salva = useMutation({
     mutationFn: () => api<{ callId: string | null }>(`/leads/${lead.id}/esito`, { method: "PATCH", json: corpoEsito(s) }),
     onSuccess: (r) => {
@@ -63,7 +60,7 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
       for (const k of [["today"], ["badge"], ["lead", lead.id], ["leads"], ["calls"]]) void qc.invalidateQueries({ queryKey: k });
       onChiudi();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
   const errore =
     validaEsito(s, motivoObbligatorio) ??
@@ -100,7 +97,7 @@ export function FoglioEsito({ lead, onChiudi }: { lead: LeadEsito; onChiudi: () 
           <div className="flex flex-col gap-3 pt-1">
             <p className="text-secondaria font-medium">Call di conoscenza</p>
             <CampoQuando etichetta="Data della call" valore={s.callAt}
-              onCambia={(ms) => { setS((p) => ({ ...p, callAt: ms })); if (ms != null) void scegli("appuntamento", ms); }} />
+              onCambia={(ms) => { setErroreData(null); setS((p) => ({ ...p, callAt: ms })); if (ms != null) void scegli("appuntamento", ms); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={s.meetLink} onChange={(e) => setS((p) => ({ ...p, meetLink: e.target.value }))} />
             <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
             <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} inCoda={!resend} />

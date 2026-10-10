@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, lte, ne, or, type SQL } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
-import type { Db } from "../db/client";
+import { violaUnico, type Db } from "../db/client";
 import { activities, auditLog, clients, documents, fees, leads, stages, users, type Activity, type Lead, type LeadSource, type Stage } from "../db/schema";
 import { audit } from "../lib/audit";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
@@ -195,7 +195,13 @@ export async function creaClienteDaLead(db: Db, lead: Lead, nome: string | undef
   if (await clienteDelLead(db, lead.id)) return;
   const clientId = crypto.randomUUID();
   const nomeCliente = nome ?? lead.company;
-  await db.insert(clients).values({ id: clientId, name: nomeCliente, scope: "acceleriamo", originLeadId: lead.id, createdAt: now });
+  try {
+    await db.insert(clients).values({ id: clientId, name: nomeCliente, scope: "acceleriamo", originLeadId: lead.id, createdAt: now });
+  } catch (err) {
+    // Due chiusure insieme: l'indice unico (migrazione 0012) ferma la seconda, che non crea niente.
+    if (violaUnico(err)) return;
+    throw err;
+  }
   if (lead.feeCents && lead.feeCents > 0) {
     await db.insert(fees).values({ id: crypto.randomUUID(), clientId, amountCents: lead.feeCents, billingDay: 1, status: "in_attesa", startAt: lead.wonStartAt });
   }

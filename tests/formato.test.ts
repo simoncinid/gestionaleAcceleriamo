@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   conteggioBadge, daIsoGiorno, euro, fermoDa, linkTel, linkWhatsApp, momento, percentuale, presetQuando, quando, riempiModello,
-  giorno, isoGiorno, nomeMese, scadenzaFattura, telefonoMostrato, testoSla, trascorso,
+  giorno, ilGiorno, isoGiorno, nomeMese, mesiRecenti, percentualeOppureNd, euroCentesimi, centesimiDaTesto, scadenzaFattura, telefonoMostrato, testoSla, trascorso,
 } from "../src/format";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0); // martedì 13 ottobre 2026, 10:00 a Roma
@@ -121,5 +121,58 @@ describe("scadenzaFattura (QA 16, giorno di Roma)", () => {
     const sabato0030 = Date.UTC(2026, 9, 9, 22, 30); // sabato 10 ottobre, 00:30 a Roma, ancora venerdì in UTC
     expect(scadenzaFattura(Date.UTC(2026, 9, 9, 10, 0), sabato0030)).toBe("scaduta da 1 giorno");
     expect(scadenzaFattura(Date.UTC(2026, 9, 9, 22, 10), venerdi2320)).toBe("scade domani"); // 00:10 di sabato a Roma
+  });
+});
+
+describe("formati dei Numeri", () => {
+  it("mesi recenti sul fuso di Roma, a cavallo dell'anno", () => {
+    expect(mesiRecenti(Date.UTC(2026, 0, 10), 2)).toEqual([{ valore: "2026-01", etichetta: "gennaio 2026" }, { valore: "2025-12", etichetta: "dicembre 2025" }]);
+    // 23:30 UTC del 31 ottobre è già il 1 novembre a Roma.
+    expect(mesiRecenti(Date.UTC(2026, 9, 31, 23, 30), 1)[0].valore).toBe("2026-11");
+  });
+  it("percentuale o n.d.", () => {
+    expect(percentualeOppureNd(null)).toBe("n.d.");
+    expect(percentualeOppureNd(78)).toBe("78%");
+  });
+  it("euro con due decimali da centesimi interi", () => {
+    expect(euroCentesimi(3_800)).toBe("€ 38,00");
+    expect(euroCentesimi(123_450)).toBe("€ 1.234,50");
+    expect(euroCentesimi(5)).toBe("€ 0,05");
+  });
+  it("importo scritto a mano in centesimi", () => {
+    expect(centesimiDaTesto("532")).toBe(53_200);
+    expect(centesimiDaTesto("532,4")).toBe(53_240);
+    expect(centesimiDaTesto("1.234,50")).toBe(123_450);
+    expect(centesimiDaTesto("1.234")).toBe(123_400);
+    expect(centesimiDaTesto("12.5")).toBe(1_250);
+    expect(centesimiDaTesto("€ 0,10")).toBe(10);
+    expect(centesimiDaTesto("")).toBeNull();
+    expect(centesimiDaTesto("-3")).toBeNull();
+    expect(centesimiDaTesto("12,345")).toBeNull();
+    expect(centesimiDaTesto("dieci")).toBeNull();
+  });
+});
+
+describe("euro", () => {
+  it("niente meno davanti allo zero", () => {
+    expect(euro(-10)).toBe("€ 0");
+    expect(euro(-150_000)).toBe("-€ 1.500");
+  });
+});
+
+describe("ilGiorno", () => {
+  it("elisione davanti a 8 e 11", () => {
+    expect(ilGiorno(Date.UTC(2026, 9, 8, 10), ORA)).toBe("l'8 ott");
+    expect(ilGiorno(Date.UTC(2026, 10, 11, 10), ORA, "dal")).toBe("dall'11 nov");
+    expect(ilGiorno(Date.UTC(2026, 9, 15, 10), ORA, "al")).toBe("al 15 ott");
+    expect(ilGiorno(Date.UTC(2026, 9, 15, 10), ORA)).toBe("il 15 ott");
+  });
+});
+
+describe("trascorso al singolare (QA Task 15)", () => {
+  it("un giorno fa si scrive al singolare", () => {
+    const ora = Date.UTC(2026, 9, 12, 8, 0);
+    expect(trascorso(ora - 30 * 3_600_000, ora)).toBe("1 giorno fa");
+    expect(trascorso(ora - 50 * 3_600_000, ora)).toBe("2 giorni fa");
   });
 });

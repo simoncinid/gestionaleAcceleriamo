@@ -7,7 +7,7 @@ const riga = (id: string, nextActionAt: number | null, createdAt = ORA - 1000): 
   id, company: id, contactName: null, phone: null, email: null, stageId: "da-richiamare", stageLabel: "Da richiamare", nextAction: "Richiamare",
   nextActionAt, stageChangedAt: ORA, ownerId: null, score: null, attemptCount: 0, createdAt, setupCents: null, feeCents: null, slaScadenza: null,
 });
-const call = (id: string, scheduledAt: number): CallOggi => ({ id, leadId: id, company: id, contactName: null, phone: null, kind: "conoscenza", scheduledAt, meetLink: null });
+const call = (id: string, scheduledAt: number): CallOggi => ({ id, leadId: id, company: id, contactName: null, phone: null, kind: "conoscenza", scheduledAt, meetLink: null, scheda: null });
 
 describe("voce Adesso (DS 6.5)", () => {
   it("prima la scaduta più vecchia", () => {

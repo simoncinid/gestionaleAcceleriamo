@@ -29,12 +29,21 @@ export type Stats = {
   firstResponse: { avgMs: number | null; count: number };
 };
 export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";
+export type { Funnel, Stats1A, Tappa, TempoFase } from "../worker/numeri/funnel";
+export type { Campagne, LivelloCosto, RigaCampagna, RigaInserzione } from "../worker/numeri/campagne";
+export type { LeadAperto, Previsione, PropostaAperta, RigaFase } from "../worker/numeri/previsione";
+export type { NumeriSettimana } from "../worker/lunedi/calcolo";
+export type { RevisioneApi } from "../worker/lunedi/routes";
+export type { VoceDiario } from "../worker/diario/routes";
 
 export type { CallAgenda } from "../worker/calls/service";
 export type { PropostaRiga } from "../worker/proposte/service";
 export type { MessageTemplate, StageRule } from "../worker/db/schema";
 export type { Impostazioni } from "../worker/impostazioni/default";
 export type { Integrazione, StatoSistema, VoceRegistro } from "../worker/integrazioni/routes";
+export type { Profilo } from "../worker/me/routes";
+export type { AnteprimaImport, RiepilogoDati, RigaImport, VoceAudit } from "../worker/dati/routes";
+export type { RisultatoCerca, RispostaCerca } from "../worker/ricerca/routes";
 export type { GiroFoglio, RigaAnteprima } from "../worker/foglio/sync";
 export type { Automation, Client, Cost, Fee, Invoice } from "../worker/db/schema";
 export type { CanoneRiga, CostoRiga, Cruscotto, FatturaRiga, MeseCosti } from "../worker/economia/service";

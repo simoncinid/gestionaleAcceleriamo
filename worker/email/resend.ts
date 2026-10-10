@@ -1,5 +1,6 @@
 import type { Env } from "../env";
 import { emailFetch } from "./fetcher";
+import { eDemo, NIENTE_IN_DEMO } from "../lib/demo";
 
 export type Esito = { ok: true; id: string } | { ok: false; errore: string; ritentabile: boolean };
 
@@ -14,6 +15,7 @@ export async function inviaEmail(
   env: Env,
   m: { from: string; to: string; replyTo?: string; subject: string; text: string; html?: string; allegati?: { filename: string; content: string }[]; chiave?: string },
 ): Promise<Esito> {
+  if (eDemo(env)) return { ok: false, errore: NIENTE_IN_DEMO, ritentabile: false };
   if (!env.RESEND_API_KEY) return { ok: false, errore: CHIAVE_MANCANTE, ritentabile: false };
   const headers: Record<string, string> = { authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" };
   if (m.chiave) headers["idempotency-key"] = m.chiave;

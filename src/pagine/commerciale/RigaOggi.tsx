@@ -33,7 +33,7 @@ export function RigaLead({ l, ora, onEsito, onRimanda }: { l: Riga; ora: number;
         <Link to={`/commerciale/lead/${l.id}`} className="flex min-w-0 flex-1 flex-col gap-0.5 rounded-controllo">
           <span className="flex items-center gap-2 text-riga">
             {l.score && <Punto colore={l.score} etichetta={`Punteggio ${l.score}`} />}
-            <span>{l.company}</span>
+            <span className="min-w-0 break-words">{l.company}</span>
           </span>
           {l.contactName && <span className="truncate text-secondaria text-grigio">{l.contactName}</span>}
           {l.slaScadenza != null ? (
@@ -57,9 +57,8 @@ export function RigaLead({ l, ora, onEsito, onRimanda }: { l: Riga; ora: number;
           )}
           {prezzo && <span className="text-meta text-grigio tabular-nums">{prezzo}</span>}
         </Link>
-        <Pulsante variante="fantasma" className="shrink-0 px-3!" onClick={onEsito}>Esito</Pulsante>
-        <PulsanteRimanda onClick={onRimanda} />
       </div>
+      {/* Voce 40: sopra solo chi è e cosa fare, sotto tutte le azioni (contatti a sinistra, Esito e Rimanda a destra). */}
       <div className="flex items-center gap-2">
         {l.phone ? (
           <>
@@ -69,6 +68,9 @@ export function RigaLead({ l, ora, onEsito, onRimanda }: { l: Riga; ora: number;
         ) : (
           <Contatto tipo="email" lead={l} variante="icona" oggetto={compila(mail?.subject, l)} testo={compila(mail?.body, l)} onAvvio={() => avviaContatto(l.id, "email", mail?.id)} />
         )}
+        <span className="flex-1" />
+        <Pulsante variante="fantasma" className="shrink-0 px-3!" onClick={onEsito}>Esito</Pulsante>
+        <PulsanteRimanda onClick={onRimanda} />
       </div>
     </li>
   );

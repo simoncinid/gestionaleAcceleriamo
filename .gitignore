@@ -5,3 +5,5 @@ dist
 *.local.sql
 old-dashboard.json
 migration-old.sql
+test-results/
+playwright-report/

@@ -8,7 +8,31 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "acceleriamo-os", "database_id": "6fe0f895-cbe5-4feb-9987-f4346f700343", "migrations_dir": "drizzle" }
   ],
-  "vars": { "META_GRAPH_VERSION": "v23.0" },
+  "vars": {
+    "META_GRAPH_VERSION": "v23.0",
+    // Chiave pubblica VAPID: vuota finché Tommaso non genera la coppia (README, Task 16). La privata è un segreto.
+    "VAPID_PUBLIC_KEY": "",
+    "VAPID_SOGGETTO": "https://acceleriamo-os.acceleriamo-os.workers.dev",
+    // Nome utente del bot di Telegram (senza @): vuoto finché Tommaso non crea il bot. Il token è un segreto.
+    "TELEGRAM_BOT": "",
+    // Indirizzo dell'app per i link nei messaggi di Telegram.
+    "APP_URL": "https://acceleriamo-os.acceleriamo-os.workers.dev",
+    // Indirizzo dello spazio demo (Task 13), mostrato in Impostazioni > Dati.
+    "DEMO_URL": "https://acceleriamo-os-demo.acceleriamo-os.workers.dev"
+  },
   "triggers": { "crons": ["*/5 * * * *"] },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  "env": {
+    // Spazio demo (spec 12): stesso codice, database separato, nessun cron, nessun segreto.
+    // Le vars non si ereditano: qui mancano apposta VAPID e bot Telegram, quindi push e Telegram restano spenti.
+    "demo": {
+      "name": "acceleriamo-os-demo",
+      "d1_databases": [
+        // database_id: id del database demo creato il 10/10/2026 con "npx wrangler d1 create acceleriamo-os-demo" (non è un segreto).
+        { "binding": "DB", "database_name": "acceleriamo-os-demo", "database_id": "9926c2ad-d2ae-4dc9-8113-391ea144df6d", "migrations_dir": "drizzle" }
+      ],
+      "vars": { "META_GRAPH_VERSION": "v23.0", "SPAZIO": "demo", "DEMO_URL": "", "APP_URL": "https://acceleriamo-os-demo.acceleriamo-os.workers.dev" },
+      "triggers": { "crons": [] }
+    }
+  }
 }

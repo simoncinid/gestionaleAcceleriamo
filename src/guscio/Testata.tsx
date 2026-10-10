@@ -5,7 +5,7 @@ import { AREE, SOTTOMENU, areaDi } from "./aree";
 
 // Telefono: testata scura con titolo dell'area, lente, "+" e avatar; sotto, le schede del sottomenu.
 // Il "+" è un pulsante icona del chrome, non un primario della pagina: niente data-variante.
-export function Testata({ nome, puntoAvatar, onCerca, onPiu }: { nome: string; puntoAvatar: boolean; onCerca: () => void; onPiu: () => void }) {
+export function Testata({ nome, puntoAvatar, avvisi = 0, onCerca, onPiu }: { nome: string; puntoAvatar: boolean; avvisi?: number; onCerca: () => void; onPiu: () => void }) {
   const { pathname } = useLocation();
   const area = areaDi(pathname);
   const titolo = area ? AREE.find((a) => a.id === area)!.etichetta : "Impostazioni";
@@ -23,9 +23,10 @@ export function Testata({ nome, puntoAvatar, onCerca, onPiu }: { nome: string; p
           <button type="button" aria-label={`Crea in ${area ? titolo : "Commerciale"}`} onClick={onPiu} className={cx("flex size-11 items-center justify-center", tocco)}>
             <span className="flex size-10 items-center justify-center rounded-controllo border border-chrome-testo/60 text-chrome-testo"><Plus size={22} weight="bold" aria-hidden /></span>
           </button>
-          <Link to="/impostazioni" aria-label="Profilo e impostazioni" className={cx("relative flex size-11 items-center justify-center", tocco)}>
+          {/* Con avvisi non letti l'avatar porta dritto agli Avvisi (spec 8). */}
+          <Link to={avvisi > 0 ? "/impostazioni/avvisi" : "/impostazioni"} aria-label={avvisi > 0 ? "Avvisi da leggere" : "Profilo e impostazioni"} className={cx("relative flex size-11 items-center justify-center", tocco)}>
             <Avatar nome={nome} />
-            {puntoAvatar && <span className="absolute top-1 right-1"><Punto colore="accento" etichetta="Un'integrazione chiede attenzione" /></span>}
+            {puntoAvatar && <span className="absolute top-1 right-1"><Punto colore="accento" etichetta={avvisi > 0 ? "Avvisi da leggere" : "Un'integrazione chiede attenzione"} /></span>}
           </Link>
         </div>
       </header>
@@ -33,7 +34,7 @@ export function Testata({ nome, puntoAvatar, onCerca, onPiu }: { nome: string; p
         <nav aria-label="Sottomenu" className="flex gap-4 overflow-x-auto border-b border-sabbia bg-avorio px-4 [scrollbar-width:none]">
           {SOTTOMENU[area].map((s) => (
             <Link key={s.percorso} to={s.percorso} aria-current={attivo(s.percorso) ? "page" : undefined}
-              className={cx("flex h-11 shrink-0 items-center border-b-2 px-1 text-secondaria font-medium transition-colors duration-(--durata-veloce)", attivo(s.percorso) ? "border-accento text-ink" : "border-transparent text-grigio")}>
+              className={cx("flex h-11 min-w-11 shrink-0 items-center justify-center border-b-2 px-1 text-secondaria font-medium transition-colors duration-(--durata-veloce)", attivo(s.percorso) ? "border-accento text-ink" : "border-transparent text-grigio")}>
               {s.etichetta}
             </Link>
           ))}

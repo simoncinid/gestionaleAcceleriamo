@@ -4,13 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../../api";
-import { CardLead, Chip, Contatto, Errore, Foglio, Intestazione, Pulsante, Selettore, Skeleton, StatoVuoto, campo } from "../../ds";
+import { CardLead, Chip, Contatto, Errore, Intestazione, Pulsante, Selettore, Skeleton, StatoVuoto, campo } from "../../ds";
 import { SOURCE_LABELS, arrivato, euro, quando } from "../../format";
 import { useDebounced, useStages, useUsers } from "../../hooks";
 import type { LeadListItem } from "../../types";
 import type { Vista } from "../../../worker/leads/service";
 import { avviaContatto } from "./chiamata";
 import { callPerFase } from "../../../worker/regole/fasi-call";
+import { BarraSelezione, FoglioSposta } from "./AzioniScaletta";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFiltri } from "./FoglioFiltri";
 import { MenuRapido } from "./MenuRapido";
@@ -33,7 +34,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const [vista, setVista] = useState<Vista>("nuovi");
   const [faseTelefono, setFaseTelefono] = useState<string>(TUTTE);
   const [scelti, setScelti] = useState<Set<string>>(new Set());
-  const [aperti, setAperti] = useState<{ filtri?: boolean; esito?: LeadListItem; sposta?: string[] }>({});
+  const [aperti, setAperti] = useState<{ filtri?: boolean; esito?: LeadListItem; sposta?: { ids: string[]; singolo: boolean } }>({});
   const q = useDebounced(filtri.q, 250);
   const chiave = parametri({ ...filtri, q }, modo === "elenco" ? { vista } : {});
   const leads = useQuery({ queryKey: ["leads", chiave], queryFn: () => api<{ leads: LeadListItem[] }>(`/leads${chiave ? `?${chiave}` : ""}`).then((r) => r.leads) });
@@ -42,7 +43,8 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const etichetta = useMemo(() => new Map(tutte.map((f) => [f.id, f.label])), [tutte]);
   const gruppi = useMemo(() => perFase(leads.data ?? []), [leads.data]);
 
-  // PV6: la lente della testata porta qui con ?cerca=1: campo aperto, fuoco, parametro tolto.
+  // PV6: con ?cerca=1 il campo si apre col fuoco e il parametro si toglie. Oggi nessun link lo usa più
+  // (la lente della testata apre il foglio di ricerca): resta per gli indirizzi salvati e per il test PV6.
   useEffect(() => {
     if (applicaCerca(params, ricerca.current, (p) => setParams(p, { replace: true }))) setCercaAperta(true);
   }, [params, setParams]);
@@ -51,6 +53,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
 
   // Cambiando vista o filtri la selezione si azzera: niente azioni su lead che non si vedono.
   useEffect(() => setScelti(new Set()), [chiave]);
+  // Voce 44: le azioni in blocco chiedono conferma; lo stato delle conferme vive in BarraSelezione e FoglioSposta.
 
   const multipla = useMutation({
     mutationFn: (corpo: Corpo) => api<{ fatti: number }>("/leads/bulk", { method: "POST", json: corpo }),
@@ -58,6 +61,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
       const n = `${r.fatti} lead`;
       toast.success(corpo.azione === "cestino" ? `${n} nel cestino` : corpo.azione === "fase" ? `${n} ${r.fatti === 1 ? "spostato" : "spostati"} di fase` : `Responsabile cambiato a ${n}`);
       setScelti(new Set());
+      setAperti({});
       for (const k of ["leads", "today", "badge"]) void qc.invalidateQueries({ queryKey: [k] });
     },
     onError: (e) => toast.error(e.message),
@@ -71,15 +75,17 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const nAperti = aperte.reduce((n, f) => n + (gruppi.get(f.id)?.length ?? 0), 0);
   const conFiltri = filtriAttivi(filtri);
   const vuoto = <StatoVuoto titolo="Nessun lead con questi filtri" testo={conFiltri || filtri.q ? "Togli qualche filtro o cambia la ricerca." : "I lead nuovi arrivano da Meta, dal Foglio Andrea o dal +."} />;
+  const nomeDi = new Map((utenti.data ?? []).map((u) => [u.id, u.name]));
+  const assegnato = (l: LeadListItem) => (l.ownerId ? nomeDi.get(l.ownerId) ?? null : null);
   const card = (l: LeadListItem) => (
-    <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: [l.id] })}>
-      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni />
+    <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: { ids: [l.id], singolo: true } })}>
+      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni assegnato={assegnato(l)} />
     </MenuRapido>
   );
   // Sul telefono (Q12): ordine per urgenza, riga "fonte · fase" e Chiama su ogni card (secondario: la Scaletta non ha primario).
   const cardTelefono = (l: LeadListItem) => (
-    <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: [l.id] })}>
-      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni
+    <MenuRapido key={l.id} lead={l} onEsito={() => setAperti({ esito: l })} onSposta={() => setAperti({ sposta: { ids: [l.id], singolo: true } })}>
+      <CardLead lead={{ ...l, stageLabel: etichetta.get(l.stageId) ?? "" }} ora={ora} spazioAzioni assegnato={assegnato(l)}
         fonteFase={fonteFase(SOURCE_LABELS[l.source] ?? l.source, etichetta.get(l.stageId) ?? "")}
         azione={<Contatto tipo="chiama" lead={l} senzaNome onAvvio={() => avviaContatto(l.id, "chiamata")} />} />
     </MenuRapido>
@@ -147,16 +153,11 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
             <Selettore etichetta="Vista" valore={vista} onCambia={setVista} opzioni={ETICHETTE_VISTE.map((v) => ({ valore: v.id, etichetta: v.etichetta }))} />
           </div>
           {scelti.size > 0 && (
-            <div className="flex flex-wrap items-center gap-3 rounded-blocco border border-sabbia bg-tinta p-3" role="toolbar" aria-label="Azioni sulla selezione">
-              <span className="text-secondaria font-semibold tabular-nums">{scelti.size === 1 ? "1 selezionato" : `${scelti.size} selezionati`}</span>
-              {pieno && <span className="text-meta text-grigio">Al massimo {MAX_SELEZIONE} per volta</span>}
-              <div className="min-w-64">
-                <Selettore etichetta="Responsabile" segnaposto="Cambia" valore={null} onCambia={(id) => multipla.mutate({ ids: [...scelti], azione: "responsabile", valore: id })}
-                  opzioni={(utenti.data ?? []).map((u) => ({ valore: u.id, etichetta: u.name }))} />
-              </div>
-              <Pulsante variante="secondario" onClick={() => setAperti({ sposta: [...scelti] })}>Sposta in fase</Pulsante>
-              <Pulsante variante="distruttivo" inCorso={multipla.isPending && multipla.variables?.azione === "cestino"} onClick={() => multipla.mutate({ ids: [...scelti], azione: "cestino" })}>Metti nel cestino</Pulsante>
-            </div>
+            <BarraSelezione key={[...scelti].join()} n={scelti.size} utenti={utenti.data ?? []}
+              inCorso={multipla.isPending && (multipla.variables?.azione === "responsabile" || multipla.variables?.azione === "cestino") ? multipla.variables.azione : null}
+              onAssegna={(id) => multipla.mutate({ ids: [...scelti], azione: "responsabile", valore: id })}
+              onSposta={() => setAperti({ sposta: { ids: [...scelti], singolo: false } })}
+              onCestino={() => multipla.mutate({ ids: [...scelti], azione: "cestino" })} />
           )}
           {righe.length === 0 ? vuoto : (
             <div className="overflow-x-auto rounded-blocco border border-sabbia bg-avorio">
@@ -164,8 +165,8 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
                 <thead className="text-etichetta uppercase text-grigio">
                   <tr>
                     <th className={`${cella} w-12`}>
-                      <input type="checkbox" className="size-5 accent-ink" aria-label="Seleziona tutti" checked={tuttiScelti}
-                        onChange={(e) => setScelti(e.target.checked ? new Set(selezionabili.map((l) => l.id)) : new Set())} />
+                      <CasellaSelezione etichetta="Seleziona tutti" scelta={tuttiScelti}
+                        onCambia={(si) => setScelti(si ? new Set(selezionabili.map((l) => l.id)) : new Set())} />
                     </th>
                     <th className={cella}>Azienda</th><th className={cella}>Fase</th><th className={cella}>Prossima azione</th><th className={cella}>Arrivato</th>
                   </tr>
@@ -173,7 +174,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
                 <tbody>
                   {righe.map((l) => (
                     <tr key={l.id} className="border-t border-sabbia hover:bg-crema">
-                      <td className={cella}><input type="checkbox" className="size-5 accent-ink" aria-label={`Seleziona ${l.company}`} checked={scelti.has(l.id)} disabled={pieno && !scelti.has(l.id)} title={pieno && !scelti.has(l.id) ? `Al massimo ${MAX_SELEZIONE} per volta` : undefined} onChange={(e) => scegli(l.id, e.target.checked)} /></td>
+                      <td className={cella}><CasellaSelezione etichetta={`Seleziona ${l.company}`} scelta={scelti.has(l.id)} spenta={pieno && !scelti.has(l.id)} onCambia={(si) => scegli(l.id, si)} /></td>
                       <td className={cella}>
                         <Link to={`/commerciale/lead/${l.id}`} className="block font-semibold text-ink hover:underline">{l.company}</Link>
                         {l.contactName && <span className="block text-grigio">{l.contactName}</span>}
@@ -196,15 +197,23 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
       {aperti.filtri && <FoglioFiltri filtri={filtri} onApplica={setFiltri} onChiudi={() => setAperti({})} />}
       {aperti.esito && <FoglioEsito lead={aperti.esito} onChiudi={() => setAperti({})} />}
       {aperti.sposta && (
-        <Foglio aperto titolo={aperti.sposta.length === 1 ? "Sposta in fase" : `Sposta ${aperti.sposta.length} lead`} onChiudi={() => setAperti({})}>
-          <div className="flex flex-col gap-3">
-            <Selettore etichetta="Fase" apertoAllInizio valore={null}
-              opzioni={tutte.filter((f) => !f.requiresReason && f.kind !== "won" && !callPerFase(f.id)).map((f) => ({ valore: f.id, etichetta: f.label }))}
-              onCambia={(id) => { multipla.mutate({ ids: aperti.sposta!, azione: "fase", valore: id }); setAperti({}); }} />
-            <p className="text-meta text-grigio">Chiuso, le fasi perse e quelle con una call si scelgono dalla scheda del lead: chiedono il motivo, i dati del vinto o la data della call.</p>
-          </div>
-        </Foglio>
+        <FoglioSposta key={aperti.sposta.ids.join()} ids={aperti.sposta.ids} singolo={aperti.sposta.singolo}
+          opzioni={tutte.filter((f) => !f.requiresReason && f.kind !== "won" && !callPerFase(f.id)).map((f) => ({ valore: f.id, etichetta: f.label }))}
+          inCorso={multipla.isPending && multipla.variables?.azione === "fase"}
+          onSposta={(fase) => multipla.mutate({ ids: aperti.sposta!.ids, azione: "fase", valore: fase })}
+          onChiudi={() => setAperti({})} />
       )}
     </div>
+  );
+}
+
+// Casella da 20 px con area di tocco di 44 px (fix dopo revisione del 14b, punto 4): il margine negativo
+// tiene la riga della tabella alla stessa altezza.
+export function CasellaSelezione({ etichetta, scelta, spenta = false, onCambia }: { etichetta: string; scelta: boolean; spenta?: boolean; onCambia: (si: boolean) => void }) {
+  return (
+    <label className={`-m-3 inline-flex min-h-11 min-w-11 items-center justify-center ${spenta ? "cursor-not-allowed" : "cursor-pointer"}`}
+      title={spenta ? `Al massimo ${MAX_SELEZIONE} per volta` : undefined}>
+      <input type="checkbox" className="size-5 accent-ink" aria-label={etichetta} checked={scelta} disabled={spenta} onChange={(e) => onCambia(e.target.checked)} />
+    </label>
   );
 }

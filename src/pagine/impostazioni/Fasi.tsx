@@ -3,14 +3,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
-import { Campo, CampoQuando, Errore, Foglio, Intestazione, Pulsante, Selettore, Skeleton, type Opzione } from "../../ds";
+import { Campo, CampoQuando, Errore, Foglio, Interruttore, Intestazione, Pulsante, Selettore, SelettoreMultiplo, Skeleton, type Opzione } from "../../ds";
 import { useStages, useUsers } from "../../hooks";
 import type { Impostazioni, Stage } from "../../types";
 import { centesimi } from "../commerciale/scheda";
 import { Aggiungi, Sezione, useImpostazioni } from "./parti";
+import { RiordinaFasi } from "./RiordinaFasi";
 import { CAMPI_REGOLE, ETICHETTE_REGOLE, ETICHETTE_TIPO, bozzaDi, corpoRegole, opzioniAggancio, sintesiDellaFase, type BozzaRegola, type RegolaLetta } from "./regole";
 
 const GIORNI: [number, string][] = [[1, "Lunedì"], [2, "Martedì"], [3, "Mercoledì"], [4, "Giovedì"], [5, "Venerdì"], [6, "Sabato"], [0, "Domenica"]];
+const OPZIONI_GIORNI: Opzione<string>[] = GIORNI.map(([n, nome]) => ({ valore: String(n), etichetta: nome }));
+// Riga chiusa: i giorni scelti in breve e nell'ordine della settimana ("lun, mar, mer, gio, ven").
+const giorniInBreve = (giorni: number[]) => GIORNI.filter(([n]) => giorni.includes(n)).map(([, nome]) => nome.slice(0, 3).toLowerCase()).join(", ");
 type Operatore = Impostazioni["punteggio"][number]["operatore"];
 const OPERATORI: Opzione<Operatore>[] = [
   { valore: "contiene", etichetta: "contiene" },
@@ -23,7 +27,7 @@ export const useRegole = () => useQuery({ queryKey: ["stage-rules"], queryFn: ()
 
 // QA 11 (prototipo 29): elenco in sola lettura, una riga per fase con nome, scadenze e azione proposta,
 // un'informazione per riga e niente testo tagliato. Toccando la riga si apre il foglio di quella fase.
-// "Riordina" arriva nel Piano B: l'ordine si legge qui ma non si cambia.
+// L'ordine si cambia con "Riordina" (foglio RiordinaFasi).
 // La fase aperta sta nel genitore: col foglio aperto il "Salva le regole" della pagina si nasconde,
 // così l'unica azione in accento è "Salva la fase".
 function ListaFasi({ fasi, regole, aperta, setAperta }: { fasi: Stage[]; regole: RegolaLetta[]; aperta: Stage | null; setAperta: (f: Stage | null) => void }) {
@@ -54,7 +58,8 @@ function ListaFasi({ fasi, regole, aperta, setAperta }: { fasi: Stage[]; regole:
   );
 }
 
-// Il modulo di una sola fase: nome, probabilità, azione proposta. "Salva la fase" è l'unica azione del foglio.
+// Il modulo di una sola fase: nome, probabilità, azione proposta. "Salva la fase" è l'unica azione del foglio;
+// senza modifiche resta spento (niente "Fase salvata" quando non è cambiato nulla).
 export function FoglioFase({ fase, onChiudi }: { fase: Stage; onChiudi: () => void }) {
   const qc = useQueryClient();
   const [nome, setNome] = useState(fase.label);
@@ -69,9 +74,11 @@ export function FoglioFase({ fase, onChiudi }: { fase: Stage; onChiudi: () => vo
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["stages"] }); toast.success("Fase salvata"); onChiudi(); },
     onError: (e) => toast.error(e.message),
   });
+  const prova = campiFase(fase, { nome, probabilita, azione });
+  const nienteDaSalvare = "campi" in prova && Object.keys(prova.campi).length === 0;
   return (
     <Foglio aperto titolo={fase.label} onChiudi={onChiudi}
-      principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva la fase</Pulsante>}>
+      principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={nienteDaSalvare ? "Non hai cambiato nulla" : undefined} onClick={() => salva.mutate()}>Salva la fase</Pulsante>}>
       <p className="text-secondaria text-grigio">{`Fase ${ETICHETTE_TIPO[fase.kind]}`}</p>
       <Campo etichetta="Nome" value={nome} onChange={(e) => setNome(e.target.value)} />
       <Campo etichetta="Probabilità, in percentuale" inputMode="numeric" value={probabilita} onChange={(e) => setProbabilita(e.target.value)} />
@@ -102,6 +109,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
     setup: String(imp.prezzi.setupCents / 100), ore: String(imp.prezzi.ore), moltiplicatore: String(imp.prezzi.moltiplicatore),
   }));
   const [faseAperta, setFaseAperta] = useState<Stage | null>(null);
+  const [riordina, setRiordina] = useState(false);
   const persone: Opzione<string>[] = utenti.map((u) => ({ valore: u.id, etichetta: u.name }));
   const regola = (id: string, campi: Partial<BozzaRegola>) => setBozze((x) => x.map((r) => (r.id === id ? { ...r, ...campi } : r)));
   const assegna = (campi: Partial<Impostazioni["assegnazione"]>) => setB({ ...b, assegnazione: { ...b.assegnazione, ...campi } });
@@ -141,11 +149,13 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
       <Sezione titolo="Fasi">
         <p className="text-secondaria text-grigio">Tocca una fase per cambiarne nome, probabilità o azione proposta.</p>
         <ListaFasi fasi={fasi} regole={regole} aperta={faseAperta} setAperta={setFaseAperta} />
+        <div><Pulsante variante="secondario" onClick={() => setRiordina(true)}>Riordina</Pulsante></div>
+        {riordina && <RiordinaFasi fasi={fasi} onChiudi={() => setRiordina(false)} />}
       </Sezione>
 
       <Sezione titolo="Regole">
         <p className="text-secondaria text-grigio">Una regola cambiata vale dal prossimo evento: i lead già in sequenza non si ricalcolano.</p>
-        <ul className="grid gap-3">
+        <ul className="grid grid-cols-1 gap-3">
           {bozze.map((r) => (
             <li key={r.id} className="grid gap-2 rounded-card bg-avorio p-3">
               <p className="text-corpo font-semibold">{ETICHETTE_REGOLE[r.ruleKey]}</p>
@@ -154,26 +164,15 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
                 <Campo key={c.chiave} etichetta={c.etichetta} inputMode={c.lista ? "text" : "numeric"} value={r.valori[c.chiave] ?? ""}
                   onChange={(e) => regola(r.id, { valori: { ...r.valori, [c.chiave]: e.target.value } })} />
               ))}
-              <label className="flex min-h-11 items-center gap-3 text-corpo">
-                <input type="checkbox" className="size-5 accent-accento" checked={r.active} onChange={(e) => regola(r.id, { active: e.target.checked })} />
-                Regola attiva
-              </label>
+              <Interruttore etichetta="Regola attiva" acceso={r.active} onCambia={(v) => regola(r.id, { active: v })} />
             </li>
           ))}
         </ul>
       </Sezione>
 
       <Sezione titolo="Orario di lavoro">
-        <fieldset className="grid grid-cols-2 gap-1 sm:grid-cols-4">
-          <legend className="sr-only">Giorni di lavoro</legend>
-          {GIORNI.map(([n, nome]) => (
-            <label key={n} className="flex min-h-11 items-center gap-3 text-corpo">
-              <input type="checkbox" className="size-5 accent-accento" checked={b.orario.giorni.includes(n)}
-                onChange={(e) => setB({ ...b, orario: { ...b.orario, giorni: e.target.checked ? [...b.orario.giorni, n] : b.orario.giorni.filter((g) => g !== n) } })} />
-              {nome}
-            </label>
-          ))}
-        </fieldset>
+        <SelettoreMultiplo etichetta="Giorni di lavoro" opzioni={OPZIONI_GIORNI} valori={b.orario.giorni.map(String)} testoValore={giorniInBreve(b.orario.giorni)}
+          onCambia={(v) => setB({ ...b, orario: { ...b.orario, giorni: v.map(Number) } })} />
         <div className="grid grid-cols-2 gap-3">
           <Campo etichetta="Inizio" type="time" value={b.orario.inizio} onChange={(e) => setB({ ...b, orario: { ...b.orario, inizio: e.target.value } })} />
           <Campo etichetta="Fine" type="time" value={b.orario.fine} onChange={(e) => setB({ ...b, orario: { ...b.orario, fine: e.target.value } })} />
@@ -181,7 +180,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
       </Sezione>
 
       <Sezione titolo="Punteggio">
-        <ul className="grid gap-3">
+        <ul className="grid grid-cols-1 gap-3">
           {b.punteggio.map((p, i) => {
             const cambia = (campi: Partial<typeof p>) => setB({ ...b, punteggio: b.punteggio.map((x, j) => (j === i ? { ...x, ...campi } : x)) });
             return (
@@ -200,7 +199,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
       </Sezione>
 
       <Sezione titolo="Motivi di scarto">
-        <ul className="grid gap-2">
+        <ul className="grid grid-cols-1 gap-2">
           {b.motivi.map((m, i) => (
             <li key={m.id} className="flex items-end gap-2">
               <div className="flex-1">
@@ -230,8 +229,8 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
         <Campo etichetta="Moltiplicatore della proprietà, da 5 a 10" inputMode="decimal" value={b.moltiplicatore} onChange={(e) => setB({ ...b, moltiplicatore: e.target.value })} />
       </Sezione>
 
-      {!faseAperta && (
-        <div className="sticky bottom-20 md:bottom-4">
+      {!faseAperta && !riordina && (
+        <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva le regole</Pulsante>
         </div>
       )}

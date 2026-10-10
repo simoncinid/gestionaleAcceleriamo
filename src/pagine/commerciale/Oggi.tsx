@@ -1,16 +1,19 @@
 import { CaretDown } from "@phosphor-icons/react";
+import { Voce } from "./numeri/righe";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type ReactNode } from "react";
 import { api } from "../../api";
-import { Chip, Contatto, Errore, Intestazione, Skeleton, StatoVuoto } from "../../ds";
+import { Chip, Contatto, Errore, Intestazione, Riga as RigaLink, Skeleton, StatoVuoto } from "../../ds";
 import { momento } from "../../format";
 import { useMe, useOra } from "../../hooks";
-import type { Lead, Oggi as DatiOggi, RigaOggi as Riga } from "../../types";
+import { partiRoma } from "../../../worker/lib/roma";
+import type { Lead, Oggi as DatiOggi, RevisioneApi, RigaOggi as Riga } from "../../types";
 import { BloccoAdesso } from "./BloccoAdesso";
 import { useRitornoChiamata } from "./chiamata";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioRimanda } from "./FoglioRimanda";
 import { RigaLead, RigaProposta } from "./RigaOggi";
+import { SegmentiOggi } from "./SegmentiOggi";
 import { inizioGiornoRoma } from "../../../worker/lib/roma";
 import { useTask } from "../lavori/dati";
 import { RigaTask } from "../lavori/RigaTask";
@@ -56,6 +59,10 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   const me = useMe();
   const q = useQuery({ queryKey: ["today", chi], queryFn: () => api<DatiOggi>(`/today?chi=${chi}`), refetchInterval: 60_000 });
   const ora = useOra(30_000, oraFissa);
+  // Spec 6.4: il lunedì fino alle 12 (ora di Roma), se la revisione non è chiusa, un rimando (riga, non pulsante pieno).
+  const p = partiRoma(ora);
+  const mattinaDiLunedi = p.settimana === 1 && p.ore < 12;
+  const revisione = useQuery({ queryKey: ["lunedi", "corrente"], queryFn: () => api<RevisioneApi>("/weekly-reviews/corrente"), enabled: mattinaDiLunedi });
   const lavori = useTask("mie");
 
   // Tornando dalla chiamata si apre il Foglio Esito del lead chiamato (spec 6.4, passo 2).
@@ -83,6 +90,12 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   return (
     <div className="flex flex-col gap-2 pb-8">
       <Intestazione titolo="Oggi" numero={d.totale} coda="da fare" eyebrow={DATA.format(ora)} />
+      <SegmentiOggi attivo="oggi" />
+      {mattinaDiLunedi && revisione.data && revisione.data.chiusaAt == null && (
+        <div className="pt-2">
+          <RigaLink titolo="La revisione della settimana è pronta" meta={`${revisione.data.numeri.arrivati} lead arrivati, ${revisione.data.numeri.fermi.length + revisione.data.numeri.proposteFerme.length} cose ferme`} href="/commerciale/oggi/lunedi" />
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-4">
@@ -134,6 +147,9 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
                     <span className="font-display text-numero text-accento-testo tabular-nums">{momento(k.scheduledAt, ora)}</span>
                     <span className="text-riga">{k.company}</span>
                     <span className="text-secondaria text-grigio">Call di {k.kind}</span>
+                    {k.kind === "conoscenza" && k.scheda && (
+                      <span className="text-secondaria text-grigio">{k.scheda === "pronta" ? "Scheda azienda pronta" : "Scheda in preparazione"}</span>
+                    )}
                   </div>
                   <div className="flex"><Contatto tipo="meet" lead={k} variante="icona" /></div>
                 </li>
@@ -151,12 +167,13 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
           </div>
           <section aria-label="Numeri del giorno" className="flex flex-col gap-3">
             <h2 className="font-display text-titolo-card">Numeri del giorno</h2>
-            <div className={`${elenco} text-corpo tabular-nums [&>p]:px-4 [&>p]:py-3`}>
-              <p>Lead nuovi oggi: {d.numeri.leadNuovi}</p>
-              <p>Prima risposta media: {d.numeri.primaRispostaMinuti == null ? "nessun dato" : `${d.numeri.primaRispostaMinuti} min`}</p>
-              <p>Call questa settimana: {d.numeri.callSettimana}</p>
-              <p>Proposte aperte: {d.numeri.proposteAperte}</p>
-            </div>
+            {/* Voce 40: nome a sinistra e numero a destra, come in Numeri. */}
+            <ul className="flex flex-col divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio">
+              <Voce nome="Lead nuovi oggi" numero={d.numeri.leadNuovi} />
+              <Voce nome="Prima risposta media" numero={d.numeri.primaRispostaMinuti == null ? "nessun dato" : `${d.numeri.primaRispostaMinuti} min`} />
+              <Voce nome="Call questa settimana" numero={d.numeri.callSettimana} />
+              <Voce nome="Proposte aperte" numero={d.numeri.proposteAperte} />
+            </ul>
           </section>
         </div>
       </div>

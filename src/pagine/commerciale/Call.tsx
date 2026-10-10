@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type ReactNode } from "react";
 import { api } from "../../api";
 import { Contatto, Errore, Intestazione, Pulsante, Skeleton, StatoVuoto } from "../../ds";
-import { momento } from "../../format";
+import { conArticolo, momento } from "../../format";
 import { useOra } from "../../hooks";
 import type { CallAgenda } from "../../types";
 import { daRoma, inizioGiornoRoma, partiRoma } from "../../../worker/lib/roma";
@@ -41,14 +41,15 @@ function Gruppo({ titolo, n, children }: { titolo: string; n: number; children: 
   );
 }
 
+// Voce 34: il nome dell'azienda va a capo invece di troncarsi a 390 px.
 // Blocco di una call: ora a sinistra, azienda e tipo al centro (il tocco apre il foglio), azione a destra.
 function BloccoCall({ k, secondaria, meta, azione, onApri }: { k: CallAgenda; secondaria: string; meta?: string; azione: ReactNode; onApri: () => void }) {
   return (
     <li className="flex min-h-[72px] items-center gap-3 rounded-blocco border border-sabbia bg-avorio py-3 pl-4 pr-3">
       <span className="w-14 shrink-0 font-display text-titolo-card text-accento-testo tabular-nums">{ore(k.scheduledAt)}</span>
       <button type="button" onClick={onApri} className="min-w-0 flex-1 text-left">
-        <p className="truncate text-corpo font-semibold">{k.company}</p>
-        <p className="truncate text-secondaria text-grigio">{secondaria}</p>
+        <p className="break-words text-corpo font-semibold">{k.company}</p>
+        <p className="break-words text-secondaria text-grigio">{secondaria}</p>
         {meta && <p className="text-meta text-grigio">{meta}</p>}
       </button>
       <div className="flex shrink-0">{azione}</div>
@@ -68,7 +69,7 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
     queryFn: () => api<{ calls: CallAgenda[] }>(`/calls?da=${lunedi - 14 * GIORNO_MS}&a=${lunedi + 7 * GIORNO_MS}`).then((r) => r.calls),
   });
   const intestazione = (n?: number) => (
-    <Intestazione titolo="Call" numero={n} coda="questa settimana" eyebrow={`Settimana dal ${partiRoma(lunedi).giorno} al ${domenica.giorno}`} />
+    <Intestazione titolo="Call" numero={n} coda="questa settimana" eyebrow={`Settimana ${conArticolo("dal", partiRoma(lunedi).giorno, String(partiRoma(lunedi).giorno))} ${conArticolo("al", domenica.giorno, String(domenica.giorno))}`} />
   );
   if (q.isLoading) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Skeleton righe={6} /></div>;
   if (q.error) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
@@ -99,7 +100,10 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
           {ks.map((k) => (
             <BloccoCall key={k.id} k={k} secondaria={`Call di ${k.kind}`} meta={k.inviteSentAt ? "Invito mandato" : undefined} onApri={() => setAperta(k)}
               azione={k.meetLink
-                ? <Contatto tipo="meet" lead={k} variante={k.id === prossimaOggi?.id ? "primario" : "secondario"} misura="md" intero />
+                ? (k.id === prossimaOggi?.id
+                  ? <Contatto tipo="meet" lead={k} variante="primario" misura="md" intero />
+                  // Le altre a icona sul telefono: "Apri Meet" per esteso schiacciava il nome a 78 px (QA Task 15).
+                  : <Contatto tipo="meet" lead={k} variante="icona" misura="md" />)
                 : <span className="text-meta text-grigio">Senza link</span>} />
           ))}
         </Gruppo>

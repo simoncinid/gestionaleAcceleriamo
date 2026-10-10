@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
+import { eCallNelPassato } from "../../errori";
 import { AreaTesto, Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { momento } from "../../format";
 import type { CallAgenda } from "../../types";
@@ -27,6 +28,7 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
   if (esito !== k.outcome) corpo.outcome = esito;
   if (esito === "rimandata" && nuovaData != null) corpo.scheduledAt = nuovaData;
   if (conPresentazione && pres != null) corpo.presentazione = { scheduledAt: pres, meetLink: meet.trim() || null };
+  const [erroreData, setErroreData] = useState<string | null>(null);
   const salva = useMutation({
     mutationFn: () => api(`/calls/${k.id}`, { method: "PATCH", json: corpo }),
     onSuccess: () => {
@@ -34,13 +36,13 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
       for (const q of [["calls"], ["lead", k.leadId], ["today"], ["leads"], ["badge"]]) void qc.invalidateQueries({ queryKey: q });
       onChiudi();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
   return (
     <Foglio aperto titolo={`Call di ${k.kind}`} onChiudi={onChiudi}
       principale={
         <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={esito === "rimandata" && nuovaData == null ? "Scegli la nuova data" : undefined} onClick={() => salva.mutate()}>
-          Salva
+          Salva la call
         </Pulsante>
       }>
       <div className="flex flex-col gap-3">
@@ -49,11 +51,11 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
           <p className="tabular-nums">{momento(k.scheduledAt)}</p>
         </div>
         <Selettore etichetta="Esito" opzioni={ESITI} valore={esito} onCambia={setEsito} />
-        {esito === "rimandata" && <CampoQuando etichetta="Nuova data" valore={nuovaData} onCambia={setNuovaData} />}
+        {esito === "rimandata" && <CampoQuando etichetta="Nuova data" valore={nuovaData} onCambia={(ms) => { setNuovaData(ms); setErroreData(null); }} errore={erroreData} />}
         {conPresentazione && (
           <section className="flex flex-col gap-3 pt-1" aria-label="Fissa la call di presentazione">
             <p className="text-secondaria font-medium">Call di presentazione</p>
-            <CampoQuando etichetta="Giorno e ora" valore={pres} onCambia={setPres} />
+            <CampoQuando etichetta="Giorno e ora" valore={pres} onCambia={(ms) => { setPres(ms); setErroreData(null); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={meet} onChange={(e) => setMeet(e.target.value)} />
           </section>
         )}

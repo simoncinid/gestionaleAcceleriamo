@@ -11,6 +11,7 @@ import { aE164 } from "../lib/telefono";
 import { catenaLeadNuovo } from "../regole/catena";
 import { tokenGoogle } from "./jwt";
 import { leggiCsv, leggiIntervalli } from "./leggi";
+import { eDemo, NIENTE_IN_DEMO } from "../lib/demo";
 
 // `ancora`: il giro si è fermato prima della fine del foglio (tetto o blocco pieno), un altro giro troverà altre righe.
 export type GiroFoglio = { lette: number; create: number; agganciate: number; scartate: number; riletto: boolean; ancora: boolean; errore?: string };
@@ -102,6 +103,7 @@ async function candidati(db: Db, righe: Mappata[], impronte: (string | null)[]) 
 // Senza id del foglio la lettura non è collegata: nessuna chiamata e nessun errore.
 // `massimoCreati`: il cron ne passa meno del default per restare sotto le 50 query D1 di una invocazione.
 export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_CREATI): Promise<GiroFoglio | null> {
+  if (eDemo(env)) return null;
   const db = getDb(env.DB);
   const { foglio } = await leggiImpostazioni(db);
   if (!foglio.attivo || !foglio.spreadsheetId.trim()) return null;
@@ -174,17 +176,17 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
         company: r.azienda || r.referente || "Lead dal Foglio Andrea senza nome",
         contactName: r.referente || null, phone: aE164(r.telefono) ?? (r.telefono || null), email: r.email || null, source: "foglio_andrea",
       }, null, now);
-      await db.update(leads).set({
+      const campi = {
         sheetRowKey: ultimaImpronta, metaCampaign: r.campagna || null, metaAd: r.inserzione || null,
         metaAnswers: Object.keys(r.risposte).length ? JSON.stringify(r.risposte) : null,
-      }).where(eq(leads.id, creato.id));
-      if (r.metaId) {
-        // Corsa col webhook: il vincolo unico su metaLeadId blocca il secondo, che resta come possibile doppione.
-        try { await db.update(leads).set({ metaLeadId: r.metaId }).where(eq(leads.id, creato.id)); }
-        catch {
-          const primo = await db.select({ id: leads.id }).from(leads).where(eq(leads.metaLeadId, r.metaId)).get();
-          await db.update(leads).set({ duplicateOfId: primo?.id ?? null }).where(eq(leads.id, creato.id));
-        }
+      };
+      // Una sola scrittura con metaLeadId (una query in meno per lead nel budget del giro).
+      // Corsa col webhook: il vincolo unico su metaLeadId blocca il secondo, che resta come possibile doppione.
+      try { await db.update(leads).set(r.metaId ? { ...campi, metaLeadId: r.metaId } : campi).where(eq(leads.id, creato.id)); }
+      catch (err) {
+        if (!r.metaId) throw err;
+        const primo = await db.select({ id: leads.id }).from(leads).where(eq(leads.metaLeadId, r.metaId)).get();
+        await db.update(leads).set({ ...campi, duplicateOfId: primo?.id ?? null }).where(eq(leads.id, creato.id));
       }
       esistenti.push({ id: creato.id, phoneNorm: tel, emailNorm: mail, metaLeadId: r.metaId || null, sheetRowKey: ultimaImpronta, deletedAt: null });
       // Come in meta/ingest.ts: se la catena fallisce su un lead, il lead resta e il giro continua con gli altri.
@@ -207,6 +209,7 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
 
 // Passo 3 di 18.3: prima di accendere la lettura, si guarda la mappa su dieci righe vere. Non scrive niente.
 export async function anteprimaFoglio(env: Env, now: number): Promise<{ colonneMancanti: string[]; righe: RigaAnteprima[] }> {
+  if (eDemo(env)) throw new Error(NIENTE_IN_DEMO);
   const db = getDb(env.DB);
   const { foglio } = await leggiImpostazioni(db);
   if (!foglio.spreadsheetId.trim()) throw new Error("Id del foglio mancante");
