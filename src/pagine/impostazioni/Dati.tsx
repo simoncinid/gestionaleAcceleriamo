@@ -17,7 +17,7 @@ export function Dati() {
   return (
     <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">
       <Intestazione eyebrow="Impostazioni" titolo="Dati" />
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         <li><Riga titolo="Cestino" secondaria={cestino} href="/impostazioni/dati/cestino" /></li>
         <li><Riga titolo="Importa lead da CSV" secondaria="Con anteprima e controllo dei doppioni" href="/impostazioni/dati/importa" /></li>
         <li><Riga titolo="Esporta" secondaria="Lead, proposte, fatture in CSV" onClick={() => setEsporta(true)} /></li>
@@ -40,7 +40,7 @@ export function Dati() {
 export function CorpoEsporta() {
   return (
     <>
-      <ul className="grid gap-1">
+      <ul className="grid grid-cols-1 gap-1">
         {ESPORTAZIONI.map(([k, t]) => <li key={k}><a className="flex min-h-11 items-center text-corpo font-semibold underline-offset-4 hover:underline" href={`/api/export/${k}`} download>{t}</a></li>)}
       </ul>
       <p className="text-secondaria text-grigio">Il file si apre con Excel o Google Fogli. Ogni scaricamento finisce nel registro.</p>

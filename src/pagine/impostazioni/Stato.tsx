@@ -27,7 +27,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
       <Intestazione eyebrow="Impostazioni" titolo="Stato del sistema" />
       <Riga titolo={avvisi.data?.avvisi.length ? `Avvisi (${avvisi.data.avvisi.length})` : "Avvisi"} href="/impostazioni/avvisi" />
       <Sezione titolo="Collegamenti" coda={rossi ? `${rossi} da controllare` : undefined}>
-        <ul className="grid gap-2">
+        <ul className="grid grid-cols-1 gap-2">
           {d.integrazioni.map((i) => (
             <li key={i.key}>
               <Riga
@@ -49,7 +49,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
       </Sezione>
       {d.errori.length > 0 && (
         <Sezione titolo="Ultimi errori">
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             {d.errori.map((e) => (
               <li key={e.key}>
                 <Riga titolo={e.etichetta} secondaria={e.errore}
@@ -60,7 +60,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
         </Sezione>
       )}
       <Sezione titolo="Configurazione">
-        <ul className="grid gap-2">{VOCI.map((v) => <li key={v.href}><Riga titolo={v.titolo} href={v.href} /></li>)}</ul>
+        <ul className="grid grid-cols-1 gap-2">{VOCI.map((v) => <li key={v.href}><Riga titolo={v.titolo} href={v.href} /></li>)}</ul>
         <Pulsante variante="fantasma" className="justify-self-start" onClick={onEsci}>Esci dall'account</Pulsante>
       </Sezione>
     </div>

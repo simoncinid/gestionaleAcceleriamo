@@ -96,7 +96,7 @@ export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Imp
         <div className="grid gap-2">
           {anteprima.colonneMancanti.map((c) => <p key={c} className="text-corpo text-errore">{`Colonna ${c} non trovata`}</p>)}
           {anteprima.righe.length === 0 && <p className="text-secondaria text-grigio">Il foglio non ha ancora righe sotto l'intestazione</p>}
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             {anteprima.righe.map((r) => (
               <li key={r.riga}>
                 <Riga titolo={`Riga ${r.riga}: ${r.azienda || "senza azienda"}`} secondaria={r.referente || undefined}
@@ -131,7 +131,7 @@ export function SezioneAggancio({ d, ora }: { d: StatoSistema; ora: number }) {
       </Pulsante>
       <h3 className="text-corpo font-semibold">Ultime 20 chiamate</h3>
       {registro.data?.length === 0 && <p className="text-secondaria text-grigio">Ancora nessuna chiamata</p>}
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {registro.data?.map((v) => (
           <li key={v.id}><Riga titolo={v.number ?? "Senza numero"} secondaria={v.outcome ?? "senza esito"} meta={<><span className="block">{momento(v.at, ora)}</span><span className="block">{`Risposta ${v.status}`}</span></>} /></li>
         ))}

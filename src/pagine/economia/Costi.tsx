@@ -7,7 +7,7 @@ import { meseRoma } from "../../../worker/lib/roma";
 import { useCosti } from "../dati-gestione";
 
 const ListaCosti = ({ costi, ora }: { costi: CostoRiga[]; ora: number }) => (
-  <ul className="grid gap-2">
+  <ul className="grid grid-cols-1 gap-2">
     {costi.map((k) => (
       <li key={k.id}>
         <Riga titolo={k.note ?? k.automazione ?? k.cliente ?? ETICHETTE_COSTO[k.category]} secondaria={euro(k.amountCents)} meta={giorno(k.date, ora)} destra={<Tag>{ETICHETTE_COSTO[k.category]}</Tag>} />

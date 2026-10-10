@@ -41,7 +41,7 @@ export function Cruscotto({ ora: oraFissa }: { ora?: number } = {}) {
             <Pulsante variante="primario" misura="lg" className="mt-3 w-full sm:w-auto sm:justify-self-start" onClick={() => setAperta(prima)}>Segna incassata</Pulsante>
           </Carta>
           {altre.length > 0 && (
-            <ul className="grid gap-2">
+            <ul className="grid grid-cols-1 gap-2">
               {altre.map((f) => (
                 <li key={f.id}><Riga titolo={f.cliente} secondaria={euro(f.amountCents)} meta={maiuscola(scadenzaFattura(f.dueAt!, ora))} onClick={() => setAperta(f)} /></li>
               ))}

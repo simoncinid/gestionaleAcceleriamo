@@ -48,7 +48,7 @@ function Push({ i }: { i: Integrazione }) {
     <>
       <h3 className="text-corpo font-semibold">I tuoi dispositivi</h3>
       {disp.isLoading ? <Skeleton righe={2} /> : disp.data?.dispositivi.length ? (
-        <ul className="grid gap-1">
+        <ul className="grid grid-cols-1 gap-1">
           {disp.data.dispositivi.map((x) => (
             <li key={x.id} className="grid">
               <span className="text-corpo">{x.etichetta}</span>
@@ -97,7 +97,7 @@ function Claude({ i }: { i: Integrazione }) {
       <Testo>{`Speso questo mese: ${euroCentesimi(d.spesoCents)} su ${euroCentesimi(d.tettoCents)}`}</Testo>
       <Nota>{`Avviso a ${euroCentesimi(d.avvisoCents)}; al tetto i lavori si fermano fino al primo del mese.`}</Nota>
       {d.fermi > 0 && <Testo>{`${d.fermi} ${d.fermi === 1 ? "lavoro fermo" : "lavori fermi"} per il tetto: ripartono il primo del mese`}</Testo>}
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {Object.entries(d.modelli).map(([k, m]) => {
           const t = d.perTipo.find((x) => x.tipo === k);
           return (

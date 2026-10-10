@@ -25,7 +25,7 @@ export function Canoni({ ora: oraFissa }: { ora?: number } = {}) {
     <div className="mx-auto grid max-w-[720px] gap-4 p-4">
       <Intestazione titolo="Canoni" numero={euro(attivi)} coda="al mese" eyebrow="Ricorrente firmato" />
       {vivi.length === 0 && <StatoVuoto titolo="Nessun canone" testo="Il primo nasce dal +." />}
-      <ul className="grid gap-2">{vivi.map((c) => <li key={c.id}><RigaCanone c={c} onClick={() => setAperto(c)} /></li>)}</ul>
+      <ul className="grid grid-cols-1 gap-2">{vivi.map((c) => <li key={c.id}><RigaCanone c={c} onClick={() => setAperto(c)} /></li>)}</ul>
       {cessati.length > 0 && (
         <details>
           <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold">{`Cessati, ${cessati.length}`}</summary>

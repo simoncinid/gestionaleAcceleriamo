@@ -21,7 +21,7 @@ export function InCostruzione({ ora: oraFissa }: { ora?: number } = {}) {
     <div className="mx-auto grid max-w-[720px] gap-4 p-4">
       <Intestazione titolo="In costruzione" numero={lista.length} eyebrow={eyebrow} />
       {lista.length === 0 && <StatoVuoto titolo="Niente in costruzione" testo="L'automazione nuova nasce dal +." />}
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {lista.map((a) => (
           <li key={a.id}>
             <Link to={`/automazioni/${a.id}`} className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5 hover:bg-crema">

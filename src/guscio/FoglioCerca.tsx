@@ -23,7 +23,7 @@ function Gruppo({ titolo, children }: { titolo: string; children: ReactNode }) {
   return (
     <section aria-label={titolo} className="grid gap-2">
       <h3 className="text-etichetta text-grigio">{titolo}</h3>
-      <ul className="grid gap-2">{children}</ul>
+      <ul className="grid grid-cols-1 gap-2">{children}</ul>
     </section>
   );
 }

@@ -12,7 +12,7 @@ export function Utenti() {
       <section aria-label="Utenti" className="grid gap-3">
         <h2 className="font-display text-titolo-card">Utenti</h2>
         {u.isLoading ? <Skeleton righe={2} /> : u.error ? <Errore errore={u.error} onRiprova={() => void u.refetch()} /> : (
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             {(u.data ?? []).map((x) => <li key={x.id}><Riga titolo={x.id === me?.id ? `${x.name} (tu)` : x.name} secondaria="Socio" /></li>)}
           </ul>
         )}

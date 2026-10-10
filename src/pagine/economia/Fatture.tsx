@@ -46,7 +46,7 @@ export function Fatture({ ora: oraFissa }: { ora?: number } = {}) {
       {fatture.length === 0 && <StatoVuoto titolo="Nessuna fattura" testo="La prima nasce dal +." />}
       {APERTI.map((s) => di(s).length > 0 && (
         <Sezione key={s} titolo={ETICHETTE_FATTURA[s]}>
-          <ul className="grid gap-2">{di(s).map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} onClick={() => setAperta(f)} /></li>)}</ul>
+          <ul className="grid grid-cols-1 gap-2">{di(s).map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} onClick={() => setAperta(f)} /></li>)}</ul>
           {s === "in_ritardo" && <Pulsante variante="primario" misura="lg" className="w-full sm:w-auto" onClick={() => setAperta(ritardo[0])}>Segna incassata</Pulsante>}
         </Sezione>
       ))}

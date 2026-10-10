@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { Chip, Contatto } from "../src/ds";
 import { Testata } from "../src/guscio/Testata";
+import { Call } from "../src/pagine/commerciale/Call";
+import { daRoma } from "../worker/lib/roma";
 import { Avvisi } from "../src/pagine/avvisi/Avvisi";
 import { Diario } from "../src/pagine/commerciale/Diario";
 import { Lunedi } from "../src/pagine/commerciale/Lunedi";
@@ -44,5 +46,14 @@ describe("QA Piano B", () => {
     const voci = html.match(/<a [^>]*aria-current[^>]*>|<a href="\/commerciale\/[a-z]+" class="[^"]*"/g) ?? [];
     expect(voci.length).toBeGreaterThan(0);
     for (const v of voci) expect(v).toContain("min-w-11");
+  });
+
+  it("Call: le call non prossime hanno Meet a icona, il nome dell'azienda ha lo spazio", () => {
+    const ora = daRoma(2026, 10, 13, 10, 0);
+    const k = (id: string, at: number) => ({ id, leadId: id, company: "Autotrasporti e Logistica Integrata Fratelli Paolicchi", contactName: null, phone: null, email: null, kind: "conoscenza", scheduledAt: at, meetLink: "https://meet.google.com/abc", notes: null, outcome: null, inviteSentAt: null });
+    const html = render(<Call ora={ora} />, { dati: [[["calls", daRoma(2026, 10, 12)], [k("oggi", daRoma(2026, 10, 13, 11)), k("giovedi", daRoma(2026, 10, 15, 9))]]] });
+    expect(html.match(/data-variante="primario"/g)).toHaveLength(1);
+    expect(html.match(/data-variante="icona"/g)).toHaveLength(1);
+    expect(html).toContain('<span class="sr-only md:not-sr-only">Apri Meet</span>');
   });
 });

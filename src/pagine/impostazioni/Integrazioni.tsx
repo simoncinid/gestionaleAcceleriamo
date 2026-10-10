@@ -18,7 +18,7 @@ export function Integrazioni({ ora = Date.now() }: { ora?: number } = {}) {
   return (
     <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">
       <Intestazione eyebrow="Impostazioni" titolo="Integrazioni" numero={attive || undefined} coda={attive === 1 ? "attiva" : "attive"} />
-      <ul className="grid gap-2">
+      <ul className="grid grid-cols-1 gap-2">
         {voci.map((i) => (
           <li key={i.key} id={i.key}>
             <Riga titolo={i.etichetta} href={`/impostazioni/integrazioni/${i.key}`}

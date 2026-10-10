@@ -100,7 +100,10 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
           {ks.map((k) => (
             <BloccoCall key={k.id} k={k} secondaria={`Call di ${k.kind}`} meta={k.inviteSentAt ? "Invito mandato" : undefined} onApri={() => setAperta(k)}
               azione={k.meetLink
-                ? <Contatto tipo="meet" lead={k} variante={k.id === prossimaOggi?.id ? "primario" : "secondario"} misura="md" intero />
+                ? (k.id === prossimaOggi?.id
+                  ? <Contatto tipo="meet" lead={k} variante="primario" misura="md" intero />
+                  // Le altre a icona sul telefono: "Apri Meet" per esteso schiacciava il nome a 78 px (QA Task 15).
+                  : <Contatto tipo="meet" lead={k} variante="icona" misura="md" />)
                 : <span className="text-meta text-grigio">Senza link</span>} />
           ))}
         </Gruppo>

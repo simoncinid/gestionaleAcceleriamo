@@ -62,9 +62,10 @@ export function ImportaCsv() {
             <p className="text-corpo">{`${anteprima.nuovi} nuovi, ${anteprima.doppioni} doppioni, ${anteprima.errori} con errori`}</p>
             <p className="text-secondaria text-grigio">Si importano solo i nuovi.</p>
           </div>
-          <ul className="grid gap-2">
+          {/* Il motivo sta nella riga meta, che va a capo: nella secondaria si troncava (QA Task 15). */}
+          <ul className="grid grid-cols-1 gap-2">
             {anteprima.righe.slice(0, MOSTRATE).map((r) => (
-              <li key={r.riga}><Riga peso="normale" titolo={r.company || `Riga ${r.riga}`} secondaria={r.motivo ?? undefined} meta={ESITO[r.esito]} /></li>
+              <li key={r.riga}><Riga peso="normale" titolo={r.company || `Riga ${r.riga}`} secondaria={ESITO[r.esito]} meta={r.motivo ?? undefined} /></li>
             ))}
           </ul>
           {anteprima.righe.length > MOSTRATE && <p className="text-secondaria text-grigio">{`Mostrate le prime ${MOSTRATE} righe di ${anteprima.righe.length}.`}</p>}

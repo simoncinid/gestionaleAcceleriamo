@@ -163,7 +163,7 @@ export function IlMioProfilo() {
       {q.isLoading ? <p className="text-secondaria text-grigio">Caricamento del profilo</p>
         : !p ? <div className="grid gap-2"><p className="text-corpo">Il profilo non si è caricato.</p><div><Pulsante variante="secondario" onClick={() => void q.refetch()}>Riprova</Pulsante></div></div>
         : (
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             <li><Riga titolo="Password" secondaria="Cambiala quando vuoi: gli altri dispositivi escono" onClick={() => setAperto("password")} /></li>
             <li><Riga titolo="Dispositivi push" secondaria={dispositivi(p.dispositivi)} onClick={() => setAperto("dispositivi")} /></li>
             <li><Riga titolo="Telegram" secondaria={p.telegram ? "Collegato" : "Non collegato"} onClick={() => setAperto("telegram")} /></li>

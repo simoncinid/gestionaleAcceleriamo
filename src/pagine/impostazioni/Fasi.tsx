@@ -155,7 +155,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
 
       <Sezione titolo="Regole">
         <p className="text-secondaria text-grigio">Una regola cambiata vale dal prossimo evento: i lead già in sequenza non si ricalcolano.</p>
-        <ul className="grid gap-3">
+        <ul className="grid grid-cols-1 gap-3">
           {bozze.map((r) => (
             <li key={r.id} className="grid gap-2 rounded-card bg-avorio p-3">
               <p className="text-corpo font-semibold">{ETICHETTE_REGOLE[r.ruleKey]}</p>
@@ -180,7 +180,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
       </Sezione>
 
       <Sezione titolo="Punteggio">
-        <ul className="grid gap-3">
+        <ul className="grid grid-cols-1 gap-3">
           {b.punteggio.map((p, i) => {
             const cambia = (campi: Partial<typeof p>) => setB({ ...b, punteggio: b.punteggio.map((x, j) => (j === i ? { ...x, ...campi } : x)) });
             return (
@@ -199,7 +199,7 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
       </Sezione>
 
       <Sezione titolo="Motivi di scarto">
-        <ul className="grid gap-2">
+        <ul className="grid grid-cols-1 gap-2">
           {b.motivi.map((m, i) => (
             <li key={m.id} className="flex items-end gap-2">
               <div className="flex-1">
