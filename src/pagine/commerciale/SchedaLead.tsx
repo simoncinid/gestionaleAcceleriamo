@@ -25,6 +25,7 @@ import { Timeline } from "./lead/Timeline";
 import { confermaNonPartita, idPerPreventivo, provenienza } from "./scheda";
 import { StepperFasi } from "./StepperFasi";
 import { callPerFase } from "../../../worker/regole/fasi-call";
+import { FoglioAvvioLavoro } from "../lavori/FoglioAvvioLavoro";
 import { SezioneCall } from "./SezioneCall";
 import { SezioneProposta } from "./SezioneProposta";
 import { SezioneSchedaAzienda } from "./SezioneSchedaAzienda";
@@ -62,7 +63,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const ora = useOra(60_000, oraFissa);
   const fasi = useStages();
   const utenti = useUsers();
-  const [foglio, setFoglio] = useState<null | "esito" | "altro" | "fissa" | "whatsapp" | "email" | { fase: Stage }>(null);
+  const [foglio, setFoglio] = useState<null | "esito" | "altro" | "fissa" | "whatsapp" | "email" | "avvio" | { fase: Stage }>(null);
   // Le azioni che non si annullano chiedono un secondo tocco sullo stesso pulsante: niente confirm() del browser.
   const [chiede, setChiede] = useState<null | "unisci" | "cestino">(null);
   // Fissa call si apre da "Altre azioni", un foglio che si chiude: alla fine il fuoco torna a quel pulsante.
@@ -144,7 +145,14 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         <div className="flex flex-col gap-2" role="group" aria-label="Contatta">
           {/* Lead vinto: l'unica azione in accento è aprire il cliente; lead perso: nessuna azione in accento. */}
           {fase?.kind === "won" && d.data.cliente && (
-            <Link to={`/commerciale/clienti/${d.data.cliente.id}`} data-variante="primario" className={classiPulsante("primario", "lg")}>Apri cliente</Link>
+            d.data.cliente.haLavori
+              ? <Link to={`/commerciale/clienti/${d.data.cliente.id}`} data-variante="primario" className={classiPulsante("primario", "lg")}>Apri cliente</Link>
+              : (
+                <>
+                  <Pulsante variante="primario" misura="lg" onClick={() => setFoglio("avvio")}>Avvia il lavoro</Pulsante>
+                  <Link to={`/commerciale/clienti/${d.data.cliente.id}`} data-variante="secondario" className={classiPulsante("secondario", "lg")}>Apri cliente</Link>
+                </>
+              )
           )}
           {fase?.kind === "won" && !d.data.cliente && (
             <Pulsante variante="primario" misura="lg" onClick={() => setCreaCliente(true)}>Crea il cliente</Pulsante>
@@ -207,6 +215,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       </div>
 
       {foglio === "esito" && <FoglioEsito lead={lead} onChiudi={chiudi} />}
+      {foglio === "avvio" && d.data.cliente && <FoglioAvvioLavoro leadId={lead.id} clientId={d.data.cliente.id} nomeCliente={d.data.cliente.name} canoneIniziale={lead.feeCents} documenti={d.data.documents} onChiudi={chiudi} />}
       {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} ritorno={altre} />}
       {(foglio === "whatsapp" || foglio === "email") && <FoglioScrivi lead={lead} canale={foglio} onChiudi={chiudi} />}
       {foglio && typeof foglio === "object" && (() => {

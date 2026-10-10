@@ -74,9 +74,9 @@ describe("migrazioni del Piano A", () => {
   });
 
   it("le migrazioni solo aggiungono: nessun DROP né ricostruzione di tabelle", () => {
-    // Dalla 0003 in poi (prima release con dati veri), comprese 0005, 0006 e 0010.
+    // Dalla 0003 in poi (prima release con dati veri), comprese 0005, 0006, 0007, 0008 e 0012.
     const dopo = env.TEST_MIGRATIONS.filter((m) => Number.parseInt(m.name, 10) >= 3);
-    expect(dopo.map((m) => m.name.slice(0, 4))).toEqual(expect.arrayContaining(["0005", "0006", "0010"]));
+    expect(dopo.map((m) => m.name.slice(0, 4))).toEqual(expect.arrayContaining(["0005", "0006", "0007", "0008", "0009", "0012"]));
     for (const m of dopo) {
       const sql = m.queries.join("\n");
       expect(sql).not.toMatch(/\bDROP\b/i);
@@ -126,9 +126,9 @@ describe("migrazioni del Piano A", () => {
   });
 });
 
-describe("migrazione 0010: indici", () => {
+describe("migrazione 0012: indici", () => {
   it("l'indice del doppione per azienda usa la stessa espressione della query", () => {
-    const m = env.TEST_MIGRATIONS.find((x) => x.name.startsWith("0010"))!;
+    const m = env.TEST_MIGRATIONS.find((x) => x.name.startsWith("0012"))!;
     expect(m.queries.join("\n")).toContain(`ON \`leads\` (${AZIENDA_SQL}) WHERE deleted_at IS NULL`);
   });
 

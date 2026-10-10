@@ -13,3 +13,4 @@ export * from "./Campi";
 export * from "./Riga";
 export * from "./Interruttore";
 export * from "./TestoMarkdown";
+export * from "./LogoCliente";

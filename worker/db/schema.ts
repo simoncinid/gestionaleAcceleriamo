@@ -414,6 +414,7 @@ export const clients = sqliteTable("clients", {
   city: text("city"),
   scope: text("scope", { enum: ["acceleriamo", "fuori_perimetro"] }).notNull().default("acceleriamo"),
   originLeadId: text("origin_lead_id"),
+  logo: text("logo"),
   createdAt: integer("created_at").notNull(),
   deletedAt: integer("deleted_at"),
 // Un lead diventa al massimo un cliente vivo (anche due chiusure insieme); un cliente nel cestino non conta.
@@ -481,6 +482,83 @@ export const costs = sqliteTable("costs", {
   deletedAt: integer("deleted_at"),
 }, (t) => [index("idx_costs_month").on(t.month)]);
 
+export const JOB_KINDS = ["una_tantum", "una_tantum_ricorrente", "ricorrente"] as const;
+
+export const jobTemplates = sqliteTable("job_templates", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  kind: text("kind", { enum: JOB_KINDS }).notNull(),
+  createdAt: integer("created_at").notNull(),
+  deletedAt: integer("deleted_at"),
+});
+
+export const jobTemplateTasks = sqliteTable("job_template_tasks", {
+  id: text("id").primaryKey(),
+  templateId: text("template_id").notNull(),
+  title: text("title").notNull(),
+  recurrence: text("recurrence", { enum: ["una_tantum", "ricorrente"] }).notNull(),
+  assigneeId: text("assignee_id"),
+  dueDays: integer("due_days"),
+  monthDay: integer("month_day"),
+  position: integer("position").notNull(),
+}, (t) => [index("idx_jtt_template").on(t.templateId, t.position)]);
+
+export const jobs = sqliteTable("jobs", {
+  id: text("id").primaryKey(),
+  clientId: text("client_id").notNull(),
+  templateId: text("template_id").notNull(),
+  name: text("name").notNull(),
+  startAt: integer("start_at").notNull(),
+  automationId: text("automation_id"),
+  feeCents: integer("fee_cents"),
+  recurringFromMonth: text("recurring_from_month"),
+  status: text("status", { enum: ["attivo", "concluso"] }).notNull().default("attivo"),
+  createdAt: integer("created_at").notNull(),
+  deletedAt: integer("deleted_at"),
+}, (t) => [index("idx_jobs_client").on(t.clientId)]);
+
+export const tasks = sqliteTable("tasks", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  clientId: text("client_id"),
+  jobId: text("job_id"),
+  templateTaskId: text("template_task_id"),
+  month: text("month"),
+  assigneeId: text("assignee_id"),
+  dueAt: integer("due_at"),
+  doneAt: integer("done_at"),
+  doneBy: text("done_by"),
+  note: text("note"),
+  createdAt: integer("created_at").notNull(),
+  deletedAt: integer("deleted_at"),
+}, (t) => [
+  uniqueIndex("uq_tasks_ricorrente").on(t.jobId, t.templateTaskId, t.month),
+  index("idx_tasks_aperte").on(t.doneAt, t.dueAt),
+  index("idx_tasks_client").on(t.clientId),
+]);
+
+export const automationSteps = sqliteTable("automation_steps", {
+  id: text("id").primaryKey(),
+  automationId: text("automation_id").notNull(),
+  position: integer("position").notNull(),
+  title: text("title").notNull(),
+  summary: text("summary").notNull().default(""),
+  branch: text("branch"),
+  icon: text("icon"),
+  tool: text("tool"),
+  trigger: text("trigger"),
+  receives: text("receives"),
+  produces: text("produces"),
+  runsOn: text("runs_on"),
+  risks: text("risks"),
+  confirmed: integer("confirmed", { mode: "boolean" }).notNull().default(false),
+}, (t) => [index("idx_steps_automation").on(t.automationId, t.position)]);
+
+export type JobTemplate = typeof jobTemplates.$inferSelect;
+export type JobTemplateTask = typeof jobTemplateTasks.$inferSelect;
+export type Job = typeof jobs.$inferSelect;
+export type TaskRow = typeof tasks.$inferSelect;
+export type AutomationStep = typeof automationSteps.$inferSelect;
 export type Lead = typeof leads.$inferSelect;
 export type Stage = typeof stages.$inferSelect;
 export type Activity = typeof activities.$inferSelect;

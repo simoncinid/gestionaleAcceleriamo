@@ -9,6 +9,7 @@ const VOCI = [
   { titolo: "Utenti e profilo", href: "/impostazioni/utenti" },
   { titolo: "Fasi e regole", href: "/impostazioni/fasi" },
   { titolo: "Modelli", href: "/impostazioni/modelli" },
+  { titolo: "Lavori tipo", href: "/impostazioni/lavori-tipo" },
   { titolo: "Integrazioni", href: "/impostazioni/integrazioni" },
   { titolo: "Dati", href: "/impostazioni/dati" },
 ];

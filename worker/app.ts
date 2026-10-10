@@ -22,6 +22,7 @@ import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/
 import { integrazioniRoutes } from "./integrazioni/routes";
 import { automazioniRoutes } from "./automazioni/routes";
 import { clientiRoutes } from "./clienti/routes";
+import { lavoriRoutes, lavoriTipoRoutes, taskRoutes } from "./lavori/routes";
 import { economiaRoutes } from "./economia/routes";
 import { pushRoutes } from "./push/routes";
 import { aiJobsRoutes, claudeRoutes } from "./claude/routes";
@@ -71,6 +72,9 @@ app.route("/api/hooks", agganciRoutes);
 app.route("/api/economia", economiaRoutes);
 app.route("/api/clients", clientiRoutes);
 app.route("/api/automations", automazioniRoutes);
+app.route("/api/job-templates", lavoriTipoRoutes);
+app.route("/api/jobs", lavoriRoutes);
+app.route("/api/tasks", taskRoutes);
 app.route("/api/notifications", avvisiRoutes);
 app.route("/api/push-subscriptions", pushRoutes);
 app.route("/api/claude", claudeRoutes);

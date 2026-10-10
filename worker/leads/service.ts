@@ -191,14 +191,14 @@ export async function clienteDelLead(db: Db, leadId: string): Promise<{ id: stri
 
 // Alla chiusura vinta nasce il cliente con il suo canone in attesa. Idempotente:
 // se il lead ha già un cliente (anche dopo riapertura e nuova chiusura) non se ne crea un altro.
-async function creaClienteDaLead(db: Db, lead: Lead, nome: string | undefined, actorId: string | null, now: number) {
+export async function creaClienteDaLead(db: Db, lead: Lead, nome: string | undefined, actorId: string | null, now: number) {
   if (await clienteDelLead(db, lead.id)) return;
   const clientId = crypto.randomUUID();
   const nomeCliente = nome ?? lead.company;
   try {
     await db.insert(clients).values({ id: clientId, name: nomeCliente, scope: "acceleriamo", originLeadId: lead.id, createdAt: now });
   } catch (err) {
-    // Due chiusure insieme: l'indice unico (migrazione 0010) ferma la seconda, che non crea niente.
+    // Due chiusure insieme: l'indice unico (migrazione 0012) ferma la seconda, che non crea niente.
     if (violaUnico(err)) return;
     throw err;
   }

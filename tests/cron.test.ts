@@ -118,11 +118,17 @@ describe("calendario del giro", () => {
     expect(quali(mar0600)).toContain("proposte_scadute");
     expect(quali(mar0600)).not.toContain("foglio");
   });
-  it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; il lunedì prima di Claude; Claude per ultimo", () => {
-    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "consegna", "telegram", "conferme", "meta_48h", "lunedi", "claude"]);
+  it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; le task ricorrenti dopo Meta 48 ore; il lunedì prima di Claude; Claude per ultimo", () => {
+    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "consegna", "telegram", "conferme", "meta_48h", "lavori", "lunedi", "claude"]);
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");
+  });
+  it("le task ricorrenti dei lavori girano alle 7:00 e alle 7:30 di Roma, non alle 7:05", () => {
+    expect(quali(r(7, 0))).toContain("lavori");
+    expect(quali(r(7, 30) + 40_000)).toContain("lavori");
+    expect(quali(r(7, 5))).not.toContain("lavori");
+    expect(quali(r(8, 0))).not.toContain("lavori");
   });
   it("le 6 sono le 6 di Roma anche il giorno del cambio d'ora", () => {
     expect(quali(daRoma(2026, 10, 25, 6, 0))).toContain("proposte_scadute");
@@ -729,6 +735,11 @@ describe("giro con Claude", () => {
   // Review Focus 2: 2 lead dal foglio, 3 da Meta, conferme e inviti, 3 lavori Claude e 12 push in attesa.
   async function tuttoInAttesa(righeFoglio: number, quando: number) {
     await createUser();
+    // Lavori attivi con le due task ricorrenti del modello predefinito: alle 7:00 e alle 7:30 ne nascono fino a 12.
+    for (let i = 0; i < 8; i++) {
+      await env.DB.prepare("INSERT INTO clients (id, name, scope, created_at) VALUES (?, ?, 'acceleriamo', 1)").bind(`kj${i}`, `Cliente ${i}`).run();
+      await env.DB.prepare("INSERT INTO jobs (id, client_id, template_id, name, start_at, recurring_from_month, status, created_at) VALUES (?, ?, 'lt-automazione-su-misura', 'Automazione su misura', 1, '2026-10', 'attivo', 1)").bind(`j${i}`, `kj${i}`).run();
+    }
     await foglioFinto(Array.from({ length: righeFoglio }, (_, i) => rigaFoglio(i)));
     for (let i = 0; i < 3; i++) await insertLead(`m${i}`, { source: "meta", meta_lead_id: `lg-${i}`, meta_status: "pending", meta_attempts: 0, stage_id: "da-chiamare-prima-volta" });
     for (let i = 0; i < 5; i++) await insertLead(`c${i}`, { source: "meta", email: `conf${i}@esempio.it`, confirmation_error: "Resend non raggiungibile, si riprova", confirmation_attempts: 1, created_at: r(10, 0) - i });
@@ -768,6 +779,9 @@ describe("giro con Claude", () => {
     ["lunedì 7:00, foglio, Meta, conferme, Meta 48 ore, revisione", daRoma(2026, 10, 12, 7, 0), 2],
     ["lunedì 7:05, foglio, conferme, revisione", daRoma(2026, 10, 12, 7, 5), 1],
     ["lunedì 7:10, foglio vuoto, revisione", daRoma(2026, 10, 12, 7, 10), 0],
+    // Alle 7:00 e alle 7:30 entrano anche le task ricorrenti dei lavori (2 fisse più una a task, al massimo 12).
+    ["martedì 7:00, foglio, Meta, conferme, Meta 48 ore, task ricorrenti", r(7, 0), 2],
+    ["martedì 7:30, foglio vuoto, task ricorrenti", r(7, 30), 0],
   ];
   for (const [nome, quando, righe] of casi) {
     it(`giro pieno alle ${nome}, 12 push e 3 lavori Claude: al massimo 45 query e 15 sottorichieste; Claude non entrato aspetta senza errori`, async () => {

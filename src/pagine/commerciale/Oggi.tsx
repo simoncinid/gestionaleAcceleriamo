@@ -14,6 +14,9 @@ import { FoglioEsito } from "./FoglioEsito";
 import { FoglioRimanda } from "./FoglioRimanda";
 import { RigaLead, RigaProposta } from "./RigaOggi";
 import { SegmentiOggi } from "./SegmentiOggi";
+import { inizioGiornoRoma } from "../../../worker/lib/roma";
+import { useTask } from "../lavori/dati";
+import { RigaTask } from "../lavori/RigaTask";
 
 type LeadEsito = Pick<Riga, "id" | "company" | "contactName" | "stageId" | "attemptCount">;
 const DATA = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Rome" });
@@ -60,6 +63,7 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   const p = partiRoma(ora);
   const mattinaDiLunedi = p.settimana === 1 && p.ore < 12;
   const revisione = useQuery({ queryKey: ["lunedi", "corrente"], queryFn: () => api<RevisioneApi>("/weekly-reviews/corrente"), enabled: mattinaDiLunedi });
+  const lavori = useTask("mie");
 
   // Tornando dalla chiamata si apre il Foglio Esito del lead chiamato (spec 6.4, passo 2).
   useRitornoChiamata((id) => {
@@ -110,6 +114,15 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
               </div>
             </div>
           </div>
+          {(() => {
+            const domani = inizioGiornoRoma(ora + 36 * 3_600_000);
+            const oggi = (lavori.data ?? []).filter((t) => t.dueAt != null && t.dueAt < domani);
+            return (
+              <Gruppo titolo="Lavori da fare oggi" n={oggi.length}>
+                <ul className={elenco}>{oggi.map((t) => <RigaTask key={t.id} t={t} ora={ora} />)}</ul>
+              </Gruppo>
+            );
+          })()}
           <Gruppo titolo="Lead nuovi da chiamare" n={d.nuovi.length}>
             <ul className={elenco}>{d.nuovi.map(riga)}</ul>
           </Gruppo>

@@ -48,10 +48,13 @@ Un solo Cron Trigger gira ogni 5 minuti (`wrangler.jsonc`, `*/5 * * * *`) e deci
 6. Telegram (al massimo 5 messaggi);
 7. email di conferma e inviti alle call (al massimo 7);
 8. controllo "Meta senza lead da 48 ore" (una volta l'ora);
-9. revisione del lunedì (lunedì dalle 7:00 alle 7:55);
-10. Claude, sempre per ultimo (al massimo 3 lavori).
+9. task ricorrenti dei lavori (alle 7:00 e alle 7:30, al massimo 12 task);
+10. revisione del lunedì (lunedì dalle 7:00 alle 7:55);
+11. Claude, sempre per ultimo (al massimo 3 lavori).
 
 Il motivo dei tetti: sul piano gratuito una invocazione del Worker può fare al massimo 50 query D1 e 50 sottorichieste esterne. Il giro si tiene a 45 query e 15 sottorichieste. Ogni lavoro dichiara in `LAVORI` quanto costa (query fisse, query per unità, sottorichieste per unità) e prende solo le unità che il budget gli lascia; quello che non entra passa al giro dopo, senza errori. Foglio, Meta e avvisi lasciano sempre spazio ad almeno 2 push per giro. I costi sono misurati in `tests/cron.test.ts`: se si cambia un `max` va rifatta la misura. Un lavoro che fallisce non ferma gli altri e il giro diventa rosso in Impostazioni.
+
+Task ricorrenti dei lavori: alle 7:00 e alle 7:30 di Roma il giro crea, per ogni lavoro attivo, la task del mese se oggi è il giorno indicato o dopo (una sola per mese, indice unico su lavoro, modello e mese). Costano 2 query fisse più una a task, al massimo 12 per giro; quelle che non entrano passano alla seconda passata delle 7:30 o al giorno dopo.
 
 Limiti noti, accettati:
 
@@ -112,15 +115,15 @@ L'ordine è sempre lo stesso: **copia del database, controllo dei doppioni, migr
 
    Il file deve essere non vuoto. Resta sul computer (i file `*.local.sql` sono esclusi da git) e il backup notturno lo copia nel Drive. In caso di guai si rimette su un database vuoto con `npx wrangler d1 execute acceleriamo-os --remote --file <copia>`.
 
-2. **Controllo dei doppioni**, solo la prima volta che si applica la migrazione `0010` (vincolo unico di un cliente per lead):
+2. **Controllo dei doppioni**, solo la prima volta che si applica la migrazione `0012` (vincolo unico di un cliente per lead):
 
    ```bash
    npx wrangler d1 execute acceleriamo-os --remote --command "SELECT origin_lead_id, count(*) FROM clients WHERE origin_lead_id IS NOT NULL AND deleted_at IS NULL GROUP BY 1 HAVING count(*) > 1"
    ```
 
-   Deve tornare vuoto. Se torna righe, la `0010` fallirebbe: prima si mette nel cestino il cliente doppione (dall'app), poi si rilancia il controllo.
+   Deve tornare vuoto. Se torna righe, la `0012` fallirebbe: prima si mette nel cestino il cliente doppione (dall'app), poi si rilancia il controllo.
 
-3. **Migrazioni** (con il Piano B sono la `0007`, la `0008` con l'indice di Telegram, la `0009` e la `0010`):
+3. **Migrazioni** (con il Piano B sono la `0009`, la `0010` con l'indice di Telegram, la `0011` e la `0012`; la `0007` e la `0008` dei lavori sono già applicate):
 
    ```bash
    npm run db:migrate:remote

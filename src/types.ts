@@ -20,7 +20,7 @@ export type Lead = LeadListItem & {
 
 export type Activity = { id: string; type: string; body: string; createdAt: number; authorId: string | null; authorName: string };
 export type DocumentRow = { id: string; leadId: string; name: string; url: string | null; createdAt: number };
-export type LeadDetail = { lead: Lead; activities: Activity[]; documents: DocumentRow[]; duplicateOf: { id: string; company: string } | null; cliente?: { id: string; name: string } | null };
+export type LeadDetail = { lead: Lead; activities: Activity[]; documents: DocumentRow[]; duplicateOf: { id: string; company: string } | null; cliente?: { id: string; name: string; haLavori?: boolean } | null };
 
 export type Stats = {
   bySource: { source: string; total: number; won: number; lost: number }[];
@@ -49,3 +49,5 @@ export type { Automation, Client, Cost, Fee, Invoice } from "../worker/db/schema
 export type { CanoneRiga, CostoRiga, Cruscotto, FatturaRiga, MeseCosti } from "../worker/economia/service";
 export type { ClienteRiga, SchedaClienteDati } from "../worker/clienti/routes";
 export type { AutomazioneRiga } from "../worker/automazioni/routes";
+export type { TaskRiga } from "../worker/lavori/routes";
+export type { AutomationStep, JobTemplate, JobTemplateTask } from "../worker/db/schema";

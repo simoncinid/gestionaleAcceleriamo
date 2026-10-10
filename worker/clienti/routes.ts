@@ -2,13 +2,15 @@ import { and, eq, isNull } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { getDb, violaUnico } from "../db/client";
-import { automations, clients, fees, leads, type Client, type Fee } from "../db/schema";
+import { automations, clients, fees, jobs, leads, type Client, type Fee } from "../db/schema";
 import { canonePrincipale, statoCliente, type StatoCliente } from "../economia/calcoli";
 import { elencoFatture, type FatturaRiga } from "../economia/service";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
+import { elencoTask, type TaskRiga } from "../lavori/routes";
 
 export type ClienteRiga = Pick<Client, "id" | "name" | "sector" | "city" | "scope" | "originLeadId"> & {
+  logo?: string | null;
   canoneCents: number;
   stato: StatoCliente;
   // Il canone da mostrare nell'elenco (QA 10): null solo se il cliente non ne ha nessuno.
@@ -20,6 +22,8 @@ export type SchedaClienteDati = {
   automazioni: { id: string; name: string; status: "in_costruzione" | "attiva" | "in_pausa" | "dismessa" }[];
   fatture: FatturaRiga[];
   lead: { id: string; company: string } | null;
+  lavori?: { id: string; name: string; startAt: number; feeCents: number | null; status: "attivo" | "concluso" }[];
+  task?: TaskRiga[];
 };
 
 const campiCliente = {
@@ -42,7 +46,7 @@ clientiRoutes.get("/", async (c) => {
     .map((k) => {
       const suoi = canoni.filter((f) => f.clientId === k.id);
       return {
-        id: k.id, name: k.name, sector: k.sector, city: k.city, scope: k.scope, originLeadId: k.originLeadId,
+        id: k.id, name: k.name, sector: k.sector, city: k.city, scope: k.scope, originLeadId: k.originLeadId, logo: k.logo,
         canoneCents: suoi.filter((f) => f.status === "attivo").reduce((t, f) => t + f.amountCents, 0),
         stato: statoCliente(suoi, autom.filter((a) => a.clientId === k.id)),
         canone: canonePrincipale(suoi),
@@ -70,19 +74,23 @@ clientiRoutes.get("/:id", async (c) => {
   const db = getDb(c.env.DB);
   const k = await db.select().from(clients).where(and(eq(clients.id, c.req.param("id")), isNull(clients.deletedAt))).get();
   if (!k) return c.json({ error: "Cliente inesistente" }, 404);
-  const [canoni, autom, fatture, lead] = await Promise.all([
+  const [canoni, autom, fatture, lead, lavori, task] = await Promise.all([
     db.select().from(fees).where(eq(fees.clientId, k.id)),
     db.select({ id: automations.id, name: automations.name, status: automations.status }).from(automations).where(and(eq(automations.clientId, k.id), isNull(automations.deletedAt))),
     elencoFatture(db, Date.now(), k.id),
     k.originLeadId ? db.select({ id: leads.id, company: leads.company }).from(leads).where(eq(leads.id, k.originLeadId)).get() : Promise.resolve(undefined),
+    db.select({ id: jobs.id, name: jobs.name, startAt: jobs.startAt, feeCents: jobs.feeCents, status: jobs.status }).from(jobs).where(and(eq(jobs.clientId, k.id), isNull(jobs.deletedAt))),
+    elencoTask(db, { clientId: k.id, solo: "aperte" }),
   ]);
   const ultime = [...fatture].sort((a, b) => (b.issuedAt ?? Infinity) - (a.issuedAt ?? Infinity)).slice(0, 5);
   const dati: SchedaClienteDati = {
-    cliente: { id: k.id, name: k.name, sector: k.sector, city: k.city, scope: k.scope, originLeadId: k.originLeadId, canoneCents: canoni.filter((f) => f.status === "attivo").reduce((t, f) => t + f.amountCents, 0), stato: statoCliente(canoni, autom), canone: canonePrincipale(canoni) },
+    cliente: { id: k.id, name: k.name, sector: k.sector, city: k.city, scope: k.scope, originLeadId: k.originLeadId, logo: k.logo, canoneCents: canoni.filter((f) => f.status === "attivo").reduce((t, f) => t + f.amountCents, 0), stato: statoCliente(canoni, autom), canone: canonePrincipale(canoni) },
     canoni,
     automazioni: autom,
     fatture: ultime,
     lead: lead ?? null,
+    lavori,
+    task,
   };
   return c.json(dati);
 });

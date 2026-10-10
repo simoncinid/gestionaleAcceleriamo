@@ -19,7 +19,7 @@ describe("migrazione del Piano B", () => {
     expect(sql).not.toMatch(/\bDROP\b|\bUPDATE\b|\bDELETE\b/i);
   });
 
-  it("0008: solo l'indice di Telegram, nessuna istruzione distruttiva", async () => {
+  it("0010: solo l'indice di Telegram, nessuna istruzione distruttiva", async () => {
     const m = (env.TEST_MIGRATIONS as { name: string; queries: string[] }[]).find((x) => x.name.includes("indice_telegram"))!;
     const sql = m.queries.join("\n");
     expect(sql).not.toMatch(/\bDROP\b|\bUPDATE\b|\bDELETE\b|\bALTER\b/i);
@@ -28,7 +28,7 @@ describe("migrazione del Piano B", () => {
     expect(i).toEqual({ name: "idx_notifications_telegram" });
   });
 
-  it("0009: solo l'indice del registro, nessuna istruzione distruttiva", async () => {
+  it("0011: solo l'indice del registro, nessuna istruzione distruttiva", async () => {
     const m = (env.TEST_MIGRATIONS as { name: string; queries: string[] }[]).find((x) => x.name.includes("indice_registro"))!;
     expect(m.queries.join("\n")).not.toMatch(/\bDROP\b|\bUPDATE\b|\bDELETE\b|\bALTER\b/i);
     expect(m.queries.every((q) => /^\s*CREATE INDEX/i.test(q))).toBe(true);

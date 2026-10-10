@@ -15,7 +15,7 @@ describe("aree e sottomenu", () => {
     expect(AREE.map((a) => a.etichetta)).toEqual(["Commerciale", "Automazioni", "Economia"]);
     expect(SOTTOMENU.commerciale.map((s) => s.etichetta)).toEqual(["Oggi", "Scaletta", "Call", "Proposte", "Clienti", "Numeri"]);
     expect(SOTTOMENU.economia.map((s) => s.etichetta)).toEqual(["Cruscotto", "Canoni", "Fatture", "Costi"]);
-    expect(SOTTOMENU.automazioni.map((s) => s.etichetta)).toEqual(["Pannello", "In costruzione"]);
+    expect(SOTTOMENU.automazioni.map((s) => s.etichetta)).toEqual(["Pannello", "In costruzione", "Lavori"]);
   });
   it("riconosce l'area dal percorso", () => {
     expect(areaDi("/commerciale/lead/abc")).toBe("commerciale");
@@ -30,20 +30,20 @@ describe("il + nella testata", () => {
       expect(creazioniDelPercorso(p).map((c) => c.etichetta)).toEqual(["Nuovo lead", "Esito di una chiamata", "Nota su un lead", "Nuovo cliente", "Proposta a mano"]);
     }
   });
-  it("in Economia le tre creazioni dell'area, in Automazioni una sola", () => {
+  it("in Economia le tre creazioni dell'area, in Automazioni automazione e task", () => {
     expect(creazioniDelPercorso("/economia/canoni").map((c) => c.id)).toEqual(["fattura", "canone", "costo"]);
-    expect(creazioniDelPercorso("/automazioni").map((c) => c.id)).toEqual(["automazione"]);
+    expect(creazioniDelPercorso("/automazioni").map((c) => c.id)).toEqual(["automazione", "task"]);
   });
   it.each([
     ["/commerciale/oggi", "lead"], ["/commerciale/scaletta", "lead"], ["/commerciale/call", "lead"], ["/commerciale/lead/x", "lead"],
     ["/commerciale/proposte", "proposta"], ["/commerciale/clienti", "cliente"], ["/commerciale/clienti/x", "cliente"],
     ["/economia", "fattura"], ["/economia/fatture", "fattura"], ["/economia/canoni", "canone"], ["/economia/costi", "costo"],
-    ["/automazioni", "automazione"], ["/automazioni/in-costruzione", "automazione"], ["/impostazioni", "lead"],
+    ["/automazioni", "automazione"], ["/automazioni/in-costruzione", "automazione"], ["/automazioni/lavori", "task"], ["/impostazioni", "lead"],
   ])("%s crea %s", (percorso, attesa) => {
     expect(creazioneDelPiu(percorso)).toBe(attesa);
   });
-  it("nove creazioni in tutto, ognuna in una sola area", () => {
-    expect(TUTTE_LE_CREAZIONI.map((c) => c.id)).toEqual(["lead", "esito", "nota", "cliente", "proposta", "canone", "fattura", "costo", "automazione"]);
+  it("dieci creazioni in tutto, ognuna in una sola area", () => {
+    expect(TUTTE_LE_CREAZIONI.map((c) => c.id)).toEqual(["lead", "esito", "nota", "cliente", "proposta", "canone", "fattura", "costo", "automazione", "task"]);
   });
 });
 

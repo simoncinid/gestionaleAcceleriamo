@@ -4,6 +4,7 @@ import { pushCollegate } from "./push/invio";
 import { COSTO_AVVISI, controllaAvvisi, controllaMeta48 } from "./avvisi/controlli";
 import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
+import { generaRicorrenti } from "./lavori/service";
 import { mandaInvitiInCoda } from "./calls/service";
 import { lavoraCoda, orologioCoda } from "./claude/coda";
 import "./claude/tipi";
@@ -18,7 +19,7 @@ import { revisioneCorrente } from "./lunedi/calcolo";
 import { retryPendingMetaLeads } from "./meta/ingest";
 import { giroTelegram } from "./telegram/bot";
 
-export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lunedi";
+export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "lunedi";
 
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
@@ -100,6 +101,17 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   },
   // Spec 8: Meta senza lead da 48 ore, una volta l'ora (giro delle :00). 3 query misurate.
   meta_48h: { quando: (p) => p.minuti < 5, fisse: 3, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => controllaMeta48(e, n) },
+  // Task ricorrenti dei lavori (dal ramo main): alle 7:00 e alle 7:30 di Roma il giro crea la task del mese per ogni
+  // lavoro attivo, se oggi è il giorno indicato o dopo (una sola per mese: indice unico su lavoro, modello e mese).
+  // Non tocca un lead che aspetta, quindi viene dopo i lavori dei lead e il controllo di Meta delle :00; sta prima
+  // della revisione del lunedì e di Claude perché costa poco e gira due volte al giorno: se il budget non basta,
+  // la seconda passata delle 7:30 recupera. Misura con contaD1: 2 letture (lavori con i modelli ricorrenti, task
+  // del mese) più una batch con una scrittura per task, quindi 2 fisse e una a unità, al massimo 12; nessuna sottorichiesta.
+  lavori: {
+    quando: (p) => p.ore === 7 && (p.minuti < 5 || (p.minuti >= 30 && p.minuti < 35)),
+    fisse: 2, perUnita: 1, sottoPerUnita: 0, max: 12,
+    esegui: (e, n, l) => generaRicorrenti(getDb(e.DB), n, l),
+  },
   // Lunedì (spec 6.4): il lunedì dalle 7:00 alle 7:55 (ora di Roma) il giro congela i numeri della settimana chiusa
   // in weekly_reviews. Dopo il lead e i suoi avvisi, prima di Claude: se il budget non basta riprova al giro dopo.
   // La revisione nasce una volta sola per settimana (settimana unica, ON CONFLICT): nei giri dopo il primo costa

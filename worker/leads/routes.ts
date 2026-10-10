@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, isNull } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { Hono } from "hono";
 import { getDb } from "../db/client";
-import { activities, calls, documents, leads, users } from "../db/schema";
+import { activities, calls, documents, jobs, leads, users } from "../db/schema";
 import type { AppEnv } from "../env";
 import { VISTE, addActivity, azioniMultiple, clienteDelLead, createLead, getLead, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead, type Vista } from "./service";
 import { activitySchema, bulkSchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
@@ -71,7 +71,9 @@ leadRoutes.get("/:id", async (c) => {
   const duplicateOf = lead.duplicateOfId
     ? ((await db.select({ id: leads.id, company: leads.company }).from(leads).where(and(eq(leads.id, lead.duplicateOfId), isNull(leads.deletedAt))).get()) ?? null)
     : null;
-  const cliente = await clienteDelLead(db, lead.id);
+  const base = await clienteDelLead(db, lead.id);
+  const lavori = base ? ((await db.select({ id: jobs.id }).from(jobs).where(and(eq(jobs.clientId, base.id), isNull(jobs.deletedAt))).limit(1)).length) : 0;
+  const cliente = base ? { ...base, haLavori: lavori > 0 } : null;
   return c.json({ lead, activities: history.map((a) => ({ ...a, authorName: a.authorName ?? "Sistema" })), documents: docs, duplicateOf, cliente });
 });
 

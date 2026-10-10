@@ -1,6 +1,6 @@
 import { Link } from "react-router";
-import { descrizioneAnonima, ETICHETTE_AUTOMAZIONE, etichettaFamiglia } from "../../../worker/economia/calcoli";
-import { Errore, Interruttore, Intestazione, Skeleton, StatoVuoto, Tag } from "../../ds";
+import { descrizioneAnonima, ETICHETTE_AUTOMAZIONE } from "../../../worker/economia/calcoli";
+import { Errore, Interruttore, Intestazione, LogoCliente, Punto, Skeleton, StatoVuoto, Tag } from "../../ds";
 import { euro } from "../../format";
 import { useOra } from "../../hooks";
 import type { AutomazioneRiga } from "../../types";
@@ -13,18 +13,26 @@ export const oggiLungo = (ora: number) => GIORNO_LUNGO.format(ora);
 
 export const nomeCliente = (a: AutomazioneRiga, anonimo: boolean) => (anonimo ? descrizioneAnonima(a.settore, a.citta) : a.cliente);
 
-// Una riga per fatto, nell'ordine della spec 10.1.
+const COLORE_STATO = { attiva: "verde", in_costruzione: "giallo", in_pausa: "grigio", dismessa: "grigio" } as const;
+
+// Titolo: cosa fa, in parole semplici. Poi il cliente (logo e nome, link alla sua scheda), lo stato, i passaggi e il costo vivo.
+// Con i nomi nascosti restano solo settore e città, senza logo. La card è un link alla scheda: il cliente è un secondo link accanto, mai dentro.
 function CardAutomazione({ a, anonimo }: { a: AutomazioneRiga; anonimo: boolean }) {
+  const passaggi = a.passaggi ?? 0;
   return (
-    <Link to={`/automazioni/${a.id}`} className="grid h-full gap-1 rounded-blocco border border-sabbia bg-avorio p-5 hover:bg-crema">
-      <p className="font-display text-titolo-card">{a.name}</p>
-      <p className="text-secondaria text-grigio">{nomeCliente(a, anonimo)}</p>
-      <p className="text-secondaria">{etichettaFamiglia(a.family)}</p>
-      {a.runsOn && <p className="text-secondaria">{`Gira su ${a.runsOn}`}</p>}
+    <div className="relative grid h-full gap-2 rounded-blocco border border-sabbia bg-avorio p-5 hover:bg-crema">
+      <Link to={`/automazioni/${a.id}`} className="font-display text-titolo-card after:absolute after:inset-0">{a.name}</Link>
+      {anonimo ? <p className="text-secondaria text-grigio">{nomeCliente(a, true)}</p> : (
+        <Link to={`/commerciale/clienti/${a.clientId}`} className="relative z-10 flex min-h-11 w-fit items-center gap-2 text-secondaria hover:underline">
+          <LogoCliente logo={a.logo} nome={a.cliente} />
+          <span>{a.cliente}</span>
+        </Link>
+      )}
+      <p className="flex items-center gap-2 text-secondaria"><Punto colore={COLORE_STATO[a.status]} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
+      <p className="text-secondaria text-grigio tabular-nums">{passaggi === 0 ? "Flusso da descrivere" : passaggi === 1 ? "1 passaggio" : `${passaggi} passaggi`}</p>
       <p className="text-meta text-grigio tabular-nums">{a.monthlyCostCents != null ? `${euro(a.monthlyCostCents)} al mese di costi vivi` : "Costo vivo da segnare"}</p>
-      <p className="text-meta">{ETICHETTE_AUTOMAZIONE[a.status]}</p>
       {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
-    </Link>
+    </div>
   );
 }
 
@@ -44,7 +52,7 @@ export function Pannello({ ora: oraFissa }: { ora?: number } = {}) {
       <Intestazione titolo="Automazioni" numero={totali.attive} coda={totali.attive === 1 ? "attiva" : "attive"} eyebrow={eyebrow} />
       {interruttore}
       <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
-        <p className="text-corpo tabular-nums">{`${totali.attive} attive`}</p>
+        <p className="text-corpo tabular-nums">{totali.attive === 1 ? "1 attiva" : `${totali.attive} attive`}</p>
         <p className="text-corpo tabular-nums">{`${totali.inCostruzione} in costruzione`}</p>
         <p className="text-corpo tabular-nums">{`${euro(totali.costiViviCents)} di costi vivi al mese`}</p>
       </div>

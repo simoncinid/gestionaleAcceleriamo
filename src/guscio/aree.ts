@@ -26,6 +26,7 @@ export const SOTTOMENU: Record<Area, { etichetta: string; percorso: string }[]> 
   automazioni: [
     { etichetta: "Pannello", percorso: "/automazioni" },
     { etichetta: "In costruzione", percorso: "/automazioni/in-costruzione" },
+    { etichetta: "Lavori", percorso: "/automazioni/lavori" },
   ],
 };
 
@@ -34,7 +35,7 @@ export function areaDi(percorso: string): Area | null {
   return primo === "commerciale" || primo === "economia" || primo === "automazioni" ? primo : null;
 }
 
-export type Creazione = "lead" | "esito" | "nota" | "cliente" | "proposta" | "canone" | "fattura" | "costo" | "automazione";
+export type Creazione = "lead" | "esito" | "nota" | "cliente" | "proposta" | "canone" | "fattura" | "costo" | "automazione" | "task";
 
 export const TUTTE_LE_CREAZIONI: { id: Creazione; etichetta: string }[] = [
   { id: "lead", etichetta: "Nuovo lead" },
@@ -46,13 +47,14 @@ export const TUTTE_LE_CREAZIONI: { id: Creazione; etichetta: string }[] = [
   { id: "fattura", etichetta: "Nuova fattura" },
   { id: "costo", etichetta: "Nuovo costo" },
   { id: "automazione", etichetta: "Nuova automazione" },
+  { id: "task", etichetta: "Nuova task" },
 ];
 
 // Voci del foglio aperto dal "+" della testata, nell'ordine deciso da Tommaso (10/10/2026).
 export const CREAZIONI_DELL_AREA: Record<Area, Creazione[]> = {
   commerciale: ["lead", "esito", "nota", "cliente", "proposta"],
   economia: ["fattura", "canone", "costo"],
-  automazioni: ["automazione"],
+  automazioni: ["automazione", "task"],
 };
 
 // Fuori dalle tre aree (Impostazioni) il "+" offre le creazioni del Commerciale.
@@ -72,6 +74,7 @@ export function creazioneDelPiu(percorso: string): Creazione {
   if (percorso.startsWith("/economia/canoni")) return "canone";
   if (percorso.startsWith("/economia/costi")) return "costo";
   if (percorso.startsWith("/economia")) return "fattura";
+  if (percorso.startsWith("/automazioni/lavori")) return "task";
   if (percorso.startsWith("/automazioni")) return "automazione";
   return "lead";
 }
