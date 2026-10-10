@@ -42,12 +42,19 @@ const euroTondi = (cents: number) => `€ ${String(Math.round(cents / 100)).repl
 
 // Un lavoro per oggetto: se ce n'è già uno in coda, in corso o fermo per il tetto, si riusa quello.
 // Una query sola nel caso comune (INSERT ... WHERE NOT EXISTS): la catena del lead nuovo accoda dentro il giro.
-export async function accoda(db: D1Database, j: { tipo: AiTipo; entityId: string; leadId?: string | null; chi?: string | null; forzato?: boolean }, now: number): Promise<{ id: string; nuovo: boolean }> {
-  const id = crypto.randomUUID();
-  const r = await db.prepare(`INSERT INTO ai_jobs (id, tipo, entity_id, lead_id, stato, forzato, richiesto_da, created_at)
+type NuovoLavoro = { tipo: AiTipo; entityId: string; leadId?: string | null; chi?: string | null; forzato?: boolean };
+
+// La sola istruzione di accodamento, da mettere in una batch insieme alla riga che il lavoro elabora
+// (profilo della scheda e lavoro nascono insieme o per niente).
+export const istruzioneAccoda = (db: D1Database, id: string, j: NuovoLavoro, now: number) =>
+  db.prepare(`INSERT INTO ai_jobs (id, tipo, entity_id, lead_id, stato, forzato, richiesto_da, created_at)
       SELECT ?1, ?2, ?3, ?4, 'in_coda', ?5, ?6, ?7
       WHERE NOT EXISTS (SELECT 1 FROM ai_jobs WHERE tipo = ?2 AND entity_id = ?3 AND stato IN ('in_coda','in_corso','fermo_tetto'))`)
-    .bind(id, j.tipo, j.entityId, j.leadId ?? null, j.forzato ? 1 : 0, j.chi ?? null, now).run();
+    .bind(id, j.tipo, j.entityId, j.leadId ?? null, j.forzato ? 1 : 0, j.chi ?? null, now);
+
+export async function accoda(db: D1Database, j: NuovoLavoro, now: number): Promise<{ id: string; nuovo: boolean }> {
+  const id = crypto.randomUUID();
+  const r = await istruzioneAccoda(db, id, j, now).run();
   if (r.meta.changes) return { id, nuovo: true };
   const gia = await db.prepare("SELECT id FROM ai_jobs WHERE tipo = ?1 AND entity_id = ?2 AND stato IN ('in_coda','in_corso','fermo_tetto') LIMIT 1").bind(j.tipo, j.entityId).first<{ id: string }>();
   return { id: gia?.id ?? id, nuovo: false };

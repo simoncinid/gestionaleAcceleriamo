@@ -1,10 +1,12 @@
 import { linkHttp } from "./validation";
-import { and, desc, eq } from "drizzle-orm";
+import { assertCallFutura } from "../calls/service";
+import { and, desc, eq, gte, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Db } from "../db/client";
 import { activities, auditLog, calls, leads, messageTemplates, type Lead } from "../db/schema";
+import { callPerFase } from "../regole/fasi-call";
 import { ESITI, type Esito } from "../regole/motore";
 import { assertMotivo, getLead, getStage } from "./service";
 
@@ -61,6 +63,15 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
   if (cambiaFase && stage.requiresReason && !input.lostReason) throw new HTTPException(422, { message: "Scegli il motivo" });
   if (cambiaFase && stage.kind === "won") throw new HTTPException(422, { message: "Per segnare Chiuso usa il cambio di fase nella scheda lead" });
   if (stage.kind === "open" && (!input.nextAction || !input.nextActionAt)) throw new HTTPException(422, { message: "Serve una prossima azione con data per i lead aperti" });
+  if (input.call) assertCallFutura(input.call.scheduledAt, now);
+  // Come nel PATCH del lead (Q14): nelle fasi che esistono solo con una call fissata si entra con la call nell'esito
+  // oppure con una call di quel tipo già in programma.
+  const kindCall = cambiaFase ? callPerFase(stage.id) : null;
+  if (kindCall && input.call?.kind !== kindCall) {
+    const esistente = await db.select({ id: calls.id }).from(calls)
+      .where(and(eq(calls.leadId, leadId), eq(calls.kind, kindCall), isNull(calls.deletedAt), isNull(calls.outcome), gte(calls.scheduledAt, now))).get();
+    if (!esistente) throw new HTTPException(422, { message: "Per questa fase serve la call: scegli giorno e ora" });
+  }
 
   const tentativo = TENTATIVI.includes(input.esito);
   const attemptNo = tentativo ? lead.attemptCount + 1 : null;

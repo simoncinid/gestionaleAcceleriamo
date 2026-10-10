@@ -42,6 +42,36 @@ describe("PATCH /leads/:id/esito", () => {
     expect(l?.first_response_at).toBeTypeOf("number");
   });
 
+  it("fase con call senza call (né nell'esito né in programma): 422 come nel PATCH, niente scritto", async () => {
+    const cookie = await authed();
+    await insertLead("lc");
+    const quando = NOW + 2 * 86_400_000;
+    const res = await esito("lc", { requestId: crypto.randomUUID(), esito: "risposto", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: quando }, cookie);
+    expect(res.status).toBe(422);
+    expect((await res.json<{ error: string }>()).error).toBe("Per questa fase serve la call: scegli giorno e ora");
+    expect(await conta("SELECT count(*) n FROM activities WHERE lead_id = 'lc'")).toBe(0);
+    expect((await leadRow("lc"))!.stage_id).toBe("da-richiamare");
+    // Con una call di conoscenza già in programma l'esito passa.
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('kc', 'lc', 'conoscenza', ?1, 0, 0)").bind(quando).run();
+    const ok = await esito("lc", { requestId: crypto.randomUUID(), esito: "risposto", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: quando }, cookie);
+    expect(ok.status).toBe(200);
+  });
+
+  it("call nel passato: 422 con un messaggio in italiano, niente scritto", async () => {
+    const cookie = await authed();
+    await insertLead("lp");
+    const ieri = NOW - 86_400_000;
+    const res = await esito("lp", { requestId: crypto.randomUUID(), esito: "appuntamento", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: NOW + 3_600_000, call: { kind: "conoscenza", scheduledAt: ieri, meetLink: null } }, cookie);
+    expect(res.status).toBe(422);
+    expect((await res.json<{ error: string }>()).error).toBe("La call è nel passato: scegli giorno e ora da adesso in poi");
+    expect(await conta("SELECT count(*) n FROM calls WHERE lead_id = 'lp'")).toBe(0);
+    // Dieci minuti fa sta nella tolleranza.
+    const quasi = await call("/api/leads/lp/calls", { method: "POST", json: { kind: "conoscenza", scheduledAt: Date.now() - 10 * 60_000, meetLink: null } }, cookie);
+    expect(quasi.status).toBe(201);
+    const vecchia = await call("/api/leads/lp/calls", { method: "POST", json: { kind: "conoscenza", scheduledAt: ieri, meetLink: null } }, cookie);
+    expect(vecchia.status).toBe(422);
+  });
+
   it("fase persa senza motivo: 422 e niente scritto", async () => {
     const cookie = await authed();
     await insertLead("l3");

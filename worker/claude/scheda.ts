@@ -1,5 +1,5 @@
 import type { Env } from "../env";
-import type { DefTipo } from "./coda";
+import { istruzioneAccoda, type DefTipo } from "./coda";
 import { chiamaClaude, ErroreClaude } from "./client";
 import { INGRESSO_PER_RICERCA, usoVuoto } from "./costo";
 import { datiPerClaude, SELECT_LEAD_PER_CLAUDE, type LeadPerClaude } from "./dati-lead";
@@ -31,14 +31,16 @@ const MAX_TOKENS = 8_000;
 
 // Una versione nuova della scheda (la vecchia resta nello storico). Una query sola: la versione si calcola
 // dentro l'INSERT. errore = "privato" segna la scheda non preparata perché il lead sembra un privato.
-export async function nuovaVersioneScheda(
-  db: D1Database, leadId: string, now: number, classificazione: string | null = null,
-  status: "queued" | "error" = "queued", errore: string | null = null,
-): Promise<string> {
+// Versione nuova della scheda e suo lavoro in una sola batch: se l'accodamento fallisce non resta un profilo
+// "in coda" senza lavoro, che lo stato mostrerebbe in coda per sempre.
+export async function nuovaVersioneScheda(db: D1Database, leadId: string, now: number, chi: string | null = null): Promise<string> {
   const id = crypto.randomUUID();
-  await db.prepare(`INSERT INTO company_profiles (id, lead_id, version, status, error, classification, created_at, updated_at)
-      SELECT ?1, ?2, coalesce(max(version), 0) + 1, ?3, ?4, ?5, ?6, ?6 FROM company_profiles WHERE lead_id = ?2`)
-    .bind(id, leadId, status, errore, classificazione, now).run();
+  await db.batch([
+    db.prepare(`INSERT INTO company_profiles (id, lead_id, version, status, error, classification, created_at, updated_at)
+        SELECT ?1, ?2, coalesce(max(version), 0) + 1, 'queued', NULL, NULL, ?3, ?3 FROM company_profiles WHERE lead_id = ?2`)
+      .bind(id, leadId, now),
+    istruzioneAccoda(db, crypto.randomUUID(), { tipo: "scheda", entityId: id, leadId, chi, forzato: true }, now),
+  ]);
   return id;
 }
 

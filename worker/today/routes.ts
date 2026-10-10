@@ -73,7 +73,9 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
       WHERE ${APERTI} ${chi} AND l.stage_id NOT IN ('probabilmente-bloccato', 'da-chiamare-prima-volta')
         AND l.stage_changed_at <= ?2 ORDER BY l.stage_changed_at LIMIT 20`, ora - giorniFermo * GIORNO),
     tutti<CallGrezza>(`SELECT k.id, k.lead_id AS leadId, l.company, l.contact_name AS contactName, l.phone, k.kind, k.scheduled_at AS scheduledAt, k.meet_link AS meetLink,
-        (SELECT cp.status FROM company_profiles cp WHERE cp.lead_id = l.id ORDER BY cp.version DESC LIMIT 1) AS schedaStato
+        -- Come statoScheda: durante "Rigenera" resta pronta se una versione pronta c'è già.
+        CASE WHEN EXISTS (SELECT 1 FROM company_profiles cp WHERE cp.lead_id = l.id AND cp.status = 'ready') THEN 'ready'
+          ELSE (SELECT cp.status FROM company_profiles cp WHERE cp.lead_id = l.id ORDER BY cp.version DESC LIMIT 1) END AS schedaStato
       FROM calls k JOIN leads l ON l.id = k.lead_id WHERE k.deleted_at IS NULL AND l.deleted_at IS NULL ${chi}
         AND k.scheduled_at >= ?2 AND k.scheduled_at < ?3 ORDER BY k.scheduled_at`, inizio, fine),
     uno<{ n: number }>("SELECT count(*) n FROM leads WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ?", inizio, fine),

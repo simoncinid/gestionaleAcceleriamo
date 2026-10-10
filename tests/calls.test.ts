@@ -96,6 +96,23 @@ describe("API delle call", () => {
     expect(await mandaInvitiInCoda(env as Env, NOW, 2)).toBe(0);
   });
 
+  it("inviti in coda senza email: escono dalla coda e non bloccano i posti del giro", async () => {
+    for (const [i, email] of [["n1", null], ["n2", null], ["n3", "luca@prova.invalid"]] as const) {
+      await insertLead(i, { email });
+      await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, invite_queued_at, created_at, updated_at) VALUES (?1, ?2, 'conoscenza', ?3, ?4, ?4, ?4)")
+        .bind(`k${i}`, i, DOMANI + (i === "n3" ? 3_600_000 : 0), NOW).run();
+    }
+    let chiamate = 0;
+    setEmailFetch(async () => { chiamate++; return Response.json({ id: "email-x" }); });
+    expect(await mandaInvitiInCoda(env as Env, NOW, 2)).toBe(0);
+    expect(await mandaInvitiInCoda(env as Env, NOW, 2)).toBe(1);
+    expect(chiamate).toBe(1);
+    const coda = await env.DB.prepare("SELECT count(*) n FROM calls WHERE invite_queued_at IS NOT NULL").first<{ n: number }>();
+    expect(coda?.n).toBe(0);
+    const voce = await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'n1'").first<{ body: string }>();
+    expect(voce?.body).toBe("Invito non mandato: il lead non ha un'email");
+  });
+
   it("invito dal foglio dell'esito senza chiave: 202 in coda, non un errore", async () => {
     const cookie = await authed();
     await insertLead("l3c");

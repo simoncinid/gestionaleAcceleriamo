@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Env } from "../env";
-import { accoda, type DefTipo } from "./coda";
+import type { DefTipo } from "./coda";
 import { chiamaClaude, ErroreClaude } from "./client";
 import { usoVuoto } from "./costo";
 import { datiPerClaude, SELECT_LEAD_PER_CLAUDE, type LeadPerClaude } from "./dati-lead";
@@ -26,7 +26,7 @@ const FINESTRA_LEAD_NUOVI = 2 * 86_400_000;
 
 export const TIPO_CLASSIFICAZIONE: DefTipo = {
   stima: (imp) => ({ modello: imp.modelli.classificazione, ingresso: 2_000, maxTokens: MAX_TOKENS, ricerche: 0 }),
-  // Query: lettura del lead, profilo, accodamento della scheda (1, al massimo 2): 4 al massimo, nessuna in alErrore.
+  // Query: lettura del lead, poi una batch da 3 (profilo, classificazione sul profilo esistente, lavoro della scheda): 4, nessuna in alErrore.
   // Sottorichieste: una (la chiamata a Claude).
   async esegui(env: Env, job, imp, now) {
     const l = await env.DB.prepare(SELECT_LEAD_PER_CLAUDE).bind(job.entityId).first<LeadPerClaude>();
@@ -40,12 +40,22 @@ export const TIPO_CLASSIFICAZIONE: DefTipo = {
       if (!c.success) throw new Error("Classificazione fuori formato");
       const vera = c.data.azienda && !c.data.fake;
       // Il profilo nasce solo se il lead non ne ha già uno (per esempio "Prepara la scheda" premuto nel frattempo):
-      // così non partono due schede per lo stesso lead.
+      // così non partono due schede per lo stesso lead. Tutto in una batch: profilo e lavoro della scheda nascono
+      // insieme; se il profilo c'era già, il risultato (con il motivo) va sull'ultima versione che non ne ha uno.
       const id = crypto.randomUUID();
-      const ins = await env.DB.prepare(`INSERT INTO company_profiles (id, lead_id, version, status, error, classification, created_at, updated_at)
-          SELECT ?1, ?2, 1, ?3, ?4, ?5, ?6, ?6 WHERE NOT EXISTS (SELECT 1 FROM company_profiles WHERE lead_id = ?2)`)
-        .bind(id, job.entityId, vera ? "queued" : "error", vera ? null : "privato", JSON.stringify(c.data), now).run();
-      if (vera && ins.meta.changes) await accoda(env.DB, { tipo: "scheda", entityId: id, leadId: job.entityId }, now);
+      const passi = [
+        env.DB.prepare(`INSERT INTO company_profiles (id, lead_id, version, status, error, classification, created_at, updated_at)
+            SELECT ?1, ?2, 1, ?3, ?4, ?5, ?6, ?6 WHERE NOT EXISTS (SELECT 1 FROM company_profiles WHERE lead_id = ?2)`)
+          .bind(id, job.entityId, vera ? "queued" : "error", vera ? null : "privato", JSON.stringify(c.data), now),
+        env.DB.prepare(`UPDATE company_profiles SET classification = ?3 WHERE classification IS NULL AND id = (
+            SELECT id FROM company_profiles WHERE lead_id = ?2 AND id <> ?1 ORDER BY version DESC LIMIT 1)`)
+          .bind(id, job.entityId, JSON.stringify(c.data)),
+      ];
+      // L'id del profilo è nuovo: il lavoro nasce solo se il profilo è appena stato scritto.
+      if (vera) passi.push(env.DB.prepare(`INSERT INTO ai_jobs (id, tipo, entity_id, lead_id, stato, forzato, richiesto_da, created_at)
+          SELECT ?1, 'scheda', ?2, ?3, 'in_coda', 0, NULL, ?4 WHERE EXISTS (SELECT 1 FROM company_profiles WHERE id = ?2)`)
+        .bind(crypto.randomUUID(), id, job.entityId, now));
+      await env.DB.batch(passi);
     } catch (e) {
       throw new ErroreClaude((e as Error).message, r.uso, r.modello, false);
     }

@@ -192,16 +192,43 @@ describe("classificazione e scheda", () => {
     expect((await call("/api/leads/nessuno/scheda-azienda/stampa", {}, cookie)).status).toBe(404);
   });
 
+  it("classificazione con un profilo già creato da 'Prepara la scheda': il motivo si salva lo stesso, nessuna scheda doppia", async () => {
+    await lead("P1");
+    await catenaLeadNuovo({ ...env, RESEND_API_KEY: "" }, "P1", "meta", ora);
+    const cookie = await loginCookie("tommaso", "password-lunga-1");
+    await call("/api/leads/P1/scheda-azienda", { method: "POST", json: {} }, cookie);
+    setClaudeFetch(async () => rispostaClaude({ testo: JSON.stringify({ azienda: true, fake: false, motivo: "sito aziendale" }) }));
+    await TIPO_CLASSIFICAZIONE.esegui(env, { id: "jc", tipo: "classificazione", entityId: "P1", leadId: "P1", stato: "in_corso", tentativi: 0, errore: null, erroreId: null, fermoMese: null, forzato: false, richiestoDa: null, createdAt: ora, startedAt: ora, finishedAt: null }, (await leggiImpostazioni(getDb(env.DB))).claude, ora);
+    const p = await env.DB.prepare("SELECT count(*) n, max(classification) c FROM company_profiles WHERE lead_id = 'P1'").first<{ n: number; c: string }>();
+    expect(p?.n).toBe(1);
+    expect(JSON.parse(p!.c)).toMatchObject({ motivo: "sito aziendale" });
+    expect(await contaJobs("tipo = 'scheda'")).toBe(1);
+  });
+
+  it("'Prepara la scheda': profilo e lavoro nascono insieme, se l'accodamento fallisce non resta un profilo in coda", async () => {
+    await lead("P2", { source: "manuale" });
+    const cookie = await loginCookie("tommaso", "password-lunga-1");
+    await env.DB.prepare(`CREATE TRIGGER blocca_scheda BEFORE INSERT ON ai_jobs WHEN NEW.tipo = 'scheda' BEGIN SELECT RAISE(ABORT, 'giù'); END`).run();
+    try {
+      const r = await call("/api/leads/P2/scheda-azienda", { method: "POST", json: {} }, cookie);
+      expect(r.status).toBe(500);
+    } finally {
+      await env.DB.prepare("DROP TRIGGER blocca_scheda").run();
+    }
+    expect((await env.DB.prepare("SELECT count(*) n FROM company_profiles WHERE lead_id = 'P2'").first<{ n: number }>())?.n).toBe(0);
+  });
+
   it("call di conoscenza in Oggi: la riga dice se la scheda è pronta o in preparazione", async () => {
     await lead("K1", { stage_id: "da-richiamare" });
     await lead("K2", { stage_id: "da-richiamare" });
-    for (const [id, l] of [["k1", "K1"], ["k2", "K2"]]) {
+    await lead("K3", { stage_id: "da-richiamare" });
+    for (const [id, l] of [["k1", "K1"], ["k2", "K2"], ["k3", "K3"]]) {
       await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES (?1, ?2, 'conoscenza', ?3, 0, 0)").bind(id, l, ora + 3_600_000).run();
     }
-    await env.DB.prepare("INSERT INTO company_profiles (id, lead_id, version, status, created_at, updated_at) VALUES ('a1', 'K1', 1, 'error', 0, 0), ('a2', 'K1', 2, 'ready', 0, 0), ('b1', 'K2', 1, 'queued', 0, 0)").run();
+    await env.DB.prepare("INSERT INTO company_profiles (id, lead_id, version, status, created_at, updated_at) VALUES ('a1', 'K1', 1, 'error', 0, 0), ('a2', 'K1', 2, 'ready', 0, 0), ('b1', 'K2', 1, 'queued', 0, 0), ('c1', 'K3', 1, 'ready', 0, 0), ('c2', 'K3', 2, 'queued', 0, 0)").run();
     const o = await calcolaOggi(env.DB, "tommaso", "tutte", ora);
     const voci = [...o.call, ...(o.adesso?.tipo === "call" ? [o.adesso] : [])];
-    expect(Object.fromEntries(voci.map((k) => [k.leadId, k.scheda]))).toEqual({ K1: "pronta", K2: "in_preparazione" });
+    expect(Object.fromEntries(voci.map((k) => [k.leadId, k.scheda]))).toEqual({ K1: "pronta", K2: "in_preparazione", K3: "pronta" });
   });
 });
 
@@ -222,7 +249,7 @@ describe("misura dei gestori", () => {
     await TIPO_CLASSIFICAZIONE.esegui({ ...env, DB: contaD1(env.DB, c) }, job("classificazione", "Q1", "Q1"), imp, ora);
     await TIPO_CLASSIFICAZIONE.alErrore(contaD1(env.DB, c), job("classificazione", "Q1", "Q1"), "x", ora);
     expect(c.query).toBeLessThanOrEqual(7);
-    expect(c.query).toBe(3);
+    expect(c.query).toBe(4);
     expect(fetch).toBe(1);
     expect(await contaJobs("tipo = 'scheda'")).toBe(1);
   });

@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Fonte } from "../claude/client";
-import { accoda } from "../claude/coda";
 import { nuovaVersioneScheda } from "../claude/scheda";
 import type { AppEnv } from "../env";
 import { paginaStampa } from "./stampa";
@@ -80,8 +79,7 @@ schedeRoutes.post("/:id/scheda-azienda", async (c) => {
   const attuale = await statoScheda(c.env.DB, leadId);
   if (!forza && (attuale.stato === "in_coda" || attuale.stato === "in_corso")) return c.json(attuale);
   const now = Date.now();
-  const profilo = await nuovaVersioneScheda(c.env.DB, leadId, now);
-  await accoda(c.env.DB, { tipo: "scheda", entityId: profilo, leadId, chi: c.get("user").id, forzato: true }, now);
+  await nuovaVersioneScheda(c.env.DB, leadId, now, c.get("user").id);
   return c.json(await statoScheda(c.env.DB, leadId));
 });
 
