@@ -113,7 +113,7 @@ function leggiJsonc(testo: string): Record<string, unknown> {
 
 describe("wrangler.jsonc", () => {
   type Db = { binding: string; database_id: string };
-  const w = leggiJsonc(configurazione) as { d1_databases: Db[]; triggers: { crons: string[] }; env: { demo: { d1_databases: Db[]; triggers: { crons: string[] }; vars: Record<string, string> } } };
+  const w = leggiJsonc(configurazione) as { d1_databases: Db[]; triggers: { crons: string[] }; vars: Record<string, string>; env: { demo: { d1_databases: Db[]; triggers: { crons: string[] }; vars: Record<string, string> } } };
   it("la demo ha un database diverso da quello vero e nessun cron", () => {
     const vero = w.d1_databases.find((d) => d.binding === "DB")!.database_id;
     const finto = w.env.demo.d1_databases.find((d) => d.binding === "DB")!.database_id;
@@ -123,5 +123,9 @@ describe("wrangler.jsonc", () => {
     expect(w.env.demo.triggers.crons).toEqual([]);
     expect(w.env.demo.vars.SPAZIO).toBe("demo");
     expect(w.triggers.crons.length).toBeGreaterThan(0);
+  });
+  it("in produzione SPAZIO non c'è: l'app vera non entra mai in modalità demo (review 14a, minore b)", () => {
+    expect(w.vars).toBeTruthy();
+    expect("SPAZIO" in w.vars).toBe(false);
   });
 });

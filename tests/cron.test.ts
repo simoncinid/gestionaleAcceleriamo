@@ -658,6 +658,33 @@ describe("giro con Claude", () => {
     expect(chiamateClaude).toBe(3);
   });
 
+  // Review del Task 14a, minore a: un gestore che va in errore dopo aver letto e che scrive in alErrore resta
+  // nel contratto (esegui più alErrore entro 7 query): il giro intero sta sotto le 45 query misurate da contaD1.
+  it("giro con lavori Claude che vanno in errore e usano alErrore: sotto le 45 query, lavori in errore e segnati", async () => {
+    await createUser();
+    tipoFinto();
+    let segnati = 0;
+    registraTipo("classificazione", {
+      stima: () => ({ modello: "claude-haiku-4-5", ingresso: 1_500, maxTokens: 300, ricerche: 0 }),
+      esegui: async (e, job, imp) => {
+        for (let i = 0; i < 5; i++) await e.DB.prepare("SELECT ?1 AS id").bind(job.entityId).first();
+        await chiamaClaude(e, { modello: imp.modelli.classificazione, sistema: "s", testo: "t", maxTokens: 300, schema: { type: "object" } });
+        throw new Error("Risposta non valida");
+      },
+      alErrore: async (db, job) => { segnati++; await db.prepare("SELECT ?1 AS id").bind(job.id).run(); },
+      accodaDaSolo: (db) => db.prepare("SELECT 1"),
+    });
+    await treLavori(r(11, 10));
+    const c = contaQuery();
+    const esito = await giro(c.env, r(11, 10));
+    expect(esito.fatti).toContain("claude");
+    expect(segnati).toBeGreaterThanOrEqual(1);
+    expect(c.n()).toBeLessThanOrEqual(45);
+    expect(esito.query).toBeLessThanOrEqual(45);
+    const inErrore = await env.DB.prepare("SELECT count(*) n FROM ai_jobs WHERE stato = 'errore'").first<{ n: number }>();
+    expect(inErrore?.n).toBe(segnati);
+  });
+
   // Al primo giro del lunedì la revisione costa 14 query e a Claude ne restano 16 (gliene servono 19): il lavoro
   // aspetta in coda senza errori. Dal giro dopo la revisione costa 1 query e lunedì e Claude girano insieme.
   it("lunedì 7:00 e 7:05 con un lavoro Claude e il foglio vuoto: la revisione nasce, Claude entra al giro dopo insieme al lunedì, sotto le 45 query", async () => {

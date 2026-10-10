@@ -127,4 +127,8 @@ describe("coach della demo", () => {
       expect(d.calls.some((c) => c.id === a.callId && c.leadId === a.leadId)).toBe(true);
     }
   });
+  it("i link Meet della demo puntano a un dominio che non esiste (review 14a, minore 7)", () => {
+    const d = datiDemo(ORA, "hash");
+    for (const c of d.calls) if (c.meetLink) expect(c.meetLink.startsWith("https://meet.esempio.invalid/")).toBe(true);
+  });
 });

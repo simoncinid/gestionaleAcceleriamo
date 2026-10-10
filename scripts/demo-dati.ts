@@ -112,7 +112,7 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
       const fatta = fase !== "appuntamento-confermato";
       const quando = fatta ? creato + 2 * GIORNO : ora + ((i % 3) + 1) * GIORNO;
       const callId = `${id}-c1`;
-      d.calls.push({ id: callId, leadId: id, kind: "conoscenza", scheduledAt: quando, meetLink: "https://meet.google.com/demo-demo-demo", outcome: fatta ? "fatta" : null, outcomeAt: fatta ? quando : null, createdBy: "demo", createdAt: creato + GIORNO, updatedAt: quando });
+      d.calls.push({ id: callId, leadId: id, kind: "conoscenza", scheduledAt: quando, meetLink: "https://meet.esempio.invalid/demo-demo-demo", outcome: fatta ? "fatta" : null, outcomeAt: fatta ? quando : null, createdBy: "demo", createdAt: creato + GIORNO, updatedAt: quando });
       if (!fatta) d.leads[d.leads.length - 1].appointmentAt = quando;
       if (fatta && d.callAnalyses.length < 3) {
         d.callAnalyses.push({ id: `${id}-coach`, leadId: id, callId, status: "ready", transcript: "Trascrizione finta dello spazio demo.", result: JSON.stringify(coach(quando + 3 * GIORNO)), model: "demo", createdAt: quando });
