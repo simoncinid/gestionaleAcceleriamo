@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Env } from "../env";
 import { usoVuoto, type Uso } from "./costo";
 import { claudeFetch } from "./fetcher";
+import { eDemo, NIENTE_IN_DEMO } from "../lib/demo";
 
 // Pagina "Limits" di Cloudflare Workers (letta il 10/10/2026): un Cron Trigger dura al massimo 15 minuti di orologio,
 // sia sul piano gratuito sia su quello a pagamento (il tetto di 10 ms riguarda la CPU, l'attesa della rete non conta).
@@ -41,6 +42,7 @@ function somma(u: Uso, x: Anthropic.Usage) {
 // Una chiamata alla Messages API. Niente tentativi qui: li fa la coda al giro dopo. Il modello registrato è quello
 // che ha risposto davvero (response.model), così il costo segue un eventuale fallback del server.
 export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<RispostaClaude> {
+  if (eDemo(env)) throw new ErroreClaude(NIENTE_IN_DEMO, usoVuoto(), r.modello, false);
   const client = new Anthropic({
     apiKey: env.ANTHROPIC_API_KEY!,
     fetch: ((url: RequestInfo | URL, init?: RequestInit) => claudeFetch(String(url), init)) as typeof fetch,

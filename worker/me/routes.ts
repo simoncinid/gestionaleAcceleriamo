@@ -9,6 +9,9 @@ import { getDb } from "../db/client";
 import { EVENTI_AVVISO, type EventoAvviso } from "../db/schema";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
+import { eDemo } from "../lib/demo";
+
+const SPAZIO_DEMO_UTENTI = "Spazio demo: password e nome dell'utente non si cambiano";
 
 export type Profilo = { id: string; name: string; username: string; telegram: boolean; notifyPrefs: Record<EventoAvviso, boolean>; quietHours: Silenzio; dispositivi: number };
 
@@ -69,6 +72,8 @@ meRoutes.get("/profilo", async (c) => c.json(await profilo(c.env.DB, c.get("user
 meRoutes.patch("/", async (c) => {
   const p = modifica.safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: p.error.issues[0]?.message ?? "Dati non validi" }, 400);
+  // Nella demo l'utente è uno solo e condiviso: il nome non si cambia (le preferenze sì).
+  if (eDemo(c.env) && p.data.name !== undefined) return c.json({ error: SPAZIO_DEMO_UTENTI }, 409);
   const id = c.get("user").id;
   let prefs: string | null = null;
   if (p.data.notifyPrefs) {
@@ -81,6 +86,8 @@ meRoutes.patch("/", async (c) => {
 });
 
 meRoutes.post("/password", async (c) => {
+  // Un visitatore non chiude fuori gli altri cambiando la password dell'unico utente demo.
+  if (eDemo(c.env)) return c.json({ error: SPAZIO_DEMO_UTENTI }, 409);
   const p = password.safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: p.error.issues[0]?.message ?? "Dati non validi" }, 400);
   const id = c.get("user").id;

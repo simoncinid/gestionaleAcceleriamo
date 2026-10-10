@@ -1,6 +1,7 @@
 import type { Env } from "../env";
 import { cifra, intestazioneVapid } from "./cifra";
 import { pushFetch } from "./fetcher";
+import { eDemo } from "../lib/demo";
 
 export type DatiPush = { titolo: string; testo?: string; href?: string; tag?: string };
 // ok: consegnata. sparita: 404 o 410, il browser ha tolto l'iscrizione. errore: rifiutata o chiavi rovinate, non si ritenta.
@@ -13,6 +14,7 @@ export const pushCollegate = (env: Env) => Boolean(env.VAPID_PUBLIC_KEY && env.V
 
 // 404 e 410: il browser ha tolto l'iscrizione. Ogni altro problema (rete, chiavi rovinate) è "errore", mai un'eccezione.
 export async function mandaPush(env: Env, sub: { endpoint: string; p256dh: string; auth: string }, dati: DatiPush, now: number): Promise<EsitoPush> {
+  if (eDemo(env)) return "errore";
   let corpo: Uint8Array;
   let firma: string;
   try {

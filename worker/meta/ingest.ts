@@ -7,6 +7,7 @@ import { aE164 } from "../lib/telefono";
 import { catenaLeadNuovo } from "../regole/catena";
 import { DEFAULT_NEXT_ACTION, addActivity, findDuplicate, firstOpenStage } from "../leads/service";
 import { metaFetch } from "./fetcher";
+import { eDemo, NIENTE_IN_DEMO } from "../lib/demo";
 
 export const MAX_META_ATTEMPTS = 10;
 
@@ -19,6 +20,7 @@ type GraphLead = {
 };
 
 export async function fetchMetaLead(env: Env, leadgenId: string) {
+  if (eDemo(env)) throw new Error(NIENTE_IN_DEMO);
   const url =
     `https://graph.facebook.com/${env.META_GRAPH_VERSION}/${encodeURIComponent(leadgenId)}` +
     `?fields=field_data,campaign_name,adset_name,ad_name,form_id&access_token=${encodeURIComponent(env.META_PAGE_TOKEN)}`;

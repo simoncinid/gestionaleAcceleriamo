@@ -3,6 +3,7 @@ import { canaleAcceso, inSilenzio } from "../avvisi/silenzio";
 import type { EventoAvviso } from "../db/schema";
 import type { Env } from "../env";
 import { telegramFetch } from "./fetcher";
+import { eDemo } from "../lib/demo";
 
 // Spec 8.4: il codice di collegamento vale 15 minuti; un avviso di più di 6 ore non serve più.
 const VALIDITA_CODICE = 15 * 60_000;
@@ -24,6 +25,7 @@ type Esito = "ok" | "ritenta" | "token" | "bloccato" | "rifiutato";
 export const TOKEN_NON_VALIDO = "Token del bot non valido";
 
 async function invia(env: Env, chatId: string, testo: string): Promise<Esito> {
+  if (eDemo(env)) return "rifiutato";
   try {
     // Testo semplice, senza parse_mode: il nome di un'azienda non può diventare formattazione.
     const r = await telegramFetch(api(env, "sendMessage"), {
@@ -58,6 +60,7 @@ type Aggiornamento = { update_id: number; message?: { chat: { id: number }; text
 // Restituisce le scritture dei collegamenti (al massimo 2): le esegue il giro nella sua batch. Una lettura
 // che non riesce non rompe niente: il codice resta valido e si riprova al giro dopo.
 export async function leggiCollegamenti(env: Env, attesa: InAttesa[]): Promise<{ scritture: D1PreparedStatement[]; sottorichieste: number }> {
+  if (eDemo(env)) return { scritture: [], sottorichieste: 0 };
   let j: { ok: boolean; result: Aggiornamento[] };
   try {
     const r = await telegramFetch(api(env, "getUpdates") + "?timeout=0&allowed_updates=%5B%22message%22%5D");

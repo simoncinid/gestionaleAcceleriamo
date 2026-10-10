@@ -1,5 +1,6 @@
 // Dati finti dello spazio demo (spec 12). Funzione pura: niente rete, niente file, niente orologio.
-// Aziende, referenti e contatti sono inventati: email solo su esempio.it, telefoni con prefisso +39 000.
+// Aziende, referenti e contatti sono inventati: email e siti solo su esempio.invalid (dominio riservato, non apre
+// pagine di terzi), telefoni con prefisso +39 000.
 import { getTableColumns } from "drizzle-orm";
 import { getTableConfig, type SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { CoachSalvato } from "../worker/claude/coach";
@@ -15,14 +16,24 @@ export type DatiDemo = {
 };
 
 const GIORNO = 86_400_000;
+// Nomi d'azienda chiaramente inventati (giochi di parole sul mestiere), per non somigliare ad aziende vere della zona.
 const SETTORI: [string, string[]][] = [
-  ["Officina meccanica", ["Officina Bertini", "Autofficina Del Corso", "Meccanica Valdera", "Officina F.lli Neri", "Car Service Arno", "Officina Martelli", "Revisioni Pontedera"]],
-  ["Agenzia immobiliare", ["Casa Toscana Immobili", "Immobiliare Le Logge", "Agenzia Lungarno", "Immobiliare Sette Ponti", "Abitare Pisa", "Studio Immobiliare Corti", "Case in Collina"]],
-  ["Studio commercialista", ["Studio Rinaldi e Associati", "Studio Fiscale Galli", "Commercialisti Associati Bindi", "Studio Paoli", "Studio Tributario Marchi", "Studio Contabile Vanni", "Studio Ferri"]],
-  ["Impianti elettrici", ["Elettro Impianti Sarti", "Impianti Bacci", "Elettrotecnica Fabbri", "Luce e Impianti", "Impianti Moretti", "Elettrica Valdarno"]],
-  ["Logistica e trasporti", ["Trasporti Baldini", "Logistica Costiera", "Corrieri Riuniti Toscana", "Spedizioni Puccini", "Autotrasporti Gori", "Magazzini Navacchio"]],
-  ["Studio dentistico", ["Studio Dentistico Lenzi", "Centro Dentale San Rossore", "Odontoiatria Mori", "Studio Dentistico Cecchi", "Sorriso Pisa", "Dentisti Associati Landi", "Studio Dentale Benvenuti"]],
+  ["Officina meccanica", ["Officina Bullonetti", "Autofficina Pistonfino", "Meccanica Frizionelli", "Officina F.lli Marmittoni", "Car Service Cambiolesto", "Officina Ruotaliscia", "Revisioni Contachilometri"]],
+  ["Agenzia immobiliare", ["Immobiliare Mattonelli", "Casa Tegolina", "Agenzia Portoncino", "Immobiliare Davanzali", "Abitare Finestrelli", "Studio Immobiliare Soffittini", "Case Comignolo"]],
+  ["Studio commercialista", ["Studio Partitadoppia", "Studio Fiscale Scontrinelli", "Commercialisti Associati Bilancini", "Studio Ricevutini", "Studio Tributario Aliquotti", "Studio Contabile Registrini", "Studio Fatturelli"]],
+  ["Impianti elettrici", ["Elettro Impianti Voltolini", "Impianti Watteschi", "Elettrotecnica Amperini", "Luce Interruttorini", "Impianti Cavetti", "Elettrica Fusibilini"]],
+  ["Logistica e trasporti", ["Trasporti Pacchettoni", "Logistica Bancalina", "Corrieri Scatoloni", "Spedizioni Nastrino", "Autotrasporti Rimorchietti", "Magazzini Scaffaloni"]],
+  ["Studio dentistico", ["Studio Dentistico Molarini", "Centro Dentale Canini", "Odontoiatria Incisivi", "Studio Dentistico Smaltini", "Sorriso Spazzolino", "Dentisti Associati Gengivelli", "Studio Dentale Collutorio"]],
 ];
+// Automazioni dei clienti finti, coerenti con il loro settore (la seconda serve se due clienti fanno lo stesso mestiere).
+export const AUTOMAZIONI_SETTORE: Record<string, [string, string][]> = {
+  "Officina meccanica": [["Promemoria revisioni e tagliandi", "Messaggi e conferme"], ["Preventivi dalle foto del cliente", "Documenti"]],
+  "Agenzia immobiliare": [["Smistamento richieste dai portali", "Email"], ["Promemoria visite agli immobili", "Messaggi e conferme"]],
+  "Studio commercialista": [["Raccolta documenti dei clienti", "Documenti"], ["Scadenzario fiscale per i clienti", "Report"]],
+  "Impianti elettrici": [["Rapportini di intervento dal telefono", "Documenti"], ["Promemoria manutenzioni", "Messaggi e conferme"]],
+  "Logistica e trasporti": [["Ordini dalle email al gestionale", "Documenti"], ["Avvisi di consegna ai clienti", "Messaggi e conferme"]],
+  "Studio dentistico": [["Promemoria appuntamenti", "Messaggi e conferme"], ["Richiami per l'igiene", "Messaggi e conferme"]],
+};
 const NOMI = ["Marco", "Giulia", "Luca", "Sara", "Andrea", "Elena", "Paolo", "Chiara", "Davide", "Francesca"];
 const COGNOMI = ["Rossi", "Bianchi", "Conti", "Ricci", "Greco", "Bruno", "Gallo", "Costa", "Fontana", "Moretti"];
 // Distribuzione sulle fasi della 1A (drizzle/0001): 40 lead, quasi tutti aperti.
@@ -75,7 +86,7 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
     const fase = fasi[i];
     const creato = ora - ((i % 20) + 1) * GIORNO - ((i * 37) % 600) * 60_000;
     const referente = `${NOMI[i % NOMI.length]} ${COGNOMI[(i * 3) % COGNOMI.length]}`;
-    const email = i % 7 === 6 ? null : `${slug(referente)}.${i + 1}@esempio.it`;
+    const email = i % 7 === 6 ? null : `${slug(referente)}.${i + 1}@esempio.invalid`;
     const telefono = `+39 000 ${String(1_000_000 + i * 7919).slice(0, 7)}`;
     const meta = i % 4 !== 3;
     const setup = 200_000 + (i % 3) * 50_000;
@@ -84,7 +95,7 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
     const conPrezzo = CON_PREZZO.includes(fase);
     d.leads.push({
       id, company: a.nome, contactName: referente, email, emailNorm: email, phone: telefono, phoneNorm: telefono.replace(/\s/g, ""),
-      website: `https://${slug(a.nome)}.esempio.it`, notes: a.settore, source: meta ? "meta" : i % 2 ? "foglio_andrea" : "manuale",
+      website: `https://${slug(a.nome)}.esempio.invalid`, notes: a.settore, source: meta ? "meta" : i % 2 ? "foglio_andrea" : "manuale",
       metaCampaign: meta ? CAMPAGNE[i % 3] : null, metaAd: meta ? `Inserzione ${(i % 5) + 1}` : null,
       stageId: fase, stageChangedAt: creato + GIORNO, ownerId: "demo",
       nextAction: chiusa || fase === "non-chiamato" ? null : "Richiamare",
@@ -126,11 +137,15 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
     }
   });
   // Tre clienti dai lead chiusi; le automazioni non portano il nome del cliente (anonime anche nel Pannello).
-  const AUTOMAZIONI = [["Promemoria appuntamenti", "Messaggi e conferme"], ["Ordini dalle email al gestionale", "Documenti"], ["Riepilogo serale per il titolare", "Report"]];
+  const usate = new Map<string, number>();
   d.leads.filter((l) => l.stageId === "chiuso").forEach((l, k) => {
     const cid = `demo-cliente-${k + 1}`;
+    const elenco = AUTOMAZIONI_SETTORE[l.notes ?? ""] ?? AUTOMAZIONI_SETTORE["Logistica e trasporti"];
+    const n = usate.get(l.notes ?? "") ?? 0;
+    usate.set(l.notes ?? "", n + 1);
+    const [nomeAuto, famiglia] = elenco[n % elenco.length];
     d.clients.push({ id: cid, name: l.company, sector: l.notes ?? null, city: "Pisa", scope: "acceleriamo", originLeadId: l.id, createdAt: ora - 30 * GIORNO });
-    d.automations.push({ id: `demo-auto-${k + 1}`, clientId: cid, name: AUTOMAZIONI[k][0], family: AUTOMAZIONI[k][1], status: k === 2 ? "in_costruzione" : "attiva", runsOn: "Cloudflare", stack: "Worker, D1", activatedAt: k === 2 ? null : ora - 20 * GIORNO, createdAt: ora - 30 * GIORNO, updatedAt: ora - 20 * GIORNO });
+    d.automations.push({ id: `demo-auto-${k + 1}`, clientId: cid, name: nomeAuto, family: famiglia, status: k === 2 ? "in_costruzione" : "attiva", runsOn: "Cloudflare", stack: "Worker, D1", activatedAt: k === 2 ? null : ora - 20 * GIORNO, createdAt: ora - 30 * GIORNO, updatedAt: ora - 20 * GIORNO });
     const fee = `demo-canone-${k + 1}`;
     d.fees.push({ id: fee, clientId: cid, automationId: `demo-auto-${k + 1}`, amountCents: l.feeCents ?? 20_000, billingDay: 1, status: k === 2 ? "in_attesa" : "attivo", startAt: k === 2 ? null : ora - 20 * GIORNO });
     d.invoices.push({ id: `demo-fattura-${k + 1}a`, clientId: cid, kind: "acconto", number: `D${k + 1}01`, amountCents: Math.round((l.setupCents ?? 200_000) / 2), issuedAt: ora - 30 * GIORNO, dueAt: ora - 15 * GIORNO, paidAt: k === 1 ? null : ora - 16 * GIORNO });
@@ -144,7 +159,7 @@ const ORDINE = [
   ["users", users], ["leads", leads], ["activities", activities], ["calls", calls], ["proposals", proposals], ["companyProfiles", companyProfiles],
   ["callAnalyses", callAnalyses], ["clients", clients], ["automations", automations], ["fees", fees], ["invoices", invoices],
 ] as const satisfies readonly (readonly [keyof DatiDemo, SQLiteTable])[];
-// Tabelle svuotate al ripristino oltre a quelle seminate (stati, avvisi, registri). Fasi, regole, impostazioni e modelli restano quelli delle migrazioni.
+// Tabelle svuotate al ripristino oltre a quelle seminate (stati, avvisi, registri).
 const SOLO_DA_SVUOTARE = ["documents", "audit_log", "notifications", "ai_jobs", "claude_usage", "campaign_spend", "weekly_reviews", "push_subscriptions", "costs", "sessions", "hook_log", "integration_status"];
 
 const letterale = (v: unknown): string => {
@@ -156,9 +171,33 @@ const letterale = (v: unknown): string => {
   return `'${s.replace(/'/g, "''").replace(/\n/g, "' || char(10) || '")}'`;
 };
 
-export function sqlDemo(d: DatiDemo): string[] {
-  const svuota = [...SOLO_DA_SVUOTARE, ...[...ORDINE].reverse().map(([, t]) => getTableConfig(t).name)];
-  const out = svuota.map((t) => `DELETE FROM ${t};`);
+// Impostazioni, regole, modelli e fasi: un visitatore della demo può cambiarli, il ripristino li rimette come
+// dopo le migrazioni. Si svuotano (dopo i lead, che citano le fasi) e si rieseguono, in ordine, le INSERT e le
+// UPDATE delle migrazioni su queste tabelle. Le impostazioni non hanno righe di partenza: vuote valgono i default.
+export const TABELLE_BASE = ["settings", "stage_rules", "message_templates", "stages"] as const;
+const SU_BASE = new RegExp(`^\\s*(INSERT INTO|UPDATE)\\s+[\`"]?(${TABELLE_BASE.join("|")})[\`"]?[\\s(]`, "i");
+
+// Una riga sola per istruzione: fuori dalle stringhe gli a capo diventano spazi, dentro diventano char(10)
+// (il modello della conferma ha un a capo nel testo).
+function suUnaRiga(q: string): string {
+  let out = "";
+  let inStringa = false;
+  for (const ch of q) {
+    if (ch === "'") inStringa = !inStringa; // l'apice doppio '' chiude e riapre: il conto resta giusto
+    if (ch === "\n") out += inStringa ? "' || char(10) || '" : " ";
+    else if (ch !== "\r") out += ch;
+  }
+  return out;
+}
+
+// Le istruzioni delle migrazioni (in ordine, già divise ai "statement-breakpoint") che scrivono le tabelle di base.
+const senzaCommenti = (q: string) => q.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").trim();
+export const istruzioniBase = (istruzioni: string[]): string[] =>
+  istruzioni.map(senzaCommenti).filter((q) => SU_BASE.test(q)).map((q) => `${suUnaRiga(q.replace(/;\s*$/, ""))};`);
+
+export function sqlDemo(d: DatiDemo, base: string[] = []): string[] {
+  const svuota = [...SOLO_DA_SVUOTARE, ...[...ORDINE].reverse().map(([, t]) => getTableConfig(t).name), ...(base.length ? TABELLE_BASE : [])];
+  const out = [...svuota.map((t) => `DELETE FROM ${t};`), ...base];
   for (const [chiave, tabella] of ORDINE) {
     const colonne = getTableColumns(tabella) as Record<string, { name: string }>;
     const nome = getTableConfig(tabella).name;

@@ -1,6 +1,6 @@
 import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import { datiDemo, sqlDemo } from "../scripts/demo-dati";
+import { AUTOMAZIONI_SETTORE, datiDemo, istruzioniBase, sqlDemo, TABELLE_BASE } from "../scripts/demo-dati";
 import { app } from "../worker/app";
 import { RisultatoCoach } from "../worker/claude/coach";
 import { hashPassword } from "../worker/auth/password";
@@ -19,7 +19,7 @@ describe("dati della demo", () => {
     const d = datiDemo(ORA, "hash");
     expect(d.leads).toHaveLength(40);
     expect(new Set(d.leads.map((l) => l.notes)).size).toBeGreaterThanOrEqual(5);
-    expect(d.leads.every((l) => l.email == null || l.email.endsWith("@esempio.it"))).toBe(true);
+    expect(d.leads.every((l) => l.email == null || l.email.endsWith("@esempio.invalid"))).toBe(true);
     expect(d.leads.every((l) => l.phone == null || l.phone.startsWith("+39 000"))).toBe(true);
     expect(d.automations).toHaveLength(3);
     expect(d.automations.every((a) => !d.clients.some((c) => a.name.includes(c.name)))).toBe(true);
@@ -27,11 +27,21 @@ describe("dati della demo", () => {
     expect(d.callAnalyses.length).toBeGreaterThanOrEqual(2);
     expect(datiDemo(ORA, "hash")).toEqual(d);
   });
-  it("valori ammessi dallo schema: fonti, motivi di perdita, siti su esempio.it", () => {
+  it("valori ammessi dallo schema: fonti, motivi di perdita, siti su esempio.invalid", () => {
     const d = datiDemo(ORA, "hash");
     expect(d.leads.every((l) => (LEAD_SOURCES as readonly string[]).includes(l.source!))).toBe(true);
     expect(d.leads.every((l) => l.lostReason == null || (LOST_REASONS as readonly string[]).includes(l.lostReason))).toBe(true);
-    expect(d.leads.every((l) => l.website == null || new URL(l.website).hostname.endsWith(".esempio.it"))).toBe(true);
+    expect(d.leads.every((l) => l.website == null || new URL(l.website).hostname.endsWith(".esempio.invalid"))).toBe(true);
+  });
+  it("nessun dominio vero: niente esempio.it in email, siti e testi", () => {
+    expect(sqlDemo(datiDemo(ORA, "hash")).join("\n")).not.toMatch(/esempio\.it\b/);
+  });
+  it("le automazioni dei clienti finti sono del loro settore", () => {
+    const d = datiDemo(ORA, "hash");
+    for (const a of d.automations) {
+      const cliente = d.clients.find((c) => c.id === a.clientId)!;
+      expect(AUTOMAZIONI_SETTORE[cliente.sector!].map(([n]) => n)).toContain(a.name);
+    }
   });
   it("una istruzione per riga, prima le DELETE poi le INSERT", () => {
     const sql = sqlDemo(datiDemo(ORA, "hash"));
@@ -48,6 +58,22 @@ describe("dati della demo", () => {
     // Gli a capo della scheda tornano a capo veri dopo char(10).
     const scheda = await env.DB.prepare("SELECT content FROM company_profiles LIMIT 1").first<{ content: string }>();
     expect(scheda?.content).toContain("\n## Cosa fa l'azienda");
+  });
+  it("il ripristino rimette fasi, regole, modelli e impostazioni come dopo le migrazioni", async () => {
+    const leggi = async () => Object.fromEntries(await Promise.all(TABELLE_BASE.map(async (t) => [t, (await env.DB.prepare(`SELECT * FROM ${t} ORDER BY 1`).all()).results] as const)));
+    const prima = await leggi();
+    expect((prima.stages as unknown[]).length).toBeGreaterThan(0);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE stages SET label = 'Fase rovinata', probability = 1"),
+      env.DB.prepare("DELETE FROM stage_rules WHERE rule_key = 'sla'"),
+      env.DB.prepare("UPDATE message_templates SET body = 'testo del visitatore'"),
+      env.DB.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('claude', '{\"tettoMensile\":1}', 0)"),
+    ]);
+    const base = istruzioniBase(env.TEST_MIGRATIONS.flatMap((m) => m.queries));
+    expect(base.every((q) => !q.includes("\n"))).toBe(true);
+    const sql = sqlDemo(datiDemo(ORA, await hashPassword("password-demo-1", 1000)), base);
+    await env.DB.batch(sql.map((q) => env.DB.prepare(q)));
+    expect(await leggi()).toEqual(prima);
   });
   it("l'utente demo entra con la sua password", async () => {
     await semina();
