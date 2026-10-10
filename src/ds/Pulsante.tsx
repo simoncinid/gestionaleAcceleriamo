@@ -1,5 +1,5 @@
 import { CircleNotch } from "@phosphor-icons/react";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode, Ref } from "react";
 import { toast } from "sonner";
 import { cx } from "./cx";
 
@@ -21,7 +21,7 @@ export function classiPulsante(variante: Variante, misura: Misura) {
   );
 }
 
-type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variante?: Variante; misura?: Misura; inCorso?: boolean; icona?: ReactNode; motivoSpento?: string };
+type Props = ButtonHTMLAttributes<HTMLButtonElement> & { ref?: Ref<HTMLButtonElement>; variante?: Variante; misura?: Misura; inCorso?: boolean; icona?: ReactNode; motivoSpento?: string };
 
 export function Pulsante({ variante = "secondario", misura = "md", inCorso, icona, motivoSpento, children, className, onClick, type = "button", ...p }: Props) {
   return (

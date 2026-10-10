@@ -1,16 +1,23 @@
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from "react";
 import { Pulsante } from "./Pulsante";
 
 export const PRIMO_CAMPO = "input:not([type=hidden]):not([disabled]), textarea:not([disabled]), select:not([disabled]), [role=switch], button[aria-expanded]";
 
-// Riporta il fuoco al pulsante che ha aperto il foglio, se è ancora nella pagina.
-function torna(prima: { current: HTMLElement | null }) {
-  const p = prima.current;
-  prima.current = null;
-  if (p?.isConnected) p.focus();
+type Bersaglio = { isConnected: boolean; focus: () => void } | null | undefined;
+
+// Dove torna il fuoco alla chiusura: al `ritorno` indicato da chi apre il foglio (per esempio "Altre azioni" quando il
+// pulsante vero stava in un altro foglio, già chiuso), altrimenti a chi aveva il fuoco all'apertura. Solo se è nella pagina.
+export function doveTorna<T extends Bersaglio>(ritorno: T, prima: T): T | null {
+  if (ritorno?.isConnected) return ritorno;
+  return prima?.isConnected ? prima : null;
 }
 
-export function Foglio({ aperto, titolo, onChiudi, principale, children }: { aperto: boolean; titolo: string; onChiudi: () => void; principale?: ReactNode; children: ReactNode }) {
+export function Foglio({ aperto, titolo, onChiudi, principale, ritorno, children }: {
+  aperto: boolean; titolo: string; onChiudi: () => void; principale?: ReactNode;
+  /** Pulsante che riceve il fuoco alla chiusura, se diverso da chi aveva il fuoco all'apertura. */
+  ritorno?: RefObject<HTMLElement | null>;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const corpo = useRef<HTMLDivElement>(null);
   const prima = useRef<HTMLElement | null>(null);
@@ -24,7 +31,7 @@ export function Foglio({ aperto, titolo, onChiudi, principale, children }: { ape
       // Voce 43: il fuoco va al primo campo, non su "Annulla"; senza campi resta il comportamento del browser.
       corpo.current?.querySelector<HTMLElement>(PRIMO_CAMPO)?.focus();
     }
-    if (!aperto && d.open) { d.close(); torna(prima); }
+    if (!aperto && d.open) { d.close(); doveTorna(ritorno?.current, prima.current)?.focus(); prima.current = null; }
   }, [aperto]);
   // Un foglio montato solo quando serve sparisce senza passare da aperto=false: il fuoco torna lo stesso a chi l'ha aperto.
   // Il fuoco torna al giro dopo e solo se il dialog è davvero uscito dalla pagina: durante la pulizia può essere ancora
@@ -33,7 +40,7 @@ export function Foglio({ aperto, titolo, onChiudi, principale, children }: { ape
     const d = ref.current;
     return () => {
       const p = prima.current;
-      setTimeout(() => { if (d && !d.isConnected && p?.isConnected) p.focus(); }, 0);
+      setTimeout(() => { if (d && !d.isConnected) doveTorna(ritorno?.current, p)?.focus(); }, 0);
     };
   }, []);
   return (

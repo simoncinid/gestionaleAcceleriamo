@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Avatar, Badge, CampoQuando, CardLead, Chip, Contatto, Intestazione, Pulsante, Punto, Selettore, StatoVuoto, classiPulsante } from "../src/ds";
+import { Avatar, Badge, CampoQuando, CardLead, Chip, Contatto, Intestazione, Pulsante, Punto, Selettore, StatoVuoto, classiPulsante, doveTorna } from "../src/ds";
 import { contaPrimari, render } from "./render";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0);
@@ -142,5 +142,22 @@ describe("CardLead", () => {
     expect(posizioni.every((p) => p >= 0)).toBe(true);
     expect([...posizioni].sort((a, b) => a - b)).toEqual(posizioni);
     expect(html).toContain('href="/commerciale/lead/l1"');
+  });
+});
+
+describe("Foglio, dove torna il fuoco", () => {
+  const el = (isConnected: boolean) => ({ isConnected, focus: () => {} });
+  it("va al ritorno indicato quando chi ha aperto non è più nella pagina (Fissa call da Altre azioni)", () => {
+    const altre = el(true);
+    expect(doveTorna(altre, el(false))).toBe(altre);
+  });
+  it("senza ritorno torna a chi ha aperto, se c'è ancora", () => {
+    const filtri = el(true);
+    expect(doveTorna(undefined, filtri)).toBe(filtri);
+    expect(doveTorna(undefined, el(false))).toBeNull();
+  });
+  it("un ritorno uscito dalla pagina non vince su chi ha aperto", () => {
+    const prima = el(true);
+    expect(doveTorna(el(false), prima)).toBe(prima);
   });
 });

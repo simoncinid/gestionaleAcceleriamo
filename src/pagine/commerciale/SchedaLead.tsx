@@ -1,6 +1,6 @@
 import { ArrowLeft, CaretDown, DotsThree, EnvelopeSimple, WhatsappLogo } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { Proposta } from "../../../worker/regole/motore";
@@ -65,6 +65,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const [foglio, setFoglio] = useState<null | "esito" | "altro" | "fissa" | "whatsapp" | "email" | { fase: Stage }>(null);
   // Le azioni che non si annullano chiedono un secondo tocco sullo stesso pulsante: niente confirm() del browser.
   const [chiede, setChiede] = useState<null | "unisci" | "cestino">(null);
+  // Fissa call si apre da "Altre azioni", un foglio che si chiude: alla fine il fuoco torna a quel pulsante.
+  const altre = useRef<HTMLButtonElement>(null);
   const [uscito, setUscito] = useState(false);
   // Il modulo dati si rimonta solo dopo un suo salvataggio riuscito: gli altri salvataggi non cancellano quello che si scrive.
   const [versione, setVersione] = useState(0);
@@ -120,7 +122,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
             {responsabile && <p className="text-secondaria text-grigio">Responsabile: {responsabile}</p>}
             {soldi && <p className="text-secondaria text-grigio tabular-nums">Attesi: setup {euro(lead.setupCents ?? 0)}, canone {euro(lead.feeCents ?? 0)} al mese</p>}
           </div>
-          <Pulsante variante="icona" aria-label="Altre azioni" title="Altre azioni" className="w-11 shrink-0 px-0!" icona={<DotsThree size={22} weight="bold" aria-hidden />} onClick={() => setFoglio("altro")} />
+          <Pulsante ref={altre} variante="icona" aria-label="Altre azioni" title="Altre azioni" className="w-11 shrink-0 px-0!" icona={<DotsThree size={22} weight="bold" aria-hidden />} onClick={() => setFoglio("altro")} />
         </header>
 
         {lead.metaStatus && lead.metaStatus !== "ok" && (
@@ -205,7 +207,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       </div>
 
       {foglio === "esito" && <FoglioEsito lead={lead} onChiudi={chiudi} />}
-      {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} />}
+      {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} ritorno={altre} />}
       {(foglio === "whatsapp" || foglio === "email") && <FoglioScrivi lead={lead} canale={foglio} onChiudi={chiudi} />}
       {foglio && typeof foglio === "object" && (() => {
         const kind = callPerFase(foglio.fase.id);

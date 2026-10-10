@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { eCallNelPassato } from "../../errori";
@@ -10,8 +10,9 @@ type Risposta = { invito: "mandato" | "in_coda" | "non_mandato" | "non_richiesto
 
 // Foglio "Fissa call" dalla scheda lead: fissare è l'azione esplicita che applica fase e prossima azione del motore.
 // Q14: aperto dal cambio di fase, il tipo è fissato dalla fase e il titolo dice dove va il lead.
-export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase }: {
+export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase, ritorno }: {
   leadId: string; haEmail: boolean; onChiudi: () => void; fase?: { label: string; kind: "conoscenza" | "presentazione" };
+  ritorno?: RefObject<HTMLElement | null>;
 }) {
   const qc = useQueryClient();
   const [kind, setKind] = useState<"conoscenza" | "presentazione">(fase?.kind ?? "conoscenza");
@@ -33,7 +34,7 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase }: {
     onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
   return (
-    <Foglio aperto titolo={fase ? `${fase.label}: quando è la call` : "Fissa call"} onChiudi={onChiudi}
+    <Foglio aperto titolo={fase ? `${fase.label}: quando è la call` : "Fissa call"} onChiudi={onChiudi} ritorno={ritorno}
       principale={
         <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={quando == null ? "Scegli giorno e ora" : undefined} onClick={() => salva.mutate()}>
           {invito && haEmail && resend ? "Fissa call e manda l'invito" : "Fissa call"}

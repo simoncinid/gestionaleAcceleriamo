@@ -29,3 +29,18 @@ test("Annulla riporta il fuoco a chi ha aperto il foglio", async ({ page }) => {
   await expect(page.getByRole("dialog")).toBeHidden();
   await expect(filtri).toBeFocused();
 });
+
+// QA del Task 15, controllo 30: Fissa call aperto da "Altre azioni" sta in un foglio che si chiude; alla chiusura il
+// fuoco torna al pulsante "Altre azioni" della scheda e non finisce su body.
+test("Fissa call aperto da Altre azioni riporta il fuoco ad Altre azioni", async ({ page }) => {
+  await entra(page);
+  await page.goto("/commerciale/lead/demo-lead-17");
+  await fermo(page);
+  const altre = page.getByRole("button", { name: "Altre azioni" });
+  await altre.click();
+  await page.getByRole("dialog").getByRole("button", { name: /^Fissa call/ }).click();
+  await expect(page.getByRole("dialog", { name: "Fissa call" })).toBeVisible();
+  await page.getByRole("dialog").getByRole("button", { name: "Annulla" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(altre).toBeFocused();
+});
