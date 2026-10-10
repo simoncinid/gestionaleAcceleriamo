@@ -2,15 +2,17 @@ import { CaretDown } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type ReactNode } from "react";
 import { api } from "../../api";
-import { Chip, Contatto, Errore, Intestazione, Skeleton, StatoVuoto } from "../../ds";
+import { Chip, Contatto, Errore, Intestazione, Riga as RigaLink, Skeleton, StatoVuoto } from "../../ds";
 import { momento } from "../../format";
 import { useMe, useOra } from "../../hooks";
-import type { Lead, Oggi as DatiOggi, RigaOggi as Riga } from "../../types";
+import { partiRoma } from "../../../worker/lib/roma";
+import type { Lead, Oggi as DatiOggi, RevisioneApi, RigaOggi as Riga } from "../../types";
 import { BloccoAdesso } from "./BloccoAdesso";
 import { useRitornoChiamata } from "./chiamata";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioRimanda } from "./FoglioRimanda";
 import { RigaLead, RigaProposta } from "./RigaOggi";
+import { SegmentiOggi } from "./SegmentiOggi";
 
 type LeadEsito = Pick<Riga, "id" | "company" | "contactName" | "stageId" | "attemptCount">;
 const DATA = new Intl.DateTimeFormat("it-IT", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Rome" });
@@ -53,6 +55,10 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   const me = useMe();
   const q = useQuery({ queryKey: ["today", chi], queryFn: () => api<DatiOggi>(`/today?chi=${chi}`), refetchInterval: 60_000 });
   const ora = useOra(30_000, oraFissa);
+  // Spec 6.4: il lunedì fino alle 12 (ora di Roma), se la revisione non è chiusa, un rimando (riga, non pulsante pieno).
+  const p = partiRoma(ora);
+  const mattinaDiLunedi = p.settimana === 1 && p.ore < 12;
+  const revisione = useQuery({ queryKey: ["lunedi", "corrente"], queryFn: () => api<RevisioneApi>("/weekly-reviews/corrente"), enabled: mattinaDiLunedi });
 
   // Tornando dalla chiamata si apre il Foglio Esito del lead chiamato (spec 6.4, passo 2).
   useRitornoChiamata((id) => {
@@ -79,6 +85,12 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   return (
     <div className="flex flex-col gap-2 pb-8">
       <Intestazione titolo="Oggi" numero={d.totale} coda="da fare" eyebrow={DATA.format(ora)} />
+      <SegmentiOggi attivo="oggi" />
+      {mattinaDiLunedi && revisione.data && revisione.data.chiusaAt == null && (
+        <div className="pt-2">
+          <RigaLink titolo="La revisione della settimana è pronta" meta={`${revisione.data.numeri.arrivati} lead arrivati, ${revisione.data.numeri.fermi.length + revisione.data.numeri.proposteFerme.length} cose ferme`} href="/commerciale/oggi/lunedi" />
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-4">

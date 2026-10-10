@@ -14,6 +14,7 @@ import { leggiImpostazioni } from "./impostazioni/service";
 import { segnaErrore, segnaOk } from "./integrazioni/stato";
 import { contaD1, QUERY_GIRO, SOTTORICHIESTE_GIRO } from "./lib/bilancio";
 import { partiRoma, type PartiRoma } from "./lib/roma";
+import { revisioneCorrente } from "./lunedi/calcolo";
 import { retryPendingMetaLeads } from "./meta/ingest";
 import { giroTelegram } from "./telegram/bot";
 
@@ -97,6 +98,12 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   },
   // Spec 8: Meta senza lead da 48 ore, una volta l'ora (giro delle :00). 3 query misurate.
   meta_48h: { quando: (p) => p.minuti < 5, fisse: 3, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => controllaMeta48(e, n) },
+  // Lunedì (spec 6.4): il lunedì dalle 7:00 alle 7:55 (ora di Roma) il giro congela i numeri della settimana chiusa
+  // in weekly_reviews. Dopo il lead e i suoi avvisi, prima di Claude: se il budget non basta riprova al giro dopo.
+  // La revisione nasce una volta sola per settimana (settimana unica, ON CONFLICT): nei giri dopo il primo costa
+  // una query e Claude riceve il resto, perché il giro conta le query vere. Fisse 15, misurate con contaD1 al
+  // primo giro: 1 lettura, 11 del calcolo, 1 scrittura, 1 rilettura (14, una di margine).
+  lunedi: { quando: (p) => p.settimana === 1 && p.ore === 7, fisse: 15, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => revisioneCorrente(e.DB, n) },
   // Claude (spec 7.4): ultimo del giro, dopo le conferme e dopo il controllo di Meta delle :00, che gira una volta
   // l'ora e non deve perdere il suo turno. Un lavoro di Claude può aspettare 5 minuti, un lead no.
   // Misura con contaD1: fisse 8 (in una batch da 3 la classificazione dei lead nuovi che si accoda da sola e la

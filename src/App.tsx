@@ -8,6 +8,8 @@ import { Login } from "./pagine/Login";
 import { resetSession } from "./session";
 import { SchedaLeadRotta } from "./pagine/commerciale/SchedaLead";
 import { Oggi } from "./pagine/commerciale/Oggi";
+import { Lunedi } from "./pagine/commerciale/Lunedi";
+import { Diario } from "./pagine/commerciale/Diario";
 import { Call } from "./pagine/commerciale/Call";
 import { DettaglioProposta } from "./pagine/commerciale/DettaglioProposta";
 import { Proposte } from "./pagine/commerciale/Proposte";
@@ -79,6 +81,8 @@ export function App() {
       <Route element={<Guscio nome={me.data.name} onEsci={esci} fogli={(crea, chiudi) => <FogliCreazione crea={crea} chiudi={chiudi} />} />}>
         <Route index element={<Navigate to="/commerciale/oggi" replace />} />
         <Route path="/commerciale/oggi" element={<Oggi />} />
+        <Route path="/commerciale/oggi/lunedi" element={<Lunedi />} />
+        <Route path="/commerciale/oggi/diario" element={<Diario />} />
         <Route path="/commerciale/scaletta" element={<Scaletta />} />
         <Route path="/commerciale/call" element={<Call />} />
         <Route path="/commerciale/proposte" element={<Proposte />} />

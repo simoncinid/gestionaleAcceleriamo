@@ -7,6 +7,8 @@ import { authRoutes } from "./auth/routes";
 import { documentRoutes, leadRoutes } from "./leads/routes";
 import { todayRoutes } from "./today/routes";
 import { numeriRoutes, spesaRoutes, statsAlias } from "./numeri/routes";
+import { lunediRoutes } from "./lunedi/routes";
+import { diarioRoutes } from "./diario/routes";
 import { avvisiRoutes } from "./avvisi/routes";
 import { badgeRoutes } from "./badge/routes";
 import { analisiRoutes, coachRoutes } from "./calls/coach-routes";
@@ -69,6 +71,8 @@ app.route("/api/claude", claudeRoutes);
 app.route("/api/ai-jobs", aiJobsRoutes);
 app.route("/api/numeri", numeriRoutes);
 app.route("/api/campaign-spend", spesaRoutes);
+app.route("/api/weekly-reviews", lunediRoutes);
+app.route("/api/diario", diarioRoutes);
 app.route("/api", statsAlias);
 app.route("/api", todayRoutes);
 

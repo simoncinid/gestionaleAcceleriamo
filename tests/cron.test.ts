@@ -118,8 +118,8 @@ describe("calendario del giro", () => {
     expect(quali(mar0600)).toContain("proposte_scadute");
     expect(quali(mar0600)).not.toContain("foglio");
   });
-  it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; Claude per ultimo", () => {
-    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "consegna", "telegram", "conferme", "meta_48h", "claude"]);
+  it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; il lunedì prima di Claude; Claude per ultimo", () => {
+    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "consegna", "telegram", "conferme", "meta_48h", "lunedi", "claude"]);
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");
@@ -696,6 +696,10 @@ describe("giro con Claude", () => {
     ["10:15, foglio e Meta", r(10, 15), 2],
     ["11:10, foglio vuoto", r(11, 10), 0],
     ["6:00, proposte scadute", r(6, 0), 2],
+    // Il lunedì alle 7 (ora di Roma) entra anche la revisione della settimana: 15 fisse.
+    ["lunedì 7:00, foglio, Meta, conferme, Meta 48 ore, revisione", daRoma(2026, 10, 12, 7, 0), 2],
+    ["lunedì 7:05, foglio, conferme, revisione", daRoma(2026, 10, 12, 7, 5), 1],
+    ["lunedì 7:10, foglio vuoto, revisione", daRoma(2026, 10, 12, 7, 10), 0],
   ];
   for (const [nome, quando, righe] of casi) {
     it(`giro pieno alle ${nome}, 12 push e 3 lavori Claude: al massimo 45 query e 15 sottorichieste; Claude non entrato aspetta senza errori`, async () => {
