@@ -1,4 +1,4 @@
-import { CaretDown, GearSix, Plus, SignOut } from "@phosphor-icons/react";
+import { CaretDown, GearSix, MagnifyingGlass, Plus, SignOut } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
 import { Avatar, Badge, Punto, cx } from "../ds";
@@ -10,7 +10,7 @@ import { Icona3D } from "./Icona3D";
 // L'etichetta segue l'area: la prima creazione del suo foglio (Nuovo lead, Nuova automazione, Nuova fattura),
 // e il pulsante apre direttamente quel foglio (QA 9); l'elenco completo resta nel "+" della testata.
 // È secondario (bordo, nessun fondo accento): l'unica azione in accento è quella della pagina o del foglio (QA 8).
-export function BarraLaterale({ nome, badge, onCrea, onEsci }: { nome: string; badge: BadgeDati | undefined; onCrea: (c: Creazione) => void; onEsci: () => void }) {
+export function BarraLaterale({ nome, badge, onCrea, onEsci, onCerca }: { nome: string; badge: BadgeDati | undefined; onCrea: (c: Creazione) => void; onEsci: () => void; onCerca?: () => void }) {
   const { pathname } = useLocation();
   const corrente = areaDi(pathname);
   const avvisi = badge?.avvisi ?? 0;
@@ -22,6 +22,12 @@ export function BarraLaterale({ nome, badge, onCrea, onEsci }: { nome: string; b
       <button type="button" data-variante="secondario" onClick={() => onCrea(prima.id)} className="m-4 flex h-11 items-center justify-center gap-2 rounded-controllo border-[1.5px] border-chrome-testo/60 font-semibold text-chrome-testo transition-[background-color,transform] duration-(--durata-veloce) hover:bg-chrome-2 active:scale-98">
         <Plus size={20} weight="bold" aria-hidden />{prima.etichetta}
       </button>
+      {/* La stessa ricerca della lente in Testata e di Cmd K: una sola ricerca per tutta l'app. */}
+      {onCerca && (
+        <button type="button" onClick={onCerca} className="mx-4 mb-2 flex h-11 items-center gap-2 rounded-controllo px-3 text-chrome-testo/80 transition-colors duration-(--durata-veloce) hover:bg-chrome-2 hover:text-chrome-testo">
+          <MagnifyingGlass size={18} weight="bold" aria-hidden /><span className="flex-1 text-left">Cerca</span><kbd className="font-sans text-meta text-chrome-testo/60">/</kbd>
+        </button>
+      )}
       <nav aria-label="Aree" className="flex-1 overflow-y-auto px-2">
         {AREE.map((a) => {
           const aperta = aperte[a.id] ?? corrente === a.id;

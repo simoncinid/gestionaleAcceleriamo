@@ -18,9 +18,14 @@ import { Numeri } from "./pagine/commerciale/Numeri";
 import { Avvisi } from "./pagine/avvisi/Avvisi";
 import { Cestino } from "./pagine/impostazioni/Cestino";
 import { Fasi } from "./pagine/impostazioni/Fasi";
+import { Dati } from "./pagine/impostazioni/Dati";
+import { ImportaCsv } from "./pagine/impostazioni/ImportaCsv";
+import { IntegrazioneDettaglio } from "./pagine/impostazioni/IntegrazioneDettaglio";
 import { Integrazioni } from "./pagine/impostazioni/Integrazioni";
 import { Modelli } from "./pagine/impostazioni/Modelli";
+import { Registro } from "./pagine/impostazioni/Registro";
 import { Stato } from "./pagine/impostazioni/Stato";
+import { Utenti } from "./pagine/impostazioni/Utenti";
 import { Scaletta } from "./pagine/commerciale/Scaletta";
 import { InCostruzione } from "./pagine/automazioni/InCostruzione";
 import { Pannello } from "./pagine/automazioni/Pannello";
@@ -104,6 +109,11 @@ export function App() {
         <Route path="/impostazioni/fasi" element={<Fasi />} />
         <Route path="/impostazioni/modelli" element={<Modelli />} />
         <Route path="/impostazioni/integrazioni" element={<Integrazioni />} />
+        <Route path="/impostazioni/integrazioni/:key" element={<IntegrazioneDettaglio />} />
+        <Route path="/impostazioni/utenti" element={<Utenti />} />
+        <Route path="/impostazioni/dati" element={<Dati />} />
+        <Route path="/impostazioni/dati/importa" element={<ImportaCsv />} />
+        <Route path="/impostazioni/dati/registro" element={<Registro />} />
         <Route path="*" element={<Navigate to="/commerciale/oggi" replace />} />
       </Route>
     </Routes>

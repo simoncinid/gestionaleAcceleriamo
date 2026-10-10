@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Fasi, FoglioFase, campiFase } from "../src/pagine/impostazioni/Fasi";
 import { sintesiRegola } from "../src/pagine/impostazioni/regole";
+import { IntegrazioneDettaglio } from "../src/pagine/impostazioni/IntegrazioneDettaglio";
 import { Integrazioni } from "../src/pagine/impostazioni/Integrazioni";
 import { FoglioModello, Modelli } from "../src/pagine/impostazioni/Modelli";
 import { Stato } from "../src/pagine/impostazioni/Stato";
@@ -44,11 +45,18 @@ const regole = [
 ];
 const utenti = [{ id: "diego", name: "Diego" }, { id: "tommaso", name: "Tommaso" }];
 const LINEETTE = /[\u2013\u2014]/;
+// Dalla 1B l'elenco porta a una pagina per integrazione: elenco e dettagli insieme coprono quello che prima stava in una pagina sola.
+const integrazioniIntere = (s: StatoSistema) => {
+  const dati: [unknown[], unknown][] = [[["integrazioni"], s], [["settings"], IMPOSTAZIONI_DEFAULT], [["aggancio-registro"], []]];
+  const elenco = render(<Integrazioni ora={ORA} />, { percorso: "/impostazioni/integrazioni", dati });
+  const dettagli = ["foglio", "aggancio", "resend"].map((k) => render(<IntegrazioneDettaglio ora={ORA} />, { percorso: `/impostazioni/integrazioni/${k}`, rotta: "/impostazioni/integrazioni/:key", dati }));
+  return { elenco, dettagli, html: [elenco, ...dettagli].join("") };
+};
 
 describe("Impostazioni", () => {
   it("Stato: un semaforo per riga, il rosso porta all'integrazione, errori col codice, nessun primario", () => {
     const html = render(<Stato ora={ORA} onEsci={() => {}} />, { dati: [[["integrazioni"], stato]] });
-    expect(html).toContain('href="/impostazioni/integrazioni#resend"');
+    expect(html).toContain('href="/impostazioni/integrazioni/resend"');
     expect(html).toContain("Ultima volta oggi 09:00");
     expect(html).toContain("Non ancora attivo");
     expect(html).toMatch(/<strong[^>]*>4<\/strong> lead dal webhook Meta/);
@@ -154,18 +162,18 @@ describe("Impostazioni", () => {
   });
 
   it("Integrazioni: stato, configurazione e prova per ognuna; link intero del foglio; segreti solo presenti o mancanti; nessun primario", () => {
-    const html = render(<Integrazioni ora={ORA} />, { dati: [[["integrazioni"], stato], [["settings"], IMPOSTAZIONI_DEFAULT], [["aggancio-registro"], []]] });
+    const { html, elenco, dettagli } = integrazioniIntere(stato);
     for (const t of ["Leggi adesso", "Anteprima della mappa", "Proposta di prova", "Manda un&#x27;email di prova a me", "Account di servizio: mancante", "Ultima riga letta: 41", "In arrivo con il passaggio a cliente", "Link della scheda"]) {
       expect(html).toContain(t);
     }
     expect(html).toContain('id="resend"');
     expect(html).not.toContain("Id del foglio");
-    expect(contaPrimari(html)).toBe(0);
+    for (const pagina of [elenco, ...dettagli]) expect(contaPrimari(pagina)).toBe(0);
     expect(html).not.toMatch(LINEETTE);
   });
 
   it("Integrazioni senza segreti: Non collegato al posto dell'errore, prove spente con il motivo", () => {
-    const html = render(<Integrazioni ora={ORA} />, { dati: [[["integrazioni"], scollegato], [["settings"], IMPOSTAZIONI_DEFAULT], [["aggancio-registro"], []]] });
+    const { html } = integrazioniIntere(scollegato);
     expect(html).toContain("Non collegato");
     expect(html).not.toContain("text-errore");
     expect(html).toMatch(/aria-disabled="true"[^>]*>Proposta di prova/);

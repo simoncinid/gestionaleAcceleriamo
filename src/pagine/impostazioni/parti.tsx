@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { api } from "../../api";
-import { momento } from "../../format";
+import { euroCentesimi, momento } from "../../format";
 import { partiRoma } from "../../../worker/lib/roma";
-import type { Impostazioni, Integrazione, StatoSistema } from "../../types";
+import type { Impostazioni, Integrazione, Profilo, StatoSistema } from "../../types";
 
 export const useImpostazioni = () => useQuery({ queryKey: ["settings"], queryFn: () => api<Impostazioni>("/settings") });
 export const useStatoSistema = () => useQuery({ queryKey: ["integrazioni"], queryFn: () => api<StatoSistema>("/integrations/status"), refetchInterval: 60_000 });
@@ -27,6 +27,15 @@ export function testoUltima(i: Integrazione, ora: number) {
   if (i.stato === "spento") return i.nota ?? "Non collegato";
   if (i.ultimaOk == null) return i.nota ?? "Non ha ancora lavorato";
   return `Ultima volta ${momento(i.ultimaOk, ora)}`;
+}
+
+export const useProfilo = () => useQuery({ queryKey: ["me", "profilo"], queryFn: () => api<Profilo>("/me/profilo") });
+
+// Una riga sola per voce: spenta o rotta dice perché; Claude dice speso e tetto del mese (Task 6, campo extra).
+export function rigaStato(i: Integrazione, ora: number) {
+  if (i.stato === "errore" || i.stato === "spento") return i.nota ?? ETICHETTA_STATO[i.stato];
+  if (i.key === "claude" && i.extra?.tettoCents) return `${euroCentesimi(i.extra.spesoCents)} su ${euroCentesimi(i.extra.tettoCents)} questo mese`;
+  return testoUltima(i, ora);
 }
 
 export function Sezione({ titolo, id, coda, children }: { titolo: string; id?: string; coda?: string; children: ReactNode }) {

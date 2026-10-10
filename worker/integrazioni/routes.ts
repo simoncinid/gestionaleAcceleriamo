@@ -152,14 +152,14 @@ integrazioniRoutes.get("/aggancio/registro", async (c) => {
 const ESEMPIO = { numero: "PROVA-0000", azienda: "Officina di prova", opzione: "standard", setup: 2000, canone: 150, stato: "draft", sourcePath: "prova" };
 
 integrazioniRoutes.post("/aggancio/prova", async (c) => {
-  if (!c.env.PROPOSAL_HOOK_KEY) return c.json({ error: `${SENZA_CHIAVE_AGGANCIO}: si mette con wrangler secret put PROPOSAL_HOOK_KEY` }, 409);
+  if (!c.env.PROPOSAL_HOOK_KEY) return c.json({ error: `${SENZA_CHIAVE_AGGANCIO}. La mette chi gestisce il server.` }, 409);
   hookSchema.parse(ESEMPIO);
   await getDb(c.env.DB).insert(hookLog).values({ id: crypto.randomUUID(), at: Date.now(), status: 200, number: ESEMPIO.numero, outcome: "prova" });
   return c.json({ ok: true });
 });
 
 integrazioniRoutes.post("/resend/prova", async (c) => {
-  if (!c.env.RESEND_API_KEY) return c.json({ error: `${SENZA_CHIAVE_RESEND}: si mette con wrangler secret put RESEND_API_KEY` }, 409);
+  if (!c.env.RESEND_API_KEY) return c.json({ error: `${SENZA_CHIAVE_RESEND}. La mette chi gestisce il server.` }, 409);
   const db = getDb(c.env.DB);
   const now = Date.now();
   const { conferma } = await leggiImpostazioni(db);
