@@ -15,7 +15,9 @@
     "db:migrate:demo:locale": "wrangler d1 migrations apply acceleriamo-os-demo --env demo --local",
     "demo:reset": "tsx scripts/seed-demo.ts --remote",
     "demo:locale": "tsx scripts/seed-demo.ts --local",
-    "deploy:demo": "CLOUDFLARE_ENV=demo vite build && wrangler deploy"
+    "deploy:demo": "CLOUDFLARE_ENV=demo vite build && wrangler deploy",
+    "e2e": "playwright test",
+    "e2e:foto": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
@@ -33,6 +35,7 @@
     "@cloudflare/vite-plugin": "^1.63.1",
     "@cloudflare/vitest-pool-workers": "^0.8.71",
     "@cloudflare/workers-types": "^5.20261008.1",
+    "@playwright/test": "^1.64.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.20.5",
     "@types/react": "^19.3.0",

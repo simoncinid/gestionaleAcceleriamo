@@ -6,6 +6,7 @@ export default defineWorkersConfig(async () => {
   return {
     test: {
       include: ["tests/**/*.test.{ts,tsx}"],
+      exclude: ["e2e/**", "node_modules/**"],
       setupFiles: ["./tests/apply-migrations.ts"],
       poolOptions: {
         workers: {
