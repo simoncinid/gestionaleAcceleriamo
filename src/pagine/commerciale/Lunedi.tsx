@@ -77,7 +77,7 @@ export function Lunedi() {
       <SegmentiOggi attivo="lunedi" />
       <Gruppo titolo="Numeri della settimana">
         <Voce nome="Lead arrivati" numero={n.arrivati} />
-        {n.perFonte.map((f) => <Voce key={f.source} nome={`Di cui da ${SOURCE_LABELS[f.source] ?? f.source}`} numero={f.n} />)}
+        {n.perFonte.map((f) => <Voce key={f.source} nome={f.source === "manuale" ? "Di cui a mano" : `Di cui da ${SOURCE_LABELS[f.source] ?? f.source}`} numero={f.n} />)}
         <Voce nome="Costo per lead del mese" numero={n.costoPerLeadCents == null ? "n.d." : euro(n.costoPerLeadCents)} />
         <Voce nome="Call di conoscenza" numero={n.conoscenza} />
         <Voce nome="Call di presentazione" numero={n.presentazione} />

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "../../api";
 import { Errore, Intestazione, Punto, Riga, Skeleton, StatoVuoto } from "../../ds";
-import { quando } from "../../format";
+import { trascorso } from "../../format";
 
 type AvvisoApi = { id: string; evento: string; titolo: string; testo: string | null; href: string | null; createdAt: number; letto: boolean };
 
@@ -27,11 +27,11 @@ export function Avvisi() {
       {avvisi.length === 0 ? (
         <StatoVuoto titolo="Nessun avviso aperto" testo="Gli avvisi si chiudono da soli quando la cosa è fatta." />
       ) : (
-        <ul className="grid gap-2">
+        <ul className="grid grid-cols-1 gap-2">
           {avvisi.map((a) => (
             <li key={a.id}>
               {/* Non letti: titolo in peso medio e pallino in accento; letti in peso normale. */}
-              <Riga titolo={a.titolo} secondaria={a.testo ?? undefined} meta={quando(a.createdAt)} href={a.href ?? undefined}
+              <Riga titolo={a.titolo} secondaria={a.testo ?? undefined} meta={trascorso(a.createdAt)} href={a.href ?? undefined}
                 peso={a.letto ? "normale" : "medio"} destra={a.letto ? undefined : <Punto colore="accento" etichetta="Da leggere" />} />
             </li>
           ))}

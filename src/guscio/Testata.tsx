@@ -34,7 +34,7 @@ export function Testata({ nome, puntoAvatar, avvisi = 0, onCerca, onPiu }: { nom
         <nav aria-label="Sottomenu" className="flex gap-4 overflow-x-auto border-b border-sabbia bg-avorio px-4 [scrollbar-width:none]">
           {SOTTOMENU[area].map((s) => (
             <Link key={s.percorso} to={s.percorso} aria-current={attivo(s.percorso) ? "page" : undefined}
-              className={cx("flex h-11 shrink-0 items-center border-b-2 px-1 text-secondaria font-medium transition-colors duration-(--durata-veloce)", attivo(s.percorso) ? "border-accento text-ink" : "border-transparent text-grigio")}>
+              className={cx("flex h-11 min-w-11 shrink-0 items-center justify-center border-b-2 px-1 text-secondaria font-medium transition-colors duration-(--durata-veloce)", attivo(s.percorso) ? "border-accento text-ink" : "border-transparent text-grigio")}>
               {s.etichetta}
             </Link>
           ))}

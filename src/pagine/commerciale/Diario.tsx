@@ -55,10 +55,21 @@ export function Diario({ ora = Date.now() }: { ora?: number }) {
             <h2 className="font-display text-titolo-blocco">{g}</h2>
             <ul className="flex flex-col divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio">
               {elenco.map((v) => (
-                <li key={v.id} className="flex flex-col gap-0.5 px-4 py-3">
-                  {v.href ? <Link to={v.href} className="text-secondaria text-ink underline-offset-2 hover:underline">{v.testo}</Link> : <span className="text-secondaria text-ink">{v.testo}</span>}
-                  {v.dettaglio && <span className="break-words text-secondaria text-grigio">{v.dettaglio}</span>}
-                  <span className="text-meta text-grigio">{v.chi} · {momento(v.at, ora)}</span>
+                <li key={v.id}>
+                  {/* Con un collegamento tutta la riga è il bersaglio (QA Task 15: il solo testo era alto 20 px). */}
+                  {v.href ? (
+                    <Link to={v.href} className="group flex min-h-11 flex-col gap-0.5 px-4 py-3 hover:bg-crema">
+                      <span className="text-secondaria text-ink underline-offset-2 group-hover:underline">{v.testo}</span>
+                      {v.dettaglio && <span className="break-words text-secondaria text-grigio">{v.dettaglio}</span>}
+                      <span className="text-meta text-grigio">{v.chi} · {momento(v.at, ora)}</span>
+                    </Link>
+                  ) : (
+                    <div className="flex flex-col gap-0.5 px-4 py-3">
+                      <span className="text-secondaria text-ink">{v.testo}</span>
+                      {v.dettaglio && <span className="break-words text-secondaria text-grigio">{v.dettaglio}</span>}
+                      <span className="text-meta text-grigio">{v.chi} · {momento(v.at, ora)}</span>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

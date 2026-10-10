@@ -24,9 +24,19 @@ export function Contatto({ tipo, lead, testo, oggetto, variante = "secondario", 
     : null;
   if (!href) {
     const motivo = tipo === "email" ? "Manca l'email" : tipo === "meet" ? "Manca il link Meet" : "Manca il telefono";
-    return <Pulsante variante={variante} misura={misura} motivoSpento={motivo} aria-label={tipo === "whatsapp" ? "Scrivi su WhatsApp" : undefined} className={cx(intero && "shrink-0", className)} icona={<Icona size={20} weight="bold" aria-hidden />}><span className={intero ? undefined : "truncate"}>{etichetta}</span></Pulsante>;
+    return <Pulsante variante={variante} misura={misura} motivoSpento={motivo} aria-label={tipo === "whatsapp" ? "Scrivi su WhatsApp" : undefined} className={cx(intero && "shrink-0", variante === "icona" && "w-11 shrink-0 px-0 md:w-auto md:px-4", className)} icona={<Icona size={20} weight="bold" aria-hidden />}><span className={variante === "icona" ? "sr-only md:not-sr-only" : intero ? undefined : "truncate"}>{etichetta}</span></Pulsante>;
   }
   const esterno = tipo === "meet" || tipo === "whatsapp";
+  // Variante a icona: sul telefono solo l'icona in un quadrato da 44 px (il nome resta per lo screen reader), dal desktop anche il nome.
+  if (variante === "icona") {
+    return (
+      <a href={href} aria-label={tipo === "whatsapp" ? "Scrivi su WhatsApp" : undefined} data-variante={variante} onClick={onAvvio} target={esterno ? "_blank" : undefined} rel={esterno ? "noreferrer" : undefined}
+        className={cx(classiPulsante(variante, misura), "w-11 shrink-0 px-0 md:w-auto md:px-4", className)}>
+        <Icona size={20} weight="bold" aria-hidden className="shrink-0" />
+        <span className="sr-only md:not-sr-only">{etichetta}</span>
+      </a>
+    );
+  }
   return (
     <a href={href} aria-label={tipo === "whatsapp" ? "Scrivi su WhatsApp" : undefined} data-variante={variante} onClick={onAvvio} target={esterno ? "_blank" : undefined} rel={esterno ? "noreferrer" : undefined}
       className={cx(classiPulsante(variante, misura), intero ? "shrink-0" : "min-w-0 flex-1", className)}>
