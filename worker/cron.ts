@@ -81,7 +81,7 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // Telegram (spec 8.4): solo "Lead nuovo", "SLA scaduto" e "Claude al tetto", subito dopo le push per lo stesso
   // motivo. Misura con contaD1: una lettura (codici, avvisi, coda e stato in una query) più una batch con una
   // scrittura a unità (lo stato in Integrazioni usa un'unità) e una di pulizia, quindi 2 fisse e una a unità; una sottorichiesta a unità (un messaggio, oppure
-  // getUpdates e la sua conferma come 2 unità quando qualcuno sta collegando la chat). Al massimo 5 per giro.
+  // getUpdates e la sua conferma come 2 unità quando qualcuno sta collegando la chat, più una per la risposta a un codice sbagliato). Al massimo 5 per giro.
   // Senza token del bot costa zero e restituisce tutte le sottorichieste prenotate.
   telegram: {
     quando: sempre, fisse: 2, perUnita: 1, sottoPerUnita: 1, max: 5,

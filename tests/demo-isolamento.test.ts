@@ -54,7 +54,7 @@ describe("demo: se è la demo, non si manda niente", () => {
   it("Telegram, invio e lettura dei collegamenti", async () => {
     setTelegramFetch(conta);
     expect(await mandaTelegram(demo, "42", "ciao")).toBe(false);
-    expect(await leggiCollegamenti(demo, [])).toEqual({ scritture: [], sottorichieste: 0 });
+    expect(await leggiCollegamenti(demo, [])).toEqual({ scritture: [], daRispondere: [], conferma: null, sottorichieste: 0 });
     expect(chiamate).toBe(0);
   });
   it("Claude", async () => {

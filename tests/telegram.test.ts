@@ -66,15 +66,63 @@ describe("collegamento", () => {
     expect(andrea?.chat).toBeNull();
   });
 
-  it("un messaggio senza codice valido non collega nessuno ma si conferma lo stesso", async () => {
+  it("un codice sbagliato non collega nessuno: risposta \"Codice non riconosciuto\" nella chat e conferma lo stesso", async () => {
     await nuovoCodice(env.DB, "tommaso", 1000);
     const conferme: string[] = [];
-    setTelegramFetch(async (url) => {
+    const risposte: { chat_id: string; text: string }[] = [];
+    setTelegramFetch(async (url, init) => {
+      if (url.includes("sendMessage")) { risposte.push(JSON.parse(String(init?.body))); return Response.json({ ok: true, result: {} }); }
       if (url.includes("offset=")) { conferme.push(url); return Response.json({ ok: true, result: [] }); }
-      return Response.json({ ok: true, result: [{ update_id: 3, message: { chat: { id: 9 }, text: "/start inventato" } }] });
+      return Response.json({ ok: true, result: [
+        { update_id: 3, message: { chat: { id: 9 }, text: "/start inventato" } },
+        { update_id: 4, message: { chat: { id: 10 }, text: "ciao" } },
+      ] });
     });
-    expect((await giroTelegram(env, 2000, 5)).collegati).toBe(0);
-    expect(conferme.some((u) => u.includes("offset=4"))).toBe(true);
+    expect((await giroTelegram(env, 2000, 5))).toMatchObject({ collegati: 0, sottorichieste: 3 });
+    expect(risposte).toHaveLength(1); // solo /start con un codice: un messaggio qualsiasi non ha risposta
+    expect(risposte[0].chat_id).toBe("9");
+    expect(risposte[0].text.startsWith("Codice non riconosciuto")).toBe(true);
+    expect(conferme.some((u) => u.includes("offset=5"))).toBe(true);
+  });
+
+  it("una chat già collegata che ripete /start (conferma persa) non riceve \"Codice non riconosciuto\"", async () => {
+    await collegaChat("diego", "55");
+    await nuovoCodice(env.DB, "tommaso", 1000);
+    const url: string[] = [];
+    setTelegramFetch(async (u) => {
+      url.push(u);
+      if (u.includes("getUpdates") && !u.includes("offset=")) return Response.json({ ok: true, result: [{ update_id: 3, message: { chat: { id: 55 }, text: "/start vecchio" } }] });
+      return Response.json({ ok: true, result: [] });
+    });
+    await giroTelegram(env, 2000, 5);
+    expect(url.some((u) => u.includes("sendMessage"))).toBe(false);
+  });
+
+  it("la conferma a Telegram parte dopo la batch: se la scrittura fallisce il messaggio torna al giro dopo", async () => {
+    const codice = await nuovoCodice(env.DB, "tommaso", 1000);
+    let chatAllaConferma: unknown = "mai";
+    setTelegramFetch(async (u) => {
+      if (u.includes("offset=")) {
+        chatAllaConferma = (await env.DB.prepare("SELECT telegram_chat_id AS chat FROM users WHERE id = 'tommaso'").first<{ chat: string | null }>())?.chat;
+        return Response.json({ ok: true, result: [] });
+      }
+      return Response.json({ ok: true, result: [{ update_id: 7, message: { chat: { id: 4242 }, text: `/start ${codice}` } }] });
+    });
+    await giroTelegram(env, 2000, 5);
+    expect(chatAllaConferma).toBe("4242");
+  });
+
+  it("con un limite di 2 e messaggi in coda vince il collegamento: il codice dura 15 minuti, l'avviso 6 ore", async () => {
+    await collegaChat("tommaso", "4242");
+    const codice = await nuovoCodice(env.DB, "diego", 1000);
+    const db = getDb(env.DB);
+    for (let i = 0; i < 2; i++) await avvisa(db, { evento: "lead_nuovo", entityId: `L${i}`, titolo: `Lead ${i}` }, 1000 + i, ["tommaso"]);
+    setTelegramFetch(async (u) => {
+      if (u.includes("getUpdates") && !u.includes("offset=")) return Response.json({ ok: true, result: [{ update_id: 1, message: { chat: { id: 99 }, text: `/start ${codice}` } }] });
+      return Response.json({ ok: true, result: [] });
+    });
+    expect(await giroTelegram(env, 2000, 2)).toMatchObject({ collegati: 1, inviati: 0, sottorichieste: 2 });
+    expect(await inCoda()).toBe(2);
   });
 
   it("con un limite di 1 vince il messaggio: il collegamento aspetta il giro dopo", async () => {
@@ -237,7 +285,8 @@ describe("consegna", () => {
     });
     const c = { query: 0 };
     const r = await giroTelegram({ ...env, DB: contaD1(env.DB, c) }, 2000, 5);
-    expect(r).toMatchObject({ inviati: 3, sottorichieste: 5 });
+    // getUpdates e conferma, la risposta al codice sbagliato, 2 messaggi.
+    expect(r).toMatchObject({ inviati: 2, sottorichieste: 5 });
     expect(sotto).toBe(5);
     expect(c.query).toBeLessThanOrEqual(2 + 5);
     // Niente da fare: una lettura sola.
