@@ -27,7 +27,15 @@ export function Foglio({ aperto, titolo, onChiudi, principale, children }: { ape
     if (!aperto && d.open) { d.close(); torna(prima); }
   }, [aperto]);
   // Un foglio montato solo quando serve sparisce senza passare da aperto=false: il fuoco torna lo stesso a chi l'ha aperto.
-  useEffect(() => () => torna(prima), []);
+  // Il fuoco torna al giro dopo e solo se il dialog è davvero uscito dalla pagina: durante la pulizia può essere ancora
+  // modale (pagina inerte) e lo StrictMode smonta per finta una volta all'apertura (QA Task 15, controlli 19 e 30).
+  useEffect(() => {
+    const d = ref.current;
+    return () => {
+      const p = prima.current;
+      setTimeout(() => { if (d && !d.isConnected && p?.isConnected) p.focus(); }, 0);
+    };
+  }, []);
   return (
     <dialog ref={ref} onClose={onChiudi} onClick={(e) => e.target === ref.current && onChiudi()} aria-labelledby={id}
       className="m-0 mt-auto w-full max-w-none max-h-[90dvh] rounded-t-blocco bg-avorio text-ink shadow-galleggiante backdrop:bg-ink/40 md:m-auto md:w-[480px] md:rounded-blocco open:animate-[sale_var(--durata-foglio)_var(--ease-foglio)] md:open:animate-[appare_var(--durata-foglio)_var(--ease-foglio)]">
