@@ -148,3 +148,14 @@ describe("scheda lead, email di conferma", () => {
     expect(normale).not.toContain("Email di conferma non partita");
   });
 });
+
+describe("QA Task 15: telefono ed email nella scheda lead", () => {
+  it("i link di telefono ed email sono bersagli da 44 px di altezza", () => {
+    const conContatti = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, phone: "+39 000 1234567", email: "luca@esempio.invalid" } };
+    const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], conContatti], [["stages"], FASI]] });
+    for (const href of ["tel:", "mailto:"]) {
+      const a = html.match(new RegExp(`<a class="([^"]*)" href="${href}`));
+      expect(a?.[1]).toMatch(/\bmin-h-11\b/);
+    }
+  });
+});

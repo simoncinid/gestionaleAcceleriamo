@@ -46,7 +46,8 @@ function Piega({ titolo, riassunto, aperta = false, children }: { titolo: string
 }
 
 // Telefono ed email della scheda si riconoscono come link (voce 41).
-const LINK_DATO = "break-all font-semibold text-ink underline decoration-sabbia-2 underline-offset-4 hover:decoration-ink";
+// QA Task 15: il link è alto 44 px (bersaglio del telefono), il testo resta sulla sua riga.
+const LINK_DATO = "inline-flex min-h-11 items-center break-all font-semibold text-ink underline decoration-sabbia-2 underline-offset-4 hover:decoration-ink";
 
 export function SchedaLeadRotta() {
   const { id = "" } = useParams();

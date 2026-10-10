@@ -168,3 +168,11 @@ describe("ilGiorno", () => {
     expect(ilGiorno(Date.UTC(2026, 9, 15, 10), ORA)).toBe("il 15 ott");
   });
 });
+
+describe("trascorso al singolare (QA Task 15)", () => {
+  it("un giorno fa si scrive al singolare", () => {
+    const ora = Date.UTC(2026, 9, 12, 8, 0);
+    expect(trascorso(ora - 30 * 3_600_000, ora)).toBe("1 giorno fa");
+    expect(trascorso(ora - 50 * 3_600_000, ora)).toBe("2 giorni fa");
+  });
+});

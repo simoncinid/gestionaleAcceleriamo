@@ -59,7 +59,8 @@ export function trascorso(ms: number, ora = Date.now()): string {
   if (d < MIN) return "adesso";
   if (d < ORA_MS) return `${Math.floor(d / MIN)} min fa`;
   if (d < GIORNO_MS) return `${Math.floor(d / ORA_MS)} h fa`;
-  return `${Math.floor(d / GIORNO_MS)} giorni fa`;
+  const giorni = Math.floor(d / GIORNO_MS);
+  return giorni === 1 ? "1 giorno fa" : `${giorni} giorni fa`;
 }
 
 export function fermoDa(ms: number, ora = Date.now()): string | null {
