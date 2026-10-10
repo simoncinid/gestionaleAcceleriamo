@@ -29,6 +29,7 @@ function Barra({ quota, evidenza }: { quota: number; evidenza?: boolean }) {
   );
 }
 
+// Voce 19 e 20 dell'addendum: il nome va a capo anche senza spazi, il numero ("€ 1.950 su € 2.000") resta su una riga.
 // Una riga: nome a sinistra, numero a destra, dettaglio sotto il nome; punto colorato e barra solo dove servono.
 export function Voce({ nome, numero, dettaglio, punto, etichettaPunto, quota, evidenza }: {
   nome: string; numero: string | number; dettaglio?: string; punto?: "verde" | "giallo" | "rosso" | "grigio"; etichettaPunto?: string;
@@ -37,11 +38,11 @@ export function Voce({ nome, numero, dettaglio, punto, etichettaPunto, quota, ev
   return (
     <li className="flex min-h-14 items-center gap-4 px-4 py-3">
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-center gap-2 break-words text-corpo">{punto && <Punto colore={punto} etichetta={etichettaPunto ?? nome} />}{nome}</span>
+        <span className="flex items-center gap-2 text-corpo">{punto && <Punto colore={punto} etichetta={etichettaPunto ?? nome} />}<span className="min-w-0 [overflow-wrap:anywhere]">{nome}</span></span>
         {dettaglio && <span className="text-secondaria text-grigio tabular-nums">{dettaglio}</span>}
         {quota != null && <Barra quota={quota} evidenza={evidenza} />}
       </div>
-      {numero !== "" && <span className="shrink-0 text-corpo font-semibold tabular-nums">{numero}</span>}
+      {numero !== "" && <span className="shrink-0 whitespace-nowrap text-corpo font-semibold tabular-nums">{numero}</span>}
     </li>
   );
 }

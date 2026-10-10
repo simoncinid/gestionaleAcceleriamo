@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Numeri } from "../src/pagine/commerciale/Numeri";
-import { FoglioSpesa } from "../src/pagine/commerciale/numeri/Campagne";
+import { FoglioSpesa, motivoSpesa } from "../src/pagine/commerciale/numeri/Campagne";
 import { durata } from "../src/pagine/commerciale/numeri/Funnel";
 import { contaPrimari, render } from "./render";
 
@@ -95,5 +95,74 @@ describe("Numeri a tre segmenti", () => {
     expect(durata(42 * 60_000)).toBe("42 min");
     expect(durata(3 * 3_600_000)).toBe("3 ore");
     expect(durata(3 * 86_400_000)).toBe("3 giorni");
+  });
+});
+
+describe("Campagne: rifiniture del Task 14", () => {
+  const riga = campagne.campagne[0];
+  const due = { ...campagne, campagne: [riga, { ...riga, campagna: "Ricerca clienti", lead: 3, spesaCents: null, costoPerLeadCents: null, costoPerClienteCents: null, livello: "senza_spesa" as const, inserzioni: [] }] };
+  const pagina = (dati: unknown) => render(<Numeri ora={Date.UTC(2026, 9, 15)} />, { percorso: "/commerciale/numeri?vista=campagne", dati: [[["numeri", "campagne", "2026-10"], dati]] });
+  it("più campagne: righe chiuse con lead e costo per lead, il resto all'apertura", () => {
+    const html = pagina(due);
+    expect((html.match(/data-campagna=/g) ?? []).length).toBe(2);
+    expect((html.match(/data-campagna="[^"]*"[^>]*aria-expanded="false"/g) ?? []).length).toBe(2);
+    expect(html).toContain("14 lead");
+    expect(html).toContain("Costo per lead € 38,03");
+    expect(html).toContain("Spesa da scrivere");
+    expect(html).not.toContain("Video 1");
+    expect(html).not.toContain("Proposte presentate");
+    expect(contaPrimari(html)).toBe(0);
+  });
+  it("il pulsante della spesa sta subito sotto il selettore del mese", () => {
+    const html = pagina(due);
+    const mese = html.indexOf('data-selettore="Mese"');
+    const spesa = html.indexOf("Scrivi la spesa del mese");
+    const prima = html.indexOf('data-campagna="');
+    expect(mese).toBeGreaterThan(-1);
+    expect(spesa).toBeGreaterThan(mese);
+    expect(spesa).toBeLessThan(prima);
+  });
+  it("mese senza campagne: stato vuoto e spesa scrivibile lo stesso", () => {
+    const html = pagina({ ...campagne, campagne: [] });
+    expect(html).toContain("Nessun lead da campagne nel mese");
+    expect(html).toContain("Scrivi la spesa del mese");
+  });
+  it("spesa zero: nessuna spesa, niente costo per lead e niente punto verde", () => {
+    const zero = { ...riga, spesaCents: 0, costoPerLeadCents: null, costoPerClienteCents: null, livello: "senza_spesa" as const };
+    const html = pagina({ ...campagne, campagne: [zero] });
+    expect(html).toContain("Nessuna spesa");
+    expect(html).not.toContain("€ 0,00");
+    expect(html).not.toContain("bg-successo");
+  });
+  it("nomi lunghi delle inserzioni vanno a capo, il numero resta su una riga", () => {
+    const lungo = "Inserzione_con_un_nome_lunghissimo_senza_spazi_che_arriva_da_Meta_e_non_finisce_mai";
+    const html = pagina({ ...campagne, campagne: [{ ...riga, inserzioni: [{ ...riga.inserzioni[0], inserzione: lungo }] }] });
+    expect(html).toContain(lungo);
+    expect(html).toContain("[overflow-wrap:anywhere]");
+    expect(html).toMatch(/whitespace-nowrap[^"]*"[^>]*>10 lead</);
+  });
+  it("foglio della spesa: campagna libera se il mese non ne ha", () => {
+    const html = render(<FoglioSpesa mese="2026-10" campagne={[]} onChiudi={() => {}} />);
+    expect(html).toContain("Nome della campagna");
+    expect(html).not.toContain('data-selettore="Campagna"');
+    expect(contaPrimari(html)).toBe(1);
+  });
+  it("foglio della spesa: con le campagne c'è anche \"Un'altra campagna\"", () => {
+    const html = render(<FoglioSpesa mese="2026-10" campagne={campagne.campagne} onChiudi={() => {}} />);
+    expect(html).toContain('data-selettore="Campagna"');
+  });
+  it("limite di 100.000 euro anche nel client", () => {
+    expect(motivoSpesa("Automazione", "100.000,00")).toBeUndefined();
+    expect(motivoSpesa("Automazione", "100.000,01")).toBe("Al massimo € 100.000 al mese");
+    expect(motivoSpesa("", "10")).toBe("Scegli la campagna");
+    expect(motivoSpesa("Automazione", "")).toBe("Scrivi l'importo");
+    expect(motivoSpesa("Automazione", "dieci")).toBe("Scrivi un importo in euro, per esempio 532,40");
+  });
+});
+
+describe("Previsione a 390 px", () => {
+  it("\"€ 1.950 su € 2.000\" resta su una riga", () => {
+    const html = render(<Numeri />, { percorso: "/commerciale/numeri?vista=previsione", dati: [[["numeri", "previsione"], previsione]] });
+    expect(html).toMatch(/whitespace-nowrap[^"]*"[^>]*>€ 1\.950 su € 2\.000</);
   });
 });
