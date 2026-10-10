@@ -37,3 +37,19 @@ export function bloccoDatiLead(campi: Record<string, string | null | undefined>)
     "</dati_del_lead>",
   ].join("\n");
 }
+
+// I campi del lead che servono a classificazione e scheda (spec 7.3): mai telefono, note, clienti o soldi.
+export type LeadPerClaude = { company: string; email: string | null; website: string | null; metaAnswers: string | null; linkedinText: string | null };
+export const SELECT_LEAD_PER_CLAUDE = "SELECT company, email, website, meta_answers AS metaAnswers, linkedin_text AS linkedinText FROM leads WHERE id = ?1 AND deleted_at IS NULL";
+
+export function datiPerClaude(l: LeadPerClaude): string {
+  const e = emailRidotta(l.email);
+  return bloccoDatiLead({
+    "Azienda (scritta dal lead)": l.company,
+    "Sito": l.website,
+    "Dominio dell'email": e.dominio,
+    "Email gratuita, parte prima della @": e.primaDellaChiocciola,
+    "Risposte del modulo": risposteModulo(l.metaAnswers),
+    "Testo LinkedIn incollato": l.linkedinText,
+  });
+}

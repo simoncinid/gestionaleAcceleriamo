@@ -38,7 +38,7 @@ describe("pagina Oggi", () => {
   });
 
   it("call in Adesso: Apri Meet", () => {
-    const html = pagina({ ...base, adesso: { tipo: "call", id: "k", leadId: "a", company: "Officina a", contactName: "Luca", phone: null, kind: "conoscenza", scheduledAt: ORA + 600_000, meetLink: "https://meet.google.com/abc" }, totale: 1 });
+    const html = pagina({ ...base, adesso: { tipo: "call", id: "k", leadId: "a", company: "Officina a", contactName: "Luca", phone: null, kind: "conoscenza", scheduledAt: ORA + 600_000, meetLink: "https://meet.google.com/abc", scheda: null }, totale: 1 });
     expect(html).toContain("Apri Meet");
     expect(contaPrimari(html)).toBe(1);
   });

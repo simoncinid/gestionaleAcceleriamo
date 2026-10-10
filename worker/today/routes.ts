@@ -8,6 +8,8 @@ import { leggiImpostazioni } from "../impostazioni/service";
 import { scegliAdesso } from "./adesso";
 import type { CallOggi, Oggi, PropostaOggi, RigaOggi } from "./tipi";
 
+type CallGrezza = Omit<CallOggi, "scheda"> & { schedaStato: string | null };
+
 const GIORNO = 86_400_000;
 const HUMAN_TYPES = "('nota','chiamata','email','cambio_fase')";
 const FROM = "FROM leads l JOIN stages s ON s.id = l.stage_id";
@@ -61,7 +63,7 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
   const minutiSla = parametro(regola("sla"), "minuti") ?? 120;
   const giorniFermo = parametro(regola("fermo"), "giorni") ?? 7;
 
-  const [nuoviGrezzi, dovuti, proposte, fermiGrezzi, callOggi, leadNuovi, primaRisposta, callSettimana, proposteAperte] = await Promise.all([
+  const [nuoviGrezzi, dovuti, proposte, fermiGrezzi, callGrezze, leadNuovi, primaRisposta, callSettimana, proposteAperte] = await Promise.all([
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM} WHERE ${APERTI} ${chi} AND l.stage_id = 'da-chiamare-prima-volta' ORDER BY l.created_at`),
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM}
       WHERE ${APERTI} ${chi} AND l.next_action_at IS NOT NULL AND l.next_action_at < ?2 ORDER BY l.next_action_at`, fine),
@@ -75,7 +77,8 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM}
       WHERE ${APERTI} ${chi} AND l.stage_id NOT IN ('probabilmente-bloccato', 'da-chiamare-prima-volta')
         AND l.stage_changed_at <= ?2 ORDER BY l.stage_changed_at LIMIT 20`, ora - giorniFermo * GIORNO),
-    tutti<CallOggi>(`SELECT k.id, k.lead_id AS leadId, l.company, l.contact_name AS contactName, l.phone, k.kind, k.scheduled_at AS scheduledAt, k.meet_link AS meetLink
+    tutti<CallGrezza>(`SELECT k.id, k.lead_id AS leadId, l.company, l.contact_name AS contactName, l.phone, k.kind, k.scheduled_at AS scheduledAt, k.meet_link AS meetLink,
+        (SELECT cp.status FROM company_profiles cp WHERE cp.lead_id = l.id ORDER BY cp.version DESC LIMIT 1) AS schedaStato
       FROM calls k JOIN leads l ON l.id = k.lead_id WHERE k.deleted_at IS NULL AND l.deleted_at IS NULL ${chi}
         AND k.scheduled_at >= ?2 AND k.scheduled_at < ?3 ORDER BY k.scheduled_at`, inizio, fine),
     uno<{ n: number }>("SELECT count(*) n FROM leads WHERE deleted_at IS NULL AND created_at >= ? AND created_at < ?", inizio, fine),
@@ -84,7 +87,11 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
     uno<{ n: number }>("SELECT count(*) n FROM proposals p JOIN leads l ON l.id = p.lead_id AND l.deleted_at IS NULL WHERE p.deleted_at IS NULL AND p.status IN ('registrata', 'presentata')"),
   ]);
 
-  // Stessa scadenza della Scaletta, dell'Elenco e della scheda (worker/regole/sla.ts).
+  const callOggi: CallOggi[] = callGrezze.map(({ schedaStato, ...k }) => ({
+    ...k,
+    scheda: schedaStato === "ready" ? "pronta" : schedaStato === "queued" || schedaStato === "running" ? "in_preparazione" : null,
+  }));
+
   // Stessa scadenza della Scaletta, dell'Elenco e della scheda (worker/regole/sla.ts).
   const nuoviTutti = nuoviGrezzi.map((l) => {
     const allineato = conScadenzaSla(l, { minuti: minutiSla, orario: imp.orario });

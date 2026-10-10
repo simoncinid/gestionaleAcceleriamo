@@ -603,6 +603,8 @@ describe("giro con Claude", () => {
         return { uso: r.uso, modello: r.modello };
       },
       alErrore: async () => undefined,
+      // Come la classificazione vera: uno statement nella prima batch della coda.
+      accodaDaSolo: (db) => db.prepare("SELECT 1"),
     });
   }
   afterEach(() => {
@@ -614,7 +616,7 @@ describe("giro con Claude", () => {
   }
   const fatti = async () => (await env.DB.prepare("SELECT count(*) n FROM ai_jobs WHERE stato = 'pronto'").first<{ n: number }>())?.n ?? 0;
 
-  it("misura: 3 lavori, un fermo e l'avviso del tetto stanno in 7 fisse più 11 a lavoro", async () => {
+  it("misura: 3 lavori, un fermo e l'avviso del tetto stanno in 8 fisse più 11 a lavoro", async () => {
     await createUser();
     tipoFinto();
     registraTipo("scheda", { stima: () => ({ modello: "claude-sonnet-5-5", ingresso: 160_000, maxTokens: 8_000, ricerche: 5 }), esegui: async () => { throw new Error("non deve partire"); }, alErrore: async () => undefined });
@@ -628,17 +630,17 @@ describe("giro con Claude", () => {
     expect(chiamateClaude).toBeLessThanOrEqual(3 * LAVORI.claude!.sottoPerUnita);
   });
 
-  it("senza lavori in coda costa 3 query; senza tipi o senza chiave nessuna", async () => {
+  it("senza lavori in coda costa 4 query; senza tipi o senza chiave nessuna", async () => {
     tipoFinto();
     const c1 = { query: 0 };
     await lavoraCoda({ ...env, DB: contaD1(env.DB, c1) }, r(11, 10), 3);
-    expect(c1.query).toBe(3);
+    expect(c1.query).toBe(4);
     const c2 = { query: 0 };
     await lavoraCoda({ ...env, DB: contaD1(env.DB, c2), ANTHROPIC_API_KEY: "" }, r(11, 10), 3);
     expect(c2.query).toBe(0);
   });
 
-  // Con le fisse degli altri lavori del giro (circa 13 query) a Claude ne restano 31: 2 lavori (7 + 2 x 11).
+  // Con le fisse degli altri lavori del giro (circa 13 query) a Claude ne restano 31: 2 lavori (8 + 2 x 11).
   // Il terzo parte al giro dopo.
   it("giro senza altro da fare: 2 lavori di Claude in questo giro, il terzo al giro dopo", async () => {
     await createUser();

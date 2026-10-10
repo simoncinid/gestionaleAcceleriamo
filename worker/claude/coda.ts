@@ -13,6 +13,9 @@ export type DefTipo = {
   stima: (imp: ImpClaude) => Stima;
   esegui: (env: Env, job: LavoroAi, imp: ImpClaude, now: number) => Promise<{ uso: Uso; modello: string }>;
   alErrore: (db: D1Database, job: LavoroAi, messaggio: string, now: number) => Promise<void>;
+  // Facoltativo: uno statement che mette in coda da solo i lavori di questo tipo (per esempio la classificazione
+  // dei lead nuovi). Gira nella prima batch della coda: una query fissa in più per tipo che lo usa.
+  accodaDaSolo?: (db: D1Database, now: number) => D1PreparedStatement;
 };
 
 // I gestori dei tipi (classificazione, scheda, coach, commento) si registrano dai loro moduli.
@@ -35,13 +38,16 @@ export function setOrologioCoda(f: (() => number) | null) {
 const euroTondi = (cents: number) => `€ ${String(Math.round(cents / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
 
 // Un lavoro per oggetto: se ce n'è già uno in coda, in corso o fermo per il tetto, si riusa quello.
+// Una query sola nel caso comune (INSERT ... WHERE NOT EXISTS): la catena del lead nuovo accoda dentro il giro.
 export async function accoda(db: D1Database, j: { tipo: AiTipo; entityId: string; leadId?: string | null; chi?: string | null; forzato?: boolean }, now: number): Promise<{ id: string; nuovo: boolean }> {
-  const gia = await db.prepare("SELECT id FROM ai_jobs WHERE tipo = ?1 AND entity_id = ?2 AND stato IN ('in_coda','in_corso','fermo_tetto') LIMIT 1").bind(j.tipo, j.entityId).first<{ id: string }>();
-  if (gia) return { id: gia.id, nuovo: false };
   const id = crypto.randomUUID();
-  await db.prepare("INSERT INTO ai_jobs (id, tipo, entity_id, lead_id, stato, forzato, richiesto_da, created_at) VALUES (?1, ?2, ?3, ?4, 'in_coda', ?5, ?6, ?7)")
+  const r = await db.prepare(`INSERT INTO ai_jobs (id, tipo, entity_id, lead_id, stato, forzato, richiesto_da, created_at)
+      SELECT ?1, ?2, ?3, ?4, 'in_coda', ?5, ?6, ?7
+      WHERE NOT EXISTS (SELECT 1 FROM ai_jobs WHERE tipo = ?2 AND entity_id = ?3 AND stato IN ('in_coda','in_corso','fermo_tetto'))`)
     .bind(id, j.tipo, j.entityId, j.leadId ?? null, j.forzato ? 1 : 0, j.chi ?? null, now).run();
-  return { id, nuovo: true };
+  if (r.meta.changes) return { id, nuovo: true };
+  const gia = await db.prepare("SELECT id FROM ai_jobs WHERE tipo = ?1 AND entity_id = ?2 AND stato IN ('in_coda','in_corso','fermo_tetto') LIMIT 1").bind(j.tipo, j.entityId).first<{ id: string }>();
+  return { id: gia?.id ?? id, nuovo: false };
 }
 
 const SPESO = "SELECT coalesce(sum(costo_micros), 0) FROM claude_usage WHERE mese = ?1";
@@ -67,10 +73,11 @@ const chiudiUso = (db: D1Database, idUso: string, uso: Uso, modello: string, cos
 
 // Spec 7.5: prima di ogni lavoro, speso del mese + costo massimo sotto il tetto. Al primo fermo del mese,
 // avviso a tutti e due (in app, push, Telegram): la chiave dell'avviso è il mese, quindi nasce una volta sola.
-// Query, misurate con contaD1 nel test del giro: fisse al massimo 7 (riapertura dei fermi e dei bloccati in una
-// batch da 2, coda con lo speso del mese, impostazioni, fermi, avviso, stato), per lavoro 4 (presa con prenotazione
-// e chiusura, due batch da 2) più quelle del gestore (al massimo 7, vedi tipi.ts). Un lavoro preso da un altro giro
-// costa 2 query e conta lo stesso come unità del giro.
+// Query, misurate con contaD1 nel test del giro: fisse al massimo 8 (in una batch da 3 i lavori che si accodano
+// da soli, oggi solo la classificazione, e la riapertura dei fermi e dei bloccati; poi coda con lo speso del mese,
+// impostazioni, fermi, avviso, stato), per lavoro 4 (presa con prenotazione e chiusura, due batch da 2) più quelle
+// del gestore (al massimo 7, vedi tipi.ts). Un lavoro preso da un altro giro costa 2 query e conta lo stesso come
+// unità del giro.
 // Senza chiave o senza tipi registrati non tocca D1.
 export async function lavoraCoda(env: Env, now: number, limite: number): Promise<{ fatti: number; fermi: number; errori: number }> {
   const esito = { fatti: 0, fermi: 0, errori: 0 };
@@ -79,7 +86,9 @@ export async function lavoraCoda(env: Env, now: number, limite: number): Promise
   if (!tipi.length || limite < 1) return esito;
   const db = env.DB;
   const mese = meseRoma(now);
+  const automatici = tipi.flatMap((t) => (TIPI[t]!.accodaDaSolo ? [TIPI[t]!.accodaDaSolo!(db, now)] : []));
   await db.batch([
+    ...automatici,
     // Il primo del mese (a Roma) i fermi del mese prima tornano in coda.
     db.prepare("UPDATE ai_jobs SET stato = 'in_coda', fermo_mese = NULL WHERE stato = 'fermo_tetto' AND fermo_mese < ?1").bind(mese),
     db.prepare(`UPDATE ai_jobs SET tentativi = tentativi + 1,

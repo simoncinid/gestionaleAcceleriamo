@@ -121,6 +121,9 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
                     <span className="font-display text-numero text-accento-testo tabular-nums">{momento(k.scheduledAt, ora)}</span>
                     <span className="text-riga">{k.company}</span>
                     <span className="text-secondaria text-grigio">Call di {k.kind}</span>
+                    {k.kind === "conoscenza" && k.scheda && (
+                      <span className="text-secondaria text-grigio">{k.scheda === "pronta" ? "Scheda azienda pronta" : "Scheda in preparazione"}</span>
+                    )}
                   </div>
                   <div className="flex"><Contatto tipo="meet" lead={k} variante="icona" /></div>
                 </li>

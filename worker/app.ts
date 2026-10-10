@@ -20,6 +20,8 @@ import { clientiRoutes } from "./clienti/routes";
 import { economiaRoutes } from "./economia/routes";
 import { pushRoutes } from "./push/routes";
 import { aiJobsRoutes, claudeRoutes } from "./claude/routes";
+import "./claude/tipi";
+import { schedeRoutes } from "./schede/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -40,6 +42,8 @@ app.use("/api/*", async (c, next) => {
 
 app.route("/api/webhooks/meta", metaRoutes);
 app.route("/api/auth", authRoutes);
+// Prima delle rotte dei lead: /api/leads/:id/scheda-azienda.
+app.route("/api/leads", schedeRoutes);
 app.route("/api/leads", leadRoutes);
 app.route("/api/documents", documentRoutes);
 app.route("/api/stages", stageRoutes);

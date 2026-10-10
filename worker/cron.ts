@@ -99,13 +99,13 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   meta_48h: { quando: (p) => p.minuti < 5, fisse: 3, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => controllaMeta48(e, n) },
   // Claude (spec 7.4): ultimo del giro, dopo le conferme e dopo il controllo di Meta delle :00, che gira una volta
   // l'ora e non deve perdere il suo turno. Un lavoro di Claude può aspettare 5 minuti, un lead no.
-  // Misura con contaD1: fisse 7 (riapertura dei fermi in una batch da 2, coda con lo speso del mese, impostazioni,
-  // fermi, avviso del tetto, stato), per lavoro 4 (presa con la prenotazione del costo massimo e chiusura, due batch
+  // Misura con contaD1: fisse 8 (in una batch da 3 la classificazione dei lead nuovi che si accoda da sola e la
+  // riapertura dei fermi; poi coda con lo speso del mese, impostazioni, fermi, avviso del tetto, stato), per lavoro 4 (presa con la prenotazione del costo massimo e chiusura, due batch
   // da 2) più al massimo 7 del gestore del tipo, quindi 11; sottorichieste 3 a lavoro (la chiamata più due
   // continuazioni di pause_turn).
   // Al massimo 3 per giro (lavoriPerGiro in Impostazioni può abbassarlo). Senza chiave o senza tipi costa zero.
   claude: {
-    quando: sempre, fisse: 7, perUnita: 11, sottoPerUnita: 3, max: 3,
+    quando: sempre, fisse: 8, perUnita: 11, sottoPerUnita: 3, max: 3,
     esegui: async (e, n, l) => {
       const r = await lavoraCoda(e, n, l);
       return { ...r, sottorichieste: (r.fatti + r.errori) * 3 };

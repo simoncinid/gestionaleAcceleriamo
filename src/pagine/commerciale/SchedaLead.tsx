@@ -26,6 +26,7 @@ import { StepperFasi } from "./StepperFasi";
 import { callPerFase } from "../../../worker/regole/fasi-call";
 import { SezioneCall } from "./SezioneCall";
 import { SezioneProposta } from "./SezioneProposta";
+import { SezioneSchedaAzienda } from "./SezioneSchedaAzienda";
 
 const PUNTEGGIO = { verde: "Verde", giallo: "Giallo", grigio: "Grigio" } as const;
 
@@ -162,6 +163,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       <div className="flex min-w-0 flex-col gap-3">
         <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} /></div>
         <div data-sezione="proposta"><SezioneProposta leadId={lead.id} /></div>
+        <div data-sezione="scheda-azienda"><SezioneSchedaAzienda leadId={lead.id} manuale={lead.source === "manuale"} /></div>
 
         <Piega titolo="Storico" aperta riassunto={activities[0] ? `ultima voce ${momento(activities[0].createdAt, ora)}` : "nessuna voce"}>
           <Timeline leadId={lead.id} activities={activities} ora={ora} />
