@@ -1,0 +1,171 @@
+// Dati finti dello spazio demo (spec 12). Funzione pura: niente rete, niente file, niente orologio.
+// Aziende, referenti e contatti sono inventati: email solo su esempio.it, telefoni con prefisso +39 000.
+import { getTableColumns } from "drizzle-orm";
+import { getTableConfig, type SQLiteTable } from "drizzle-orm/sqlite-core";
+import type { CoachSalvato } from "../worker/claude/coach";
+import {
+  activities, automations, callAnalyses, calls, clients, companyProfiles, fees, invoices, leads, proposals, users,
+} from "../worker/db/schema";
+
+type Riga<T extends SQLiteTable> = T["$inferInsert"];
+export type DatiDemo = {
+  users: Riga<typeof users>[]; leads: Riga<typeof leads>[]; calls: Riga<typeof calls>[]; proposals: Riga<typeof proposals>[];
+  clients: Riga<typeof clients>[]; automations: Riga<typeof automations>[]; fees: Riga<typeof fees>[]; invoices: Riga<typeof invoices>[];
+  companyProfiles: Riga<typeof companyProfiles>[]; callAnalyses: Riga<typeof callAnalyses>[]; activities: Riga<typeof activities>[];
+};
+
+const GIORNO = 86_400_000;
+const SETTORI: [string, string[]][] = [
+  ["Officina meccanica", ["Officina Bertini", "Autofficina Del Corso", "Meccanica Valdera", "Officina F.lli Neri", "Car Service Arno", "Officina Martelli", "Revisioni Pontedera"]],
+  ["Agenzia immobiliare", ["Casa Toscana Immobili", "Immobiliare Le Logge", "Agenzia Lungarno", "Immobiliare Sette Ponti", "Abitare Pisa", "Studio Immobiliare Corti", "Case in Collina"]],
+  ["Studio commercialista", ["Studio Rinaldi e Associati", "Studio Fiscale Galli", "Commercialisti Associati Bindi", "Studio Paoli", "Studio Tributario Marchi", "Studio Contabile Vanni", "Studio Ferri"]],
+  ["Impianti elettrici", ["Elettro Impianti Sarti", "Impianti Bacci", "Elettrotecnica Fabbri", "Luce e Impianti", "Impianti Moretti", "Elettrica Valdarno"]],
+  ["Logistica e trasporti", ["Trasporti Baldini", "Logistica Costiera", "Corrieri Riuniti Toscana", "Spedizioni Puccini", "Autotrasporti Gori", "Magazzini Navacchio"]],
+  ["Studio dentistico", ["Studio Dentistico Lenzi", "Centro Dentale San Rossore", "Odontoiatria Mori", "Studio Dentistico Cecchi", "Sorriso Pisa", "Dentisti Associati Landi", "Studio Dentale Benvenuti"]],
+];
+const NOMI = ["Marco", "Giulia", "Luca", "Sara", "Andrea", "Elena", "Paolo", "Chiara", "Davide", "Francesca"];
+const COGNOMI = ["Rossi", "Bianchi", "Conti", "Ricci", "Greco", "Bruno", "Gallo", "Costa", "Fontana", "Moretti"];
+// Distribuzione sulle fasi della 1A (drizzle/0001): 40 lead, quasi tutti aperti.
+const FASI: [string, number][] = [
+  ["da-chiamare-prima-volta", 6], ["non-chiamato", 4], ["da-richiamare", 6], ["appuntamento-confermato", 4],
+  ["presentazione-confermata", 3], ["in-attesa-preventivo", 3], ["in-attesa-decisione", 4], ["probabilmente-bloccato", 2],
+  ["chiuso", 3], ["non-chiuso", 3], ["fuori-target", 2],
+];
+const CHIUSE = ["chiuso", "non-chiuso", "fuori-target"];
+const CON_PREZZO = ["in-attesa-preventivo", "in-attesa-decisione", "chiuso"];
+const CON_CALL = ["appuntamento-confermato", "presentazione-confermata", "in-attesa-preventivo", "in-attesa-decisione", "chiuso", "non-chiuso"];
+const CAMPAGNE = ["Lavoro ripetuto, video", "Excel e gestionale, carosello", "Telefonate perse, video"];
+const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+const SCHEDA = (azienda: string, settore: string) => `## Chi è
+Dati finti dello spazio demo. ${azienda} è un'azienda del settore "${settore.toLowerCase()}" con una decina di persone, una sede e molti clienti abituali.
+
+## Cosa fa l'azienda
+Lavora soprattutto con privati e piccole imprese della provincia. Gran parte del tempo dell'ufficio va in telefonate, promemoria e fogli Excel aggiornati a mano.
+
+## Sito e presenza online
+Sito vetrina semplice, nessun modulo di contatto collegato al gestionale.
+
+## Dove possiamo fare la differenza
+1. Promemoria automatici ai clienti, con conferma o spostamento in un messaggio.
+2. Riepilogo serale delle attività del giorno, già pronto per il titolare.
+3. Lettura automatica delle email in arrivo e smistamento a chi deve rispondere.
+
+## Da chiarire in call
+Quale gestionale usano, chi aggiorna oggi i fogli, quante telefonate al giorno.`;
+
+// Stesso formato che il coach salva in call_analyses.result (CoachSalvato, Task 8).
+const coach = (prossimaAzioneAt: number): CoachSalvato => ({
+  riassunto: "Call di conoscenza andata bene: il titolare passa due ore al giorno a ricopiare ordini dalle email al gestionale.",
+  faseSuggerita: "presentazione-confermata",
+  prossimaAzione: { testo: "Fissare la call di presentazione con la proposta", entroGiorni: 3 },
+  bozzaFollowUp: "Buongiorno, grazie per il tempo di oggi. Come detto, preparo una proposta per togliere la ricopiatura degli ordini: la vediamo insieme in una call di mezz'ora la prossima settimana?",
+  risposteObiezioni: [{ obiezione: "Teme di dover cambiare gestionale", risposta: "L'automazione lavora sul gestionale che usa già: legge le email e compila gli ordini, senza cambiare programma." }],
+  controlli: ["Chiedere quante persone toccano gli ordini", "Verificare chi aggiorna oggi il gestionale"],
+  prossimaAzioneAt,
+});
+
+export function datiDemo(ora: number, hashDemo: string): DatiDemo {
+  const d: DatiDemo = { users: [], leads: [], calls: [], proposals: [], clients: [], automations: [], fees: [], invoices: [], companyProfiles: [], callAnalyses: [], activities: [] };
+  d.users.push({ id: "demo", username: "demo", name: "Utente demo", passwordHash: hashDemo, active: true, failedLogins: 0, createdAt: ora - 90 * GIORNO });
+  const aziende = SETTORI.flatMap(([settore, nomi]) => nomi.map((n) => ({ settore, nome: n }))).slice(0, 40);
+  const fasi = FASI.flatMap(([id, n]) => Array.from({ length: n }, () => id));
+  aziende.forEach((a, i) => {
+    const id = `demo-lead-${String(i + 1).padStart(2, "0")}`;
+    const fase = fasi[i];
+    const creato = ora - ((i % 20) + 1) * GIORNO - ((i * 37) % 600) * 60_000;
+    const referente = `${NOMI[i % NOMI.length]} ${COGNOMI[(i * 3) % COGNOMI.length]}`;
+    const email = i % 7 === 6 ? null : `${slug(referente)}.${i + 1}@esempio.it`;
+    const telefono = `+39 000 ${String(1_000_000 + i * 7919).slice(0, 7)}`;
+    const meta = i % 4 !== 3;
+    const setup = 200_000 + (i % 3) * 50_000;
+    const canone = 15_000 + (i % 4) * 5_000;
+    const chiusa = CHIUSE.includes(fase);
+    const conPrezzo = CON_PREZZO.includes(fase);
+    d.leads.push({
+      id, company: a.nome, contactName: referente, email, emailNorm: email, phone: telefono, phoneNorm: telefono.replace(/\s/g, ""),
+      website: `https://${slug(a.nome)}.esempio.it`, notes: a.settore, source: meta ? "meta" : i % 2 ? "foglio_andrea" : "manuale",
+      metaCampaign: meta ? CAMPAGNE[i % 3] : null, metaAd: meta ? `Inserzione ${(i % 5) + 1}` : null,
+      stageId: fase, stageChangedAt: creato + GIORNO, ownerId: "demo",
+      nextAction: chiusa || fase === "non-chiamato" ? null : "Richiamare",
+      nextActionAt: chiusa ? null : ora + ((i % 5) - 2) * 3_600_000,
+      setupCents: conPrezzo ? setup : null, feeCents: conPrezzo ? canone : null,
+      score: (["verde", "giallo", "grigio"] as const)[i % 3],
+      lostReason: fase === "non-chiuso" ? "budget" : fase === "fuori-target" ? "fuori_target" : null,
+      firstResponseAt: fase === "da-chiamare-prima-volta" ? null : creato + 40 * 60_000,
+      wonStartAt: fase === "chiuso" ? ora - 30 * GIORNO : null,
+      createdBy: meta ? null : "demo", createdAt: creato, updatedAt: creato + GIORNO,
+    });
+    d.activities.push({ id: `${id}-a1`, leadId: id, type: "creazione", body: "Lead creato (dati finti)", authorId: null, createdAt: creato });
+    if (CON_CALL.includes(fase)) {
+      const fatta = fase !== "appuntamento-confermato";
+      const quando = fatta ? creato + 2 * GIORNO : ora + ((i % 3) + 1) * GIORNO;
+      const callId = `${id}-c1`;
+      d.calls.push({ id: callId, leadId: id, kind: "conoscenza", scheduledAt: quando, meetLink: "https://meet.google.com/demo-demo-demo", outcome: fatta ? "fatta" : null, outcomeAt: fatta ? quando : null, createdBy: "demo", createdAt: creato + GIORNO, updatedAt: quando });
+      if (!fatta) d.leads[d.leads.length - 1].appointmentAt = quando;
+      if (fatta && d.callAnalyses.length < 3) {
+        d.callAnalyses.push({ id: `${id}-coach`, leadId: id, callId, status: "ready", transcript: "Trascrizione finta dello spazio demo.", result: JSON.stringify(coach(quando + 3 * GIORNO)), model: "demo", createdAt: quando });
+      }
+    }
+    if (["in-attesa-decisione", "chiuso", "non-chiuso"].includes(fase)) {
+      const stato = fase === "chiuso" ? "accettata" : fase === "non-chiuso" ? "rifiutata" : i % 2 ? "presentata" : "registrata";
+      const proprieta = i % 5 === 0;
+      d.proposals.push({
+        id: `${id}-p1`, leadId: id, number: `DEMO-2026-${String(i + 1).padStart(3, "0")}`, company: a.nome, option: proprieta ? "proprieta" : "standard",
+        setupCents: setup, feeCents: proprieta ? 0 : canone, status: stato, sentAt: creato + 4 * GIORNO,
+        presentedAt: stato === "registrata" ? null : creato + 5 * GIORNO, decidedAt: ["accettata", "rifiutata"].includes(stato) ? creato + 8 * GIORNO : null,
+        registeredVia: "manuale", createdAt: creato + 4 * GIORNO, updatedAt: creato + 5 * GIORNO,
+      });
+    }
+    if (i < 6 || (i >= 20 && i < 22)) {
+      d.companyProfiles.push({
+        id: `${id}-scheda`, leadId: id, version: 1, status: "ready", content: SCHEDA(a.nome, a.settore), sources: "[]", model: "demo",
+        classification: JSON.stringify({ azienda: true, fake: false, motivo: "Azienda con sito e settore chiaro (dati finti)" }),
+        createdAt: creato + 600_000, updatedAt: creato + 600_000,
+      });
+    }
+  });
+  // Tre clienti dai lead chiusi; le automazioni non portano il nome del cliente (anonime anche nel Pannello).
+  const AUTOMAZIONI = [["Promemoria appuntamenti", "Messaggi e conferme"], ["Ordini dalle email al gestionale", "Documenti"], ["Riepilogo serale per il titolare", "Report"]];
+  d.leads.filter((l) => l.stageId === "chiuso").forEach((l, k) => {
+    const cid = `demo-cliente-${k + 1}`;
+    d.clients.push({ id: cid, name: l.company, sector: l.notes ?? null, city: "Pisa", scope: "acceleriamo", originLeadId: l.id, createdAt: ora - 30 * GIORNO });
+    d.automations.push({ id: `demo-auto-${k + 1}`, clientId: cid, name: AUTOMAZIONI[k][0], family: AUTOMAZIONI[k][1], status: k === 2 ? "in_costruzione" : "attiva", runsOn: "Cloudflare", stack: "Worker, D1", activatedAt: k === 2 ? null : ora - 20 * GIORNO, createdAt: ora - 30 * GIORNO, updatedAt: ora - 20 * GIORNO });
+    const fee = `demo-canone-${k + 1}`;
+    d.fees.push({ id: fee, clientId: cid, automationId: `demo-auto-${k + 1}`, amountCents: l.feeCents ?? 20_000, billingDay: 1, status: k === 2 ? "in_attesa" : "attivo", startAt: k === 2 ? null : ora - 20 * GIORNO });
+    d.invoices.push({ id: `demo-fattura-${k + 1}a`, clientId: cid, kind: "acconto", number: `D${k + 1}01`, amountCents: Math.round((l.setupCents ?? 200_000) / 2), issuedAt: ora - 30 * GIORNO, dueAt: ora - 15 * GIORNO, paidAt: k === 1 ? null : ora - 16 * GIORNO });
+    if (k !== 2) d.invoices.push({ id: `demo-fattura-${k + 1}c`, clientId: cid, feeId: fee, kind: "canone", number: `D${k + 1}02`, amountCents: l.feeCents ?? 20_000, period: new Date(ora).toISOString().slice(0, 7), issuedAt: ora - 10 * GIORNO, dueAt: ora + 20 * GIORNO, paidAt: null });
+  });
+  return d;
+}
+
+// Ordine delle tabelle: chi è citato prima di chi cita (le chiavi esterne di D1 sono attive).
+const ORDINE = [
+  ["users", users], ["leads", leads], ["activities", activities], ["calls", calls], ["proposals", proposals], ["companyProfiles", companyProfiles],
+  ["callAnalyses", callAnalyses], ["clients", clients], ["automations", automations], ["fees", fees], ["invoices", invoices],
+] as const satisfies readonly (readonly [keyof DatiDemo, SQLiteTable])[];
+// Tabelle svuotate al ripristino oltre a quelle seminate (stati, avvisi, registri). Fasi, regole, impostazioni e modelli restano quelli delle migrazioni.
+const SOLO_DA_SVUOTARE = ["documents", "audit_log", "notifications", "ai_jobs", "claude_usage", "campaign_spend", "weekly_reviews", "push_subscriptions", "costs", "sessions", "hook_log", "integration_status"];
+
+const letterale = (v: unknown): string => {
+  if (v === null || v === undefined) return "NULL";
+  if (typeof v === "boolean") return v ? "1" : "0";
+  if (typeof v === "number") return String(v);
+  const s = typeof v === "string" ? v : JSON.stringify(v);
+  // Una riga per istruzione: gli a capo diventano char(10).
+  return `'${s.replace(/'/g, "''").replace(/\n/g, "' || char(10) || '")}'`;
+};
+
+export function sqlDemo(d: DatiDemo): string[] {
+  const svuota = [...SOLO_DA_SVUOTARE, ...[...ORDINE].reverse().map(([, t]) => getTableConfig(t).name)];
+  const out = svuota.map((t) => `DELETE FROM ${t};`);
+  for (const [chiave, tabella] of ORDINE) {
+    const colonne = getTableColumns(tabella) as Record<string, { name: string }>;
+    const nome = getTableConfig(tabella).name;
+    for (const riga of d[chiave] as Record<string, unknown>[]) {
+      const campi = Object.keys(riga).filter((k) => riga[k] !== undefined);
+      out.push(`INSERT INTO ${nome} (${campi.map((k) => colonne[k].name).join(", ")}) VALUES (${campi.map((k) => letterale(riga[k])).join(", ")});`);
+    }
+  }
+  return out;
+}

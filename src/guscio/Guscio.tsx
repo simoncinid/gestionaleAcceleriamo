@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { useBadge } from "../hooks";
 import { creazioneDelPiu, creazioniDelPercorso, type Creazione } from "./aree";
+import { BannerDemo } from "./BannerDemo";
 import { BarraBasso } from "./BarraBasso";
 import { BarraLaterale } from "./BarraLaterale";
 import { FoglioCerca } from "./FoglioCerca";
@@ -47,6 +48,7 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
         <BarraLaterale nome={nome} badge={badge} onCrea={setCrea} onEsci={onEsci} onCerca={() => setCerca(true)} />
         <div className="min-w-0 flex-1">
           <div className="sticky top-0 z-10">
+            <BannerDemo />
             <Testata nome={nome} puntoAvatar={badge?.avatar ?? false} avvisi={badge?.avvisi ?? 0} onCerca={() => setCerca(true)} onPiu={piu} />
           </div>
           <main className="mx-auto w-full max-w-[1100px] px-4 pt-4 md:px-8 md:pt-8"><Outlet /></main>

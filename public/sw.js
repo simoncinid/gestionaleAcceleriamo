@@ -1,5 +1,6 @@
 // Spec 8.3 e 17: in cache solo il guscio statico, mai le API.
-const VERSIONE = "guscio-v1";
+// v2 (Task 13): le icone sono passate da PNG a WebP, la cache vecchia si butta.
+const VERSIONE = "guscio-v2";
 const GUSCIO = ["/offline.html", "/manifest.webmanifest", "/app/icona-192.png", "/fonts/DegularDisplay-Semibold.otf", "/fonts/Inter-Regular.ttf"];
 const STATICI = ["/assets/", "/fonts/", "/icone/", "/brand/", "/app/"];
 const IMMUTABILI = ["/assets/", "/fonts/"];

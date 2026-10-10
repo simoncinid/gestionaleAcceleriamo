@@ -123,17 +123,24 @@ integrazioniRoutes.get("/status", async (c) => {
     segreti,
     foglio: { ultimaRiga: st?.lastRow ?? 1, ultimaLettura: st?.lastRunAt ?? null },
   };
+  // Spazio demo (spec 12): nessun segreto e nessun servizio vero, lo si dice in chiaro.
+  if (c.env.SPAZIO === "demo") out.integrazioni = out.integrazioni.map((i) => ({ ...i, stato: "spento", ultimaOk: null, nota: "Spazio demo", extra: undefined }));
+  if (c.env.SPAZIO === "demo") out.errori = [];
   return c.json(out);
 });
 
 // Stesso tetto del cron: anche una richiesta HTTP ha 50 query D1 sul piano gratuito.
+// Nello spazio demo il foglio non si legge mai: nessun dato vero entra nei dati finti.
+const SOLO_FUORI_DEMO = "Nello spazio demo il foglio non si legge";
 integrazioniRoutes.post("/foglio/leggi", async (c) => {
+  if (c.env.SPAZIO === "demo") return c.json({ error: SOLO_FUORI_DEMO }, 409);
   const esito = await giroFoglio(c.env, Date.now(), LAVORI.foglio?.max ?? 2);
   if (!esito) return c.json({ error: "La lettura del foglio è spenta: incolla il link, accendila e salva" }, 409);
   return c.json({ giro: esito });
 });
 
 integrazioniRoutes.get("/foglio/anteprima", async (c) => {
+  if (c.env.SPAZIO === "demo") return c.json({ error: SOLO_FUORI_DEMO }, 409);
   const { foglio } = await leggiImpostazioni(getDb(c.env.DB));
   if (!foglio.spreadsheetId.trim()) return c.json({ error: "Incolla prima il link del foglio e salva" }, 409);
   try {

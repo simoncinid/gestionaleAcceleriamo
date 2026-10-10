@@ -47,6 +47,8 @@ app.use("/api/*", async (c, next) => {
   return requireAuth(c, next);
 });
 
+// Spazio demo (spec 12): il frontend lo legge per il banner. Dietro la sessione come ogni rotta /api.
+app.get("/api/spazio", (c) => c.json({ demo: c.env.SPAZIO === "demo" }));
 app.route("/api/webhooks/meta", metaRoutes);
 app.route("/api/auth", authRoutes);
 // Prima delle rotte dei lead: /api/leads/:id/scheda-azienda.

@@ -122,6 +122,23 @@ E, se si sanno, questi campi che lo script legge e manda: `azienda`, `opzione` (
 - **Indirizzo:** di default il Worker online; si cambia con la variabile `ACC_OS_URL`.
 - **Limiti dell'aggancio:** chiave `Authorization: Bearer <chiave>` (senza, 401 e nessuna scrittura), corpo al massimo 16 KB (413), al massimo 30 chiamate l'ora (429). Ogni chiamata con la chiave giusta finisce nel registro di Impostazioni > Integrazioni, Aggancio, che tiene 30 giorni.
 
+## Spazio demo
+
+Una copia dell'app con dati finti, da mostrare a clienti e collaboratori senza aprire i dati veri. È un secondo Worker (`acceleriamo-os-demo`) con il suo database D1 (`acceleriamo-os-demo`): stesso codice, ambiente `demo` in `wrangler.jsonc`, nessun cron e nessun segreto. In testa a ogni pagina compare "Spazio demo, dati finti"; in Impostazioni > Integrazioni ogni servizio dice "Spazio demo"; il Foglio Andrea non si legge. Push, Telegram, email e Claude non partono mai, perché nella demo le chiavi non esistono.
+
+I dati (40 lead in sei settori, call, proposte, schede azienda, analisi del coach, tre clienti con automazioni, canoni e fatture) stanno in `scripts/demo-dati.ts`. Email solo su `esempio.it`, telefoni con prefisso `+39 000`: nessun messaggio può arrivare a una persona vera. L'unico utente è `demo`, con la password scelta al ripristino.
+
+Prima volta (con le credenziali Cloudflare esportate come sopra):
+
+```bash
+npx wrangler d1 create acceleriamo-os-demo   # copia l'id stampato in wrangler.jsonc, ambiente demo, al posto degli zeri
+npm run db:migrate:demo                      # crea le tabelle nel database della demo
+npm run demo:reset                           # semina i dati finti, chiede la password dell'utente demo
+npm run deploy:demo                          # pubblica su https://acceleriamo-os-demo.acceleriamo-os.workers.dev
+```
+
+Ripristino (rimette i dati di partenza e cancella tutto quello che è stato cambiato): `npm run demo:reset`. In locale: `npm run db:migrate:demo:locale` una volta, poi `npm run demo:locale`.
+
 ## Aggiungere un utente
 
 Come in locale, ma per il database online si usa `--remote` al posto di `--local` nel comando che lo script stampa:

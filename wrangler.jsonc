@@ -17,9 +17,22 @@
     "TELEGRAM_BOT": "",
     // Indirizzo dell'app per i link nei messaggi di Telegram.
     "APP_URL": "https://acceleriamo-os.acceleriamo-os.workers.dev",
-    // Indirizzo dello spazio demo: vuoto finché il Task 13 non lo pubblica.
-    "DEMO_URL": ""
+    // Indirizzo dello spazio demo (Task 13), mostrato in Impostazioni > Dati.
+    "DEMO_URL": "https://acceleriamo-os-demo.acceleriamo-os.workers.dev"
   },
   "triggers": { "crons": ["*/5 * * * *"] },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  "env": {
+    // Spazio demo (spec 12): stesso codice, database separato, nessun cron, nessun segreto.
+    // Le vars non si ereditano: qui mancano apposta VAPID e bot Telegram, quindi push e Telegram restano spenti.
+    "demo": {
+      "name": "acceleriamo-os-demo",
+      "d1_databases": [
+        // database_id: da sostituire con l'id stampato da "npx wrangler d1 create acceleriamo-os-demo" (non è un segreto).
+        { "binding": "DB", "database_name": "acceleriamo-os-demo", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "drizzle" }
+      ],
+      "vars": { "META_GRAPH_VERSION": "v23.0", "SPAZIO": "demo", "DEMO_URL": "", "APP_URL": "https://acceleriamo-os-demo.acceleriamo-os.workers.dev" },
+      "triggers": { "crons": [] }
+    }
+  }
 }

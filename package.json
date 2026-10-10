@@ -10,7 +10,12 @@
     "deploy": "vite build && wrangler deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply acceleriamo-os --local",
-    "db:migrate:remote": "wrangler d1 migrations apply acceleriamo-os --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply acceleriamo-os --remote",
+    "db:migrate:demo": "wrangler d1 migrations apply acceleriamo-os-demo --env demo --remote",
+    "db:migrate:demo:locale": "wrangler d1 migrations apply acceleriamo-os-demo --env demo --local",
+    "demo:reset": "tsx scripts/seed-demo.ts --remote",
+    "demo:locale": "tsx scripts/seed-demo.ts --local",
+    "deploy:demo": "CLOUDFLARE_ENV=demo vite build && wrangler deploy"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
