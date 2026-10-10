@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../src/api";
-import { CardLead, Errore, PRIMO_CAMPO } from "../src/ds";
+import { CampoGiorno, CampoQuando, CardLead, Errore, PRIMO_CAMPO } from "../src/ds";
+import { presetPassato } from "../src/format";
+import { FoglioFattura } from "../src/pagine/economia/Fogli";
 import { scorciatoiaRicerca } from "../src/guscio/scorciatoie";
-import { eBloccoDemo, messaggioImportInterrotto, testoBloccoDemo } from "../src/errori";
+import { eBloccoDemo, eCallNelPassato, messaggioImportInterrotto, testoBloccoDemo } from "../src/errori";
 import { CorpoEsporta } from "../src/pagine/impostazioni/Dati";
 import { Fasi, FoglioFase } from "../src/pagine/impostazioni/Fasi";
 import { IntegrazioneDettaglio } from "../src/pagine/impostazioni/IntegrazioneDettaglio";
 import { Utenti } from "../src/pagine/impostazioni/Utenti";
 import { RiordinaFasi, spostaFase } from "../src/pagine/impostazioni/RiordinaFasi";
-import type { Stage } from "../src/types";
+import { FoglioAbbina } from "../src/pagine/commerciale/FoglioProposta";
+import { Voci } from "../src/pagine/commerciale/MenuRapido";
+import type { LeadListItem, Stage } from "../src/types";
 import { IMPOSTAZIONI_DEFAULT } from "../worker/impostazioni/default";
 import { contaPrimari, render } from "./render";
 
@@ -123,5 +127,48 @@ describe("Guscio e Foglio: voci 43 e 65", () => {
     expect(PRIMO_CAMPO).toContain("input");
     expect(PRIMO_CAMPO).toContain("[role=switch]");
     expect(PRIMO_CAMPO).toContain("button[aria-expanded]");
+  });
+});
+
+describe("Commerciale: voci 34 e 42", () => {
+  it("42: le voci del menu rapido sono tutte allineate a sinistra", () => {
+    const lead = { id: "L1", company: "Officina", phone: "+393330000001", email: null, stageId: "a", contactName: null } as unknown as LeadListItem;
+    const html = render(<Voci lead={lead} chiudi={() => {}} onEsito={() => {}} onSposta={() => {}} />, { percorso: "/commerciale/scaletta" });
+    const voci = html.match(/<(a|button)[^>]*class="[^"]*"/g) ?? [];
+    expect(voci.length).toBe(4);
+    for (const v of voci) expect(v).toContain("justify-start");
+  });
+});
+
+describe("Abbina: voce 44", () => {
+  it("scegliere il lead non abbina: il primario è spento finché non c'è il lead", () => {
+    const proposta = { id: "P1", number: "2026-014", leadId: null, company: "" } as unknown as Parameters<typeof FoglioAbbina>[0]["proposta"];
+    const html = render(<FoglioAbbina proposta={proposta} onChiudi={() => {}} />, { percorso: "/commerciale/proposte" });
+    expect(contaPrimari(html)).toBe(1);
+    expect(html).toMatch(/data-variante="primario"[^>]*aria-disabled="true"|aria-disabled="true"[^>]*data-variante="primario"/);
+  });
+});
+
+describe("Date: voci 33, 48 e minore 3", () => {
+  const ORA = Date.UTC(2026, 9, 13, 8, 0);
+  it("33: CampoGiorno mostra l'etichetta della scorciatoia scelta", () => {
+    const [oggi] = presetPassato(ORA);
+    const html = render(<CampoGiorno etichetta="Inizio" valore={oggi.ms} onCambia={() => {}} ora={ORA} scorciatoie={presetPassato} />);
+    expect(html).toContain(">Oggi<");
+  });
+  it("48: Segna incassata usa CampoGiorno, niente campo data nativo", () => {
+    const f = { id: "F1", kind: "setup", cliente: "Officina", amountCents: 100_000, number: "12", period: null, issuedAt: ORA - 86_400_000, dueAt: ORA + 86_400_000, paidAt: null, pdfUrl: null, stato: "emessa" } as unknown as Parameters<typeof FoglioFattura>[0]["f"];
+    const html = render(<FoglioFattura f={f} ora={ORA} onChiudi={() => {}} />, { percorso: "/economia" });
+    expect(html).not.toContain('type="date"');
+    expect(html).toContain('data-selettore="Incassata il"');
+    expect(html).toContain(">Oggi<");
+  });
+  it("minore 3: la call nel passato si legge sotto la data", () => {
+    const e = new ApiError(422, "La call è nel passato: scegli giorno e ora da adesso in poi");
+    expect(eCallNelPassato(e)).toBe(true);
+    expect(eCallNelPassato(new ApiError(422, "Altro"))).toBe(false);
+    const html = render(<CampoQuando etichetta="Giorno e ora" valore={null} onCambia={() => {}} ora={ORA} errore={e.message} />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("La call è nel passato");
   });
 });

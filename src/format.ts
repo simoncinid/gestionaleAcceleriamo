@@ -115,6 +115,15 @@ export function presetInizio(ora = Date.now()) {
   ];
 }
 
+// Scorciatoie per i giorni passati (Segna incassata, Segna emessa): voce 48.
+export function presetPassato(ora = Date.now()) {
+  const p = partiRoma(ora);
+  return [
+    { etichetta: "Oggi", ms: daRoma(p.anno, p.mese, p.giorno) },
+    { etichetta: "Ieri", ms: daRoma(p.anno, p.mese, p.giorno - 1) },
+  ];
+}
+
 // Minuti interi in ore e minuti ("1 h 10 min"): diversa da durata(), che arrotonda all'unità più grande.
 const durataMinuti = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}` : `${m} min`);
 
