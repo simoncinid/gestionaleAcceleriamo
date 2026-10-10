@@ -1,5 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
+import { spesoDelMese } from "../claude/coda";
+import { centsDaMicros } from "../claude/costo";
 import { LAVORI } from "../cron";
 import { getDb } from "../db/client";
 import { hookLog, integrationStatus, sheetSyncState } from "../db/schema";
@@ -7,6 +9,7 @@ import { inviaEmail } from "../email/resend";
 import type { AppEnv, Env } from "../env";
 import { anteprimaFoglio, giroFoglio } from "../foglio/sync";
 import { leggiImpostazioni } from "../impostazioni/service";
+import { meseRoma } from "../lib/roma";
 import { MAX_META_ATTEMPTS } from "../meta/ingest";
 import { pushCollegate } from "../push/invio";
 import { provaPush } from "../push/routes";
@@ -15,7 +18,8 @@ import { mandaTelegram, nuovoCodice, telegramCollegato } from "../telegram/bot";
 import { segnaErrore, segnaOk } from "./stato";
 
 // "spento" vale anche per "non collegato": un segreto o un link che manca non è mai un errore rosso.
-export type Integrazione = { key: string; etichetta: string; stato: "ok" | "errore" | "spento" | "mai"; ultimaOk: number | null; nota: string | null };
+// extra: numeri che la schermata formatta da sé (Claude: speso del mese e tetto, in centesimi).
+export type Integrazione = { key: string; etichetta: string; stato: "ok" | "errore" | "spento" | "mai"; ultimaOk: number | null; nota: string | null; extra?: { spesoCents: number; tettoCents: number } };
 export type StatoSistema = {
   integrazioni: Integrazione[];
   settimana: { meta: number; foglio: number; aggancio: number };
@@ -36,6 +40,7 @@ const SENZA_SEGRETI_META = "Non collegato: mancano i segreti di Meta";
 const SENZA_LINK_FOGLIO = "Non collegato: manca il link del foglio";
 export const SENZA_CHIAVI_PUSH = "Non collegato: mancano le chiavi VAPID";
 export const SENZA_BOT_TELEGRAM = "Non collegato: manca il token del bot";
+export const SENZA_CHIAVE_CLAUDE = "Non collegato: manca la chiave di Anthropic";
 const SENZA_NOME_BOT = "Non collegato: manca il nome del bot";
 
 // I segreti risultano solo presenti o mancanti: il valore non esce mai dal Worker.
@@ -53,7 +58,7 @@ integrazioniRoutes.get("/status", async (c) => {
   const db = getDb(c.env.DB);
   const da = Date.now() - SETTIMANA;
   const conta = async (q: string, ...b: unknown[]) => (await c.env.DB.prepare(q).bind(...b).first<{ n: number }>())?.n ?? 0;
-  const [righe, imp, st, ultimoMetaRiga, metaFermi, sMeta, sFoglio, sAggancio, dispositivi, chat] = await Promise.all([
+  const [righe, imp, st, ultimoMetaRiga, metaFermi, sMeta, sFoglio, sAggancio, dispositivi, chat, spesoClaude] = await Promise.all([
     db.select().from(integrationStatus),
     leggiImpostazioni(db),
     db.select().from(sheetSyncState).where(eq(sheetSyncState.id, "foglio-andrea")).get(),
@@ -64,9 +69,10 @@ integrazioniRoutes.get("/status", async (c) => {
     conta("SELECT count(*) n FROM hook_log WHERE status IN (200, 201) AND outcome <> 'prova' AND at >= ?", da),
     pushCollegate(c.env) ? conta("SELECT count(*) n FROM push_subscriptions WHERE rotta = 0") : Promise.resolve(0),
     telegramCollegato(c.env) ? conta("SELECT count(*) n FROM users WHERE telegram_chat_id IS NOT NULL AND active = 1") : Promise.resolve(0),
+    c.env.ANTHROPIC_API_KEY ? spesoDelMese(c.env.DB, meseRoma(Date.now())) : Promise.resolve(0),
   ]);
   const segreti = segretiDi(c.env);
-  const collegato = (key: string) => (key === "resend" ? segreti.resend : key === "aggancio" ? segreti.aggancio : key === "telegram" ? telegramCollegato(c.env) : true);
+  const collegato = (key: string) => (key === "resend" ? segreti.resend : key === "aggancio" ? segreti.aggancio : key === "telegram" ? telegramCollegato(c.env) : key === "claude" ? Boolean(c.env.ANTHROPIC_API_KEY) : true);
   const daRiga = (key: string, spento: string | null): Integrazione => {
     const r = righe.find((x) => x.key === key);
     const base = { key, etichetta: ETICHETTE[key], ultimaOk: r?.lastOkAt ?? null };
@@ -74,7 +80,6 @@ integrazioniRoutes.get("/status", async (c) => {
     if (!r) return { ...base, stato: "mai", nota: "Non ha ancora lavorato" };
     return { ...base, stato: r.ok ? "ok" : "errore", nota: r.ok ? null : r.lastError };
   };
-  const futura = (key: string): Integrazione => ({ key, etichetta: ETICHETTE[key], stato: "spento", ultimaOk: null, nota: "Non ancora attivo" });
   // Meta non scrive in integration_status: l'ultima volta è l'ultimo lead completo, l'errore sono i lead fermi dopo tutti i tentativi.
   const ultimoMeta = ultimoMetaRiga?.t ?? null;
   const meta: Integrazione = !segreti.meta
@@ -94,6 +99,10 @@ integrazioniRoutes.get("/status", async (c) => {
     : rigaTelegram && !rigaTelegram.ok
       ? { key: "telegram", etichetta: "Telegram", stato: "errore", ultimaOk: rigaTelegram.lastOkAt ?? null, nota: rigaTelegram.lastError }
       : { key: "telegram", etichetta: "Telegram", stato: "ok", ultimaOk: rigaTelegram?.lastOkAt ?? null, nota: chat === 1 ? "1 chat collegata" : `${chat} chat collegate` };
+  // Claude: senza chiave "Non collegato"; con la chiave lo stato dei lavori (integration_status) e lo speso del mese.
+  const claude: Integrazione = c.env.ANTHROPIC_API_KEY
+    ? { ...daRiga("claude", null), extra: { spesoCents: centsDaMicros(spesoClaude), tettoCents: imp.claude.tettoCents } }
+    : { key: "claude", etichetta: "Claude", stato: "spento", ultimaOk: null, nota: SENZA_CHIAVE_CLAUDE };
   const foglioSpento = !imp.foglio.spreadsheetId.trim() ? SENZA_LINK_FOGLIO : !imp.foglio.attivo ? "Lettura spenta" : null;
   const out: StatoSistema = {
     integrazioni: [
@@ -101,7 +110,7 @@ integrazioniRoutes.get("/status", async (c) => {
       daRiga("foglio", foglioSpento),
       daRiga("aggancio", segreti.aggancio ? null : SENZA_CHIAVE_AGGANCIO),
       daRiga("resend", segreti.resend ? null : SENZA_CHIAVE_RESEND),
-      push, telegram, futura("claude"),
+      push, telegram, claude,
       daRiga("giro", null),
     ],
     settimana: { meta: sMeta, foglio: sFoglio, aggancio: sAggancio },

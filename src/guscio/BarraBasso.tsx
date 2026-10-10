@@ -3,7 +3,7 @@ import { Badge, cx } from "../ds";
 import { AREE, areaDi } from "./aree";
 import { Icona3D } from "./Icona3D";
 
-export type BadgeDati = { commerciale: number; economia: number; avvisi?: number; avatar: boolean };
+export type BadgeDati = { commerciale: number; economia: number; avvisi?: number; avatar: boolean; claude?: "ok" | "avviso" | "tetto" };
 
 // Telefono: solo le tre aree. Il "+" sta nella testata (decisione di Tommaso, 10/10/2026).
 export function BarraBasso({ badge }: { badge: BadgeDati | undefined }) {

@@ -91,6 +91,9 @@ export const IMPOSTAZIONI_DEFAULT: Impostazioni = {
     prezzi: {
       "claude-haiku-4-5": { ingresso: 1, uscita: 5, cacheLettura: 0.1, cacheScrittura: 1.25 },
       "claude-sonnet-5-5": { ingresso: 2, uscita: 10, cacheLettura: 0.2, cacheScrittura: 2.5 },
+      // Il fallback del server per Sonnet 5.5 risponde con Sonnet 5: il costo segue il modello che ha risposto.
+      "claude-sonnet-5": { ingresso: 2, uscita: 10, cacheLettura: 0.2, cacheScrittura: 2.5 },
+      "claude-opus-5-5": { ingresso: 4, uscita: 20, cacheLettura: 0.4, cacheScrittura: 5 },
     },
     ricercaMicros: 10_000,
     tettoCents: 2000,

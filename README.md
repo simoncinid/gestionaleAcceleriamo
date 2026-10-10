@@ -77,6 +77,7 @@ I segreti stanno solo in Cloudflare, mai nel repo. Si impostano uno alla volta c
 - `META_VERIFY_TOKEN`, `META_APP_SECRET`, `META_PAGE_TOKEN`: connessione con Meta (dal rilascio 1A).
 - `RESEND_API_KEY`: invio delle email (conferma al lead nuovo, invito alla call).
 - `PROPOSAL_HOOK_KEY`: chiave dell'aggancio delle proposte (`POST /api/hooks/proposals`). La stessa chiave sta nel Portachiavi del Mac, voce `acceleriamo-os-aggancio`, da cui la legge lo script `dopo-il-pdf` del wiki.
+- `ANTHROPIC_API_KEY`: chiave di Claude (`npx wrangler secret put ANTHROPIC_API_KEY`). Senza, i lavori di Claude restano in coda e Impostazioni > Integrazioni dice "Non collegato: manca la chiave di Anthropic". Il tetto è di 20 euro al mese (mese di Roma): oltre, i lavori si fermano fino al primo del mese.
 - `GOOGLE_SA_EMAIL`, `GOOGLE_SA_PRIVATE_KEY` (facoltativi): account di servizio Google, via alternativa per leggere il Foglio Andrea. Si usano solo se ci sono tutti e due.
 
 Quando un segreto manca nessuno vede errori: Impostazioni > Integrazioni mostra il servizio in grigio come "Non collegato" (per esempio "Non collegato: manca la chiave di Resend") e il resto dell'app funziona. Senza `RESEND_API_KEY` le email di conferma restano in coda senza consumare tentativi e partono al primo giro dopo l'arrivo della chiave (vedi la regola delle 48 ore sotto); le call si salvano lo stesso, senza invito. Senza `PROPOSAL_HOOK_KEY` l'aggancio risponde sempre 401. Impostazioni > Integrazioni mostra solo se un segreto c'è o manca, mai il valore.

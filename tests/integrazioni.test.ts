@@ -4,6 +4,7 @@ import { app } from "../worker/app";
 import { setEmailFetch } from "../worker/email/fetcher";
 import type { Env } from "../worker/env";
 import { setGoogleFetch } from "../worker/foglio/fetcher";
+import { meseRoma } from "../worker/lib/roma";
 import { authed, call } from "./helpers";
 
 type Stato = { integrazioni: { key: string; stato: string; nota: string | null }[]; settimana: { meta: number; foglio: number; aggancio: number }; errori: { key: string; errorId: string | null }[]; segreti: Record<string, boolean> };
@@ -53,6 +54,18 @@ describe("Impostazioni, integrazioni", () => {
     expect(voce(s, "aggancio").nota).toBe("Non collegato: manca la chiave dell'aggancio");
     expect(voce(s, "meta").nota).toBe("Non collegato: mancano i segreti di Meta");
     expect(s.errori.map((e) => e.key)).not.toContain("resend");
+  });
+
+  it("Claude: senza chiave non collegato; con la chiave stato dei lavori, speso del mese e tetto in centesimi", async () => {
+    const cookie = await authed();
+    await env.DB.prepare("INSERT INTO integration_status (key, ok, last_error_at, last_error, error_id) VALUES ('claude', 0, 1, 'Lavori di Claude non riusciti', 'cd34ef56')").run();
+    const senza = (await (await callCon({ ANTHROPIC_API_KEY: "" }, "/api/integrations/status", {}, cookie)).json()) as Stato;
+    expect(voce(senza, "claude")).toMatchObject({ stato: "spento", nota: "Non collegato: manca la chiave di Anthropic" });
+    expect(senza.errori.map((e) => e.key)).not.toContain("claude");
+    await env.DB.prepare("INSERT INTO claude_usage (id, tipo, modello, mese, costo_micros, created_at) VALUES ('u1', 'scheda', 'claude-sonnet-5-5', ?1, 1234567, 0)").bind(meseRoma(Date.now())).run();
+    const con = await stato(cookie);
+    expect(voce(con, "claude")).toMatchObject({ stato: "errore", nota: "Lavori di Claude non riusciti", extra: { spesoCents: 124, tettoCents: 2000 } });
+    expect(JSON.stringify(con)).not.toContain(env.ANTHROPIC_API_KEY!);
   });
 
   it("email di prova: va all'indirizzo delle risposte e accende Resend", async () => {

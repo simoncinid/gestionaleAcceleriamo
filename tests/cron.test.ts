@@ -12,6 +12,11 @@ import { setMetaFetch } from "../worker/meta/fetcher";
 import { b64u } from "../worker/push/cifra";
 import { setPushFetch } from "../worker/push/fetcher";
 import { setTelegramFetch } from "../worker/telegram/fetcher";
+import { chiamaClaude } from "../worker/claude/client";
+import { accoda, lavoraCoda, registraTipo, TIPI } from "../worker/claude/coda";
+import { setClaudeFetch } from "../worker/claude/fetcher";
+import { contaD1 } from "../worker/lib/bilancio";
+import { rispostaClaude } from "./claude-fixture";
 import { createUser } from "./helpers";
 
 const r = (ore: number, minuti: number) => daRoma(2026, 10, 13, ore, minuti);
@@ -86,7 +91,7 @@ const rigaFoglio = (i: number) => `2026-10-12 09:${String(i % 60).padStart(2, "0
 const ultimaRiga = async () => (await env.DB.prepare("SELECT last_row FROM sheet_sync_state WHERE id = 'foglio-andrea'").first<{ last_row: number }>())?.last_row;
 const agganciati = async () => (await env.DB.prepare("SELECT count(*) n FROM leads WHERE sheet_row_key IS NOT NULL").first<{ n: number }>())?.n;
 
-afterEach(() => { setEmailFetch(null); setGoogleFetch(null); setMetaFetch(null); setPushFetch(null); setTelegramFetch(null); });
+afterEach(() => { setEmailFetch(null); setGoogleFetch(null); setMetaFetch(null); setPushFetch(null); setTelegramFetch(null); setClaudeFetch(null); });
 
 describe("limiteDi", () => {
   const def: DefLavoro = { quando: () => true, fisse: 4, perUnita: 6, sottoPerUnita: 1, max: 5, esegui: async () => 0 };
@@ -113,8 +118,8 @@ describe("calendario del giro", () => {
     expect(quali(mar0600)).toContain("proposte_scadute");
     expect(quali(mar0600)).not.toContain("foglio");
   });
-  it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme", () => {
-    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "consegna", "telegram", "conferme", "meta_48h"]);
+  it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; Claude per ultimo", () => {
+    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "consegna", "telegram", "conferme", "meta_48h", "claude"]);
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");
@@ -194,7 +199,7 @@ describe("proposte scadute", () => {
 
 describe("giro programmato", () => {
   it("registra la sua ora in integration_status", async () => {
-    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["foglio", "avvisi", "consegna", "telegram", "conferme"], saltati: [], errori: [] });
+    expect(await giro(env, r(10, 5))).toMatchObject({ fatti: ["foglio", "avvisi", "consegna", "telegram", "conferme", "claude"], saltati: [], errori: [] });
     expect(await env.DB.prepare("SELECT ok, last_ok_at FROM integration_status WHERE key = 'giro'").first()).toEqual({ ok: 1, last_ok_at: r(10, 5) });
   });
 
@@ -299,7 +304,7 @@ describe("giro programmato", () => {
     // Foglio spento (1 query), due lead da Meta (33), avvisi (8): consegna delle push, Telegram (2 fisse più 1) e
     // conferme non entrano e aspettano il giro dopo.
     const esito = await giro(c.env, r(10, 15));
-    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi"], saltati: ["consegna", "telegram", "conferme"], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi"], saltati: ["consegna", "telegram", "conferme", "claude"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
     expect(chiamate).toBe(MAX.meta);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
@@ -581,3 +586,132 @@ describe("arretrato nel foglio", () => {
     expect(esito.query).toBeLessThanOrEqual(45);
   });
 });
+
+// Lavoro "claude" (Task 6). Il gestore finto usa il massimo che il contratto concede a un tipo: 7 query D1 e
+// una chiamata a Claude (sottorichiesta contata dal fetcher finto). Le stime del giro vengono da qui.
+describe("giro con Claude", () => {
+  const salvati = { ...TIPI };
+  let chiamateClaude = 0;
+  function tipoFinto() {
+    chiamateClaude = 0;
+    setClaudeFetch(async () => { chiamateClaude++; return rispostaClaude({ testo: '{"ok":true}', ingresso: 1_200, uscita: 80 }); });
+    registraTipo("classificazione", {
+      stima: () => ({ modello: "claude-haiku-4-5", ingresso: 1_500, maxTokens: 300, ricerche: 0 }),
+      esegui: async (e, job, imp) => {
+        for (let i = 0; i < 7; i++) await e.DB.prepare("SELECT ?1 AS id").bind(job.entityId).first();
+        const r = await chiamaClaude(e, { modello: imp.modelli.classificazione, sistema: "s", testo: "t", maxTokens: 300, schema: { type: "object" } });
+        return { uso: r.uso, modello: r.modello };
+      },
+      alErrore: async () => undefined,
+    });
+  }
+  afterEach(() => {
+    for (const k of Object.keys(TIPI)) delete (TIPI as Record<string, unknown>)[k];
+    Object.assign(TIPI, salvati);
+  });
+  async function treLavori(quando: number) {
+    for (const e of ["L1", "L2", "L3"]) await accoda(env.DB, { tipo: "classificazione", entityId: e, leadId: e }, quando - 60_000);
+  }
+  const fatti = async () => (await env.DB.prepare("SELECT count(*) n FROM ai_jobs WHERE stato = 'pronto'").first<{ n: number }>())?.n ?? 0;
+
+  it("misura: 3 lavori, un fermo e l'avviso del tetto stanno in 7 fisse più 10 a lavoro", async () => {
+    await createUser();
+    tipoFinto();
+    registraTipo("scheda", { stima: () => ({ modello: "claude-sonnet-5-5", ingresso: 160_000, maxTokens: 8_000, ricerche: 5 }), esegui: async () => { throw new Error("non deve partire"); }, alErrore: async () => undefined });
+    await env.DB.prepare("INSERT INTO claude_usage (id, tipo, modello, mese, costo_micros, created_at) VALUES ('u1', 'scheda', 'claude-sonnet-5-5', '2026-10', 19800000, 0)").run();
+    await accoda(env.DB, { tipo: "scheda", entityId: "S1" }, r(11, 0));
+    await treLavori(r(11, 10));
+    const contatore = { query: 0 };
+    const esito = await lavoraCoda({ ...env, DB: contaD1(env.DB, contatore) }, r(11, 10), 3);
+    expect(esito).toEqual({ fatti: 3, fermi: 1, errori: 0 });
+    expect(contatore.query).toBe(LAVORI.claude!.fisse + 3 * LAVORI.claude!.perUnita);
+    expect(chiamateClaude).toBeLessThanOrEqual(3 * LAVORI.claude!.sottoPerUnita);
+  });
+
+  it("senza lavori in coda costa 3 query; senza tipi o senza chiave nessuna", async () => {
+    tipoFinto();
+    const c1 = { query: 0 };
+    await lavoraCoda({ ...env, DB: contaD1(env.DB, c1) }, r(11, 10), 3);
+    expect(c1.query).toBe(3);
+    const c2 = { query: 0 };
+    await lavoraCoda({ ...env, DB: contaD1(env.DB, c2), ANTHROPIC_API_KEY: "" }, r(11, 10), 3);
+    expect(c2.query).toBe(0);
+  });
+
+  // Con le fisse degli altri lavori del giro (circa 13 query) a Claude ne restano 31: 2 lavori (7 + 2 x 10).
+  // Il terzo parte al giro dopo.
+  it("giro senza altro da fare: 2 lavori di Claude in questo giro, il terzo al giro dopo", async () => {
+    await createUser();
+    tipoFinto();
+    await treLavori(r(11, 10));
+    const c = contaQuery();
+    const esito = await giro(c.env, r(11, 10));
+    expect(esito.errori).toEqual([]);
+    expect(esito.fatti).toContain("claude");
+    expect(await fatti()).toBe(2);
+    expect(c.n()).toBeLessThanOrEqual(45);
+    const dopo = await giro(env, r(11, 15));
+    expect(dopo.errori).toEqual([]);
+    expect(await fatti()).toBe(3);
+    expect(chiamateClaude).toBe(3);
+  });
+
+  // Review Focus 2: 2 lead dal foglio, 3 da Meta, conferme e inviti, 3 lavori Claude e 12 push in attesa.
+  async function tuttoInAttesa(righeFoglio: number, quando: number) {
+    await createUser();
+    await foglioFinto(Array.from({ length: righeFoglio }, (_, i) => rigaFoglio(i)));
+    for (let i = 0; i < 3; i++) await insertLead(`m${i}`, { source: "meta", meta_lead_id: `lg-${i}`, meta_status: "pending", meta_attempts: 0, stage_id: "da-chiamare-prima-volta" });
+    for (let i = 0; i < 5; i++) await insertLead(`c${i}`, { source: "meta", email: `conf${i}@esempio.it`, confirmation_error: "Resend non raggiungibile, si riprova", confirmation_attempts: 1, created_at: r(10, 0) - i });
+    for (let i = 0; i < 2; i++) {
+      await insertLead(`inv${i}`, { email: `anna${i}@esempio.it`, contact_name: "Anna Prova" });
+      await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, invite_queued_at, created_at, updated_at) VALUES (?, ?, 'conoscenza', ?, ?, ?, ?)")
+        .bind(`kq${i}`, `inv${i}`, r(10, 0) + 2 * GIORNO, NOW, NOW, NOW).run();
+    }
+    let sotto = 0;
+    setGoogleFetch(async () => { sotto++; return new Response([TESTATA_FOGLIO, ...Array.from({ length: righeFoglio }, (_, i) => rigaFoglio(i))].join("\n"), { headers: { "content-type": "text/csv" } }); });
+    setEmailFetch(async () => { sotto++; return Response.json({ id: `re_${sotto}` }); });
+    setMetaFetch(async () => { sotto++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`meta${sotto}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
+    let push = 0;
+    setPushFetch(async () => { sotto++; push++; return new Response("", { status: 201 }); });
+    // Push: un dispositivo e 12 avvisi da consegnare, chiavi VAPID generate al volo.
+    const v = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
+    const tel = (await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"])) as CryptoKeyPair;
+    await env.DB.prepare("INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, etichetta, created_at) VALUES ('sub1', 'tommaso', 'https://push.esempio.it/1', ?, ?, 'iPhone', 0)")
+      .bind(b64u((await crypto.subtle.exportKey("raw", tel.publicKey)) as ArrayBuffer), b64u(crypto.getRandomValues(new Uint8Array(16)))).run();
+    for (let i = 0; i < 12; i++) {
+      await env.DB.prepare("INSERT INTO notifications (id, chiave, user_id, evento, entity_id, titolo, created_at) VALUES (?, ?, 'tommaso', 'sla_90', ?, 'Prima chiamata tra 30 minuti', ?)")
+        .bind(`np${i}`, `sla_90:P${i}:tommaso`, `P${i}`, quando - 60_000 - i).run();
+    }
+    tipoFinto();
+    await treLavori(quando);
+    const chiavi = { VAPID_PUBLIC_KEY: b64u((await crypto.subtle.exportKey("raw", v.publicKey)) as ArrayBuffer), VAPID_PRIVATE_KEY: (await crypto.subtle.exportKey("jwk", v.privateKey)).d! };
+    return { sotto: () => sotto + chiamateClaude, push: () => push, chiavi };
+  }
+  const casi: [string, number, number][] = [
+    ["10:00, foglio, Meta, conferme, Meta 48 ore", r(10, 0), 2],
+    ["10:05, foglio e conferme", r(10, 5), 2],
+    ["10:10, 1 riga nel foglio", r(10, 10), 1],
+    ["10:15, foglio e Meta", r(10, 15), 2],
+    ["11:10, foglio vuoto", r(11, 10), 0],
+    ["6:00, proposte scadute", r(6, 0), 2],
+  ];
+  for (const [nome, quando, righe] of casi) {
+    it(`giro pieno alle ${nome}, 12 push e 3 lavori Claude: al massimo 45 query e 15 sottorichieste; Claude non entrato aspetta senza errori`, async () => {
+      const s = await tuttoInAttesa(righe, quando);
+      const c = contaQuery();
+      const esito = await giro({ ...c.env, ...s.chiavi }, quando);
+      expect(esito.errori).toEqual([]);
+      expect(c.n()).toBeLessThanOrEqual(45);
+      expect(esito.query).toBeLessThanOrEqual(45);
+      expect(s.sotto()).toBeLessThanOrEqual(15);
+      expect(s.push()).toBeLessThanOrEqual(10);
+      expect(chiamateClaude).toBeLessThanOrEqual(3);
+      const stati = await env.DB.prepare("SELECT stato, count(*) n FROM ai_jobs GROUP BY stato ORDER BY stato").all<{ stato: string; n: number }>();
+      // I lavori che non sono entrati restano in coda: niente errori, niente fermi.
+      expect(stati.results.every((x) => x.stato === "in_coda" || x.stato === "pronto")).toBe(true);
+      expect(await fatti()).toBe(chiamateClaude);
+      if (esito.fatti.includes("claude")) expect(chiamateClaude).toBeGreaterThan(0);
+    });
+  }
+});
+

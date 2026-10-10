@@ -5,6 +5,8 @@ import { COSTO_AVVISI, controllaAvvisi, controllaMeta48 } from "./avvisi/control
 import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
 import { mandaInvitiInCoda } from "./calls/service";
+import { lavoraCoda } from "./claude/coda";
+import "./claude/tipi";
 import { ritentaConferme } from "./email/conferma";
 import type { Env } from "./env";
 import { giroFoglio } from "./foglio/sync";
@@ -95,6 +97,19 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   },
   // Spec 8: Meta senza lead da 48 ore, una volta l'ora (giro delle :00). 3 query misurate.
   meta_48h: { quando: (p) => p.minuti < 5, fisse: 3, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => controllaMeta48(e, n) },
+  // Claude (spec 7.4): ultimo del giro, dopo le conferme e dopo il controllo di Meta delle :00, che gira una volta
+  // l'ora e non deve perdere il suo turno. Un lavoro di Claude può aspettare 5 minuti, un lead no.
+  // Misura con contaD1: fisse 7 (riapertura dei fermi in una batch da 2, coda con lo speso del mese, impostazioni,
+  // fermi, avviso del tetto, stato), per lavoro 3 (in corso, uso più pronto in una batch) più al massimo 7 del
+  // gestore del tipo, quindi 10; sottorichieste 3 a lavoro (la chiamata più due continuazioni di pause_turn).
+  // Al massimo 3 per giro (lavoriPerGiro in Impostazioni può abbassarlo). Senza chiave o senza tipi costa zero.
+  claude: {
+    quando: sempre, fisse: 7, perUnita: 10, sottoPerUnita: 3, max: 3,
+    esegui: async (e, n, l) => {
+      const r = await lavoraCoda(e, n, l);
+      return { ...r, sottorichieste: (r.fatti + r.errori) * 3 };
+    },
+  },
 };
 
 // Vero se nel giro di questo istante c'è in programma almeno un altro lavoro oltre a quello indicato.
