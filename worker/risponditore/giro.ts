@@ -48,7 +48,7 @@ export async function giroRisponditore(env: Env, now: number, limite: number): P
     }
     // Il tentativo interrotto di un in_corso conta come tentativo (senza avviso: se questo riesce non c'è nulla da dire).
     if (r.stato === "in_corso") {
-      await env.DB.prepare(`UPDATE risp_eventi SET tentativi = tentativi + 1, campagna_id = ? WHERE commento_id = ?`).bind(campagna.id, r.commento_id).run();
+      await env.DB.prepare(`UPDATE risp_eventi SET tentativi = tentativi + 1, campagna_id = ?, aggiornato_il = ? WHERE commento_id = ?`).bind(campagna.id, now, r.commento_id).run();
     }
     ritentati++;
     try {
