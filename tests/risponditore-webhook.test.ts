@@ -151,13 +151,13 @@ describe("trattaCommento", () => {
     expect((await evento("c1"))?.motivo).toContain("Troppe risposte");
   });
 
-  it("errore sul privato: stato errore, tentativi 1, messaggio di Meta nel motivo", async () => {
+  it("errore sul privato: stato errore, tentativi 1, motivo in italiano", async () => {
     await campagna();
     setMetaFetch(async (url) =>
       url.endsWith("/replies") ? Response.json({ id: "r" }) : Response.json({ error: { message: "Finestra scaduta", code: 10 } }, { status: 400 }),
     );
     expect(await trattaCommento(env, commento(), NOW)).toBe("errore");
-    expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "Finestra scaduta" });
+    expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "finestra dei 7 giorni chiusa o messaggi non consentiti" });
   });
 
   it("eccezione dopo l'inserimento: l'evento non resta in_corso (varianti malformate e privato che lancia)", async () => {
@@ -169,7 +169,7 @@ describe("trattaCommento", () => {
     });
     expect(await trattaCommento(env, commento(), NOW)).toBe("errore");
     expect(urlsFinali()).toEqual(["/me/messages"]);
-    expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "rete caduta" });
+    expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "Instagram non risponde, riprovo" });
   });
 
   it("eccezione vera nei passi 3-7 (D1 che lancia): stato errore, non in_corso", async () => {

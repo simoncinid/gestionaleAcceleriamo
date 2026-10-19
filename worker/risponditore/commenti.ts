@@ -1,7 +1,8 @@
 import { drizzle } from "drizzle-orm/d1";
 import type { Env } from "../env";
-import { rispCampagne, type RispEvento } from "../db/schema";
-import { igPost } from "./graph";
+import { rispCampagne, type RispCampagna, type RispEvento } from "../db/schema";
+import { MOTIVO_NON_COLLEGATO, motivoErrore, registraFallimento } from "./errori";
+import { igPost, type EsitoGraph } from "./graph";
 import { scegliCampagna } from "./parola";
 import { leggiToken } from "./token";
 
@@ -56,7 +57,7 @@ async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof 
   }
 
   if (!account) {
-    await chiudi(env, c.id, "errore", now, { campagnaId: campagna.id, motivo: "Account Instagram non collegato", errore: true });
+    await chiudi(env, c.id, "errore", now, { campagnaId: campagna.id, motivo: MOTIVO_NON_COLLEGATO, errore: true });
     return "errore";
   }
 
@@ -79,8 +80,21 @@ async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof 
   }
 
   // 6. Messaggio privato con il pulsante.
-  const priv = await igPost(env, account.token, "/me/messages", {
-    recipient: { comment_id: c.id },
+  const priv = await inviaPrivato(env, account.token, campagna, c.id);
+  if (!priv.ok) {
+    await registraFallimento(env, c.id, motivoErrore(priv.codice, priv.messaggio).motivo, now, { campagnaId: campagna.id, rispostaPubblicaId });
+    return "errore";
+  }
+
+  // 7. Fatto.
+  await chiudi(env, c.id, "inviato", now, { campagnaId: campagna.id, motivo, rispostaPubblicaId });
+  return "inviato";
+}
+
+// Passo 6, anche per il giro dei ritentativi: il messaggio privato in risposta al commento, con il pulsante.
+export function inviaPrivato(env: Env, token: string, campagna: RispCampagna, commentoId: string): Promise<EsitoGraph> {
+  return igPost(env, token, "/me/messages", {
+    recipient: { comment_id: commentoId },
     message: {
       attachment: {
         type: "template",
@@ -92,12 +106,4 @@ async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof 
       },
     },
   });
-  if (!priv.ok) {
-    await chiudi(env, c.id, "errore", now, { campagnaId: campagna.id, motivo: priv.messaggio, rispostaPubblicaId, errore: true });
-    return "errore";
-  }
-
-  // 7. Fatto.
-  await chiudi(env, c.id, "inviato", now, { campagnaId: campagna.id, motivo, rispostaPubblicaId });
-  return "inviato";
 }

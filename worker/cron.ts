@@ -17,9 +17,10 @@ import { contaD1, QUERY_GIRO, SOTTORICHIESTE_GIRO } from "./lib/bilancio";
 import { partiRoma, type PartiRoma } from "./lib/roma";
 import { revisioneCorrente } from "./lunedi/calcolo";
 import { retryPendingMetaLeads } from "./meta/ingest";
+import { giroRisponditore } from "./risponditore/giro";
 import { giroTelegram } from "./telegram/bot";
 
-export type Lavoro = "avvisi" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "lunedi";
+export type Lavoro = "avvisi" | "risponditore" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "lunedi";
 
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
@@ -69,6 +70,10 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // chiamare, quindi foglio e Meta passano prima; con un arretrato nel foglio alle :15 gli avvisi aspettano
   // il giro dopo (5 minuti, dentro i 30 del preavviso). Fisse 8 (letture e chiusure), una query per unità.
   avvisi: { quando: sempre, ...COSTO_AVVISI, sottoPerUnita: 0, riserva: RISERVA_PUSH, esegui: (e, n, l) => controllaAvvisi(e, n, l) },
+  // Risponditore: ritentativi del messaggio privato (solo il passo 6) dopo gli avvisi, così l'avviso "messaggio non
+  // partito" che nasce al terzo tentativo arriva sul telefono nello stesso giro. Stime: fisse 3 (token, eventi, campagne),
+  // per evento 4 (controllo dell'invio già fatto, scrittura dell'esito, eventuale tentativo e avviso), una sottorichiesta a tentativo (2 di stima).
+  risponditore: { quando: ogni15, fisse: 3, perUnita: 4, sottoPerUnita: 2, max: 3, riserva: RISERVA_PUSH, esegui: async (e, n, l) => ({ sottorichieste: (await giroRisponditore(e, n, l)).ritentati }) },
   // Push (spec 8): subito dopo gli avvisi, così l'avviso nato in questo giro (SLA, "Lead nuovo" della catena di
   // foglio e Meta) arriva sul telefono nello stesso giro. Prima delle conferme: una push SLA vale più di un'email
   // di conferma da ritentare, che può aspettare 5 minuti. Misura con contaD1: 2 letture più una batch con al

@@ -10,4 +10,5 @@ export const EVENTI: Record<EventoAvviso, { etichetta: string; chi: "tutti" | "r
   claude_tetto: { etichetta: "Claude al tetto del mese", chi: "tutti", push: true, telegram: true },
   meta_48h: { etichetta: "Meta senza lead da 48 ore", chi: "tutti", push: true, telegram: false },
   integrazione_rotta: { etichetta: "Integrazione rotta", chi: "tutti", push: false, telegram: false },
+  risponditore_errore: { etichetta: "Risponditore: messaggio non partito", chi: "tutti", push: true, telegram: true },
 };
