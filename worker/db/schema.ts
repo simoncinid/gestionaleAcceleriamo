@@ -598,6 +598,8 @@ export const rispCampagne = sqliteTable("risp_campagne", {
   creataIl: integer("creata_il").notNull(),
 });
 
+export type RispCampagna = typeof rispCampagne.$inferSelect;
+
 export const RISP_STATI = ["in_corso", "inviato", "link_inviato", "ignorato", "errore"] as const;
 
 export const rispEventi = sqliteTable("risp_eventi", {
