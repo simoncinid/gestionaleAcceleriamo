@@ -74,6 +74,7 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // Risponditore: ritentativi del messaggio privato (solo il passo 6) dopo gli avvisi, così l'avviso "messaggio non
   // partito" che nasce al terzo tentativo arriva sul telefono nello stesso giro. Stime: fisse 3 (token, eventi, campagne),
   // per evento 4 (controllo dell'invio già fatto, scrittura dell'esito, eventuale tentativo e avviso), una sottorichiesta a tentativo (2 di stima).
+  // Con il budget che resta, il recupero dei commenti persi: una lettura per post (più una per i post recenti) e fino a 3 commenti nuovi a giro, 2 chiamate l'uno.
   risponditore: { quando: ogni15, fisse: 5, perUnita: 4, sottoPerUnita: 2, max: 3, riserva: RISERVA_PUSH, esegui: async (e, n, l) => {
       // Preavviso di scadenza del token (2 query in più): un errore qui non deve mai bloccare i ritentativi.
       try {
@@ -81,7 +82,7 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
       } catch (err) {
         console.error("risponditore_preavviso", err instanceof Error ? err.message : "errore");
       }
-      return { sottorichieste: (await giroRisponditore(e, n, l)).ritentati };
+      return { sottorichieste: (await giroRisponditore(e, n, l)).sottorichieste };
     } },
   // Rinnovo del token Instagram: una volta al giorno alle 5 di Roma. Letture e scritture del token (1), il rinnovo è una sottorichiesta.
   ig_token: { quando: (p) => p.ore === 5 && p.minuti < 5, fisse: 2, perUnita: 0, sottoPerUnita: 1, max: 1, esegui: (e, n) => rinnovaToken(e, n) },

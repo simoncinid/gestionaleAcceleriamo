@@ -20,6 +20,8 @@ function graphFinto() {
     return Response.json({ id: "ok-1" });
   });
 }
+// Il recupero dei commenti persi legge i post (/me/media): qui contano solo le chiamate dei ritentativi.
+const senzaRecupero = () => chiamate.filter((c) => !c.startsWith("/me/media"));
 const errMeta = (code: number, message = "boom") => Response.json({ error: { code, message } }, { status: 400 });
 
 async function campagna() {
@@ -70,9 +72,9 @@ describe("giroRisponditore", () => {
     expect(e1).toMatchObject({ stato: "errore", motivo: "troppe richieste, riprovo", tentativi: 1 });
     privato = () => Response.json({ message_id: "m" });
     chiamate = [];
-    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toEqual({ ritentati: 1 });
+    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toMatchObject({ ritentati: 1 });
     expect(await evento("c1")).toMatchObject({ stato: "inviato", tentativi: 1 });
-    expect(chiamate).toEqual(["/me/messages"]); // solo il passo 6
+    expect(senzaRecupero()).toEqual(["/me/messages"]); // solo il passo 6
     expect(await avvisi()).toBe(0);
   });
 
@@ -81,21 +83,21 @@ describe("giroRisponditore", () => {
     privato = () => errMeta(613);
     await trattaCommento(env, commento(), NOW);
     chiamate = [];
-    expect(await giroRisponditore(env, NOW + 5 * MIN, 3)).toEqual({ ritentati: 0 });
-    expect(chiamate).toEqual([]);
+    expect(await giroRisponditore(env, NOW + 5 * MIN, 3)).toMatchObject({ ritentati: 0 });
+    expect(senzaRecupero()).toEqual([]);
   });
 
   it("dopo 3 fallimenti resta errore e nasce un solo avviso, anche ai giri dopo", async () => {
     await campagna();
     privato = () => errMeta(613);
     await trattaCommento(env, commento(), NOW);
-    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toEqual({ ritentati: 1 });
+    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toMatchObject({ ritentati: 1 });
     expect(await avvisi()).toBe(0);
-    expect(await giroRisponditore(env, NOW + 22 * MIN, 3)).toEqual({ ritentati: 1 });
+    expect(await giroRisponditore(env, NOW + 22 * MIN, 3)).toMatchObject({ ritentati: 1 });
     expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 3 });
     expect(await avvisi()).toBe(1);
     expect(await righeAvviso()).toEqual({ titolo: "Risponditore: messaggio non partito", href: "/automazioni/risponditore" });
-    expect(await giroRisponditore(env, NOW + 40 * MIN, 3)).toEqual({ ritentati: 0 });
+    expect(await giroRisponditore(env, NOW + 40 * MIN, 3)).toMatchObject({ ritentati: 0 });
     expect(await avvisi()).toBe(1);
     const n = (await env.DB.prepare("SELECT count(*) n FROM notifications WHERE evento = 'risponditore_errore'").first<{ n: number }>())!.n;
     await giroRisponditore(env, NOW + 60 * MIN, 3);
@@ -109,8 +111,8 @@ describe("giroRisponditore", () => {
     expect(await evento("c1")).toMatchObject({ stato: "errore", motivo: "accesso a Instagram scaduto", tentativi: 1 });
     expect(await avvisi()).toBe(1);
     chiamate = [];
-    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toEqual({ ritentati: 0 });
-    expect(chiamate).toEqual([]);
+    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toMatchObject({ ritentati: 0 });
+    expect(senzaRecupero()).toEqual([]);
     expect(await avvisi()).toBe(1);
   });
 
@@ -118,7 +120,7 @@ describe("giroRisponditore", () => {
     await campagna();
     privato = () => errMeta(10);
     await trattaCommento(env, commento(), NOW);
-    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toEqual({ ritentati: 0 });
+    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toMatchObject({ ritentati: 0 });
     expect(await avvisi()).toBe(0);
   });
 
@@ -127,8 +129,8 @@ describe("giroRisponditore", () => {
     await env.DB.prepare(
       "INSERT INTO risp_eventi (commento_id, media_id, autore_id, autore_nome, testo, campagna_id, stato, tentativi, creato_il, aggiornato_il) VALUES ('c1','m1','persona-1','mario','CASA','camp-1','in_corso',0,?,?)",
     ).bind(NOW, NOW).run();
-    expect(await giroRisponditore(env, NOW + 5 * MIN, 3)).toEqual({ ritentati: 0 });
-    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toEqual({ ritentati: 1 });
+    expect(await giroRisponditore(env, NOW + 5 * MIN, 3)).toMatchObject({ ritentati: 0 });
+    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toMatchObject({ ritentati: 1 });
     expect(await evento("c1")).toMatchObject({ stato: "inviato", tentativi: 1 });
   });
 
@@ -141,8 +143,8 @@ describe("giroRisponditore", () => {
     ).bind(NOW, NOW).run();
     privato = () => Response.json({ message_id: "m" });
     chiamate = [];
-    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toEqual({ ritentati: 0 });
-    expect(chiamate).toEqual([]);
+    expect(await giroRisponditore(env, NOW + 11 * MIN, 3)).toMatchObject({ ritentati: 0 });
+    expect(senzaRecupero()).toEqual([]);
     expect(await evento("c1")).toMatchObject({ stato: "ignorato" });
   });
 
@@ -152,6 +154,6 @@ describe("giroRisponditore", () => {
     await trattaCommento(env, commento({ id: "c1", autoreId: "p1" }), NOW);
     await trattaCommento(env, commento({ id: "c2", autoreId: "p2" }), NOW);
     privato = () => Response.json({ message_id: "m" });
-    expect(await giroRisponditore(env, NOW + 11 * MIN, 1)).toEqual({ ritentati: 1 });
+    expect(await giroRisponditore(env, NOW + 11 * MIN, 1)).toMatchObject({ ritentati: 1 });
   });
 });
