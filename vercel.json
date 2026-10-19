@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo skip",
+  "buildCommand": "mkdir -p .proxy-out && printf ok > .proxy-out/keep",
+  "outputDirectory": ".proxy-out",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "https://acceleriamo-os.diego-faf.workers.dev/$1"
+    }
+  ]
+}
