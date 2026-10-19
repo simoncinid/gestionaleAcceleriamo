@@ -18,10 +18,7 @@ async function chiudi(env: Env, id: string, stato: RispEvento["stato"], now: num
 
 export async function trattaCommento(env: Env, c: Commento, now: number): Promise<RispEvento["stato"]> {
   const account = await leggiToken(env);
-  // 1. Niente autore, commento nostro o risposta a un altro commento: si scarta senza scrivere.
   if (!c.autoreId || c.parentId || c.autoreId === account?.igUserId) return "ignorato";
-
-  // 2. Un solo trattamento per commento: Meta rimanda gli avvisi.
   const ins = await env.DB.prepare(
     `INSERT OR IGNORE INTO risp_eventi (commento_id, media_id, autore_id, autore_nome, testo, stato, tentativi, creato_il, aggiornato_il)
      VALUES (?, ?, ?, ?, ?, 'in_corso', 0, ?, ?)`,
@@ -29,7 +26,16 @@ export async function trattaCommento(env: Env, c: Commento, now: number): Promis
     .bind(c.id, c.mediaId, c.autoreId, c.autoreNome, c.testo, now, now)
     .run();
   if (!ins.meta.changes) return "ignorato";
+  try {
+    return await lavora(env, c, account, now);
+  } catch (err) {
+    const motivo = (err instanceof Error ? err.message : String(err)).slice(0, 200);
+    await chiudi(env, c.id, "errore", now, { motivo, errore: true });
+    return "errore";
+  }
+}
 
+async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof leggiToken>>, now: number): Promise<RispEvento["stato"]> {
   // 3. Campagna.
   const campagne = await drizzle(env.DB).select().from(rispCampagne).all();
   const campagna = scegliCampagna(campagne, c.mediaId, c.testo);
@@ -55,16 +61,18 @@ export async function trattaCommento(env: Env, c: Commento, now: number): Promis
   }
 
   // 5. Risposta pubblica: se fallisce si va avanti col privato.
-  let varianti: string[] = [];
+  let varianti: unknown = null;
   try {
     varianti = JSON.parse(campagna.rispostepubbliche);
   } catch {
-    /* campagna senza varianti leggibili: niente risposta pubblica */
+    /* illeggibile: gestito sotto */
   }
   let motivo: string | null = null;
   let rispostaPubblicaId: string | null = null;
-  if (varianti.length) {
-    const message = varianti[Math.floor(Math.random() * varianti.length)];
+  if (!Array.isArray(varianti) || !varianti.length) {
+    motivo = "Risposte pubbliche mancanti o non leggibili";
+  } else {
+    const message = String(varianti[Math.floor(Math.random() * varianti.length)]);
     const pub = await igPost(env, account.token, `/${c.id}/replies`, { message });
     if (pub.ok) rispostaPubblicaId = pub.dati?.id ? String(pub.dati.id) : null;
     else motivo = `Risposta pubblica non riuscita: ${pub.messaggio}`;

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { env } from "cloudflare:test";
+import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:test";
 import { computeMetaSignature } from "../worker/meta/signature";
 import { setMetaFetch } from "../worker/meta/fetcher";
 import { trattaCommento } from "../worker/risponditore/commenti";
@@ -84,7 +84,9 @@ describe("webhook Instagram: verifica e firma", () => {
     const raw = avviso({ id: "c1", text: "CASA", from: { id: "p1" }, media: { id: "m1" } });
     const headers = { "content-type": "application/json", "x-hub-signature-256": await computeMetaSignature(raw, "segreto-ig-test") };
     const { app } = await import("../worker/app");
-    const res = await app.fetch(new Request("https://test.local/api/webhooks/instagram", { method: "POST", body: raw, headers }), { ...env, SPAZIO: "demo" }, { waitUntil() {}, passThroughOnException() {} } as any);
+    const ctx = createExecutionContext();
+    const res = await app.fetch(new Request("https://test.local/api/webhooks/instagram", { method: "POST", body: raw, headers }), { ...env, SPAZIO: "demo" }, ctx);
+    await waitOnExecutionContext(ctx);
     expect(res.status).toBe(200);
     expect(chiamate).toHaveLength(0);
     expect(await evento("c1")).toBeNull();
@@ -156,5 +158,31 @@ describe("trattaCommento", () => {
     );
     expect(await trattaCommento(env, commento(), NOW)).toBe("errore");
     expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "Finestra scaduta" });
+  });
+
+  it("eccezione dopo l'inserimento: l'evento non resta in_corso (varianti malformate e privato che lancia)", async () => {
+    await campagna({ rispostepubbliche: '{"non":"un array"}' });
+    setMetaFetch(async (url) => {
+      chiamate.push({ url, corpo: null, auth: null });
+      if (url.endsWith("/me/messages")) throw new Error("rete caduta");
+      return Response.json({ id: "r" });
+    });
+    expect(await trattaCommento(env, commento(), NOW)).toBe("errore");
+    expect(urlsFinali()).toEqual(["/me/messages"]);
+    expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "rete caduta" });
+  });
+
+  it("eccezione vera nei passi 3-7 (D1 che lancia): stato errore, non in_corso", async () => {
+    await campagna();
+    const db = new Proxy(env.DB, {
+      get(t, k) {
+        if (k === "prepare") return (q: string) => (q.includes("SELECT 1 FROM risp_eventi") ? { bind: () => { throw new Error("D1 non risponde"); } } : t.prepare(q));
+        const v = (t as any)[k];
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    expect(await trattaCommento({ ...env, DB: db as D1Database }, commento(), NOW)).toBe("errore");
+    expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "D1 non risponde" });
+    expect(chiamate).toHaveLength(0);
   });
 });
