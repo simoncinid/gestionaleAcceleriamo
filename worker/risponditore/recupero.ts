@@ -22,16 +22,18 @@ function ora(ts: unknown): number | null {
 // Rete di sicurezza del webhook: rilegge i commenti dei post sotto campagna e tratta quelli mai visti (la deduplica
 // per commento_id evita doppioni). Tocca al massimo maxPost post per giro, a rotazione: la finestra parte da un
 // punto che cambia ogni 15 minuti, così giri successivi coprono post diversi senza tabelle in più.
-export async function recuperaCommenti(env: Env, now: number, maxPost: number): Promise<{ trovati: number; chiamate: number }> {
+// budget: chiamate Graph al massimo in questo giro (default due per post); il tetto non si supera mai, nemmeno di una.
+export async function recuperaCommenti(env: Env, now: number, maxPost: number, budget = maxPost * 2): Promise<{ trovati: number; chiamate: number }> {
   const esito = { trovati: 0, chiamate: 0 };
-  if (maxPost <= 0) return esito;
+  if (maxPost <= 0 || budget < 2) return esito;
+  const entra = (n: number) => esito.chiamate + n <= budget;
   const account = await leggiToken(env);
   if (!account) return esito;
   const campagne = await drizzle(env.DB).select().from(rispCampagne).where(eq(rispCampagne.attiva, true)).all();
   if (!campagne.length) return esito;
 
   const posti = new Set<string>(campagne.flatMap((c) => (c.mediaId ? [c.mediaId] : [])));
-  if (campagne.some((c) => !c.mediaId)) {
+  if (campagne.some((c) => !c.mediaId) && entra(2)) {
     esito.chiamate++;
     const r = await igGet(env, account.token, "me/media?fields=id,timestamp&limit=3");
     if (r.ok) {
@@ -48,7 +50,7 @@ export async function recuperaCommenti(env: Env, now: number, maxPost: number): 
 
   let nuovi = 0;
   for (const mediaId of scelti) {
-    if (nuovi >= NUOVI_PER_GIRO) break;
+    if (!entra(1)) break;
     esito.chiamate++;
     const r = await igGet(env, account.token, `${mediaId}/comments?fields=id,text,from,username,parent_id,timestamp&limit=50`);
     if (!r.ok) {
@@ -56,7 +58,7 @@ export async function recuperaCommenti(env: Env, now: number, maxPost: number): 
       continue;
     }
     for (const c of r.dati?.data ?? []) {
-      if (nuovi >= NUOVI_PER_GIRO) break;
+      if (nuovi >= NUOVI_PER_GIRO || !entra(CHIAMATE_PER_NUOVO)) break;
       const t = ora(c?.timestamp);
       // Meta vieta il messaggio privato dopo 7 giorni: inutile provarci.
       if (!c?.id || (t !== null && now - t > SETTE_GIORNI)) continue;

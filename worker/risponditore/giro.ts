@@ -20,11 +20,12 @@ export async function giroRisponditore(env: Env, now: number, limite: number): P
   const account = await leggiToken(env);
   if (!account) return { ritentati: 0, sottorichieste: 0 };
   const ritentati = await ritenta(env, now, limite, account);
-  const budget = limite - ritentati;
+  // Il cron riserva sottoPerUnita (2) a unità; i ritentativi ne usano una ciascuno, il resto è del recupero.
+  const budget = limite * 2 - ritentati;
   let recupero = 0;
-  if (budget > 0) {
+  if (budget >= 2) {
     try {
-      recupero = (await recuperaCommenti(env, now, budget)).chiamate;
+      recupero = (await recuperaCommenti(env, now, budget, budget)).chiamate;
     } catch (err) {
       console.error("risponditore_recupero", err instanceof Error ? err.message : "errore");
     }

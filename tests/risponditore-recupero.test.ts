@@ -128,3 +128,39 @@ describe("giroRisponditore con recupero", () => {
     expect(chiamate).toEqual([]);
   });
 });
+
+describe("recupero dentro il budget", () => {
+  async function scenarioPieno() {
+    for (let i = 1; i <= 6; i++) await campagna("c" + i, "m" + i, "casa" + i);
+    await campagna("g", null, "casa");
+    postRecenti = [1, 2, 3].map((i) => ({ id: "p" + i, timestamp: iso(NOW - 1000) }));
+    for (const id of ["m1", "m2", "m3", "m4", "m5", "m6", "p1", "p2", "p3"])
+      commentiPerPost[id] = Array.from({ length: 10 }, (_, i) => graphComm(`${id}-${i}`, "casa casa1 casa2 casa3 casa4 casa5 casa6"));
+  }
+
+  for (const limite of [1, 2, 3]) {
+    it(`limite ${limite}: le chiamate Graph restano <= ${limite * 2}`, async () => {
+      await scenarioPieno();
+      const r = await giroRisponditore(env, NOW, limite);
+      expect(chiamate.length).toBeLessThanOrEqual(limite * 2);
+      expect(r.sottorichieste).toBeLessThanOrEqual(limite * 2);
+      expect(r.sottorichieste).toBeGreaterThanOrEqual(chiamate.length - 0); // conteggio onesto, mai sotto il reale
+    });
+  }
+
+  it("con i ritentativi che consumano budget il recupero fa meno", async () => {
+    await scenarioPieno();
+    await env.DB.prepare(
+      "INSERT INTO risp_eventi (commento_id, media_id, autore_id, testo, campagna_id, stato, motivo, tentativi, creato_il, aggiornato_il) VALUES ('r1','m1','x','casa','c1','errore','troppe richieste, riprovo',1,?,?)",
+    ).bind(NOW - 3_600_000, NOW - 3_600_000).run();
+    const r = await giroRisponditore(env, NOW, 1);
+    expect(r.ritentati).toBe(1);
+    expect(chiamate.length).toBeLessThanOrEqual(2);
+  });
+
+  it("budget sotto 2: nessun recupero", async () => {
+    await scenarioPieno();
+    expect(await recuperaCommenti(env, NOW, 3, 1)).toEqual({ trovati: 0, chiamate: 0 });
+    expect(chiamate).toEqual([]);
+  });
+});
