@@ -173,6 +173,60 @@ Le variabili pubbliche stanno in `wrangler.jsonc`, sotto `vars`, e si committano
 
 Quando un segreto manca nessuno vede errori: Impostazioni > Integrazioni mostra il servizio in grigio come "Non collegato" (per esempio "Non collegato: manca la chiave di Resend") e il resto dell'app funziona. Senza `RESEND_API_KEY` le email di conferma restano in coda senza consumare tentativi e partono al primo giro dopo l'arrivo della chiave (vedi la regola delle 48 ore sotto); le call si salvano lo stesso, senza invito. Senza `PROPOSAL_HOOK_KEY` l'aggancio risponde sempre 401. Senza le chiavi VAPID non parte nessuna push; senza `TELEGRAM_BOT_TOKEN` nessun messaggio Telegram; gli avvisi restano comunque nell'app. Impostazioni > Integrazioni mostra solo se un segreto c'è o manca, mai il valore.
 
+## Risponditore
+
+Risponde ai commenti Instagram che contengono la parola di una campagna (per esempio TEMPO) con una risposta pubblica, manda in privato un messaggio con un pulsante e, al tocco, il link alla pagina della risorsa (`/r/<slug>`). Chi commenta non entra mai nei lead. Si gestisce da Automazioni > Risponditore. Nello spazio demo il webhook risponde 200 senza fare nulla e il cron non gira.
+
+### Segreti da impostare
+
+Uno alla volta, con `npx wrangler secret put <NOME>` (il valore si digita quando lo chiede):
+
+- `IG_APP_SECRET`: il segreto dell'app Instagram su Meta, con cui si controlla la firma dei webhook (se non c'è si prova `META_APP_SECRET`).
+- `IG_VERIFY_TOKEN`: una stringa lunga e casuale che scegli tu; la stessa va scritta su Meta quando configuri il webhook.
+- `IG_TOKEN_KEY`: 32 byte casuali in base64 (per esempio `openssl rand -base64 32`). Cifra il token Instagram dentro il database. Se la perdi o la cambi il token salvato non si legge più e va ricaricato.
+
+La versione dell'API, `IG_GRAPH_VERSION` (`v25.0`), non è un segreto: sta in `wrangler.jsonc`. Senza i segreti la sezione resta in grigio in Impostazioni > Integrazioni e nulla si rompe.
+
+### Webhook su Meta
+
+Nella configurazione dell'app Instagram imposta:
+
+- URL di callback: `https://risorse.acceleriamo.it/api/webhooks/instagram`
+- Token di verifica: lo stesso valore di `IG_VERIFY_TOKEN`
+- Campi da sottoscrivere: `comments` e `messages`
+
+### Caricare il token
+
+Prendi il token dell'account Instagram da Meta (accesso Instagram a lunga durata, 60 giorni) e caricalo in uno di questi due modi:
+
+- dalla pagina Automazioni > Risponditore, con "Collega l'account" o "Cambia il token";
+- con `POST /api/risponditore/account` e corpo `{ "token": "..." }`, da sessione aperta.
+
+L'app chiede a Instagram chi è il token, lo salva cifrato e mostra il nome dell'account e la scadenza. Il token non viene mai mostrato né scritto nei log. Il rinnovo parte da solo e, se non riesce, sette giorni prima della scadenza arriva un avviso.
+
+### Risorse e campagne da file: lo script di semina
+
+Le risorse (pagine `/r/<slug>`) e le campagne dei reel pianificati si caricano da un file JSON. Parti da `scripts/risponditore-semina.esempio.json` (due voci di prova, TEMPO e MANUTENZIONE, con testi finti da sostituire):
+
+```bash
+npm run risponditore:semina -- mio-file.json            # database locale
+npm run risponditore:semina -- mio-file.json --remote   # database online
+```
+
+Lo script controlla il file (slug in minuscolo con i trattini, `pdfUrl` solo http o https, parola unica dopo la normalizzazione, almeno una risposta pubblica, pulsante di massimo 20 caratteri) e si ferma con l'elenco degli errori. Si può rilanciare: una risorsa con lo stesso slug o una campagna con la stessa parola (e lo stesso post) viene aggiornata, mai duplicata. Senza `--remote` non tocca il database online.
+
+### Prove dal vivo
+
+Dopo il deploy, con il token caricato, fai queste prove e scrivi l'esito nel registro del progetto:
+
+1. Commento con la parola da un profilo esterno: arriva la risposta pubblica e il messaggio privato col pulsante.
+2. Commento senza la parola: non succede nulla (evento ignorato).
+3. Commento dell'account stesso con la parola: ignorato, niente risposta.
+4. Lo stesso commento due volte: una sola risposta (nessun doppione).
+5. Tocco del pulsante nel messaggio privato: arriva il link.
+6. Apertura del link: la pagina `/r/<slug>` si vede e il PDF si apre.
+7. Rinnovo del token a mano: ricarica un token valido come sopra e controlla che la scadenza si sposti avanti di 60 giorni.
+
 ## Claude
 
 Claude fa quattro lavori, tutti in una coda (`ai_jobs`) che il giro del cron smaltisce per ultima, al massimo 3 per giro:

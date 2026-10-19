@@ -1,0 +1,44 @@
+{
+  "risorse": [
+    {
+      "slug": "tempo",
+      "titolo": "TITOLO DI PROVA: guida sul tempo",
+      "sottotitolo": "Sottotitolo di prova, da sostituire",
+      "corpo": "Testo di prova della risorsa TEMPO.\n\nSostituiscilo con il testo vero prima di pubblicare.",
+      "pdfUrl": "https://example.com/tempo-di-prova.pdf",
+      "attiva": true
+    },
+    {
+      "slug": "manutenzione",
+      "titolo": "TITOLO DI PROVA: guida sulla manutenzione",
+      "sottotitolo": "Sottotitolo di prova, da sostituire",
+      "corpo": "Testo di prova della risorsa MANUTENZIONE.\n\nSostituiscilo con il testo vero prima di pubblicare.",
+      "pdfUrl": null,
+      "attiva": true
+    }
+  ],
+  "campagne": [
+    {
+      "nome": "PROVA: reel TEMPO",
+      "parola": "TEMPO",
+      "mediaId": null,
+      "rispostePubbliche": ["Risposta pubblica di prova 1", "Risposta pubblica di prova 2"],
+      "testoPrivato": "Messaggio privato di prova: tocca il pulsante per ricevere il link.",
+      "etichettaPulsante": "Mandami il link",
+      "risorsaSlug": "tempo",
+      "testoLink": "Testo di prova che accompagna il link.",
+      "attiva": true
+    },
+    {
+      "nome": "PROVA: reel MANUTENZIONE",
+      "parola": "MANUTENZIONE",
+      "mediaId": null,
+      "rispostePubbliche": ["Risposta pubblica di prova 1"],
+      "testoPrivato": "Messaggio privato di prova: tocca il pulsante per ricevere il link.",
+      "etichettaPulsante": "Mandami il link",
+      "risorsaSlug": "manutenzione",
+      "testoLink": "Testo di prova che accompagna il link.",
+      "attiva": true
+    }
+  ]
+}

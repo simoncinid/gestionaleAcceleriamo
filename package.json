@@ -15,6 +15,7 @@
     "db:migrate:demo:locale": "wrangler d1 migrations apply acceleriamo-os-demo --env demo --local",
     "demo:reset": "tsx scripts/seed-demo.ts --remote",
     "demo:locale": "tsx scripts/seed-demo.ts --local",
+    "risponditore:semina": "tsx scripts/risponditore-semina.ts",
     "deploy:demo": "CLOUDFLARE_ENV=demo vite build && wrangler deploy",
     "e2e": "playwright test",
     "e2e:foto": "playwright test --update-snapshots"
