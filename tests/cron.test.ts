@@ -119,7 +119,7 @@ describe("calendario del giro", () => {
     expect(quali(mar0600)).not.toContain("foglio");
   });
   it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; le task ricorrenti dopo Meta 48 ore; il lunedì prima di Claude; Claude per ultimo", () => {
-    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "risponditore", "consegna", "telegram", "conferme", "meta_48h", "lavori", "lunedi", "claude"]);
+    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "risponditore", "ig_token", "consegna", "telegram", "conferme", "meta_48h", "lavori", "lunedi", "claude"]);
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");

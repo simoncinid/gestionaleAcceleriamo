@@ -72,9 +72,9 @@ describe("webhook Instagram: verifica e firma", () => {
     expect((await evento("c9"))?.stato).toBe("inviato");
   });
 
-  it("i messaggi (messaging) vengono ignorati", async () => {
+  it("i messaggi (messaging) che non sono un tocco su RISORSA vengono ignorati", async () => {
     await campagna();
-    const raw = JSON.stringify({ object: "instagram", entry: [{ id: "1", messaging: [{ postback: { payload: "RISORSA:camp-1" }, sender: { id: "p1" } }] }] });
+    const raw = JSON.stringify({ object: "instagram", entry: [{ id: "1", messaging: [{ postback: { payload: "ALTRO:camp-1" }, sender: { id: "p1" } }, { message: { text: "ciao" }, sender: { id: "p1" } }] }] });
     expect((await post(raw, "segreto-ig-test")).status).toBe(200);
     expect(chiamate).toHaveLength(0);
   });

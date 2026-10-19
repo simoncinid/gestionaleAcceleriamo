@@ -2,9 +2,11 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { verifyMetaSignature } from "../meta/signature";
 import { trattaCommento } from "./commenti";
+import { mandaLink } from "./link";
 
 type Payload = {
   entry?: {
+    messaging?: { sender?: { id?: string }; postback?: { payload?: string } }[];
     changes?: {
       field?: string;
       value?: { id?: string; text?: string; from?: { id?: string; username?: string }; media?: { id?: string }; parent_id?: string };
@@ -39,6 +41,15 @@ webhookInstagram.post("/", async (c) => {
   const env = c.env;
   const lavoro = async () => {
     for (const entry of payload.entry ?? []) {
+      for (const m of entry.messaging ?? []) {
+        const payload = m.postback?.payload;
+        if (!m.sender?.id || typeof payload !== "string" || !payload.startsWith("RISORSA:")) continue;
+        try {
+          await mandaLink(env, String(m.sender.id), payload.slice("RISORSA:".length), Date.now());
+        } catch (err) {
+          console.error("risponditore_link", err instanceof Error ? err.message : "errore");
+        }
+      }
       for (const change of entry.changes ?? []) {
         const v = change.value;
         if (change.field !== "comments" || !v?.id || !v.media?.id) continue;
