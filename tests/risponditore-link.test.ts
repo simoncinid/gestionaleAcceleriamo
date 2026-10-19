@@ -158,6 +158,22 @@ describe("preavviso di scadenza", () => {
     expect(a[0].titolo).toBe("Risponditore: accesso a Instagram da rinnovare");
     expect(chiamate).toHaveLength(0);
   });
+  it("se il preavviso lancia, il lavoro del risponditore ritenta comunque gli eventi in errore", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await salvaToken(env, { igUserId: "1784", username: "acceleriamo", token: "IGAA-segreto", scadeIl: NOW + 3 * GIORNO }, NOW - 50 * GIORNO);
+    await env.DB.prepare(
+      "INSERT INTO risp_eventi (commento_id, media_id, autore_id, autore_nome, testo, campagna_id, stato, motivo, tentativi, creato_il, aggiornato_il) VALUES ('ce','m1','p1','mario','CASA','camp-1','errore','x',1,?,?)",
+    ).bind(NOW - 3_600_000, NOW - 3_600_000).run();
+    const db = new Proxy(env.DB, {
+      get(t, k) {
+        if (k === "prepare") return (q: string) => { if (q.includes("SELECT scade_il")) throw new Error("D1 giù"); return t.prepare(q); };
+        const v = (t as any)[k];
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    await LAVORI.risponditore!.esegui({ ...env, DB: db } as any, NOW, 3);
+    expect((await evento("ce"))?.stato).toBe("inviato");
+  });
   it("token con più di 7 giorni: nessun avviso", async () => {
     await controllaScadenzaToken(env, NOW);
     expect((await avvisi()).results).toHaveLength(0);

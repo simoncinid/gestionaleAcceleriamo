@@ -75,7 +75,12 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // partito" che nasce al terzo tentativo arriva sul telefono nello stesso giro. Stime: fisse 3 (token, eventi, campagne),
   // per evento 4 (controllo dell'invio già fatto, scrittura dell'esito, eventuale tentativo e avviso), una sottorichiesta a tentativo (2 di stima).
   risponditore: { quando: ogni15, fisse: 5, perUnita: 4, sottoPerUnita: 2, max: 3, riserva: RISERVA_PUSH, esegui: async (e, n, l) => {
-      await controllaScadenzaToken(e, n); // preavviso di scadenza del token: 2 query in più
+      // Preavviso di scadenza del token (2 query in più): un errore qui non deve mai bloccare i ritentativi.
+      try {
+        await controllaScadenzaToken(e, n);
+      } catch (err) {
+        console.error("risponditore_preavviso", err instanceof Error ? err.message : "errore");
+      }
       return { sottorichieste: (await giroRisponditore(e, n, l)).ritentati };
     } },
   // Rinnovo del token Instagram: una volta al giorno alle 5 di Roma. Letture e scritture del token (1), il rinnovo è una sottorichiesta.

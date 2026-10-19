@@ -24,7 +24,7 @@ async function avvisoDaRinnovare(env: Env, scadeIl: number, now: number, causa: 
 // Preavviso: mancano meno di 7 giorni alla scadenza (rinnovo fallito o mai tentato). Gira dal lavoro del risponditore.
 export async function controllaScadenzaToken(env: Env, now: number): Promise<void> {
   const riga = await env.DB.prepare(`SELECT scade_il FROM ig_account WHERE id = 'principale'`).first<{ scade_il: number }>();
-  if (riga && riga.scade_il - now < PREAVVISO) await avvisoDaRinnovare(env, riga.scade_il, now, null);
+  if (riga && riga.scade_il != null && riga.scade_il - now < PREAVVISO) await avvisoDaRinnovare(env, riga.scade_il, now, null);
 }
 
 // Rinnova il token Instagram (dura 60 giorni). Salta se è stato salvato meno di 24 ore fa (Meta rifiuta il rinnovo).
