@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "https://acceleriamo-os.acceleriamo-os.workers.dev/$1"
+      "destination": "https://acceleriamo-os.diego-faf.workers.dev/$1"
     }
   ]
 }
