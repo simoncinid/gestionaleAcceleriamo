@@ -11,4 +11,5 @@ export const EVENTI: Record<EventoAvviso, { etichetta: string; chi: "tutti" | "r
   meta_48h: { etichetta: "Meta senza lead da 48 ore", chi: "tutti", push: true, telegram: false },
   integrazione_rotta: { etichetta: "Integrazione rotta", chi: "tutti", push: false, telegram: false },
   risponditore_errore: { etichetta: "Risponditore: messaggio non partito", chi: "tutti", push: true, telegram: true },
+  risorsa_richiesta: { etichetta: "Richiesta di chiamata da una risorsa", chi: "tutti", push: true, telegram: true },
 };

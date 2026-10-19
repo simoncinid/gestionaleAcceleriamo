@@ -18,6 +18,7 @@ import { agganciRoutes } from "./proposte/aggancio";
 import { proposalRoutes } from "./proposte/routes";
 import { metaRoutes } from "./meta/routes";
 import { webhookInstagram } from "./risponditore/webhook";
+import { risorsePubbliche } from "./risorse/routes";
 import { stageRoutes, userRoutes } from "./stages/routes";
 import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/routes";
 import { integrazioniRoutes } from "./integrazioni/routes";
@@ -46,7 +47,7 @@ app.onError((err, c) => {
 const PUBLIC_PATHS = ["/api/health", "/api/_boom", "/api/auth/login", "/api/hooks/proposals"];
 
 app.use("/api/*", async (c, next) => {
-  if (PUBLIC_PATHS.includes(c.req.path) || c.req.path.startsWith("/api/webhooks/")) return next();
+  if (PUBLIC_PATHS.includes(c.req.path) || c.req.path.startsWith("/api/webhooks/") || c.req.path.startsWith("/api/pubblico/")) return next();
   return requireAuth(c, next);
 });
 
@@ -54,6 +55,7 @@ app.use("/api/*", async (c, next) => {
 app.get("/api/spazio", (c) => c.json({ demo: c.env.SPAZIO === "demo" }));
 app.route("/api/webhooks/meta", metaRoutes);
 app.route("/api/webhooks/instagram", webhookInstagram);
+app.route("/api/pubblico/risorse", risorsePubbliche);
 app.route("/api/auth", authRoutes);
 // Prima delle rotte dei lead: /api/leads/:id/scheda-azienda.
 app.route("/api/leads", schedeRoutes);

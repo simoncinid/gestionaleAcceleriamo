@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { Navigate, Route, Routes, useParams } from "react-router";
+import { Navigate, Route, Routes, useMatch, useParams } from "react-router";
 import { ApiError, api } from "./api";
 import { REDIRECT_1A } from "./guscio/aree";
 import { Guscio } from "./guscio/Guscio";
 import { Login } from "./pagine/Login";
+import { PaginaRisorsa } from "./pagine/pubbliche/Risorsa";
 import { resetSession } from "./session";
 import { SchedaLeadRotta } from "./pagine/commerciale/SchedaLead";
 import { Oggi } from "./pagine/commerciale/Oggi";
@@ -56,7 +57,13 @@ function SchedaAutomazioneRotta() {
   return <SchedaAutomazione key={id} id={id} />;
 }
 
+// Le pagine pubbliche si rendono prima di ogni controllo di sessione: nessun accesso, nessun guscio.
 export function App() {
+  const pubblica = useMatch("/r/:slug");
+  return pubblica ? <PaginaRisorsa slug={pubblica.params.slug ?? ""} /> : <AppPrivata />;
+}
+
+function AppPrivata() {
   const qc = useQueryClient();
   const me = useQuery({
     queryKey: ["me"],

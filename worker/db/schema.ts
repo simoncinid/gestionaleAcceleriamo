@@ -231,7 +231,7 @@ export const campaignSpend = sqliteTable("campaign_spend", {
 }, (t) => [uniqueIndex("uq_campaign_spend").on(t.campagna, t.mese)]);
 
 export const EVENTI_AVVISO = [
-  "lead_nuovo", "sla_90", "sla_scaduto", "proposta_oggi", "fine_pausa", "claude_tetto", "meta_48h", "integrazione_rotta", "risponditore_errore",
+  "lead_nuovo", "sla_90", "sla_scaduto", "proposta_oggi", "fine_pausa", "claude_tetto", "meta_48h", "integrazione_rotta", "risponditore_errore", "risorsa_richiesta",
 ] as const;
 export type EventoAvviso = (typeof EVENTI_AVVISO)[number];
 
