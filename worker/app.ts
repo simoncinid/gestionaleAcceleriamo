@@ -17,6 +17,7 @@ import { callRoutes } from "./calls/routes";
 import { agganciRoutes } from "./proposte/aggancio";
 import { proposalRoutes } from "./proposte/routes";
 import { metaRoutes } from "./meta/routes";
+import { webhookInstagram } from "./risponditore/webhook";
 import { stageRoutes, userRoutes } from "./stages/routes";
 import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/routes";
 import { integrazioniRoutes } from "./integrazioni/routes";
@@ -52,6 +53,7 @@ app.use("/api/*", async (c, next) => {
 // Spazio demo (spec 12): il frontend lo legge per il banner. Dietro la sessione come ogni rotta /api.
 app.get("/api/spazio", (c) => c.json({ demo: c.env.SPAZIO === "demo" }));
 app.route("/api/webhooks/meta", metaRoutes);
+app.route("/api/webhooks/instagram", webhookInstagram);
 app.route("/api/auth", authRoutes);
 // Prima delle rotte dei lead: /api/leads/:id/scheda-azienda.
 app.route("/api/leads", schedeRoutes);

@@ -620,6 +620,8 @@ export const rispEventi = sqliteTable("risp_eventi", {
   index("idx_risp_eventi_stato").on(t.stato, t.aggiornatoIl),
 ]);
 
+export type RispEvento = typeof rispEventi.$inferSelect;
+
 export const risorse = sqliteTable("risorse", {
   slug: text("slug").primaryKey(),
   titolo: text("titolo").notNull(),
