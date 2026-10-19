@@ -7,6 +7,11 @@ export type TokenInstagram = { igUserId: string; username: string; token: string
 
 const ID = "principale";
 
+// Manca la chiave per cifrare (o non è valida): lo si distingue da un guasto del database.
+export class ChiaveMancante extends Error {
+  constructor() { super("IG_TOKEN_KEY mancante o non valida"); }
+}
+
 const base64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
 const daBase64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
@@ -24,7 +29,7 @@ async function chiave(env: Env): Promise<CryptoKey | null> {
 
 export async function salvaToken(env: Env, t: TokenInstagram, now: number): Promise<void> {
   const k = await chiave(env);
-  if (!k) throw new Error("IG_TOKEN_KEY mancante o non valida");
+  if (!k) throw new ChiaveMancante();
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const cifrato = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, k, new TextEncoder().encode(t.token)));
   const out = new Uint8Array(iv.length + cifrato.length);

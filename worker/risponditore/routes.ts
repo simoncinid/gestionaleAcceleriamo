@@ -9,7 +9,7 @@ import { eDemo } from "../lib/demo";
 import { linkHttp } from "../leads/validation";
 import { igGet } from "./graph";
 import { normalizza } from "./parola";
-import { salvaToken } from "./token";
+import { ChiaveMancante, salvaToken } from "./token";
 
 export const risponditoreRoutes = new Hono<AppEnv>();
 
@@ -54,7 +54,7 @@ async function leggiCampagna(c: { req: { json: () => Promise<unknown> } }) {
   return campagnaSchema.parse(await c.req.json().catch(() => ({})));
 }
 
-const risorsaEsiste = async (db: Db, slug: string) => Boolean(await db.select({ slug: risorse.slug }).from(risorse).where(eq(risorse.slug, slug)).get());
+const trovaRisorsa = (db: Db, slug: string) => db.select({ slug: risorse.slug, attiva: risorse.attiva }).from(risorse).where(eq(risorse.slug, slug)).get();
 
 // Unica tra le attive dello stesso post (o tra quelle di tutti i post): la parola è già normalizzata.
 async function parolaOccupata(db: Db, d: DatiCampagna, escludi?: string) {
@@ -70,7 +70,9 @@ async function parolaOccupata(db: Db, d: DatiCampagna, escludi?: string) {
 }
 
 async function controlla(db: Db, d: DatiCampagna, escludi?: string): Promise<{ errore: string; stato: 400 | 409 } | null> {
-  if (!(await risorsaEsiste(db, d.risorsaSlug))) return { errore: "La risorsa scelta non esiste", stato: 400 };
+  const risorsa = await trovaRisorsa(db, d.risorsaSlug);
+  if (!risorsa) return { errore: "La risorsa scelta non esiste", stato: 400 };
+  if (!risorsa.attiva) return { errore: "La risorsa scelta è spenta: accendila oppure scegline un'altra", stato: 400 };
   if (await parolaOccupata(db, d, escludi)) return { errore: `La parola "${d.parola}" è già usata da un'altra campagna attiva sullo stesso post`, stato: 409 };
   return null;
 }
@@ -129,12 +131,16 @@ risponditoreRoutes.post("/account", async (c) => {
   const { token } = z.object({ token: testo(1000, "Incolla il token di Instagram") }).parse(await c.req.json().catch(() => ({})));
   const me = await igGet(c.env, token, "me?fields=user_id,username");
   if (!me.ok || !me.dati?.username) return c.json({ error: `Instagram non accetta questo token: ${me.ok ? "risposta senza nome utente" : me.messaggio}` }, 400);
+  const igUserId = String(me.dati.user_id ?? me.dati.id ?? "").trim();
+  if (!igUserId) return c.json({ error: "Instagram non ha detto a quale account appartiene il token: riprova con un altro token" }, 400);
   const now = Date.now();
   const scadeIl = now + DURATA_TOKEN;
   try {
-    await salvaToken(c.env, { igUserId: String(me.dati.user_id ?? me.dati.id ?? ""), username: String(me.dati.username), token, scadeIl }, now);
-  } catch {
-    return c.json({ error: "Manca la chiave per cifrare il token: la mette chi gestisce il server" }, 409);
+    await salvaToken(c.env, { igUserId, username: String(me.dati.username), token, scadeIl }, now);
+  } catch (e) {
+    // Solo la chiave mancante è un 409; ogni altro errore (database compreso) risale a onError.
+    if (e instanceof ChiaveMancante) return c.json({ error: "Manca la chiave per cifrare il token: la mette chi gestisce il server" }, 409);
+    throw e;
   }
   await audit(getDb(c.env.DB), c.get("user").id, "ig_account", "principale", "collega", { username: me.dati.username });
   return c.json({ account: { username: String(me.dati.username), scadeIl, ultimoErrore: null } });

@@ -49,8 +49,8 @@ function Account({ account, ora, onCollega }: { account: DatiRisponditore["accou
         {account ? (
           <>
             <p className="flex items-center gap-2 text-corpo font-semibold">
-              <Punto colore={account.ultimoErrore || account.scadeIl <= ora ? "rosso" : "verde"} etichetta={account.ultimoErrore ? "Con errore" : "Collegato"} />
-              {`Collegato come @${account.username}`}
+              <Punto colore={account.ultimoErrore || account.scadeIl <= ora ? "rosso" : "verde"} etichetta={account.ultimoErrore ? "Con errore" : account.scadeIl <= ora ? "Token scaduto" : "Collegato"} />
+              {account.scadeIl <= ora ? `Token scaduto per @${account.username}` : `Collegato come @${account.username}`}
             </p>
             <p className="text-secondaria text-grigio tabular-nums">{account.scadeIl <= ora ? "Token scaduto: collegalo di nuovo" : giorniAlRinnovo(account.scadeIl, ora)}</p>
             {account.ultimoErrore && <p className="text-secondaria text-errore">{`Ultimo errore: ${account.ultimoErrore}`}</p>}

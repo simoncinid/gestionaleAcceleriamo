@@ -64,6 +64,16 @@ describe("risponditore: campagne", () => {
     expect(res.status).toBe(400);
     expect((await res.json<{ error: string }>()).error).toMatch(/risorsa/i);
   });
+  it("risorsa spenta: 400 in creazione e in modifica, con messaggio in italiano", async () => {
+    await env.DB.prepare("INSERT INTO risorse (slug, titolo, sottotitolo, corpo, pdf_url, attiva, creata_il) VALUES ('spenta','Spenta','','',NULL,0,?)").bind(NOW).run();
+    const res = await crea(campagna({ risorsaSlug: "spenta" }));
+    expect(res.status).toBe(400);
+    expect((await res.json<{ error: string }>()).error).toMatch(/spenta/i);
+    const { campagna: c } = await (await crea(campagna())).json<{ campagna: { id: string } }>();
+    const mod = await call(`/api/risponditore/campagne/${c.id}`, { method: "PUT", json: campagna({ risorsaSlug: "spenta" }) }, cookie);
+    expect(mod.status).toBe(400);
+    expect((await mod.json<{ error: string }>()).error).toMatch(/spenta/i);
+  });
   it("parola doppia tra le attive con lo stesso post: 409, anche con maiuscole diverse", async () => {
     expect((await crea(campagna())).status).toBe(201);
     const res = await crea(campagna({ nome: "Altra", parola: "casa" }));
@@ -155,6 +165,37 @@ describe("risponditore: account", () => {
     await waitOnExecutionContext(ctx);
     expect(res.status).toBe(409);
     expect(chiamate).toBe(0);
+  });
+  const postAccount = async (ambiente: typeof env) => {
+    const ctx = createExecutionContext();
+    const req = new Request("https://test.local/api/risponditore/account", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ token: "IGAAtoken" }) });
+    const res = await app.fetch(req, ambiente, ctx);
+    await waitOnExecutionContext(ctx);
+    return res;
+  };
+  it("chiave di cifratura mancante: 409 con messaggio chiaro", async () => {
+    setMetaFetch(async () => Response.json({ user_id: "17841", username: "acceleriamo" }));
+    const res = await postAccount({ ...env, IG_TOKEN_KEY: undefined } as typeof env);
+    expect(res.status).toBe(409);
+    expect((await res.json<{ error: string }>()).error).toMatch(/chiave/i);
+  });
+  it("guasto del database nel salvataggio: non diventa un 409, resta un errore del server", async () => {
+    setMetaFetch(async () => Response.json({ user_id: "17841", username: "acceleriamo" }));
+    const db = new Proxy(env.DB, {
+      get(t, k) {
+        if (k === "prepare") return (sql: string) => { if (/insert into "ig_account"/i.test(sql)) throw new Error("D1 non risponde"); return t.prepare(sql); };
+        const v = Reflect.get(t, k);
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    const res = await postAccount({ ...env, DB: db } as typeof env);
+    expect(res.status).toBe(500);
+  });
+  it("Instagram non dice l'id dell'account: 400, nulla salvato", async () => {
+    setMetaFetch(async () => Response.json({ username: "acceleriamo" }));
+    const res = await call("/api/risponditore/account", { method: "POST", json: { token: "IGAAtoken" } }, cookie);
+    expect(res.status).toBe(400);
+    expect(await env.DB.prepare("SELECT count(*) n FROM ig_account").first("n")).toBe(0);
   });
   it("token vuoto: 400", async () => {
     expect((await call("/api/risponditore/account", { method: "POST", json: { token: " " } }, cookie)).status).toBe(400);
