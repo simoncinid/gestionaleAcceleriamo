@@ -307,10 +307,11 @@ describe("giro programmato", () => {
     setMetaFetch(async () => { chiamate++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`anna${chiamate}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
     setEmailFetch(async () => Response.json({ id: "re_1" }));
     const c = contaQuery();
-    // Foglio spento (1 query), due lead da Meta (33), avvisi (8): consegna delle push, Telegram (2 fisse più 1) e
-    // conferme non entrano e aspettano il giro dopo.
+    // Foglio spento (1 query), due lead da Meta (33), avvisi (8): restano 3 query (misurate: residuo 3 query e 9
+    // sottorichieste prima del risponditore). Il risponditore (5 fisse), la consegna delle push (3 fisse più 2 a push) e le
+    // conferme non entrano; Telegram (2 fisse più 1) sì, con 1 unità, perché non ha riserva. Il totale resta sotto le 45.
     const esito = await giro(c.env, r(10, 15));
-    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi"], saltati: ["consegna", "telegram", "conferme", "claude"], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi", "telegram"], saltati: ["risponditore", "consegna", "conferme", "claude"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
     expect(chiamate).toBe(MAX.meta);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);
