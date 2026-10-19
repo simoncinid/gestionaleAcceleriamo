@@ -1,9 +1,14 @@
+import { fileURLToPath } from "node:url";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
+
+// Vercel sets VERCEL=1. There the app must build with Nitro: vinext does not
+// emit `.next/routes-manifest.json`, so the Next.js builder fails the deploy.
+const onVercel = process.env.VERCEL === "1";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -50,6 +55,10 @@ export default defineConfig(async ({ command }) => {
 
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
+  const { nitro } = onVercel ? await import("nitro/vite") : { nitro: null };
+  const cloudflareWorkersShim = fileURLToPath(
+    new URL("./build/vercel-cloudflare-shim.ts", import.meta.url),
+  );
 
   return {
     server: {
@@ -64,6 +73,9 @@ export default defineConfig(async ({ command }) => {
       vinext(),
       sites({ mockAuth: !managedLinux }),
       connectorPreview(),
+      ...(onVercel
+        ? nitro({ alias: { "cloudflare:workers": cloudflareWorkersShim } })
+        : []),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
