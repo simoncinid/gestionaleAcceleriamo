@@ -5,7 +5,7 @@ import { setMetaFetch } from "../worker/meta/fetcher";
 import { LAVORI } from "../worker/cron";
 import { mandaLink } from "../worker/risponditore/link";
 import { createUser } from "./helpers";
-import { rinnovaToken } from "../worker/risponditore/rinnovo";
+import { controllaScadenzaToken, rinnovaToken } from "../worker/risponditore/rinnovo";
 import { leggiToken, salvaToken } from "../worker/risponditore/token";
 
 const NOW = 1_800_000_000_000;
@@ -96,6 +96,13 @@ describe("mandaLink", () => {
 });
 
 describe("rinnovaToken", () => {
+  it("salta il rinnovo se il token è stato salvato meno di 24 ore fa", async () => {
+    await salvaToken(env, { igUserId: "1784", username: "acceleriamo", token: "IGAA-segreto", scadeIl: NOW + 60 * GIORNO }, NOW - GIORNO / 2);
+    await rinnovaToken(env, NOW);
+    expect(chiamate).toHaveLength(0);
+    expect((await avvisi()).results).toHaveLength(0);
+  });
+
   it("rinnovo riuscito: nuovo token e nuova scadenza", async () => {
     risposta = () => Response.json({ access_token: "IGAA-nuovo", token_type: "bearer", expires_in: 5_184_000 });
     await rinnovaToken(env, NOW);
@@ -138,6 +145,22 @@ describe("rinnovaToken", () => {
     await env.DB.prepare("DELETE FROM ig_account").run();
     await rinnovaToken(env, NOW);
     expect(chiamate).toHaveLength(0);
+  });
+});
+
+describe("preavviso di scadenza", () => {
+  it("token che scade tra 3 giorni: un solo avviso dopo due giri, senza chiamare il rinnovo", async () => {
+    await salvaToken(env, { igUserId: "1784", username: "acceleriamo", token: "IGAA-segreto", scadeIl: NOW + 3 * GIORNO }, NOW - 50 * GIORNO);
+    await controllaScadenzaToken(env, NOW);
+    await controllaScadenzaToken(env, NOW + 15 * 60_000);
+    const a = (await avvisi()).results;
+    expect(a).toHaveLength(1);
+    expect(a[0].titolo).toBe("Risponditore: accesso a Instagram da rinnovare");
+    expect(chiamate).toHaveLength(0);
+  });
+  it("token con più di 7 giorni: nessun avviso", async () => {
+    await controllaScadenzaToken(env, NOW);
+    expect((await avvisi()).results).toHaveLength(0);
   });
 });
 

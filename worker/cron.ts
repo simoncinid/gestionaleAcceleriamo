@@ -18,7 +18,7 @@ import { partiRoma, type PartiRoma } from "./lib/roma";
 import { revisioneCorrente } from "./lunedi/calcolo";
 import { retryPendingMetaLeads } from "./meta/ingest";
 import { giroRisponditore } from "./risponditore/giro";
-import { rinnovaToken } from "./risponditore/rinnovo";
+import { controllaScadenzaToken, rinnovaToken } from "./risponditore/rinnovo";
 import { giroTelegram } from "./telegram/bot";
 
 export type Lavoro = "avvisi" | "risponditore" | "ig_token" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "lunedi";
@@ -74,7 +74,10 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // Risponditore: ritentativi del messaggio privato (solo il passo 6) dopo gli avvisi, così l'avviso "messaggio non
   // partito" che nasce al terzo tentativo arriva sul telefono nello stesso giro. Stime: fisse 3 (token, eventi, campagne),
   // per evento 4 (controllo dell'invio già fatto, scrittura dell'esito, eventuale tentativo e avviso), una sottorichiesta a tentativo (2 di stima).
-  risponditore: { quando: ogni15, fisse: 3, perUnita: 4, sottoPerUnita: 2, max: 3, riserva: RISERVA_PUSH, esegui: async (e, n, l) => ({ sottorichieste: (await giroRisponditore(e, n, l)).ritentati }) },
+  risponditore: { quando: ogni15, fisse: 5, perUnita: 4, sottoPerUnita: 2, max: 3, riserva: RISERVA_PUSH, esegui: async (e, n, l) => {
+      await controllaScadenzaToken(e, n); // preavviso di scadenza del token: 2 query in più
+      return { sottorichieste: (await giroRisponditore(e, n, l)).ritentati };
+    } },
   // Rinnovo del token Instagram: una volta al giorno alle 5 di Roma. Letture e scritture del token (1), il rinnovo è una sottorichiesta.
   ig_token: { quando: (p) => p.ore === 5 && p.minuti < 5, fisse: 2, perUnita: 0, sottoPerUnita: 1, max: 1, esegui: (e, n) => rinnovaToken(e, n) },
   // Push (spec 8): subito dopo gli avvisi, così l'avviso nato in questo giro (SLA, "Lead nuovo" della catena di

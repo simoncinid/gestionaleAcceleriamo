@@ -7,12 +7,34 @@ import { leggiToken, salvaToken } from "./token";
 const GIORNO = 86_400_000;
 const PREAVVISO = 7 * GIORNO;
 
-// Rinnova il token Instagram (dura 60 giorni). Se non riesce: scrive ultimoErrore e crea un solo avviso per scadenza
-// (la chiave dell'avviso contiene scadeIl, quindi i giri dei giorni dopo non ne creano altri). Lo stesso avviso nasce
-// se mancano meno di 7 giorni alla scadenza. Il token non finisce mai nei log né nei messaggi di errore.
+const TITOLO = "Risponditore: accesso a Instagram da rinnovare";
+
+// Un solo avviso per scadenza: la chiave contiene scadeIl, quindi giri e giorni dopo non ne creano altri.
+async function avvisoDaRinnovare(env: Env, scadeIl: number, now: number, causa: string | null): Promise<void> {
+  const giorni = Math.max(0, Math.floor((scadeIl - now) / GIORNO));
+  await avvisa(getDb(env.DB), {
+    evento: "risponditore_errore",
+    entityId: `token-${scadeIl}`,
+    titolo: TITOLO,
+    testo: `${causa ? `Il rinnovo automatico non è riuscito (${causa}). ` : ""}L'accesso scade tra ${giorni} giorni: ricollega l'account Instagram.`,
+    href: "/automazioni/risponditore",
+  }, now);
+}
+
+// Preavviso: mancano meno di 7 giorni alla scadenza (rinnovo fallito o mai tentato). Gira dal lavoro del risponditore.
+export async function controllaScadenzaToken(env: Env, now: number): Promise<void> {
+  const riga = await env.DB.prepare(`SELECT scade_il FROM ig_account WHERE id = 'principale'`).first<{ scade_il: number }>();
+  if (riga && riga.scade_il - now < PREAVVISO) await avvisoDaRinnovare(env, riga.scade_il, now, null);
+}
+
+// Rinnova il token Instagram (dura 60 giorni). Salta se è stato salvato meno di 24 ore fa (Meta rifiuta il rinnovo).
+// Se non riesce: scrive ultimoErrore e crea l'avviso (lo stesso del preavviso, stessa chiave). Il token non finisce
+// mai nei log né nei messaggi di errore.
 export async function rinnovaToken(env: Env, now: number): Promise<void> {
   const account = await leggiToken(env);
   if (!account) return;
+  const r = await env.DB.prepare(`SELECT rinnovato_il FROM ig_account WHERE id = 'principale'`).first<{ rinnovato_il: number }>();
+  if (r && now - r.rinnovato_il < GIORNO) return;
   let errore: string | null = null;
   try {
     const res = await metaFetch(`https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(account.token)}`, { method: "GET" });
@@ -26,12 +48,5 @@ export async function rinnovaToken(env: Env, now: number): Promise<void> {
     errore = "Instagram non risponde";
   }
   await env.DB.prepare(`UPDATE ig_account SET ultimo_errore = ? WHERE id = 'principale'`).bind(errore).run();
-  const giorni = Math.max(0, Math.floor((account.scadeIl - now) / GIORNO));
-  await avvisa(getDb(env.DB), {
-    evento: "risponditore_errore",
-    entityId: `token-${account.scadeIl}`,
-    titolo: "Risponditore: accesso a Instagram da rinnovare",
-    testo: `Il rinnovo automatico non è riuscito (${errore}). L'accesso scade tra ${giorni} giorni: ricollega l'account Instagram.`,
-    href: "/automazioni/risponditore",
-  }, now);
+  await avvisoDaRinnovare(env, account.scadeIl, now, errore);
 }
