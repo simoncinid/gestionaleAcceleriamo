@@ -17,7 +17,12 @@ export type Env = {
   ANTHROPIC_API_KEY?: string;
   VAPID_PRIVATE_KEY?: string;
   TELEGRAM_BOT_TOKEN?: string;
+  // Segreti del risponditore Instagram (wrangler secret put). IG_TOKEN_KEY: 32 byte in base64, cifra il token in D1 (AES-GCM).
+  IG_APP_SECRET?: string;
+  IG_VERIFY_TOKEN?: string;
+  IG_TOKEN_KEY?: string;
   // Variabili pubbliche (wrangler.jsonc, vars).
+  IG_GRAPH_VERSION?: string;
   VAPID_PUBLIC_KEY?: string;
   VAPID_SOGGETTO?: string; // "mailto:" o indirizzo dell'app, richiesto da VAPID
   TELEGRAM_BOT?: string; // nome utente del bot, senza @

@@ -10,6 +10,7 @@
   ],
   "vars": {
     "META_GRAPH_VERSION": "v23.0",
+    "IG_GRAPH_VERSION": "v25.0",
     // Chiave pubblica VAPID: vuota finché Tommaso non genera la coppia (README, Task 16). La privata è un segreto.
     "VAPID_PUBLIC_KEY": "",
     "VAPID_SOGGETTO": "https://risorse.acceleriamo.it",
@@ -31,7 +32,7 @@
         // database_id: id del database demo creato il 19/10/2026 su account diego@acceleriamo.it (non è un segreto).
         { "binding": "DB", "database_name": "acceleriamo-os-demo", "database_id": "4d356e6d-f9fb-4816-acc2-a5198ed4a8ab", "migrations_dir": "drizzle" }
       ],
-      "vars": { "META_GRAPH_VERSION": "v23.0", "SPAZIO": "demo", "DEMO_URL": "", "APP_URL": "https://acceleriamo-os-demo.diego-faf.workers.dev" },
+      "vars": { "META_GRAPH_VERSION": "v23.0", "IG_GRAPH_VERSION": "v25.0", "SPAZIO": "demo", "DEMO_URL": "", "APP_URL": "https://acceleriamo-os-demo.diego-faf.workers.dev" },
       "triggers": { "crons": [] }
     }
   }

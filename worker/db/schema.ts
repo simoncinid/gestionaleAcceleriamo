@@ -572,3 +572,68 @@ export type Automation = typeof automations.$inferSelect;
 export type Fee = typeof fees.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type Cost = typeof costs.$inferSelect;
+
+// Risponditore ai commenti di Instagram.
+export const igAccount = sqliteTable("ig_account", {
+  id: text("id").primaryKey(), // sempre "principale"
+  igUserId: text("ig_user_id").notNull(),
+  username: text("username").notNull(),
+  tokenCifrato: text("token_cifrato").notNull(),
+  scadeIl: integer("scade_il").notNull(),
+  rinnovatoIl: integer("rinnovato_il").notNull(),
+  ultimoErrore: text("ultimo_errore"),
+});
+
+export const rispCampagne = sqliteTable("risp_campagne", {
+  id: text("id").primaryKey(),
+  nome: text("nome").notNull(),
+  parola: text("parola").notNull(), // normalizzata
+  mediaId: text("media_id"), // null = tutti i post
+  rispostepubbliche: text("rispostepubbliche").notNull(), // JSON: array di stringhe, almeno 1
+  testoPrivato: text("testo_privato").notNull(),
+  etichettaPulsante: text("etichetta_pulsante").notNull().default("Mandami il link"),
+  risorsaSlug: text("risorsa_slug").notNull(),
+  testoLink: text("testo_link").notNull(),
+  attiva: integer("attiva", { mode: "boolean" }).notNull(),
+  creataIl: integer("creata_il").notNull(),
+});
+
+export const RISP_STATI = ["in_corso", "inviato", "link_inviato", "ignorato", "errore"] as const;
+
+export const rispEventi = sqliteTable("risp_eventi", {
+  commentoId: text("commento_id").primaryKey(),
+  mediaId: text("media_id").notNull(),
+  autoreId: text("autore_id").notNull(),
+  autoreNome: text("autore_nome"),
+  testo: text("testo").notNull(),
+  campagnaId: text("campagna_id"),
+  stato: text("stato", { enum: RISP_STATI }).notNull(),
+  motivo: text("motivo"),
+  tentativi: integer("tentativi").notNull().default(0),
+  rispostaPubblicaId: text("risposta_pubblica_id"),
+  creatoIl: integer("creato_il").notNull(),
+  aggiornatoIl: integer("aggiornato_il").notNull(),
+}, (t) => [
+  index("idx_risp_eventi_campagna").on(t.campagnaId, t.autoreId, t.mediaId),
+  index("idx_risp_eventi_stato").on(t.stato, t.aggiornatoIl),
+]);
+
+export const risorse = sqliteTable("risorse", {
+  slug: text("slug").primaryKey(),
+  titolo: text("titolo").notNull(),
+  sottotitolo: text("sottotitolo").notNull(),
+  corpo: text("corpo").notNull(), // markdown
+  pdfUrl: text("pdf_url"),
+  attiva: integer("attiva", { mode: "boolean" }).notNull(),
+  creataIl: integer("creata_il").notNull(),
+});
+
+export const risorseRichieste = sqliteTable("risorse_richieste", {
+  id: text("id").primaryKey(),
+  slug: text("slug").notNull(),
+  nome: text("nome").notNull(),
+  azienda: text("azienda").notNull(),
+  telefono: text("telefono").notNull(),
+  messaggio: text("messaggio"),
+  creataIl: integer("creata_il").notNull(),
+});
