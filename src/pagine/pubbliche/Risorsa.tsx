@@ -5,6 +5,9 @@ import { AreaTesto, Campo, Pulsante, classiPulsante } from "../../ds";
 
 type Risorsa = { titolo: string; sottotitolo: string; corpo: string; pdfUrl: string | null };
 
+// Il link della scheda si mostra solo se è web: niente javascript:, data: e simili, anche se arrivassero dal database.
+export const linkScheda = (u: string | null) => (u && /^https?:\/\//i.test(u) ? u : null);
+
 // Il corpo è testo semplice: paragrafi separati da una riga vuota, righe che iniziano con "- " in elenco.
 // Nessun HTML interpretato: solo elementi React costruiti qui.
 export function CorpoRisorsa({ testo }: { testo: string }) {
@@ -100,8 +103,8 @@ export function PaginaRisorsa({ slug }: { slug: string }) {
         {r.sottotitolo && <p className="text-corpo text-grigio">{r.sottotitolo}</p>}
       </header>
       <CorpoRisorsa testo={r.corpo} />
-      {r.pdfUrl && (
-        <a href={r.pdfUrl} target="_blank" rel="noopener noreferrer" className={`${classiPulsante("secondario", "lg")} w-full`}>Scarica la scheda</a>
+      {linkScheda(r.pdfUrl) && (
+        <a href={linkScheda(r.pdfUrl)!} target="_blank" rel="noopener noreferrer" className={`${classiPulsante("secondario", "lg")} w-full`}>Scarica la scheda</a>
       )}
       <section aria-labelledby="chiamata" className="grid gap-5 rounded-blocco border border-sabbia bg-avorio p-6">
         <div className="grid gap-2">

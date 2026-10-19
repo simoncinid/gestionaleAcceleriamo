@@ -69,10 +69,11 @@ describe("Impostazioni della 1B", () => {
     expect(html).toContain("Manca la chiave di Anthropic");
     expect(html).not.toContain('role="alert"');
   });
-  it("dettaglio di Telegram: i tre eventi, la chat collegata, scollega", () => {
+  it("dettaglio di Telegram: gli eventi con Telegram, la chat collegata, scollega", () => {
     const conTelegram = { ...stato, integrazioni: [...stato.integrazioni, { key: "telegram", etichetta: "Telegram", stato: "ok", ultimaOk: ORA, nota: null }] };
     const html = render(<IntegrazioneDettaglio ora={ORA} />, { percorso: "/impostazioni/integrazioni/telegram", rotta: "/impostazioni/integrazioni/:key", dati: [[["integrazioni"], conTelegram], [["settings"], {}], [["me", "profilo"], profilo]] });
-    expect(html).toContain("Lead nuovo, Prima chiamata scaduta, Claude al tetto del mese");
+    for (const e of ["Lead nuovo", "Prima chiamata scaduta", "Claude al tetto del mese", "Risponditore: messaggio non partito", "Richiesta di chiamata da una risorsa"]) expect(html).toContain(`<li class="text-corpo">${e}</li>`);
+    expect(html).not.toContain("tre avvisi");
     expect(html).toContain("La tua chat è collegata");
     expect(html).toContain("Scollega la tua chat");
     expect(contaPrimari(html)).toBe(0);

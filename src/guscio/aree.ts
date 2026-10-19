@@ -27,6 +27,7 @@ export const SOTTOMENU: Record<Area, { etichetta: string; percorso: string }[]> 
     { etichetta: "Pannello", percorso: "/automazioni" },
     { etichetta: "In costruzione", percorso: "/automazioni/in-costruzione" },
     { etichetta: "Lavori", percorso: "/automazioni/lavori" },
+    { etichetta: "Risponditore", percorso: "/automazioni/risponditore" },
   ],
 };
 

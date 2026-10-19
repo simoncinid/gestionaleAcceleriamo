@@ -32,6 +32,7 @@ import { Utenti } from "./pagine/impostazioni/Utenti";
 import { Scaletta } from "./pagine/commerciale/Scaletta";
 import { InCostruzione } from "./pagine/automazioni/InCostruzione";
 import { Pannello } from "./pagine/automazioni/Pannello";
+import { Risponditore } from "./pagine/automazioni/Risponditore";
 import { SchedaAutomazione } from "./pagine/automazioni/Scheda";
 import { Clienti } from "./pagine/commerciale/Clienti";
 import { SchedaCliente } from "./pagine/commerciale/SchedaCliente";
@@ -112,6 +113,7 @@ function AppPrivata() {
         <Route path="/automazioni" element={<Pannello />} />
         <Route path="/automazioni/in-costruzione" element={<InCostruzione />} />
         <Route path="/automazioni/lavori" element={<Lavori />} />
+        <Route path="/automazioni/risponditore" element={<Risponditore />} />
         <Route path="/automazioni/:id" element={<SchedaAutomazioneRotta />} />
         <Route path="/impostazioni/dati/cestino" element={<Cestino />} />
         <Route path="/impostazioni" element={<Stato onEsci={esci} />} />

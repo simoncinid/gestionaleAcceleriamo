@@ -1,6 +1,6 @@
 import type { EventoAvviso } from "../db/schema";
 
-// Spec 8, tabella degli eventi. Telegram solo per tre eventi (decisione della spec).
+// Spec 8, tabella degli eventi. Telegram solo per gli eventi con telegram: true (i tre della spec, più i due del risponditore).
 export const EVENTI: Record<EventoAvviso, { etichetta: string; chi: "tutti" | "responsabile"; push: boolean; telegram: boolean }> = {
   lead_nuovo: { etichetta: "Lead nuovo", chi: "tutti", push: true, telegram: true },
   sla_90: { etichetta: "Prima chiamata tra 30 minuti", chi: "responsabile", push: true, telegram: false },

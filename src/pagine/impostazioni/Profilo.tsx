@@ -5,16 +5,23 @@ import { api } from "../../api";
 import { mostraErrore } from "../../errori";
 import { Campo, Foglio, Interruttore, Pulsante, Riga } from "../../ds";
 import type { Profilo } from "../../types";
+import { EVENTI as TABELLA_EVENTI } from "../../../worker/avvisi/eventi";
 import { AttivaNotifiche } from "./AttivaNotifiche";
 import { useProfilo, useStatoSistema } from "./parti";
 
-// Stesso ordine e stessi nomi della tabella degli eventi (worker/avvisi/eventi.ts).
-const EVENTI: [string, string][] = [
-  ["lead_nuovo", "Lead nuovo"], ["sla_90", "Prima chiamata tra 30 minuti"], ["sla_scaduto", "Prima chiamata scaduta"],
-  ["proposta_oggi", "Proposta da seguire oggi"], ["fine_pausa", "Fine della pausa"], ["claude_tetto", "Claude al tetto del mese"],
-  ["meta_48h", "Meta senza lead da 48 ore"], ["integrazione_rotta", "Integrazione rotta"],
-];
-export const EVENTI_TELEGRAM = "Lead nuovo, Prima chiamata scaduta, Claude al tetto del mese";
+// Stesso ordine e stessi nomi della tabella degli eventi: si leggono da lì, così un evento nuovo compare da solo.
+const EVENTI: [string, string][] = Object.entries(TABELLA_EVENTI).map(([k, e]) => [k, e.etichetta]);
+export const EVENTI_TELEGRAM: string[] = Object.values(TABELLA_EVENTI).filter((e) => e.telegram).map((e) => e.etichetta);
+
+// Gli avvisi che arrivano anche su Telegram, uno per riga.
+export function AvvisiTelegram({ attenuato = false }: { attenuato?: boolean }) {
+  return (
+    <div className="grid gap-1">
+      <p className={attenuato ? "text-secondaria text-grigio" : "text-corpo"}>Su Telegram arrivano solo questi avvisi:</p>
+      <ul className="grid gap-0.5">{EVENTI_TELEGRAM.map((e) => <li key={e} className={attenuato ? "text-secondaria text-grigio" : "text-corpo"}>{e}</li>)}</ul>
+    </div>
+  );
+}
 const ORA_VALIDA = /^([01]\d|2[0-3]):[0-5]\d$/;
 type Aperto = null | "password" | "dispositivi" | "telegram" | "avvisi" | "silenzio";
 const errore = (e: Error) => mostraErrore(e);
@@ -124,12 +131,12 @@ function FoglioTelegram({ p, onChiudi }: { p: Profilo; onChiudi: () => void }) {
       ) : p.telegram ? (
         <>
           <p className="text-corpo">La tua chat è collegata.</p>
-          <p className="text-secondaria text-grigio">{`Arrivano solo tre avvisi: ${EVENTI_TELEGRAM}.`}</p>
+          <AvvisiTelegram attenuato />
           <div><ScollegaTelegram scollega={scollega} testo="Scollega Telegram" /></div>
         </>
       ) : (
         <>
-          <p className="text-corpo">{`Telegram manda solo tre avvisi: ${EVENTI_TELEGRAM}.`}</p>
+          <AvvisiTelegram />
           {link ? <LinkTelegram link={link} /> : <p className="text-secondaria text-grigio">Premi Collega: si apre il bot con il tuo codice.</p>}
         </>
       )}

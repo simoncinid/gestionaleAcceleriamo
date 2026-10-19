@@ -10,7 +10,7 @@ import type { Integrazione, StatoSistema } from "../../types";
 import { ScollegaTelegram } from "./Profilo";
 import { SezioneAggancio, SezioneFoglio, SezioneResend } from "./integrazioni-sezioni";
 import { COLORE, ETICHETTA_STATO, rigaStato, useImpostazioni, useProfilo, useStatoSistema } from "./parti";
-import { EVENTI_TELEGRAM, LinkTelegram, useTelegram } from "./Profilo";
+import { AvvisiTelegram, LinkTelegram, useTelegram } from "./Profilo";
 
 type UsoClaude = { collegato: boolean; spesoCents: number; tettoCents: number; avvisoCents: number; fermi: number; perTipo: { tipo: string; lavori: number; costoCents: number }[]; modelli: Record<string, string> };
 type Dispositivo = { id: string; etichetta: string; lastOkAt: number | null; rotta: boolean };
@@ -69,7 +69,7 @@ function Telegram({ i }: { i: Integrazione }) {
   const mia = profilo.data?.telegram ?? false;
   return (
     <>
-      <Testo>{`Telegram manda solo tre avvisi: ${EVENTI_TELEGRAM}.`}</Testo>
+      <AvvisiTelegram />
       <Testo>{mia ? "La tua chat è collegata." : "La tua chat non è collegata."}</Testo>
       {!mia && link && <LinkTelegram link={link} />}
       <div className="flex flex-wrap gap-2">
