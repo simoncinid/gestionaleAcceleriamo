@@ -72,7 +72,7 @@ async function parolaOccupata(db: Db, d: DatiCampagna, escludi?: string) {
 async function controlla(db: Db, d: DatiCampagna, escludi?: string): Promise<{ errore: string; stato: 400 | 409 } | null> {
   const risorsa = await trovaRisorsa(db, d.risorsaSlug);
   if (!risorsa) return { errore: "La risorsa scelta non esiste", stato: 400 };
-  if (!risorsa.attiva) return { errore: "La risorsa scelta è spenta: accendila oppure scegline un'altra", stato: 400 };
+  if (d.attiva && !risorsa.attiva) return { errore: "La risorsa scelta è spenta: accendila oppure scegline un'altra", stato: 400 };
   if (await parolaOccupata(db, d, escludi)) return { errore: `La parola "${d.parola}" è già usata da un'altra campagna attiva sullo stesso post`, stato: 409 };
   return null;
 }

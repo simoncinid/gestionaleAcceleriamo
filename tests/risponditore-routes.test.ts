@@ -74,6 +74,16 @@ describe("risponditore: campagne", () => {
     expect(mod.status).toBe(400);
     expect((await mod.json<{ error: string }>()).error).toMatch(/spenta/i);
   });
+  it("campagna spenta con risorsa spenta: si può salvare, spegnere e rinominare", async () => {
+    const { campagna: c } = await (await crea(campagna())).json<{ campagna: { id: string } }>();
+    await env.DB.prepare("UPDATE risorse SET attiva = 0 WHERE slug = 'guida'").run();
+    const spegni = await call(`/api/risponditore/campagne/${c.id}`, { method: "PUT", json: campagna({ attiva: false }) }, cookie);
+    expect(spegni.status).toBe(200);
+    const rinomina = await call(`/api/risponditore/campagne/${c.id}`, { method: "PUT", json: campagna({ nome: "Nuovo nome", attiva: false }) }, cookie);
+    expect(rinomina.status).toBe(200);
+    expect((await crea(campagna({ attiva: false }))).status).toBe(201);
+    expect((await crea(campagna())).status).toBe(400);
+  });
   it("parola doppia tra le attive con lo stesso post: 409, anche con maiuscole diverse", async () => {
     expect((await crea(campagna())).status).toBe(201);
     const res = await crea(campagna({ nome: "Altra", parola: "casa" }));

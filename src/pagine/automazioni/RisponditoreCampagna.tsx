@@ -47,7 +47,9 @@ export function FoglioCampagna({ campagna, risorse, onChiudi }: { campagna: Camp
     : !risorsa ? "Scegli la risorsa"
     : !testoLink.trim() ? "Scrivi il testo del link"
     : undefined;
-  const opzioniRisorse = risorse.map((r) => ({ valore: r.slug, etichetta: r.titolo, meta: r.attiva ? `/r/${r.slug}` : `/r/${r.slug}, spenta` }));
+  // Le risorse spente non si offrono, tranne quella già collegata a questa campagna.
+  const opzioniRisorse = risorse.filter((r) => r.attiva || r.slug === campagna?.risorsaSlug)
+    .map((r) => ({ valore: r.slug, etichetta: r.attiva ? r.titolo : `${r.titolo} (spenta)`, meta: `/r/${r.slug}` }));
   return (
     <Foglio aperto lato titolo={campagna ? "Modifica la campagna" : "Nuova campagna"} onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Salva la campagna</Pulsante>}>
@@ -59,7 +61,7 @@ export function FoglioCampagna({ campagna, risorse, onChiudi }: { campagna: Camp
       <p className="-mt-2 text-meta text-grigio">Sotto il commento ne parte una a caso.</p>
       <AreaTesto etichetta="Messaggio privato" cresce value={privato} onChange={(e) => setPrivato(e.target.value)} />
       <Campo etichetta="Testo del pulsante" aiuto="Al massimo 20 caratteri" maxLength={20} value={pulsante} onChange={(e) => setPulsante(e.target.value)} />
-      <Selettore etichetta="Risorsa da mandare" opzioni={opzioniRisorse} valore={risorsa} onCambia={setRisorsa} segnaposto={risorse.length ? "Scegli" : "Nessuna risorsa"} />
+      <Selettore etichetta="Risorsa da mandare" opzioni={opzioniRisorse} valore={risorsa} onCambia={setRisorsa} segnaposto={opzioniRisorse.length ? "Scegli" : "Nessuna risorsa"} />
       <AreaTesto etichetta="Testo che accompagna il link" cresce value={testoLink} onChange={(e) => setTestoLink(e.target.value)} />
       <Interruttore etichetta="Campagna attiva" aiuto="Spenta, i commenti con questa parola restano senza risposta" acceso={attiva} onCambia={setAttiva} />
     </Foglio>
