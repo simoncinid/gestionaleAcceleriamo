@@ -16,6 +16,7 @@
     "demo:reset": "tsx scripts/seed-demo.ts --remote",
     "demo:locale": "tsx scripts/seed-demo.ts --local",
     "risponditore:semina": "tsx scripts/risponditore-semina.ts",
+    "risorse:grafiche": "tsx scripts/risorse-grafiche.ts",
     "deploy:demo": "CLOUDFLARE_ENV=demo vite build && wrangler deploy",
     "e2e": "playwright test",
     "e2e:foto": "playwright test --update-snapshots"

@@ -215,6 +215,17 @@ npm run risponditore:semina -- mio-file.json --remote   # database online
 
 Lo script controlla il file (slug in minuscolo con i trattini, `pdfUrl` solo http o https, parola unica dopo la normalizzazione, almeno una risposta pubblica, pulsante di massimo 20 caratteri) e si ferma con l'elenco degli errori. Si può rilanciare: una risorsa con lo stesso slug o una campagna con la stessa parola (e lo stesso post) viene aggiornata, mai duplicata. Senza `--remote` non tocca il database online.
 
+### Grafiche del messaggio con il link
+
+Quando la persona tocca il pulsante, il messaggio con il link è fatto di una riga, un'animazione dello schema e un carosello con una scheda per passo e la chiamata gratuita in fondo (al secondo tocco solo il carosello). Le grafiche si generano dallo stesso file JSON della semina, con Google Chrome e ffmpeg installati:
+
+```bash
+npm run risorse:grafiche -- mio-file.json                     # tutte le risorse
+npm run risorse:grafiche -- mio-file.json --solo slug1,slug2  # solo alcune
+```
+
+Lo script scrive `public/risorse/<slug>/` (`passo-<n>.png`, `chiamata.png`, `schema.mp4`) e `worker/risponditore/grafiche-risorse.ts`, poi si fa commit e deploy. Il Worker usa le grafiche solo se i passi della risorsa nel database sono ancora quelli da cui sono state disegnate: se cambi titoli o numeri dei passi, rigenera; fino ad allora parte la scheda singola di sempre.
+
 ### Prove dal vivo
 
 Dopo il deploy, con il token caricato, fai queste prove e scrivi l'esito nel registro del progetto:
