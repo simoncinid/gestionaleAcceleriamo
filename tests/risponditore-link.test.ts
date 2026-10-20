@@ -3,7 +3,8 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { computeMetaSignature } from "../worker/meta/signature";
 import { setMetaFetch } from "../worker/meta/fetcher";
 import { LAVORI } from "../worker/cron";
-import { etichettaApri, mandaLink, taglia } from "../worker/risponditore/link";
+import { etichettaApri, mandaLink, setGrafiche, taglia } from "../worker/risponditore/link";
+import { firmaPassi, passiSchema } from "../src/pagine/pubbliche/corpoRisorsa";
 import { createUser } from "./helpers";
 import { controllaScadenzaToken, rinnovaToken } from "../worker/risponditore/rinnovo";
 import { leggiToken, salvaToken } from "../worker/risponditore/token";
@@ -31,6 +32,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   setMetaFetch(null);
+  setGrafiche(null);
   vi.restoreAllMocks();
 });
 
@@ -130,6 +132,123 @@ describe("mandaLink", () => {
     expect(chiamate).toHaveLength(1);
     expect(chiamate[0].corpo.recipient).toEqual({ id: "p1" });
     expect(chiamate[0].corpo.message.attachment.payload.elements[0].buttons[0].url).toBe("https://risorse.acceleriamo.it/r/guida");
+    expect((await evento("c1"))?.stato).toBe("link_inviato");
+  });
+});
+
+describe("mandaLink con le grafiche dello schema", () => {
+  const CORPO = "## Lo schema\n\n1. **Registrazione dei dati.** Ordini, contatti e ore ricopiati a mano da email o fogli dentro il gestionale, ogni giorno.\n2. **Invio delle richieste.** Preventivi chiesti ai fornitori.\n3. **Report.** Il riepilogo del lunedì.";
+  const B = "https://risorse.acceleriamo.it";
+  const conGrafiche = async (corpo = CORPO, video = true) => {
+    await env.DB.prepare("INSERT INTO risorse (slug, titolo, sottotitolo, corpo, pdf_url, attiva, creata_il) VALUES ('guida', 'Lo schema dei dati', '', ?, NULL, 1, 1)").bind(corpo).run();
+    setGrafiche({ guida: { firma: firmaPassi(passiSchema(CORPO)), v: "ab12cd34", video } });
+  };
+  const tipo = (c: Chiamata) => (c.corpo.message.text ? "testo" : c.corpo.message.attachment.type === "video" ? "video" : c.corpo.message.attachment.payload.elements.length > 1 ? "carosello" : "scheda");
+
+  it("primo tocco: una riga, l'animazione e il carosello dei passi con la chiamata in fondo; stato scritto una volta", async () => {
+    await conGrafiche();
+    await inserisci("c1", "p1", "inviato", NOW);
+    await mandaLink(ENV, "p1", "camp-1", NOW + 5);
+    expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello"]);
+    expect(chiamate.every((c) => c.corpo.recipient.id === "p1")).toBe(true);
+    expect(chiamate[0].corpo.message).toEqual({ text: "Eccolo, e seguici!" });
+    expect(chiamate[1].corpo.message).toEqual({ attachment: { type: "video", payload: { url: `${B}/risorse/guida/schema.mp4?v=ab12cd34` } } });
+    const el = chiamate[2].corpo.message.attachment.payload.elements;
+    expect(el).toHaveLength(4);
+    expect(el[0]).toEqual({
+      title: "Registrazione dei dati",
+      subtitle: "Ordini, contatti e ore ricopiati a mano da email o fogli dentro il gestionale…",
+      image_url: `${B}/risorse/guida/passo-1.png?v=ab12cd34`,
+      default_action: { type: "web_url", url: `${B}/r/guida#passo-1` },
+      buttons: [{ type: "web_url", url: `${B}/r/guida#passo-1`, title: "Apri lo schema" }],
+    });
+    expect(el[2].buttons[0].url).toBe(`${B}/r/guida#passo-3`);
+    expect(el[3]).toEqual({
+      title: "Chiamata gratuita",
+      subtitle: "Ti richiamiamo e guardiamo insieme come applicarlo alla tua azienda.",
+      image_url: `${B}/risorse/guida/chiamata.png?v=ab12cd34`,
+      default_action: { type: "web_url", url: `${B}/r/guida#chiamata` },
+      buttons: [{ type: "web_url", url: `${B}/r/guida#chiamata`, title: "Richiedi la chiamata" }],
+    });
+    for (const e of el) {
+      expect(e.title.length).toBeLessThanOrEqual(80);
+      expect(e.subtitle.length).toBeLessThanOrEqual(80);
+      expect(e.buttons[0].title.length).toBeLessThanOrEqual(20);
+    }
+    expect(await evento("c1")).toMatchObject({ stato: "link_inviato", aggiornato_il: NOW + 5 });
+  });
+
+  it("secondo tocco: solo il carosello, niente animazione doppia, lo stato non si riscrive", async () => {
+    await conGrafiche();
+    await inserisci("c1", "p1", "inviato", NOW);
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    chiamate = [];
+    await mandaLink(ENV, "p1", "camp-1", NOW + 2);
+    expect(chiamate.map(tipo)).toEqual(["carosello"]);
+    expect(await evento("c1")).toMatchObject({ stato: "link_inviato", aggiornato_il: NOW + 1 });
+  });
+
+  it("due tocchi insieme: l'animazione parte una volta sola", async () => {
+    await conGrafiche();
+    await inserisci("c1", "p1", "inviato", NOW);
+    await Promise.all([mandaLink(ENV, "p1", "camp-1", NOW + 1), mandaLink(ENV, "p1", "camp-1", NOW + 2)]);
+    expect(chiamate.filter((c) => tipo(c) === "video")).toHaveLength(1);
+    expect(chiamate.filter((c) => tipo(c) === "carosello")).toHaveLength(2);
+    expect((await evento("c1"))?.stato).toBe("link_inviato");
+  });
+
+  it("animazione rifiutata: si salta e il carosello parte lo stesso", async () => {
+    await conGrafiche();
+    await inserisci("c1", "p1", "inviato", NOW);
+    risposta = () => (chiamate.length === 2 ? Response.json({ error: { code: 100, message: "video" } }, { status: 400 }) : Response.json({ message_id: "m" }));
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello"]);
+    expect((await evento("c1"))?.stato).toBe("link_inviato");
+  });
+
+  it("senza animazione generata: riga e carosello", async () => {
+    await conGrafiche(CORPO, false);
+    await inserisci("c1", "p1", "inviato", NOW);
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    expect(chiamate.map(tipo)).toEqual(["testo", "carosello"]);
+  });
+
+  it("carosello rifiutato: la scheda singola; rifiutata anche quella: il testo con il link", async () => {
+    await conGrafiche();
+    await inserisci("c1", "p1", "inviato", NOW);
+    risposta = () => (chiamate.length === 3 ? Response.json({ error: { code: 100, message: "template" } }, { status: 400 }) : Response.json({ message_id: "m" }));
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello", "scheda"]);
+    expect(chiamate[3].corpo.message.attachment.payload.elements[0].image_url).toBe(`${B}/brand/scheda-risorsa.png`);
+    expect((await evento("c1"))?.stato).toBe("link_inviato");
+
+    await env.DB.prepare("UPDATE risp_eventi SET stato = 'inviato' WHERE commento_id = 'c1'").run();
+    chiamate = [];
+    risposta = () => ([3, 4].includes(chiamate.length) ? Response.json({ error: { code: 100, message: "template" } }, { status: 400 }) : Response.json({ message_id: "m" }));
+    await mandaLink(ENV, "p1", "camp-1", NOW + 2);
+    expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello", "scheda", "testo"]);
+    expect(chiamate[4].corpo.message).toEqual({ text: `Eccolo, e seguici!\n\n${B}/r/guida` });
+    expect((await evento("c1"))?.stato).toBe("link_inviato");
+  });
+
+  it("tutto rifiutato: lo stato resta inviato e il tocco successivo è ancora il primo", async () => {
+    await conGrafiche();
+    await inserisci("c1", "p1", "inviato", NOW);
+    risposta = () => Response.json({ error: { code: 10, message: "no" } }, { status: 400 });
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello", "scheda", "testo"]);
+    expect((await evento("c1"))?.stato).toBe("inviato");
+    chiamate = [];
+    risposta = () => Response.json({ message_id: "m" });
+    await mandaLink(ENV, "p1", "camp-1", NOW + 2);
+    expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello"]);
+  });
+
+  it("corpo cambiato dopo le grafiche (firma diversa) o slug senza grafiche: la scheda singola di oggi", async () => {
+    await conGrafiche(CORPO.replace("Report.", "Riepilogo."));
+    await inserisci("c1", "p1", "inviato", NOW);
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    expect(chiamate.map(tipo)).toEqual(["scheda"]);
     expect((await evento("c1"))?.stato).toBe("link_inviato");
   });
 });

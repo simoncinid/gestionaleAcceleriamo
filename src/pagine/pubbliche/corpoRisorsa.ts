@@ -111,3 +111,37 @@ export function chiaveTitolo(titolo: string): [string, string, string] {
   }
   return [titolo, "", ""];
 }
+
+// Un elenco numerato è lo schema quando almeno metà delle voci apre con il titolo del passo in grassetto.
+export const eSchema = (b: Blocco): b is Extract<Blocco, { tipo: "elenco" }> =>
+  b.tipo === "elenco" && b.ordinato && b.voci.filter((v) => v.guida).length * 2 >= b.voci.length;
+
+// Indice del primo elenco a passi del corpo (-1 se non c'è): è lui ad avere le ancore #passo-N nella pagina.
+export const indiceSchema = (blocchi: Blocco[]) => blocchi.findIndex(eSchema);
+
+export type Passo = { numero: number; titolo: string; descrizione: string };
+export const MAX_PASSI = 7;
+
+// I passi dello schema (al massimo sette) che finiscono nel messaggio su Instagram e nelle sue grafiche:
+// il numero scritto nella pagina, il titolo in grassetto e il resto della voce come descrizione.
+export function passiSchema(corpo: string): Passo[] {
+  const blocchi = analizzaCorpo(corpo);
+  const schema = blocchi[indiceSchema(blocchi)];
+  if (!schema || !eSchema(schema)) return [];
+  return schema.voci
+    .map((v, i) => ({ v, numero: schema.inizio + i }))
+    .filter(({ v }) => v.guida)
+    .slice(0, MAX_PASSI)
+    .map(({ v, numero }) => ({ numero, titolo: v.guida!, descrizione: v.resto.map((p) => p.testo).join("").replace(/\s+/g, " ").trim() }));
+}
+
+// Impronta breve (FNV-1a a 32 bit) dei numeri e dei titoli dei passi: le grafiche disegnate per una risorsa
+// valgono solo finché la firma del corpo attuale è la stessa di quando sono state generate.
+export function firmaPassi(passi: Passo[]): string {
+  let h = 0x811c9dc5;
+  for (const c of passi.map((p) => `${p.numero}:${p.titolo}`).join("|")) {
+    h ^= c.codePointAt(0)!;
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
+}

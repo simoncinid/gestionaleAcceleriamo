@@ -51,3 +51,11 @@ test("pagina risorsa pubblica: niente scorrimento di lato a 360 e 390 pixel, lo 
     await expect(page.locator(".risorsa-corpo")).not.toContainText("**");
   }
 });
+
+test("pagina risorsa pubblica: i link del messaggio portano al passo e alla chiamata", async ({ page }) => {
+  await page.goto("/r/prova-schema#passo-6");
+  await expect(page.locator("#passo-6")).toBeInViewport();
+  await expect(page.locator("#passo-1")).not.toBeInViewport();
+  await page.goto("/r/prova-schema#chiamata");
+  await expect(page.locator("#chiamata")).toBeInViewport();
+});

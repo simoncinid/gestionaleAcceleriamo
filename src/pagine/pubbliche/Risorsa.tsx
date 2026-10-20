@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError, api } from "../../api";
 import { CircleNotch } from "@phosphor-icons/react";
 import { AreaTesto, Campo, classiPulsante } from "../../ds";
-import { analizzaCorpo, chiaveTitolo, minutiLettura, type Blocco, type Pezzo } from "./corpoRisorsa";
+import { analizzaCorpo, chiaveTitolo, eSchema, indiceSchema, minutiLettura, type Blocco, type Pezzo } from "./corpoRisorsa";
 
 type Risorsa = { titolo: string; sottotitolo: string; corpo: string; pdfUrl: string | null };
 
@@ -25,16 +25,17 @@ function TitoloConChiave({ testo: grezzo, anche }: { testo: string; anche?: bool
   return <>{prima}<span className={anche ? "text-accento" : "block text-accento"}>{chiave}</span>{anche ? dopo : dopo.trim()}</>;
 }
 
-function Elenco({ b }: { b: Extract<Blocco, { tipo: "elenco" }> }) {
+// "ancore": il primo schema del corpo ha id="passo-N" su ogni voce, per i link dei messaggi su Instagram (/r/<slug>#passo-N).
+function Elenco({ b, ancore }: { b: Extract<Blocco, { tipo: "elenco" }>; ancore?: boolean }) {
   if (!b.ordinato) {
     return <ul className="risorsa-punti">{b.voci.map((v, i) => <li key={i}><Testo pezzi={v.pezzi} /></li>)}</ul>;
   }
   // Elenco numerato con il titolo del passo in grassetto: è lo schema, con i numeri grandi e il filo che li unisce.
-  const schema = b.voci.filter((v) => v.guida).length * 2 >= b.voci.length;
+  const schema = eSchema(b);
   return (
     <ol start={b.inizio} className={schema ? "risorsa-passi" : "risorsa-numeri"}>
       {b.voci.map((v, i) => (
-        <li key={i}>
+        <li key={i} id={ancore ? `passo-${b.inizio + i}` : undefined}>
           <span aria-hidden className="risorsa-numero">{b.inizio + i}</span>
           {schema && v.guida ? (
             <div className="grid gap-1.5">
@@ -51,9 +52,11 @@ function Elenco({ b }: { b: Extract<Blocco, { tipo: "elenco" }> }) {
 }
 
 export function CorpoRisorsa({ testo }: { testo: string }) {
+  const blocchi = analizzaCorpo(testo);
+  const primoSchema = indiceSchema(blocchi);
   return (
     <div className="risorsa-corpo">
-      {analizzaCorpo(testo).map((b, i) => {
+      {blocchi.map((b, i) => {
         if (b.tipo === "titolo") {
           const solo = b.pezzi.map((p) => p.testo).join("");
           return b.livello === 2
@@ -61,7 +64,7 @@ export function CorpoRisorsa({ testo }: { testo: string }) {
             : <h3 key={i}><Testo pezzi={b.pezzi} /></h3>;
         }
         if (b.tipo === "paragrafo") return <p key={i}><Testo pezzi={b.pezzi} /></p>;
-        return <Elenco key={i} b={b} />;
+        return <Elenco key={i} b={b} ancore={i === primoSchema} />;
       })}
     </div>
   );
@@ -123,6 +126,14 @@ export function PaginaRisorsa({ slug }: { slug: string }) {
     queryFn: () => api<Risorsa>(`/pubblico/risorse/${encodeURIComponent(slug)}`),
   });
   useEffect(() => { if (q.data) document.title = `${q.data.titolo} | Acceleriamo`; }, [q.data]);
+  // I link del messaggio su Instagram arrivano con #passo-N o #chiamata: all'apertura la pagina non c'è ancora,
+  // quindi il salto all'ancora si fa a contenuto caricato.
+  useEffect(() => {
+    const ancora = q.data ? decodeURIComponent(window.location.hash.slice(1)) : "";
+    if (!/^(passo-\d{1,3}|chiamata)$/.test(ancora)) return;
+    const f = requestAnimationFrame(() => document.getElementById(ancora)?.scrollIntoView({ block: "start" }));
+    return () => cancelAnimationFrame(f);
+  }, [q.data]);
 
   const cornice = (figli: ReactNode) => (
     <main className="risorsa min-h-[100dvh] overflow-x-clip bg-crema pb-0 text-ink">

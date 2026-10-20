@@ -9,6 +9,10 @@ export default function prepara() {
   // Risorsa di prova per la pagina pubblica /r/prova (il seed della demo non ne ha).
   const risorsa = "INSERT OR REPLACE INTO risorse (slug, titolo, sottotitolo, corpo, pdf_url, attiva, creata_il) VALUES ('prova', 'lo schema del workflow', 'Come rispondere ai commenti senza perdere un contatto', 'Un commento arriva, il messaggio parte da solo.\n\n- Commenti letti\n- Risposta pubblica\n- Messaggio privato con la guida', 'https://example.com/scheda.pdf', 1, 1)";
   execFileSync("npx", ["wrangler", "d1", "execute", "acceleriamo-os-demo", "--env", "demo", "--local", "--command", risorsa], opz);
+  // Risorsa con uno schema a passi lungo: i link del messaggio su Instagram aprono /r/prova-schema#passo-N e #chiamata.
+  const passi = Array.from({ length: 7 }, (_, i) => `${i + 1}. **Passo numero ${i + 1}.** ${"Una descrizione che occupa spazio sullo schermo del telefono. ".repeat(3)}`).join("\n");
+  const schema = `INSERT OR REPLACE INTO risorse (slug, titolo, sottotitolo, corpo, pdf_url, attiva, creata_il) VALUES ('prova-schema', 'Lo schema dei passi', 'Sette passi', '## Lo schema\n\n${passi}\n\nUltimo paragrafo.', NULL, 1, 1)`;
+  execFileSync("npx", ["wrangler", "d1", "execute", "acceleriamo-os-demo", "--env", "demo", "--local", "--command", schema], opz);
   // Risponditore (Task 8): un account, due campagne, commenti nei vari stati, una richiesta di chiamata. Ore fisse sull'ora delle foto.
   const m = (minuti: number) => ORA_DEMO - minuti * 60_000;
   const risponditore = [
