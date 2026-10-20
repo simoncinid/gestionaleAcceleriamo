@@ -3,7 +3,7 @@
 // schema a passi, disegna con Google Chrome (headless) e ffmpeg:
 //   public/risorse/<slug>/passo-<n>.png   una scheda del carosello per passo (1200x628)
 //   public/risorse/<slug>/chiamata.png    l'ultima scheda, la chiamata gratuita
-//   public/risorse/<slug>/schema.mp4      l'animazione dello schema (1080x1350, muta, in giro continuo)
+//   public/risorse/<slug>/schema.mp4      l'animazione dello schema (1080x1350, muta, 8-14 s: titolo, un passo per volta, colonna finale)
 // e riscrive worker/risponditore/grafiche-risorse.ts, che dice al Worker quali risorse hanno le grafiche.
 // Richiede Google Chrome installato (o CHROME=/percorso/del/binario) e ffmpeg nel PATH.
 import { execFileSync } from "node:child_process";
@@ -80,7 +80,9 @@ try {
       await pagina.setViewportSize({ width: VIDEO.larghezza, height: VIDEO.altezza });
       await pagina.goto(`file://${join(lavoro, "animazione.html")}`);
       await caricaFont();
-      await pagina.evaluate(() => (window as any).prepara());
+      const misure = await pagina.evaluate(() => (window as any).prepara()) as { fsColonna: number; fsTitolo: number };
+      if (misure.fsColonna < 44) problemi.push(`${r.slug}: la colonna finale scende a ${misure.fsColonna} px (minimo 44)`);
+      if (misure.fsTitolo < 64) problemi.push(`${r.slug}: il titolo di apertura scende a ${misure.fsTitolo} px`);
       const { durata } = tempiAnimazione(passi.length);
       const n = Math.round(durata * VIDEO.fps);
       for (let f = 0; f < n; f++) {

@@ -10,7 +10,7 @@ import {
 import { chiaveTitolo, firmaPassi, type Passo } from "../../src/pagine/pubbliche/corpoRisorsa";
 
 // Cambia questo numero quando cambia il disegno: cambiano gli indirizzi e Instagram non mostra le immagini vecchie.
-export const DESIGN_VERSIONE = 1;
+export const DESIGN_VERSIONE = 2;
 
 export const COLORI = { arancione: "#EC5E2D", crema: "#F7F2EC", testo: "#1C1915", sabbia: "#E3DCD2", grigio: "#6B645C" };
 export const SCHEDA = { larghezza: 1200, altezza: 628 }; // 1.91:1, il formato delle schede dei messaggi
@@ -94,7 +94,9 @@ const ADATTA = `<script>
       const min = Number(el.dataset.adatta);
       const dentro = el.firstElementChild;
       let px = parseFloat(getComputedStyle(el).fontSize);
-      const esce = () => dentro.getBoundingClientRect().height > el.clientHeight + 1 || dentro.scrollWidth > el.clientWidth + 1;
+      const righe = Number(el.dataset.righe || 0); // facoltativo: al massimo tante righe
+      const esce = () => dentro.getBoundingClientRect().height > el.clientHeight + 1 || dentro.scrollWidth > el.clientWidth + 1 ||
+        (righe > 0 && dentro.getBoundingClientRect().height > parseFloat(getComputedStyle(el).lineHeight) * righe + 2);
       while (esce() && px > min) {
         px -= 2;
         el.style.fontSize = px + "px";
@@ -151,91 +153,167 @@ export function htmlChiamata(cartellaFont: string): string {
   </body></html>`;
 }
 
-// Tempi dell'animazione, in secondi: il titolo, poi un passo ogni 0,9 s con il filo che scende fino a lui,
-// la freccia in fondo, una pausa per leggere e un'uscita breve. Primo e ultimo fotogramma sono uguali (crema e logo): il giro è continuo.
+// Tempi dell'animazione, in secondi: apertura con il titolo (1,2 s), poi un passo alla volta a tutto schermo
+// (entra in 0,45 s, resta 0,9 s, esce in 0,25 s: circa 1,35 s a vista), poi la chiusura con tutti i passi in colonna (circa 1,5 s).
+// Con pochi passi la chiusura si ferma un po' di più, perché il video non scenda sotto gli 8 secondi.
 export function tempiAnimazione(passi: number) {
-  const titolo = 0.2;
-  const primoPasso = 1.0;
-  const intervallo = 0.9;
-  const ultimo = primoPasso + (passi - 1) * intervallo;
-  const freccia = ultimo + 0.6;
-  const uscita = freccia + 0.6 + 3.2;
-  const durata = uscita + 0.6;
-  return { titolo, primoPasso, intervallo, freccia, uscita, durata };
+  const apertura = 1.2;
+  const ingresso = 0.45;
+  const sosta = 0.9;
+  const uscita = 0.25;
+  const passo = ingresso + sosta + uscita;
+  const chiusura = apertura + passi * passo;
+  const durata = Math.max(8.1, chiusura + 1.5);
+  return { apertura, ingresso, sosta, uscita, passo, chiusura, durata };
 }
 
-// L'animazione dello schema: logo, titolo della risorsa e i passi che entrano uno dopo l'altro, con il filo che li cuce.
-// Le animazioni CSS restano ferme: lo script porta ogni fotogramma al suo tempo (document.getAnimations) e lo fotografa.
+// L'animazione dello schema, verticale 4:5 e muta. Tre momenti:
+//   apertura: il titolo della risorsa, enorme, con la parola chiave che si accende in arancione;
+//   un passo per volta a tutto schermo (numero gigante, titolo grande, icona), con il filo arancione in basso che si allunga di passo in passo;
+//   chiusura: tutti i passi in una colonna che riempie il riquadro, e il logo.
+// Le animazioni (Web Animations) restano ferme: lo script porta ogni fotogramma al suo tempo (vaiA) e lo fotografa.
+// Niente testo sotto i 40 px (la colonna finale sta tra 44 e 96 px) e il primo fotogramma è già l'apertura, non un vuoto.
 export function htmlAnimazione(r: { titolo: string; passi: Passo[] }, cartellaFont: string, logoSvg: string): string {
   const { larghezza: W, altezza: H } = VIDEO;
-  const t = tempiAnimazione(r.passi.length);
-  const x = 132; // centro dei numeri e del filo
-  const cerchio = r.passi.length >= 6 ? 84 : 100;
+  const n = r.passi.length;
+  const t = tempiAnimazione(n);
+  const x = 130; // centro dei cerchi e del filo nella colonna finale
+  const cerchio = n >= 6 ? 84 : 100;
   const [prima, chiave, dopo] = chiaveTitolo(apostrofo(r.titolo));
   const titolo = chiave ? conChiave([prima, chiave, dopo]) : conChiave(chiavePasso(apostrofo(r.titolo)));
-  const righe = r.passi
-    .map((p, i) => `<li style="--ritardo:${(t.primoPasso + i * t.intervallo).toFixed(2)}s"><span class="n">${p.numero}</span><span class="tp">${conChiave(chiavePasso(apostrofo(p.titolo)))}</span></li>`)
+  const scene = r.passi
+    .map(
+      (p, i) => `<section class="scena passo" data-i="${i}">
+    <div class="di">passo ${i + 1} di ${n}</div>
+    <div class="ic">${iconaPasso(p, COLORI.testo, 96)}</div>
+    <div class="num">${p.numero}</div>
+    <div class="tp" data-adatta="84" data-righe="2"><span class="t">${conChiave(chiavePasso(apostrofo(p.titolo)))}</span></div>
+  </section>`,
+    )
+    .join("\n  ");
+  const colonna = r.passi
+    .map((p) => `<li><span class="n">${p.numero}</span><span class="tc">${conChiave(chiavePasso(apostrofo(p.titolo)))}</span></li>`)
     .join("");
+  const punti = r.passi.map((_, i) => `<i class="pt" style="left:${n > 1 ? (i * 100) / (n - 1) : 0}%"></i>`).join("");
+  const puntiAcceso = r.passi.map((_, i) => `<i class="pa" style="left:${n > 1 ? (i * 100) / (n - 1) : 0}%"></i>`).join("");
   return `<!doctype html><html lang="it"><head><meta charset="utf-8"><style>${font(cartellaFont)}
   body { background: ${COLORI.crema}; color: ${COLORI.testo}; width: ${W}px; height: ${H}px; position: relative; }
-  .logo { position: absolute; left: 80px; top: 76px; width: 300px; }
+  .scena { position: absolute; inset: 0; }
+  .logo { position: absolute; left: 80px; top: 76px; width: 320px; }
   .logo svg { width: 100%; height: auto; display: block; }
-  .titolo { position: absolute; left: 80px; right: 80px; top: 186px; height: 196px; display: flex; align-items: flex-end; font: 500 84px/0.95 "Degular"; letter-spacing: -0.025em; text-transform: lowercase; overflow: hidden; }
-  .passi { position: absolute; left: 0; right: 80px; top: 440px; bottom: 120px; list-style: none; display: flex; flex-direction: column; justify-content: space-between; }
-  .passi li { display: flex; align-items: center; gap: 44px; padding-left: ${x - cerchio / 2}px; min-height: 0; }
+  .apertura .titolo { position: absolute; left: 64px; right: 64px; top: 250px; height: 900px; display: flex; align-items: center; font: 500 230px/0.92 "Degular"; letter-spacing: -0.03em; text-transform: lowercase; overflow: hidden; }
+  .apertura .titolo span.t { display: block; text-wrap: balance; }
+  .passo .di { position: absolute; left: 80px; top: 92px; font: 600 44px/1 "Inter"; color: ${COLORI.grigio}; }
+  .passo .ic { position: absolute; right: 80px; top: 56px; width: 176px; height: 176px; border-radius: 999px; background: #FEFDF9; border: 3px solid ${COLORI.sabbia}; display: grid; place-items: center; }
+  .passo .num { position: absolute; left: 56px; top: 90px; font: 600 800px/0.8 "Degular"; letter-spacing: -0.04em; color: ${COLORI.arancione}; }
+  .passo .tp { position: absolute; left: 80px; right: 80px; top: 800px; height: 370px; display: flex; align-items: flex-end; font: 500 176px/0.94 "Degular"; letter-spacing: -0.02em; text-transform: lowercase; overflow: hidden; }
+  .passo .tp span.t { display: block; }
+  .trama { position: absolute; left: 100px; width: 880px; top: 1236px; height: 14px; }
+  .pista, .filo { position: absolute; left: 0; top: 0; width: 100%; height: 14px; border-radius: 7px; }
+  .pista { background: ${COLORI.sabbia}; }
+  .filo { background: ${COLORI.arancione}; transform-origin: left; }
+  .pt, .pa { position: absolute; top: -15px; width: 44px; height: 44px; margin-left: -22px; border-radius: 999px; }
+  .pt { background: ${COLORI.sabbia}; }
+  .pa { background: ${COLORI.arancione}; }
+  .chiusura .logo { top: 70px; width: 360px; }
+  .chiusura ol { position: absolute; left: 0; right: 70px; top: 220px; bottom: 80px; list-style: none; display: flex; flex-direction: column; justify-content: space-between; }
+  .chiusura li { display: flex; align-items: center; gap: 36px; padding-left: ${x - cerchio / 2}px; min-height: 0; }
   .n { flex: none; width: ${cerchio}px; height: ${cerchio}px; border-radius: 999px; background: ${COLORI.crema}; border: 6px solid ${COLORI.arancione}; color: ${COLORI.arancione}; display: grid; place-items: center; font: 600 ${Math.round(cerchio * 0.54)}px/1 "Degular"; position: relative; z-index: 1; }
-  .tp { font: 500 var(--fs, 64px)/0.98 "Degular"; letter-spacing: -0.02em; text-transform: lowercase; }
-  .filo { position: absolute; left: ${x - 7}px; width: 14px; border-radius: 7px; background: ${COLORI.arancione}; transform-origin: top; }
-  .punta { position: absolute; left: 0; top: 0; }
-
-  .entra, .passi li { animation: entra 700ms ${EASE_OUT} both; animation-delay: var(--ritardo); }
-  @keyframes entra { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
-  .scena { animation: esce 600ms cubic-bezier(0.4, 0, 1, 1) both; animation-delay: ${t.uscita}s; }
-  @keyframes esce { from { opacity: 1; } to { opacity: 0; } }
+  .tc { font: 500 var(--fs, 96px)/0.98 "Degular"; letter-spacing: -0.02em; text-transform: lowercase; }
+  .vfilo { position: absolute; left: ${x - 7}px; width: 14px; border-radius: 7px; background: ${COLORI.arancione}; transform-origin: top; }
   </style>${ADATTA}</head><body>
-  <div class="logo">${logoSvg}</div>
-  <div class="scena">
-    <div class="filo" id="filo"></div>
-    <svg class="punta" width="${W}" height="${H}"><path id="punta" fill="none" stroke="${COLORI.arancione}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <div class="titolo entra" style="--ritardo:${t.titolo}s" data-adatta="56"><span>${titolo}</span></div>
-    <ol class="passi" id="passi">${righe}</ol>
-  </div>
+  <section class="scena apertura" id="apertura">
+    <div class="logo">${logoSvg}</div>
+    <div class="titolo" data-adatta="64" data-righe="3"><span class="t">${titolo}</span></div>
+  </section>
+  ${scene}
+  <div class="trama" id="trama"><div class="pista"></div><div class="filo" id="filo"></div>${punti}${puntiAcceso}</div>
+  <section class="scena chiusura" id="chiusura">
+    <div class="logo">${logoSvg}</div>
+    <div class="vfilo" id="vfilo"></div>
+    <ol id="colonna">${colonna}</ol>
+  </section>
   <script>
-    // Il filo: dal primo numero all'ultimo, cresce verso ogni passo poco prima che entri; poi la freccia aperta in fondo.
+    const D = ${t.durata};
+    const USCITA = ${t.uscita};
+    const FORTE = "${EASE_OUT}";
+    // Un elemento, una lista di punti [secondo, proprietà, curva verso il punto dopo]: la durata è quella dell'intero video.
+    const anima = (el, punti) => {
+      let ultimo = 0;
+      const kf = punti.map(([s, p, e]) => {
+        const offset = Math.min(1, Math.max(ultimo, s / D));
+        ultimo = offset;
+        return Object.assign({ offset }, p, e ? { easing: e } : {});
+      });
+      el.animate(kf, { duration: D * 1000, fill: "both" });
+    };
+    const NASCOSTO = (da) => Object.assign({ opacity: 0 }, da);
+    const VISIBILE = { opacity: 1, transform: "none" };
+    // Entrata di un pezzo: fermo e invisibile fino a s, poi arriva in dur secondi con un'uscita forte (ease-out, nessun rimbalzo).
+    const entra = (el, s, dur, da, resto = []) => anima(el, [[0, NASCOSTO(da)], [s, NASCOSTO(da), FORTE], [s + dur, VISIBILE], ...resto]);
+    // La scena resta nascosta fino al suo turno e, finita la sua sosta, esce in un attimo, morbida.
+    const finestra = (el, s, fine) => anima(el, [
+      [0, { opacity: 0 }], [s, { opacity: 0 }], [s + 0.01, { opacity: 1, transform: "none" }],
+      [fine, { opacity: 1, transform: "none" }, FORTE], [fine + USCITA, { opacity: 0, transform: "translateX(-64px)" }], [D, { opacity: 0, transform: "translateX(-64px)" }],
+    ]);
+
     window.prepara = () => {
       window.adatta();
-      const li = [...document.querySelectorAll("#passi li")];
-      // Titoli dei passi: una misura sola per tutti, la più grande con cui ognuno sta in due righe.
-      // (offsetHeight e non scrollHeight: le righe ferme al primo fotogramma sono spostate in basso dall'entrata.)
-      let fs = 64;
+      const scene = [...document.querySelectorAll(".passo")];
+      // Colonna finale: una misura sola per tutti, la più grande (da 96 a 44 px) con cui ognuno sta in due righe e la colonna ci sta tutta.
+      const li = [...document.querySelectorAll("#colonna li")];
+      const ol = document.getElementById("colonna");
+      let fs = 96;
       document.body.style.setProperty("--fs", fs + "px");
-      const ol = document.getElementById("passi");
-      const troppo = () => li.some((l) => l.querySelector(".tp").offsetHeight > fs * 0.98 * 2 + 2) ||
+      const troppo = () => li.some((l) => l.querySelector(".tc").offsetHeight > fs * 0.98 * 2 + 2) ||
         li.reduce((s, l) => s + l.offsetHeight, 0) + 22 * (li.length - 1) > ol.clientHeight;
-      while (troppo() && fs > 36) { fs -= 2; document.body.style.setProperty("--fs", fs + "px"); }
-      const cy = li.map((l) => { const n = l.querySelector(".n").getBoundingClientRect(); return n.top + n.height / 2; });
-      const filo = document.getElementById("filo");
-      const fine = cy[cy.length - 1] + 92;
-      filo.style.top = cy[0] + "px";
-      filo.style.height = (fine - cy[0]) + "px";
-      const tot = fine - cy[0];
-      const k = [{ offset: 0, transform: "scaleY(0)" }];
-      const D = ${t.durata};
-      cy.forEach((y, i) => {
-        if (i === 0) return;
-        const arrivo = ${t.primoPasso} + i * ${t.intervallo};
-        k.push({ offset: Math.max(0, (arrivo - 0.55) / D), transform: "scaleY(" + ((cy[i - 1] - cy[0]) / tot) + ")", easing: "${EASE_OUT}" });
-        k.push({ offset: (arrivo + 0.05) / D, transform: "scaleY(" + ((y - cy[0]) / tot) + ")" });
+      while (troppo() && fs > 44) { fs -= 2; document.body.style.setProperty("--fs", fs + "px"); }
+      const cy = li.map((l) => { const c = l.querySelector(".n").getBoundingClientRect(); return c.top + c.height / 2; });
+      const vfilo = document.getElementById("vfilo");
+      vfilo.style.top = cy[0] + "px";
+      vfilo.style.height = (cy[cy.length - 1] - cy[0]) + "px";
+      const titoloAperturaPx = parseFloat(getComputedStyle(document.querySelector(".apertura .titolo")).fontSize);
+
+      // Apertura: il titolo c'è già dal primo fotogramma; la parola chiave si accende in arancione, poi tutto esce.
+      const finApertura = ${t.apertura} - USCITA;
+      anima(document.getElementById("apertura"), [[0, VISIBILE], [finApertura, VISIBILE, FORTE], [finApertura + USCITA, { opacity: 0, transform: "translateX(-64px)" }], [D, { opacity: 0, transform: "translateX(-64px)" }]]);
+      document.querySelectorAll(".apertura .chiave").forEach((c) => anima(c, [[0, { color: "${COLORI.testo}" }], [0.1, { color: "${COLORI.testo}" }, FORTE], [0.65, { color: "${COLORI.arancione}" }]]));
+
+      // Un passo per volta.
+      scene.forEach((el, i) => {
+        const s = ${t.apertura} + i * ${t.passo};
+        finestra(el, s, s + ${t.ingresso} + ${t.sosta});
+        entra(el.querySelector(".num"), s, ${t.ingresso}, { transform: "translateX(-96px)" });
+        entra(el.querySelector(".tp"), s + 0.06, ${t.ingresso}, { transform: "translateY(56px)" });
+        entra(el.querySelector(".ic"), s + 0.12, ${t.ingresso}, { transform: "scale(0.88)" });
+        entra(el.querySelector(".di"), s + 0.08, ${t.ingresso}, { transform: "translateY(16px)" });
       });
-      k.push({ offset: (${t.freccia} - 0.45) / D, transform: "scaleY(" + ((cy[cy.length - 1] - cy[0]) / tot) + ")", easing: "${EASE_OUT}" });
-      k.push({ offset: ${t.freccia} / D, transform: "scaleY(1)" });
-      k.push({ offset: 1, transform: "scaleY(1)" });
-      filo.animate(k, { duration: D * 1000, fill: "both" });
-      const punta = document.getElementById("punta");
-      punta.setAttribute("d", "M ${x - 30} " + (fine - 30) + " L ${x} " + fine + " L ${x + 30} " + (fine - 30));
-      punta.animate([{ opacity: 0, transform: "translateY(-24px)" }, { opacity: 1, transform: "none" }],
-        { duration: 500, delay: ${t.freccia} * 1000, easing: "${EASE_OUT}", fill: "both" });
+
+      // Il filo in basso: nasce con il primo passo e si allunga fino al punto di ogni passo, che si accende; sparisce quando arriva la chiusura.
+      const trama = document.getElementById("trama");
+      const n = scene.length;
+      const quota = (i) => (n > 1 ? i / (n - 1) : 1);
+      anima(trama, [[0, { opacity: 0 }], [${t.apertura}, { opacity: 0 }, FORTE], [${t.apertura} + 0.3, { opacity: 1 }], [${t.chiusura} - USCITA, { opacity: 1 }], [${t.chiusura}, { opacity: 0 }], [D, { opacity: 0 }]]);
+      const kf = [[0, { transform: "scaleX(0)" }]];
+      scene.forEach((_, i) => {
+        const s = ${t.apertura} + i * ${t.passo};
+        kf.push([s + 0.05, { transform: "scaleX(" + (i ? quota(i - 1) : 0) + ")" }, FORTE]);
+        kf.push([s + 0.05 + ${t.ingresso} + 0.1, { transform: "scaleX(" + quota(i) + ")" }]);
+      });
+      kf.push([D, { transform: "scaleX(1)" }]);
+      anima(document.getElementById("filo"), kf);
+      document.querySelectorAll(".pa").forEach((p, i) => {
+        const s = ${t.apertura} + i * ${t.passo} + 0.2;
+        entra(p, s, 0.35, { transform: "scale(0.6)" });
+      });
+
+      // Chiusura: i passi in colonna, uno dopo l'altro con un'entrata breve, e il filo che li cuce.
+      const tc = ${t.chiusura};
+      anima(document.getElementById("chiusura"), [[0, { opacity: 0 }], [tc, { opacity: 0 }, FORTE], [tc + 0.3, { opacity: 1 }]]);
+      li.forEach((l, i) => entra(l, tc + 0.05 + i * 0.07, ${t.ingresso}, { transform: "translateY(32px)" }));
+      anima(vfilo, [[0, { transform: "scaleY(0)" }], [tc + 0.1, { transform: "scaleY(0)" }, FORTE], [tc + 0.1 + 0.9, { transform: "scaleY(1)" }]]);
       for (const a of document.getAnimations()) a.pause();
+      return { fsColonna: fs, fsTitolo: titoloAperturaPx };
     };
     window.vaiA = (s) => { for (const a of document.getAnimations()) a.currentTime = s * 1000; };
   </script>

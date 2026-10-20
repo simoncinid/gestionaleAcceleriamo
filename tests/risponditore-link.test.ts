@@ -220,6 +220,7 @@ describe("mandaLink con le grafiche dello schema", () => {
     await mandaLink(ENV, "p1", "camp-1", NOW + 1);
     expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello", "scheda"]);
     expect(chiamate[3].corpo.message.attachment.payload.elements[0].image_url).toBe(`${B}/brand/scheda-risorsa.png`);
+    expect(chiamate[3].corpo.message.attachment.payload.elements[0].subtitle).toBeUndefined(); // la riga è già arrivata: il testo non si ripete
     expect((await evento("c1"))?.stato).toBe("link_inviato");
 
     await env.DB.prepare("UPDATE risp_eventi SET stato = 'inviato' WHERE commento_id = 'c1'").run();
@@ -227,7 +228,7 @@ describe("mandaLink con le grafiche dello schema", () => {
     risposta = () => ([3, 4].includes(chiamate.length) ? Response.json({ error: { code: 100, message: "template" } }, { status: 400 }) : Response.json({ message_id: "m" }));
     await mandaLink(ENV, "p1", "camp-1", NOW + 2);
     expect(chiamate.map(tipo)).toEqual(["testo", "video", "carosello", "scheda", "testo"]);
-    expect(chiamate[4].corpo.message).toEqual({ text: `Eccolo, e seguici!\n\n${B}/r/guida` });
+    expect(chiamate[4].corpo.message).toEqual({ text: `${B}/r/guida` }); // la riga con il testo è già arrivata: solo il link
     expect((await evento("c1"))?.stato).toBe("link_inviato");
   });
 

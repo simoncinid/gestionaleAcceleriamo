@@ -57,11 +57,13 @@ export async function mandaLink(env: Env, autoreId: string, campagnaId: string, 
   }
 
   let esito: EsitoGraph | null = null;
+  let rigaArrivata = false; // se la riga con il testo è già arrivata, nelle riserve il testo non si ripete
   if (conGrafiche) {
     const d = { base, url, slug, titolo: risorsa?.titolo ?? "", passi, v: g.v };
     if (primo) {
       if (campagna.testoLink.trim()) {
         const riga = await invia({ text: campagna.testoLink.trim() });
+        rigaArrivata = riga.ok;
         if (!riga.ok) console.warn("risponditore_link: riga non accettata", riga.codice);
       }
       if (g.video) {
@@ -73,10 +75,10 @@ export async function mandaLink(env: Env, autoreId: string, campagnaId: string, 
     if (!esito.ok) console.warn("risponditore_link: carosello non accettato, mando la scheda", esito.codice);
   }
   if (!esito?.ok) {
-    esito = await invia(messaggioScheda({ base, url, slug, titolo: risorsa?.titolo ?? "", testoLink: campagna.testoLink }));
+    esito = await invia(messaggioScheda({ base, url, slug, titolo: risorsa?.titolo ?? "", testoLink: rigaArrivata ? "" : campagna.testoLink }));
     if (!esito.ok) {
       console.warn("risponditore_link: scheda non accettata, mando il testo", esito.codice);
-      esito = await invia({ text: `${campagna.testoLink}\n\n${url}` });
+      esito = await invia({ text: rigaArrivata ? url : `${campagna.testoLink}\n\n${url}` });
     }
   }
   if (!esito.ok) {
@@ -117,7 +119,7 @@ export function messaggioScheda(d: { base: string; url: string; slug: string; ti
         template_type: "generic",
         elements: [{
           title: taglia(d.titolo || "La risorsa del video"),
-          subtitle: taglia(d.testoLink),
+          ...(d.testoLink.trim() ? { subtitle: taglia(d.testoLink) } : {}),
           image_url: `${d.base}/brand/scheda-risorsa.png`,
           default_action: { type: "web_url", url: d.url },
           buttons: [{ type: "web_url", url: d.url, title: etichettaApri(d.slug, d.titolo) }],
