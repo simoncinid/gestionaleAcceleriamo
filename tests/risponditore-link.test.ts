@@ -3,7 +3,7 @@ import { createExecutionContext, env, waitOnExecutionContext } from "cloudflare:
 import { computeMetaSignature } from "../worker/meta/signature";
 import { setMetaFetch } from "../worker/meta/fetcher";
 import { LAVORI } from "../worker/cron";
-import { mandaLink } from "../worker/risponditore/link";
+import { etichettaApri, mandaLink, taglia } from "../worker/risponditore/link";
 import { createUser } from "./helpers";
 import { controllaScadenzaToken, rinnovaToken } from "../worker/risponditore/rinnovo";
 import { leggiToken, salvaToken } from "../worker/risponditore/token";
@@ -51,7 +51,21 @@ describe("mandaLink", () => {
     expect(chiamate[0].url).toBe("https://graph.instagram.com/v25.0/me/messages");
     expect(chiamate[0].auth).toBe("Bearer IGAA-segreto");
     expect(chiamate[0].corpo.recipient).toEqual({ id: "p1" });
-    expect(chiamate[0].corpo.message.text).toBe("Eccolo, e seguici!\n\nhttps://risorse.acceleriamo.it/r/guida");
+    expect(chiamate[0].corpo.message).toEqual({
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "generic",
+          elements: [{
+            title: "La risorsa del video",
+            subtitle: "Eccolo, e seguici!",
+            image_url: "https://risorse.acceleriamo.it/brand/scheda-risorsa.png",
+            default_action: { type: "web_url", url: "https://risorse.acceleriamo.it/r/guida" },
+            buttons: [{ type: "web_url", url: "https://risorse.acceleriamo.it/r/guida", title: "Apri la guida" }],
+          }],
+        },
+      },
+    });
     expect(await evento("c2")).toMatchObject({ stato: "link_inviato", aggiornato_il: NOW + 5 });
     expect((await evento("c1"))?.stato).toBe("inviato");
     expect((await evento("c3"))?.stato).toBe("inviato");
@@ -72,10 +86,35 @@ describe("mandaLink", () => {
     expect(chiamate).toHaveLength(0);
   });
 
+  it("la scheda usa il titolo della risorsa, tagliato pulito, e il pulsante dello schema", async () => {
+    const titolo = "Lo schema completo dello studio dentistico, dalla prenotazione al richiamo dei pazienti in ritardo";
+    await env.DB.prepare("INSERT INTO risorse (slug, titolo, sottotitolo, corpo, pdf_url, attiva, creata_il) VALUES ('guida', ?, '', 'x', NULL, 1, 1)").bind(titolo).run();
+    await env.DB.prepare("UPDATE risp_campagne SET testo_link = ? WHERE id = 'camp-1'")
+      .bind("Ecco lo schema: si legge in cinque minuti e puoi usarlo subito con il tuo team. Se ti è utile, segui @acceleriamo.it.").run();
+    await inserisci("c1", "p1", "inviato", NOW);
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    const el = chiamate[0].corpo.message.attachment.payload.elements[0];
+    expect(el.title).toBe("Lo schema completo dello studio dentistico, dalla prenotazione al richiamo dei…");
+    expect(el.title.length).toBeLessThanOrEqual(80);
+    expect(el.subtitle).toBe("Ecco lo schema: si legge in cinque minuti e puoi usarlo subito con il tuo team.");
+    expect(el.buttons[0].title).toBe("Apri lo schema");
+  });
+
+  it("se Instagram rifiuta la scheda parte il testo semplice, e l'evento passa a link_inviato", async () => {
+    await inserisci("c1", "p1", "inviato", NOW);
+    risposta = () => (chiamate.length === 1 ? Response.json({ error: { code: 100, message: "template" } }, { status: 400 }) : Response.json({ message_id: "m" }));
+    await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    expect(chiamate).toHaveLength(2);
+    expect(chiamate[0].corpo.message.attachment.type).toBe("template");
+    expect(chiamate[1].corpo).toEqual({ recipient: { id: "p1" }, message: { text: "Eccolo, e seguici!\n\nhttps://risorse.acceleriamo.it/r/guida" } });
+    expect((await evento("c1"))?.stato).toBe("link_inviato");
+  });
+
   it("se l'invio fallisce l'evento non cambia", async () => {
     await inserisci("c1", "p1", "inviato", NOW);
     risposta = () => Response.json({ error: { code: 10, message: "no" } }, { status: 400 });
     await mandaLink(ENV, "p1", "camp-1", NOW + 1);
+    expect(chiamate).toHaveLength(2); // la scheda e poi il testo, entrambi rifiutati
     expect((await evento("c1"))?.stato).toBe("inviato");
   });
 
@@ -90,8 +129,23 @@ describe("mandaLink", () => {
     expect(res.status).toBe(200);
     expect(chiamate).toHaveLength(1);
     expect(chiamate[0].corpo.recipient).toEqual({ id: "p1" });
-    expect(chiamate[0].corpo.message.text).toContain("https://risorse.acceleriamo.it/r/guida");
+    expect(chiamate[0].corpo.message.attachment.payload.elements[0].buttons[0].url).toBe("https://risorse.acceleriamo.it/r/guida");
     expect((await evento("c1"))?.stato).toBe("link_inviato");
+  });
+});
+
+describe("taglia ed etichettaApri", () => {
+  it("sotto gli 80 caratteri il testo resta com'è, sopra si chiude su una parola intera con i puntini", () => {
+    expect(taglia("  Breve   e   pulito ")).toBe("Breve e pulito");
+    const t = taglia("parola ".repeat(30));
+    expect(t.length).toBeLessThanOrEqual(80);
+    expect(t.endsWith("parola…")).toBe(true);
+    expect(taglia("x".repeat(120))).toBe(`${"x".repeat(79)}…`);
+    expect(taglia("Ciao. " + "lungo ".repeat(30))).toMatch(/…$/); // una prima frase troppo corta non basta
+  });
+  it("pulsante: schema o guida", () => {
+    expect(etichettaApri("schema-studio", "")).toBe("Apri lo schema");
+    expect(etichettaApri("pec-scadenze", "Come funziona: la PEC")).toBe("Apri la guida");
   });
 });
 

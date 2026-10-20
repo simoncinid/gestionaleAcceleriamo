@@ -127,3 +127,63 @@
 @keyframes appare { from { transform: scale(0.98); opacity: 0; } }
 @keyframes respiro { 50% { opacity: 0.55; } }
 .skeleton { background: var(--color-sabbia); animation: respiro 1.4s ease-in-out infinite; }
+
+/* Pagina pubblica della risorsa (/r/:slug): si legge dal telefono, dentro il browser di Instagram. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+.risorsa { overflow-wrap: break-word; }
+.risorsa-titolo {
+  font-family: var(--font-display); font-weight: 500; text-transform: lowercase; text-wrap: balance;
+  font-size: clamp(2.375rem, 1.6rem + 4.2vw, 3.5rem); line-height: 0.94; letter-spacing: -0.025em;
+}
+.risorsa-sottotitolo { font-size: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem); line-height: 1.45; color: var(--testo-2); text-wrap: pretty; max-width: 34em; }
+.risorsa-corpo { font-size: clamp(1.0625rem, 1rem + 0.3vw, 1.125rem); line-height: 1.62; max-width: 65ch; text-wrap: pretty; }
+.risorsa-corpo > * + * { margin-top: 1.1em; }
+.risorsa-corpo strong { font-weight: 600; }
+.risorsa-corpo h2 {
+  font-weight: 500; text-transform: lowercase; text-wrap: balance;
+  font-size: clamp(1.75rem, 1.5rem + 1vw, 2.125rem); line-height: 1; letter-spacing: -0.018em;
+  margin-top: 2.6em;
+}
+.risorsa-corpo > h2:first-child { margin-top: 1.6em; }
+.risorsa-corpo h2 + * { margin-top: 0.8em; }
+.risorsa-corpo h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.125em; line-height: 1.35; margin-top: 2em; }
+
+/* Lo schema: numero grande in arancione, titolo del passo, descrizione; un filo sottile unisce i passi. */
+.risorsa-passi { display: grid; margin-top: 1.4em !important; }
+.risorsa-passi > li { position: relative; display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); column-gap: 1rem; padding-bottom: 1.75rem; }
+.risorsa-passi > li:last-child { padding-bottom: 0; }
+.risorsa-passi > li:not(:last-child)::after {
+  content: ""; position: absolute; left: calc(1.375rem - 0.75px); top: 3.4rem; bottom: 0.6rem; width: 1.5px; background: var(--color-sabbia-2); border-radius: 1px;
+}
+.risorsa-numero {
+  font-family: var(--font-display); font-weight: 500; font-variant-numeric: tabular-nums lining-nums;
+  font-size: 2.875rem; line-height: 0.82; letter-spacing: -0.04em; color: var(--color-accento); text-align: center;
+}
+.risorsa-passo { font-family: var(--font-display); font-weight: 500; text-transform: lowercase; font-size: 1.5rem; line-height: 1.02; letter-spacing: -0.012em; padding-top: 0.2rem; text-wrap: balance; }
+.risorsa-descrizione { color: var(--testo); opacity: 0.86; font-size: 0.97em; line-height: 1.55; }
+.risorsa-numeri { display: grid; gap: 0.9em; }
+.risorsa-numeri > li { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); column-gap: 0.75rem; align-items: baseline; }
+.risorsa-numeri .risorsa-numero { font-size: 1.75rem; line-height: 1; text-align: left; }
+.risorsa-punti { display: grid; gap: 0.55em; }
+.risorsa-punti > li { position: relative; padding-left: 1.4rem; }
+.risorsa-punti > li::before { content: ""; position: absolute; left: 0.2rem; top: 0.68em; width: 0.45rem; height: 0.45rem; border-radius: 2px; background: var(--color-accento); }
+
+/* Chiamata: il blocco arancione chiude la pagina, da bordo a bordo sul telefono. */
+.risorsa-chiamata {
+  display: grid; gap: 1.75rem; margin: 3.5rem -1.25rem 0; padding: 2.5rem 1.25rem calc(3rem + var(--safe-bottom));
+  background: var(--color-accento); color: var(--color-accento-inchiostro);
+}
+.risorsa-chiamata label { color: var(--color-ink); font-weight: 600; }
+@media (min-width: 40rem) { .risorsa-chiamata { margin: 4.5rem 0 3rem; padding: 2.5rem; border-radius: var(--radius-blocco); } }
+.risorsa-invia {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; height: 3.5rem; margin-top: 0.25rem;
+  border-radius: var(--radius-controllo); background: var(--color-ink); color: var(--color-crema); font-weight: 600; font-size: 1.0625rem;
+  transition: transform 160ms var(--ease-uscita), background-color 150ms ease;
+}
+.risorsa-invia:active:not(:disabled) { transform: scale(0.97); }
+.risorsa-invia:disabled { opacity: 0.75; }
+@media (hover: hover) and (pointer: fine) { .risorsa-invia:hover:not(:disabled) { background: #2E2924; } }
+
+/* Ingresso: una sola volta all'apertura, testata e corpo salgono di poco, uno dopo l'altro. */
+@keyframes risorsa-entra { from { opacity: 0; transform: translateY(10px); } }
+.risorsa-entra { animation: risorsa-entra 420ms var(--ease-foglio) both; animation-delay: calc(var(--i, 0) * 60ms); }

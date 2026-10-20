@@ -37,3 +37,17 @@ test("pagina risorsa pubblica: slug inesistente", async ({ page }) => {
   await page.goto("/r/non-esiste");
   await expect(page.getByRole("heading", { name: "Questa pagina non c'è più" })).toBeVisible();
 });
+
+test("pagina risorsa pubblica: niente scorrimento di lato a 360 e 390 pixel, lo schema ha i suoi numeri", async ({ page }, info) => {
+  test.skip(info.project.name !== "tel", "controllo del telefono");
+  for (const larghezza of [360, 390]) {
+    await page.setViewportSize({ width: larghezza, height: 800 });
+    await page.goto("/r/prova");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const { sw, cw } = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+    expect(sw, `larghezza ${larghezza}`).toBeLessThanOrEqual(cw);
+    // Il corpo è markdown letto: nessun simbolo "- " o "**" resta a vista.
+    await expect(page.locator(".risorsa-corpo li")).toHaveCount(3);
+    await expect(page.locator(".risorsa-corpo")).not.toContainText("**");
+  }
+});
