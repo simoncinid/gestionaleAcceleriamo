@@ -82,7 +82,7 @@ try {
       await caricaFont();
       const misure = await pagina.evaluate(() => (window as any).prepara()) as { fsColonna: number; fsTitolo: number };
       if (misure.fsColonna < 44) problemi.push(`${r.slug}: la colonna finale scende a ${misure.fsColonna} px (minimo 44)`);
-      if (misure.fsTitolo < 64) problemi.push(`${r.slug}: il titolo di apertura scende a ${misure.fsTitolo} px`);
+      if (misure.fsTitolo < 150) problemi.push(`${r.slug}: la parte enorme dell'apertura scende a ${misure.fsTitolo} px (minimo 150)`);
       const { durata } = tempiAnimazione(passi.length);
       const n = Math.round(durata * VIDEO.fps);
       for (let f = 0; f < n; f++) {

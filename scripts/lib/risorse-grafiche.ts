@@ -153,6 +153,25 @@ export function htmlChiamata(cartellaFont: string): string {
   </body></html>`;
 }
 
+// L'apertura divide il titolo: la parte enorme (prima dei due punti, se sono entro 4 parole; altrimenti le prime 3 o 4 parole,
+// senza chiudere su un articolo o una preposizione) e il resto, più piccolo.
+export function dividiTitolo(titolo: string): { grande: string; resto: string } {
+  const t = titolo.replace(/\s+/g, " ").trim();
+  const parole = (x: string) => x.split(" ").filter(Boolean);
+  const due = t.indexOf(":");
+  if (due > 0) {
+    const prima = t.slice(0, due).trim();
+    if (parole(prima).length <= 4) return { grande: prima, resto: t.slice(due + 1).trim() };
+  }
+  const tutte = parole(t.replace(/:/g, ""));
+  if (tutte.length <= 4) return { grande: tutte.join(" "), resto: "" };
+  const vuota = (w: string) => VUOTE.has(w.toLocaleLowerCase("it").replace(/[^\p{L}']/gu, ""));
+  let n = 3;
+  while (n < 4 && vuota(tutte[n - 1])) n++;
+  while (n > 2 && vuota(tutte[n - 1])) n--;
+  return { grande: tutte.slice(0, n).join(" "), resto: tutte.slice(n).join(" ") };
+}
+
 // Tempi dell'animazione, in secondi: apertura con il titolo (1,2 s), poi un passo alla volta a tutto schermo
 // (entra in 0,45 s, resta 0,9 s, esce in 0,25 s: circa 1,35 s a vista), poi la chiusura con tutti i passi in colonna (circa 1,5 s).
 // Con pochi passi la chiusura si ferma un po' di più, perché il video non scenda sotto gli 8 secondi.
@@ -168,7 +187,7 @@ export function tempiAnimazione(passi: number) {
 }
 
 // L'animazione dello schema, verticale 4:5 e muta. Tre momenti:
-//   apertura: il titolo della risorsa, enorme, con la parola chiave che si accende in arancione;
+//   apertura: il titolo della risorsa diviso in una parte enorme arancione (150 px o più, a tutta larghezza) e il resto più piccolo;
 //   un passo per volta a tutto schermo (numero gigante, titolo grande, icona), con il filo arancione in basso che si allunga di passo in passo;
 //   chiusura: tutti i passi in una colonna che riempie il riquadro, e il logo.
 // Le animazioni (Web Animations) restano ferme: lo script porta ogni fotogramma al suo tempo (vaiA) e lo fotografa.
@@ -179,8 +198,7 @@ export function htmlAnimazione(r: { titolo: string; passi: Passo[] }, cartellaFo
   const t = tempiAnimazione(n);
   const x = 130; // centro dei cerchi e del filo nella colonna finale
   const cerchio = n >= 6 ? 84 : 100;
-  const [prima, chiave, dopo] = chiaveTitolo(apostrofo(r.titolo));
-  const titolo = chiave ? conChiave([prima, chiave, dopo]) : conChiave(chiavePasso(apostrofo(r.titolo)));
+  const { grande, resto } = dividiTitolo(apostrofo(r.titolo));
   const scene = r.passi
     .map(
       (p, i) => `<section class="scena passo" data-i="${i}">
@@ -201,8 +219,10 @@ export function htmlAnimazione(r: { titolo: string; passi: Passo[] }, cartellaFo
   .scena { position: absolute; inset: 0; }
   .logo { position: absolute; left: 80px; top: 76px; width: 320px; }
   .logo svg { width: 100%; height: auto; display: block; }
-  .apertura .titolo { position: absolute; left: 64px; right: 64px; top: 250px; height: 900px; display: flex; align-items: center; font: 500 230px/0.92 "Degular"; letter-spacing: -0.03em; text-transform: lowercase; overflow: hidden; }
-  .apertura .titolo span.t { display: block; text-wrap: balance; }
+  .apertura .titolo { position: absolute; left: 56px; right: 56px; top: 230px; bottom: 150px; display: flex; flex-direction: column; justify-content: center; gap: 56px; }
+  .grande { font: 500 340px/0.88 "Degular"; letter-spacing: -0.035em; text-transform: lowercase; color: ${COLORI.arancione}; }
+  .grande span.t, .resto span.t { display: block; }
+  .resto { font: 500 72px/1.04 "Degular"; letter-spacing: -0.015em; text-transform: lowercase; }
   .passo .di { position: absolute; left: 80px; top: 92px; font: 600 44px/1 "Inter"; color: ${COLORI.grigio}; }
   .passo .ic { position: absolute; right: 80px; top: 56px; width: 176px; height: 176px; border-radius: 999px; background: #FEFDF9; border: 3px solid ${COLORI.sabbia}; display: grid; place-items: center; }
   .passo .num { position: absolute; left: 56px; top: 90px; font: 600 800px/0.8 "Degular"; letter-spacing: -0.04em; color: ${COLORI.arancione}; }
@@ -224,7 +244,10 @@ export function htmlAnimazione(r: { titolo: string; passi: Passo[] }, cartellaFo
   </style>${ADATTA}</head><body>
   <section class="scena apertura" id="apertura">
     <div class="logo">${logoSvg}</div>
-    <div class="titolo" data-adatta="64" data-righe="3"><span class="t">${titolo}</span></div>
+    <div class="titolo">
+      <div class="grande" data-adatta="150" data-righe="3"><span class="t">${escape(grande)}</span></div>${resto ? `
+      <div class="resto" data-adatta="48" data-righe="4"><span class="t">${escape(resto)}</span></div>` : ""}
+    </div>
   </section>
   ${scene}
   <div class="trama" id="trama"><div class="pista"></div><div class="filo" id="filo"></div>${punti}${puntiAcceso}</div>
@@ -272,12 +295,11 @@ export function htmlAnimazione(r: { titolo: string; passi: Passo[] }, cartellaFo
       const vfilo = document.getElementById("vfilo");
       vfilo.style.top = cy[0] + "px";
       vfilo.style.height = (cy[cy.length - 1] - cy[0]) + "px";
-      const titoloAperturaPx = parseFloat(getComputedStyle(document.querySelector(".apertura .titolo")).fontSize);
+      const titoloAperturaPx = parseFloat(getComputedStyle(document.querySelector(".apertura .grande")).fontSize);
 
-      // Apertura: il titolo c'è già dal primo fotogramma; la parola chiave si accende in arancione, poi tutto esce.
+      // Apertura: il titolo c'è già intero dal primo fotogramma (è la copertina che si vede in chat); poi tutto esce.
       const finApertura = ${t.apertura} - USCITA;
       anima(document.getElementById("apertura"), [[0, VISIBILE], [finApertura, VISIBILE, FORTE], [finApertura + USCITA, { opacity: 0, transform: "translateX(-64px)" }], [D, { opacity: 0, transform: "translateX(-64px)" }]]);
-      document.querySelectorAll(".apertura .chiave").forEach((c) => anima(c, [[0, { color: "${COLORI.testo}" }], [0.1, { color: "${COLORI.testo}" }, FORTE], [0.65, { color: "${COLORI.arancione}" }]]));
 
       // Un passo per volta.
       scene.forEach((el, i) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chiavePasso, htmlAnimazione, htmlChiamata, htmlPasso, leggiModulo, moduloGrafiche, tempiAnimazione, versioneGrafiche, DESIGN_VERSIONE } from "../scripts/lib/risorse-grafiche";
+import { chiavePasso, dividiTitolo, htmlAnimazione, htmlChiamata, htmlPasso, leggiModulo, moduloGrafiche, tempiAnimazione, versioneGrafiche, DESIGN_VERSIONE } from "../scripts/lib/risorse-grafiche";
 import { firmaPassi } from "../src/pagine/pubbliche/corpoRisorsa";
 
 const passo = (numero: number, titolo: string, descrizione = "") => ({ numero, titolo, descrizione });
@@ -28,6 +28,19 @@ describe("grafiche del risponditore", () => {
     }
   });
 
+  it("il titolo dell'apertura si divide: prima dei due punti è la parte enorme, altrimenti le prime parole con un taglio sensato", () => {
+    expect(dividiTitolo("Come funziona: il WhatsApp del salone che risponde anche a porte chiuse")).toEqual({ grande: "Come funziona", resto: "il WhatsApp del salone che risponde anche a porte chiuse" });
+    expect(dividiTitolo("Come l'abbiamo fatto: le richieste dei portali")).toEqual({ grande: "Come l'abbiamo fatto", resto: "le richieste dei portali" });
+    expect(dividiTitolo("Lo schema completo dello studio dentistico, dalla prenotazione al richiamo")).toEqual({ grande: "Lo schema completo", resto: "dello studio dentistico, dalla prenotazione al richiamo" });
+    // non si chiude su un articolo o una preposizione
+    expect(dividiTitolo("Lo schema dei processi da automatizzare prima di assumere")).toEqual({ grande: "Lo schema dei processi", resto: "da automatizzare prima di assumere" });
+    expect(dividiTitolo("Lo schema per un'azienda che va avanti anche quando sei in ferie").grande).toBe("Lo schema per un'azienda");
+    // prima dei due punti troppo lungo: si usa la regola delle parole
+    expect(dividiTitolo("Un caso vero di un'agenzia a Pisa: come abbiamo fatto").grande).toBe("Un caso vero");
+    // titolo corto: tutto enorme, niente resto
+    expect(dividiTitolo("Lo schema completo")).toEqual({ grande: "Lo schema completo", resto: "" });
+  });
+
   it("l'animazione: nessun testo sotto i 40 px, niente corsivi, gradienti, lineette né HTML del titolo", () => {
     const passi = [passo(1, "Registrazione dei dati"), passo(2, "Invio delle richieste"), passo(3, "Report")];
     const html = htmlAnimazione({ titolo: "Lo schema <b>dei dati</b>: come ordinare", passi }, "/f", "<svg></svg>");
@@ -36,6 +49,7 @@ describe("grafiche del risponditore", () => {
     expect(html).not.toMatch(/italic|gradient|[\u2013\u2014]/);
     expect(html).not.toContain("<b>");
     expect(html).toContain("&lt;b&gt;");
+    expect(html).toContain('class="grande"'); // il primo fotogramma è già l'apertura completa (copertina in chat)
     expect(html.match(/class="scena passo"/g)).toHaveLength(3);
     expect(html).toContain("passo 2 di 3");
   });
