@@ -42,15 +42,19 @@ Un solo Cron Trigger gira ogni 5 minuti (`wrangler.jsonc`, `*/5 * * * *`) e deci
 
 1. proposte scadute (solo alle 6:00, da sole);
 2. Foglio Andrea (al massimo 2 lead nuovi; 1 se nel giro c'è altro, cioè quasi sempre: in pratica 12 lead l'ora);
-3. lead Meta rimasti incompleti (ogni 15 minuti, al massimo 2);
-4. avvisi in app;
-5. push (al massimo 10);
-6. Telegram (al massimo 5 messaggi);
-7. email di conferma e inviti alle call (al massimo 7);
-8. controllo "Meta senza lead da 48 ore" (una volta l'ora);
-9. task ricorrenti dei lavori (alle 7:00 e alle 7:30, al massimo 12 task);
-10. revisione del lunedì (lunedì dalle 7:00 alle 7:55);
-11. Claude, sempre per ultimo (al massimo 3 lavori).
+3. recupero dei lead Meta (ogni 15 minuti, vedi "Meta lead");
+4. lead Meta rimasti incompleti (ogni 15 minuti, al massimo 2);
+5. avvisi in app;
+6. push (al massimo 10);
+7. Telegram (al massimo 5 messaggi);
+8. email di conferma e inviti alle call (al massimo 7);
+9. controllo "Meta senza lead da 48 ore" (una volta l'ora);
+10. task ricorrenti dei lavori (alle 7:00 e alle 7:30, al massimo 12 task);
+11. revisione del lunedì (lunedì dalle 7:00 alle 7:55);
+12. controllo dello stato delle automazioni (ogni 15 minuti, vedi "Stato");
+13. Claude, sempre per ultimo (al massimo 3 lavori).
+
+Ogni giro scrive l'esito di ogni lavoro (fatto, saltato per il budget, spento, errore) nello storico della pagina Stato, con una sola query.
 
 Il motivo dei tetti: sul piano gratuito una invocazione del Worker può fare al massimo 50 query D1 e 50 sottorichieste esterne. Il giro si tiene a 45 query e 15 sottorichieste. Ogni lavoro dichiara in `LAVORI` quanto costa (query fisse, query per unità, sottorichieste per unità) e prende solo le unità che il budget gli lascia; quello che non entra passa al giro dopo, senza errori. Foglio, Meta e avvisi lasciano sempre spazio ad almeno 2 push per giro. I costi sono misurati in `tests/cron.test.ts`: se si cambia un `max` va rifatta la misura. Un lavoro che fallisce non ferma gli altri e il giro diventa rosso in Impostazioni.
 
@@ -270,6 +274,54 @@ Il registro dei costi (speso del mese, lavori per tipo, lavori fermi) è in Impo
 Dati verso Claude: solo quelli del lead (azienda, sito, email ridotta, risposte del modulo, testo LinkedIn; per il coach gli appunti della call e lo storico del lead). Mai clienti, fatture, canoni o costi.
 
 Limite noto della coda, raro e accettato: se un'invocazione muore a metà lavoro, il lavoro resta "in corso" e torna in coda dopo 20 minuti, con un tentativo consumato.
+
+## Meta lead
+
+I lead dei moduli Meta entrano in due modi, con lo stesso registro anti doppioni (un lead Meta si registra una volta sola, per id, anche se poi finisce nel cestino):
+
+- **Webhook** (`/api/webhooks/meta`): Meta avvisa in pochi secondi. App iscritta all'oggetto `page`, campo `leadgen`; la Pagina è iscritta all'app.
+- **Recupero ogni 15 minuti** (`worker/meta/recupero.ts`, lavoro `meta_recupero` del giro): rete di sicurezza se il webhook perde qualcosa. Legge l'elenco dei moduli della Pagina (riletto ogni 6 ore) e chiede a Meta, in una sola richiesta batch, i lead creati dopo l'ultimo controllo meno un'ora di margine. I lead di prova di Meta ("test lead") si scartano. Lo stato del recupero sta in `settings`, chiave `meta_recupero`.
+
+Il **primo giro** guarda indietro 90 giorni e va a pagine: al massimo 25 righe per modulo a giro, finché non ha letto tutto. I lead trovati entrano subito nella lista; i dati del modulo li completa il lavoro "lead Meta incompleti", 2 ogni 15 minuti, quindi un arretrato grosso si completa in qualche ora. I lead più vecchi di 48 ore entrano **senza catena**: niente avviso "lead nuovo" e niente email di conferma.
+
+Configurazione:
+
+- variabile `META_PAGE_ID` in `wrangler.jsonc` (l'id della Pagina, non è un segreto);
+- segreti `META_PAGE_TOKEN` (token della Pagina, senza scadenza) per il recupero e per completare i lead, `META_APP_SECRET` per la firma del webhook, `META_VERIFY_TOKEN` per la verifica del webhook.
+
+Senza token o senza id della Pagina il recupero è spento (grigio nella pagina Stato) e non chiama Meta.
+
+## Stato
+
+La pagina **Automazioni > Stato** (`/automazioni/stato`) dice in un colpo d'occhio se le automazioni girano. Ogni voce ha un colore:
+
+- **verde**: l'ultimo giro è andato bene;
+- **giallo**: non si sente da più del previsto (intervallo più metà dell'intervallo, almeno 5 minuti);
+- **rosso**: l'ultimo giro è andato in errore; si vede il messaggio e il passo in cui si è fermata;
+- **grigio**: spenta o mai partita.
+
+Le voci sono di tre tipi:
+
+- i lavori del giro, più il giro intero (`giro`): li scrive il cron a ogni giro;
+- il webhook dei lead Meta (`meta_webhook`): verde all'ultimo lead ricevuto, rosso dopo una notifica con firma non valida o illeggibile; non ha intervallo, quindi non diventa mai gialla;
+- le automazioni esterne (n8n, Make, script dei clienti): si aggiungono con "Segui un'automazione esterna" e mandano un **battito** a ogni giro.
+
+Il battito è una chiamata con la chiave della voce, che si vede una volta sola alla creazione (o quando se ne fa una nuova):
+
+```bash
+curl -X POST https://acceleriamo-os.diego-faf.workers.dev/api/stato/battito \
+  -H "Authorization: Bearer bat_..." -H "content-type: application/json" \
+  -d '{"esito":"ok"}'
+# in caso di errore: {"esito":"errore","messaggio":"Timeout del CRM","passo":"Invio al CRM"}
+```
+
+Nel database si salva solo l'impronta della chiave (SHA-256). Se la voce è legata a una scheda automazione, la scheda mostra lo stato e mette in evidenza il blocco del flusso in cui si è fermata.
+
+**Avvisi.** Il lavoro `stato` del giro (ogni 15 minuti) apre un avviso "Automazione in errore o ferma" quando una voce diventa rossa o resta gialla oltre il doppio dell'intervallo: uno per episodio, a tutti, anche push e Telegram. L'avviso si chiude da solo quando la voce torna verde. Lo storico dei giri tiene 30 giorni (pulizia alle 3:00).
+
+## Lavori tipo
+
+`npm run lavori:tipo -- --remote` crea o aggiorna i tre lavori tipo "Una tantum", "Mensile" e "Mensile più una tantum" con i loro passi, giorni e assegnatari (`scripts/lib/lavori-tipo.ts`). Gli id sono fissi: rilanciarlo aggiorna, non duplica. Senza `--remote` tocca il database locale.
 
 ## Avvisi, push e Telegram
 
