@@ -40,23 +40,31 @@ export function ordinaFlusso(passi: AutomationStep[]): { principali: Principale[
   return { principali, sigle };
 }
 
-function Blocco({ p, sigla, ramo, onApri }: { p: AutomationStep; sigla: string; ramo?: boolean; onApri: (p: AutomationStep) => void }) {
+// Il passo del battito ("dove") indica il passaggio rotto: per numero o sigla ("3", "6a") o per titolo, senza maiuscole.
+export const ePassoRotto = (passo: string | null | undefined, p: AutomationStep, sigla: string) => {
+  const t = passo?.trim().toLowerCase();
+  return Boolean(t) && (t === sigla || t === p.title.trim().toLowerCase());
+};
+
+function Blocco({ p, sigla, ramo, rotto, onApri }: { p: AutomationStep; sigla: string; ramo?: boolean; rotto?: string | null; onApri: (p: AutomationStep) => void }) {
   const Icona = iconaDi(p.icon);
+  const qui = ePassoRotto(rotto, p, sigla);
   return (
-    <button type="button" onClick={() => onApri(p)} aria-label={`Passaggio ${sigla}: ${p.title}. Apri il dettaglio tecnico`}
-      className={cx("flex min-h-11 w-full flex-col gap-2 rounded-blocco border bg-avorio p-4 text-left hover:bg-crema", ramo ? "border-dashed border-sabbia-2" : "border-sabbia")}>
+    <button type="button" onClick={() => onApri(p)} aria-label={`Passaggio ${sigla}: ${p.title}${qui ? ". Si è fermata qui" : ""}. Apri il dettaglio tecnico`}
+      className={cx("flex min-h-11 w-full flex-col gap-2 rounded-blocco border bg-avorio p-4 text-left hover:bg-crema", qui ? "border-[1.5px] border-errore" : ramo ? "border-dashed border-sabbia-2" : "border-sabbia")}>
       <span className="flex items-center gap-2">
         <span className={cx("inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-etichetta font-semibold tabular-nums", ramo ? "border-[1.5px] border-ink text-ink" : "bg-ink text-avorio")}>{sigla}</span>
         <Icona size={22} weight="regular" aria-hidden />
       </span>
       <span className="text-corpo font-semibold">{p.title}</span>
       <span className="text-secondaria text-grigio">{p.summary}</span>
+      {qui && <span className="text-secondaria font-medium text-errore">Si è fermata qui</span>}
     </button>
   );
 }
 
 // Una colonna sola, a ogni larghezza: i passaggi principali uniti da una linea con freccia; ogni ramo spostato a destra, sotto il passaggio da cui parte, con linea tratteggiata e la sua etichetta.
-export function Flusso({ passi, onApri }: { passi: AutomationStep[]; onApri: (p: AutomationStep) => void }) {
+export function Flusso({ passi, onApri, rotto }: { passi: AutomationStep[]; onApri: (p: AutomationStep) => void; rotto?: string | null }) {
   const { principali } = ordinaFlusso(passi);
   return (
     <ol aria-label="Flusso dell'automazione" className="flex max-w-[720px] flex-col">
@@ -68,14 +76,14 @@ export function Flusso({ passi, onApri }: { passi: AutomationStep[]; onApri: (p:
               <CaretDown size={14} weight="bold" className="-ml-[6px] -mt-1" />
             </div>
           )}
-          <Blocco p={p} sigla={String(n)} onApri={onApri} />
+          <Blocco p={p} sigla={String(n)} rotto={rotto} onApri={onApri} />
           {rami.map(({ p: r, sigla }) => (
             <div key={r.id} className="ml-[26px] flex flex-col sm:ml-12">
               <div aria-hidden className="flex h-9 items-center gap-3">
                 <span className="h-full w-0 border-l-2 border-dashed border-ink/60" />
                 <span className="text-meta text-ink">{r.branch}</span>
               </div>
-              <Blocco p={r} sigla={sigla} ramo onApri={onApri} />
+              <Blocco p={r} sigla={sigla} ramo rotto={rotto} onApri={onApri} />
               <p className="pt-2 text-meta text-grigio">{i + 1 < principali.length ? `Poi si torna al passaggio ${n + 1}` : "Il flusso finisce qui"}</p>
             </div>
           ))}

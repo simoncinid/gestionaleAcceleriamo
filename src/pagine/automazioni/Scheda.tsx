@@ -15,6 +15,8 @@ import { useAnonimo } from "./anonimo";
 import { Flusso, FoglioPasso, ordinaFlusso } from "./Flusso";
 import { FoglioPassaggi } from "./FoglioPassaggi";
 import { nomeCliente } from "./Pannello";
+import { useStato } from "./Stato";
+import { ETICHETTE_COLORE } from "../../../worker/stato/calcoli";
 
 type Testo = "description" | "runsOn" | "stack" | "notes";
 
@@ -25,6 +27,7 @@ export function SchedaAutomazione({ id }: { id: string }) {
   const anonimo = useAnonimo();
   const ricarica = useRicarica();
   const passiQ = usePassi(id);
+  const stato = useStato();
   const [passo, setPasso] = useState<AutomationStep | null>(null);
   const [modifica, setModifica] = useState(false);
   const patch = useMutation({
@@ -40,6 +43,9 @@ export function SchedaAutomazione({ id }: { id: string }) {
   if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
   if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const a = q.data!;
+  // Voce dello stato legata a questa scheda (battito esterno): il passo dell'ultimo errore evidenzia il passaggio rotto.
+  const voce = stato.data?.find((v) => v.automationId === id);
+  const rotto = voce?.colore === "rosso" ? voce.ultimoPasso : null;
   const persone = (utenti.data ?? []).map((u) => ({ valore: u.id, etichetta: u.name }));
   const alBlur = (campo: Testo, v: string) => {
     const t = v.trim();
@@ -66,9 +72,16 @@ export function SchedaAutomazione({ id }: { id: string }) {
         {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
         <p className="flex items-center gap-2 text-secondaria"><Punto colore={a.status === "attiva" ? "verde" : a.status === "in_costruzione" ? "giallo" : "grigio"} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
       </Intestazione>
+      {voce && (
+        <Link to="/automazioni/stato" className="grid max-w-[720px] gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3 hover:bg-crema">
+          <span className="flex items-center gap-2 text-corpo font-semibold"><Punto colore={voce.colore} etichetta={ETICHETTE_COLORE[voce.colore]} />{`Stato: ${ETICHETTE_COLORE[voce.colore].toLowerCase()}`}</span>
+          {voce.colore === "rosso" && voce.ultimoErrore && <span className="text-secondaria text-errore">{voce.ultimoErrore}</span>}
+          {rotto && <span className="text-secondaria text-errore">{`Dove: ${rotto}`}</span>}
+        </Link>
+      )}
       <Sezione titolo="Flusso" coda={passiQ.data?.length ? passiQ.data.length === 1 ? "1 passaggio" : `${passiQ.data.length} passaggi` : undefined}>
         {passiQ.data && passiQ.data.length > 0
-          ? <Flusso passi={passiQ.data} onApri={setPasso} />
+          ? <Flusso passi={passiQ.data} onApri={setPasso} rotto={rotto} />
           : <p className="text-secondaria text-grigio">Il flusso non è ancora descritto.</p>}
         <Pulsante variante="secondario" className="self-start" onClick={() => setModifica(true)}>Modifica passaggi</Pulsante>
       </Sezione>

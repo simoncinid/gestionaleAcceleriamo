@@ -15,7 +15,7 @@ describe("aree e sottomenu", () => {
     expect(AREE.map((a) => a.etichetta)).toEqual(["Commerciale", "Automazioni", "Economia"]);
     expect(SOTTOMENU.commerciale.map((s) => s.etichetta)).toEqual(["Oggi", "Scaletta", "Call", "Proposte", "Clienti", "Numeri"]);
     expect(SOTTOMENU.economia.map((s) => s.etichetta)).toEqual(["Cruscotto", "Canoni", "Fatture", "Costi"]);
-    expect(SOTTOMENU.automazioni.map((s) => s.etichetta)).toEqual(["Pannello", "In costruzione", "Lavori", "Risponditore"]);
+    expect(SOTTOMENU.automazioni.map((s) => s.etichetta)).toEqual(["Pannello", "In costruzione", "Lavori", "Risponditore", "Stato"]);
   });
   it("riconosce l'area dal percorso", () => {
     expect(areaDi("/commerciale/lead/abc")).toBe("commerciale");

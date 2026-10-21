@@ -21,6 +21,7 @@ const SCHERMATE: Schermata[] = [
   { nome: "pannello", percorso: "/automazioni" },
   { nome: "pannello-anonimo", percorso: "/automazioni", prima: async (p) => { await p.getByRole("switch", { name: "Nomi dei clienti nascosti" }).click(); } },
   { nome: "lavori", percorso: "/automazioni/lavori" },
+  { nome: "stato", percorso: "/automazioni/stato" },
   { nome: "scheda-automazione", percorso: "/automazioni/demo-auto-1" },
   { nome: "cruscotto", percorso: "/economia" },
   { nome: "canoni", percorso: "/economia/canoni" },
