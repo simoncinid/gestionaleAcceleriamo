@@ -29,6 +29,8 @@ export const LAVORI_TIPO: LavoroTipo[] = [
 ];
 
 const q = (s: string) => `'${s.replace(/'/g, "''")}'`;
+// Online gli utenti sono "diego.simoncini" e "tommaso.rovini": vale il nome esatto o il nome seguito da un punto.
+const utente = (chi: string) => `(SELECT id FROM users WHERE username = ${q(chi)} OR username LIKE ${q(`${chi}.%`)} ORDER BY username = ${q(chi)} DESC LIMIT 1)`;
 
 export function sqlLavoriTipo(now: number, lavori = LAVORI_TIPO): string[] {
   const righe: string[] = [];
@@ -37,7 +39,7 @@ export function sqlLavoriTipo(now: number, lavori = LAVORI_TIPO): string[] {
     const ids = l.passi.map((_, i) => `${l.id}-${i + 1}`);
     l.passi.forEach((p, i) => {
       const ricorrente = p.giornoDelMese != null;
-      righe.push(`INSERT INTO job_template_tasks (id, template_id, title, recurrence, assignee_id, due_days, month_day, position) VALUES (${q(ids[i])}, ${q(l.id)}, ${q(p.titolo)}, ${ricorrente ? "'ricorrente'" : "'una_tantum'"}, (SELECT id FROM users WHERE username = ${q(p.chi)}), ${ricorrente ? "NULL" : p.giorni}, ${ricorrente ? p.giornoDelMese : "NULL"}, ${i + 1}) ON CONFLICT (id) DO UPDATE SET title = excluded.title, recurrence = excluded.recurrence, assignee_id = excluded.assignee_id, due_days = excluded.due_days, month_day = excluded.month_day, position = excluded.position;`);
+      righe.push(`INSERT INTO job_template_tasks (id, template_id, title, recurrence, assignee_id, due_days, month_day, position) VALUES (${q(ids[i])}, ${q(l.id)}, ${q(p.titolo)}, ${ricorrente ? "'ricorrente'" : "'una_tantum'"}, ${utente(p.chi)}, ${ricorrente ? "NULL" : p.giorni}, ${ricorrente ? p.giornoDelMese : "NULL"}, ${i + 1}) ON CONFLICT (id) DO UPDATE SET title = excluded.title, recurrence = excluded.recurrence, assignee_id = excluded.assignee_id, due_days = excluded.due_days, month_day = excluded.month_day, position = excluded.position;`);
     });
     // Un passo tolto dall'elenco sparisce dal lavoro tipo (le task già create nei lavori restano).
     righe.push(`DELETE FROM job_template_tasks WHERE template_id = ${q(l.id)} AND id NOT IN (${ids.map(q).join(", ")});`);
