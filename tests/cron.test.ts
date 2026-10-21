@@ -119,7 +119,7 @@ describe("calendario del giro", () => {
     expect(quali(mar0600)).not.toContain("foglio");
   });
   it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; le task ricorrenti dopo Meta 48 ore; il lunedì prima di Claude; Claude per ultimo", () => {
-    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta", "avvisi", "risponditore", "ig_token", "consegna", "telegram", "conferme", "meta_48h", "lavori", "lunedi", "claude"]);
+    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta_recupero", "meta", "avvisi", "risponditore", "ig_token", "consegna", "telegram", "conferme", "meta_48h", "lavori", "lunedi", "stato", "claude"]);
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");
@@ -307,11 +307,11 @@ describe("giro programmato", () => {
     setMetaFetch(async () => { chiamate++; return Response.json({ field_data: [{ name: "full_name", values: ["Anna Prova"] }, { name: "email", values: [`anna${chiamate}@esempio.it`] }, { name: "company_name", values: ["Bar Prova"] }] }); });
     setEmailFetch(async () => Response.json({ id: "re_1" }));
     const c = contaQuery();
-    // Foglio spento (1 query), due lead da Meta (33), avvisi (8): restano 3 query (misurate: residuo 3 query e 9
-    // sottorichieste prima del risponditore). Il risponditore (5 fisse), la consegna delle push (3 fisse più 2 a push) e le
-    // conferme non entrano; Telegram (2 fisse più 1) sì, con 1 unità, perché non ha riserva. Il totale resta sotto le 45.
+    // Foglio spento (1 query), recupero Meta spento (senza id della Pagina, 0 query), due lead da Meta (33, con la catena:
+    // il giro passa la sua ora a fillMetaLead), avvisi (8 più i 2 SLA scaduti dei due lead): restano 0 query. Gli altri
+    // lavori aspettano il giro dopo. Il totale resta sotto le 45.
     const esito = await giro(c.env, r(10, 15));
-    expect(esito).toMatchObject({ fatti: ["foglio", "meta", "avvisi", "telegram"], saltati: ["risponditore", "consegna", "conferme", "claude"], errori: [] });
+    expect(esito).toMatchObject({ fatti: ["foglio", "meta_recupero", "meta", "avvisi"], saltati: ["risponditore", "consegna", "telegram", "conferme", "stato", "claude"], errori: [] });
     expect(esito.query).toBeLessThanOrEqual(45);
     expect(chiamate).toBe(MAX.meta);
     expect(c.n()).toBeLessThan(QUERY_MASSIME);

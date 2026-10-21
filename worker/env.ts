@@ -5,6 +5,8 @@ export type Env = {
   META_VERIFY_TOKEN: string;
   META_PAGE_TOKEN: string;
   META_GRAPH_VERSION: string;
+  // Id della Pagina Facebook dei moduli (wrangler.jsonc, vars). Vuoto: il recupero dei lead resta spento.
+  META_PAGE_ID?: string;
   // Segreto di produzione (wrangler secret put). Vuoto o assente: gli inviti non partono, la call si salva lo stesso.
   RESEND_API_KEY: string;
   // Chiave dell'aggancio dal wiki (wrangler secret put PROPOSAL_HOOK_KEY). Vuota o assente: l'aggancio risponde sempre 401.

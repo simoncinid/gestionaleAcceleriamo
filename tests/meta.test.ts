@@ -118,4 +118,14 @@ describe("webhook Meta", () => {
     await postWebhook("L6");
     expect((await leadByMeta("L6"))?.duplicate_of_id).toBe(manualId);
   });
+
+  it("segna nella pagina Stato l'ultimo lead ricevuto e l'ultima firma non valida", async () => {
+    graphOk({ full_name: "Mario Rossi" });
+    const voce = () => env.DB.prepare("SELECT ultimo_esito AS esito, ultimo_ok_at AS ok, ultimo_errore AS errore, ultimo_passo AS passo FROM stato_voci WHERE id = 'meta_webhook'").first<Record<string, unknown>>();
+    expect((await postWebhook("STATO-1")).status).toBe(200);
+    expect(await voce()).toMatchObject({ esito: "ok", errore: null });
+    expect((await postWebhook("STATO-2", "segreto-sbagliato")).status).toBe(401);
+    expect(await voce()).toMatchObject({ esito: "errore", passo: "firma" });
+    expect((await voce())!.ok).not.toBeNull();
+  });
 });

@@ -12,16 +12,18 @@ import { ritentaConferme } from "./email/conferma";
 import type { Env } from "./env";
 import { giroFoglio } from "./foglio/sync";
 import { leggiImpostazioni } from "./impostazioni/service";
-import { segnaErrore, segnaOk } from "./integrazioni/stato";
 import { contaD1, QUERY_GIRO, SOTTORICHIESTE_GIRO } from "./lib/bilancio";
 import { partiRoma, type PartiRoma } from "./lib/roma";
 import { revisioneCorrente } from "./lunedi/calcolo";
 import { retryPendingMetaLeads } from "./meta/ingest";
+import { recuperaLeadMeta } from "./meta/recupero";
 import { giroRisponditore } from "./risponditore/giro";
 import { controllaScadenzaToken, rinnovaToken } from "./risponditore/rinnovo";
 import { giroTelegram } from "./telegram/bot";
+import { COSTO_STATO, controllaStato, potaStorico, scriviEsiti, type EsitoGiro } from "./stato/service";
+import { idVoceGiro, VOCE_GIRO, VOCI_GIRO } from "./stato/voci";
 
-export type Lavoro = "avvisi" | "risponditore" | "ig_token" | "consegna" | "foglio" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "lunedi";
+export type Lavoro = "avvisi" | "risponditore" | "ig_token" | "consegna" | "foglio" | "meta_recupero" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "lunedi" | "stato";
 
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
@@ -34,6 +36,8 @@ export type DefLavoro = {
   fisse: number;
   perUnita: number;
   sottoPerUnita: number;
+  // Sottorichieste fisse a giro (il recupero Meta: elenco dei moduli e batch dei lead), prenotate prima delle unità.
+  sottoFisse?: number;
   max: number;
   // Budget lasciato ai lavori che vengono dopo (la consegna delle push): il lavoro prende le sue unità solo
   // da quello che resta tolta la riserva. Vale solo se le push sono collegate.
@@ -66,7 +70,15 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // Con un arretrato grande (prima lettura del foglio) il foglio non deve affamare Meta e conferme: se nel
   // giro è in programma un altro lavoro prende al massimo 1 lead (25 query), da solo fino a 2 se il budget li copre.
   foglio: { quando: (p) => !alle6(p), fisse: 5, perUnita: 20, sottoPerUnita: 2, max: 2, riserva: RISERVA_PUSH, esegui: (e, n, l) => giroFoglio(e, n, altriInProgramma("foglio", n) ? Math.min(1, l) : l) },
-  meta: { quando: ogni15, fisse: 2, perUnita: 16, sottoPerUnita: 2, max: 2, riserva: RISERVA_PUSH, esegui: (e, _n, l) => retryPendingMetaLeads(e, l) },
+  // Recupero dei lead Meta (spec 22/10/2026), la via principale finché la Pagina non è iscritta al webhook: ogni 15
+  // minuti, prima di "meta" che nello stesso giro completa i lead appena registrati. Misura con contaD1: 3 fisse (stato,
+  // controllo dei doppioni, salvataggio) più 3 a lead nuovo (fase, INSERT, attività), al massimo 5; 2 sottorichieste
+  // fisse (elenco dei moduli ogni 6 ore e una batch per tutti i moduli). Senza token o id della Pagina è spento e non costa.
+  meta_recupero: {
+    quando: ogni15, fisse: 3, perUnita: 3, sottoPerUnita: 0, sottoFisse: 2, max: 5, riserva: RISERVA_PUSH,
+    esegui: async (e, n, l) => recuperaLeadMeta(e, n, l),
+  },
+  meta: { quando: ogni15, fisse: 2, perUnita: 16, sottoPerUnita: 2, max: 2, riserva: RISERVA_PUSH, esegui: (e, n, l) => retryPendingMetaLeads(e, l, n) },
   // Avvisi in app (spec 8): a ogni giro, dopo l'ingresso dei lead. Un lead che non è ancora entrato non si può
   // chiamare, quindi foglio e Meta passano prima; con un arretrato nel foglio alle :15 gli avvisi aspettano
   // il giro dopo (5 minuti, dentro i 30 del preavviso). Fisse 8 (letture e chiusure), una query per unità.
@@ -135,6 +147,9 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // una query e Claude riceve il resto, perché il giro conta le query vere. Fisse 15, misurate con contaD1 al
   // primo giro: 1 lettura, 11 del calcolo, 1 scrittura, 1 rilettura (14, una di margine).
   lunedi: { quando: (p) => p.settimana === 1 && p.ore === 7, fisse: 15, perUnita: 0, sottoPerUnita: 0, max: 1, esegui: (e, n) => revisioneCorrente(e.DB, n) },
+  // Stato delle automazioni (spec 22/10/2026): ogni 15 minuti, un avviso per episodio quando una voce va in rosso o
+  // resta gialla oltre il doppio dell'intervallo. 3 fisse (voci, avvisi aperti, chiusura) più un INSERT ad avviso, al massimo 5.
+  stato: { quando: ogni15, ...COSTO_STATO, sottoPerUnita: 0, esegui: (e, n, l) => controllaStato(e, n, l) },
   // Claude (spec 7.4): ultimo del giro, dopo le conferme e dopo il controllo di Meta delle :00, che gira una volta
   // l'ora e non deve perdere il suo turno. Un lavoro di Claude può aspettare 5 minuti, un lead no.
   // Misura con contaD1: fisse 8 (in una batch da 3 la classificazione dei lead nuovi che si accoda da sola e la
@@ -167,6 +182,8 @@ export function limiteDi(def: DefLavoro, residuoQuery: number, residuoSotto: num
     residuoQuery -= def.riserva.query;
     residuoSotto -= def.riserva.sotto;
   }
+  residuoSotto -= def.sottoFisse ?? 0;
+  if (residuoSotto < 0) return 0;
   if (residuoQuery < def.fisse) return 0;
   const perQuery = def.perUnita > 0 ? Math.floor((residuoQuery - def.fisse) / def.perUnita) : def.max;
   const perSotto = def.sottoPerUnita > 0 ? Math.floor(residuoSotto / def.sottoPerUnita) : def.max;
@@ -201,28 +218,44 @@ export async function giro(env: Env, now: number): Promise<{ fatti: Lavoro[]; sa
   const saltati: Lavoro[] = [];
   const errori: string[] = [];
   let sotto = SOTTORICHIESTE_GIRO;
-  const RISERVA_FINALE = 1; // la riga "giro" in integration_status
+  // Gli esiti nello stato (con la riga "giro" in integration_status) e, alle 3, la potatura dello storico.
+  const pota = p.ore === 3 && p.minuti < 5;
+  const RISERVA_FINALE = pota ? 2 : 1;
+  const esiti: EsitoGiro[] = [];
   const conRiserva = pushCollegate(env); // senza chiavi VAPID la consegna non spende niente: niente riserva
   for (const [nome, def] of Object.entries(LAVORI) as [Lavoro, DefLavoro][]) {
     if (!def.quando(p)) continue;
     const limite = limiteDi(def, QUERY_GIRO - RISERVA_FINALE - contatore.query, sotto, conRiserva);
     if (limite < 1) {
       saltati.push(nome);
+      esiti.push({ voce: idVoceGiro(nome), esito: "saltato", messaggio: "Budget del giro esaurito: riprova al giro dopo" });
       continue;
     }
-    sotto -= limite * def.sottoPerUnita;
+    const prenotate = (def.sottoFisse ?? 0) + limite * def.sottoPerUnita;
+    sotto -= prenotate;
     try {
       const esito = await def.esegui(envContato, now, limite, inizio);
       const usate = (esito as { sottorichieste?: unknown } | null)?.sottorichieste;
-      if (typeof usate === "number") sotto += Math.max(0, limite * def.sottoPerUnita - usate);
+      if (typeof usate === "number") sotto += Math.max(0, prenotate - usate);
       fatti.push(nome);
+      const spento = (esito as { spento?: unknown } | null)?.spento === true || VOCI_GIRO[nome]?.spento?.(env) === true;
+      esiti.push({ voce: idVoceGiro(nome), esito: spento ? "spento" : "ok" });
     } catch (e) {
       errori.push(`${nome}: ${(e as Error).message}`);
+      esiti.push({ voce: idVoceGiro(nome), esito: "errore", messaggio: (e as Error).message });
     }
   }
-  // Anche la riga "giro" passa dal contatore: query restituito è il totale vero dell'invocazione.
+  // Una query sola per lo stato del giro, dei lavori e della riga "giro" in Integrazioni (trigger della migrazione 0014).
+  // Anche questa passa dal contatore: query restituito è il totale vero dell'invocazione.
   const db = getDb(envContato.DB);
-  if (errori.length) await segnaErrore(db, "giro", errori.join("; "), now);
-  else await segnaOk(db, "giro", now);
+  if (errori.length) {
+    const errorId = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+    console.error("integrazione", "giro", errorId, errori.join("; "));
+    esiti.push({ voce: VOCE_GIRO, esito: "errore", messaggio: errori.join("; "), passo: errorId });
+  } else {
+    esiti.push({ voce: VOCE_GIRO, esito: "ok" });
+  }
+  await scriviEsiti(db, esiti, now);
+  if (pota) await potaStorico(db, now);
   return { fatti, saltati, errori, query: contatore.query };
 }

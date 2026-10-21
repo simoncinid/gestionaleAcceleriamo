@@ -10,6 +10,9 @@
   ],
   "vars": {
     "META_GRAPH_VERSION": "v23.0",
+    // Id della Pagina Facebook con i moduli dei lead (non è un segreto).
+    // Senza id (o senza META_PAGE_TOKEN) il recupero dei lead risulta "spento" nella pagina Stato.
+    "META_PAGE_ID": "1217893964750759",
     "IG_GRAPH_VERSION": "v25.0",
     // Chiave pubblica VAPID: vuota finché Tommaso non genera la coppia (README, Task 16). La privata è un segreto.
     "VAPID_PUBLIC_KEY": "",

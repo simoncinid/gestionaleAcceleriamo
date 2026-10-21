@@ -10,6 +10,9 @@ import { metaFetch } from "./fetcher";
 import { eDemo, NIENTE_IN_DEMO } from "../lib/demo";
 
 export const MAX_META_ATTEMPTS = 10;
+// Un lead Meta arrivato da più di 48 ore (primo import del recupero) entra senza catena: niente email di conferma
+// né avviso "Lead nuovo" per un contatto di settimane fa. Fase e prossima azione si decidono a mano.
+export const ARRETRATO_MS = 48 * 3_600_000;
 
 type GraphLead = {
   field_data?: { name: string; values?: string[] }[];
@@ -116,6 +119,7 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
       .where(eq(leads.id, leadId));
     return false;
   }
+  if (now - lead.createdAt > ARRETRATO_MS) return true;
   // Fuori dal try: se la catena fallisce il lead resta riempito ("ok") e non torna tra quelli da riprovare.
   try {
     await catenaLeadNuovo(env, leadId, "meta", now);
@@ -126,7 +130,7 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
 }
 
 // `limite`: il cron ne completa pochi per giro (ogni lead costa una chiamata a Meta e la sua catena).
-export async function retryPendingMetaLeads(env: Env, limite = 20) {
+export async function retryPendingMetaLeads(env: Env, limite = 20, now = Date.now()) {
   const db = getDb(env.DB);
   const rows = await db
     .select({ id: leads.id })
@@ -134,6 +138,6 @@ export async function retryPendingMetaLeads(env: Env, limite = 20) {
     .where(and(inArray(leads.metaStatus, ["pending", "error"]), lt(leads.metaAttempts, MAX_META_ATTEMPTS), isNull(leads.deletedAt)))
     .limit(limite);
   let ok = 0;
-  for (const row of rows) if (await fillMetaLead(env, row.id)) ok++;
+  for (const row of rows) if (await fillMetaLead(env, row.id, now)) ok++;
   return ok;
 }
