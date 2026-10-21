@@ -232,6 +232,7 @@ export const campaignSpend = sqliteTable("campaign_spend", {
 
 export const EVENTI_AVVISO = [
   "lead_nuovo", "sla_90", "sla_scaduto", "proposta_oggi", "fine_pausa", "claude_tetto", "meta_48h", "integrazione_rotta", "risponditore_errore", "risorsa_richiesta",
+  "automazione_rotta",
 ] as const;
 export type EventoAvviso = (typeof EVENTI_AVVISO)[number];
 
@@ -641,3 +642,39 @@ export const risorseRichieste = sqliteTable("risorse_richieste", {
   messaggio: text("messaggio"),
   creataIl: integer("creata_il").notNull(),
 });
+
+// Stato delle automazioni (spec 22/10/2026). Una voce per lavoro del giro (id "giro:<lavoro>", nome e intervallo nel
+// codice) o per automazione esterna che manda il battito (nome, cliente e intervallo qui; della chiave solo l'impronta SHA-256).
+export const ESITI_STATO = ["ok", "errore", "saltato", "spento"] as const;
+export type EsitoStato = (typeof ESITI_STATO)[number];
+
+export const statoVoci = sqliteTable("stato_voci", {
+  id: text("id").primaryKey(),
+  tipo: text("tipo", { enum: ["interno", "esterno"] }).notNull().default("interno"),
+  nome: text("nome"),
+  clientId: text("client_id"), // null = Acceleriamo
+  automationId: text("automation_id"), // scheda con il flusso a passaggi, per evidenziare il passo rotto
+  intervalloMin: integer("intervallo_min"),
+  chiaveImpronta: text("chiave_impronta").unique(),
+  attiva: integer("attiva", { mode: "boolean" }).notNull().default(true),
+  ultimoEsito: text("ultimo_esito", { enum: ESITI_STATO }),
+  ultimoGiroAt: integer("ultimo_giro_at"),
+  ultimoOkAt: integer("ultimo_ok_at"),
+  ultimoErroreAt: integer("ultimo_errore_at"),
+  ultimoErrore: text("ultimo_errore"),
+  ultimoPasso: text("ultimo_passo"),
+  creataIl: integer("creata_il"),
+  eliminataIl: integer("eliminata_il"),
+});
+
+// Storico dei giri e dei battiti: il dettaglio mostra gli ultimi 20 di una voce. Il giro delle 3 pota oltre i 30 giorni.
+export const statoGiri = sqliteTable("stato_giri", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  voceId: text("voce_id").notNull(),
+  esito: text("esito", { enum: ESITI_STATO }).notNull(),
+  at: integer("at").notNull(),
+  messaggio: text("messaggio"),
+  passo: text("passo"),
+}, (t) => [index("idx_stato_giri_voce").on(t.voceId, t.at)]);
+
+export type StatoVoce = typeof statoVoci.$inferSelect;

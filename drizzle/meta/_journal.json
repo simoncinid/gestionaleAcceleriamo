@@ -99,6 +99,13 @@
       "when": 1792432681879,
       "tag": "0013_risponditore",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792614686361,
+      "tag": "0014_stato_automazioni",
+      "breakpoints": true
     }
   ]
 }

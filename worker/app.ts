@@ -34,6 +34,7 @@ import { schedeRoutes } from "./schede/routes";
 import { meRoutes } from "./me/routes";
 import { datiRoutes } from "./dati/routes";
 import { ricercaRoutes } from "./ricerca/routes";
+import { statoRoutes } from "./stato/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -45,7 +46,7 @@ app.onError((err, c) => {
   return c.json({ error: "Errore del server", errorId }, 500);
 });
 
-const PUBLIC_PATHS = ["/api/health", "/api/_boom", "/api/auth/login", "/api/hooks/proposals"];
+const PUBLIC_PATHS = ["/api/health", "/api/_boom", "/api/auth/login", "/api/hooks/proposals", "/api/stato/battito"];
 
 app.use("/api/*", async (c, next) => {
   if (PUBLIC_PATHS.includes(c.req.path) || c.req.path.startsWith("/api/webhooks/") || c.req.path.startsWith("/api/pubblico/")) return next();
@@ -78,6 +79,7 @@ app.route("/api/economia", economiaRoutes);
 app.route("/api/clients", clientiRoutes);
 app.route("/api/automations", automazioniRoutes);
 app.route("/api/risponditore", risponditoreRoutes);
+app.route("/api/stato", statoRoutes);
 app.route("/api/job-templates", lavoriTipoRoutes);
 app.route("/api/jobs", lavoriRoutes);
 app.route("/api/tasks", taskRoutes);
