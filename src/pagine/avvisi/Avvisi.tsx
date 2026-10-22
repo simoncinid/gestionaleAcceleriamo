@@ -18,16 +18,16 @@ export function Avvisi() {
   useEffect(() => {
     if (q.data?.nonLetti) letti.mutate();
   }, [q.data?.nonLetti]);
-  if (q.isPending) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={4} /></div>;
-  if (q.isError) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isPending) return <div className="p-4 md:px-0 md:pt-0"><Skeleton righe={4} /></div>;
+  if (q.isError) return <div className="p-4 md:px-0 md:pt-0"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const { avvisi } = q.data;
   return (
-    <div className="mx-auto max-w-[720px] p-4 pb-28">
+    <div className="p-4 pb-28 md:px-0 md:pt-0">
       <Intestazione eyebrow="Impostazioni" titolo="Avvisi" numero={avvisi.length || undefined} />
       {avvisi.length === 0 ? (
         <StatoVuoto titolo="Nessun avviso aperto" testo="Gli avvisi si chiudono da soli quando la cosa è fatta." />
       ) : (
-        <ul className="grid grid-cols-1 gap-2">
+        <ul className="grid grid-cols-1 gap-2 @5xl:grid-cols-2">
           {avvisi.map((a) => (
             <li key={a.id}>
               {/* Non letti: titolo in peso medio e pallino in accento; letti in peso normale. */}

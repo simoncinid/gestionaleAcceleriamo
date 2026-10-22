@@ -28,8 +28,8 @@ export function Fatture({ ora: oraFissa }: { ora?: number } = {}) {
   const q = useFatture();
   const [aperta, setAperta] = useState<FatturaRiga | null>(null);
   const eyebrow = nomeMese(meseRoma(ora));
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Fatture" eyebrow={eyebrow} /><Skeleton righe={8} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Fatture" eyebrow={eyebrow} /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:px-0 md:pt-0"><Intestazione titolo="Fatture" eyebrow={eyebrow} /><Skeleton righe={8} /></div>;
+  if (q.error) return <div className="p-4 md:px-0 md:pt-0"><Intestazione titolo="Fatture" eyebrow={eyebrow} /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const fatture = q.data!;
   const di = (s: StatoFattura) => fatture.filter((f) => f.stato === s);
   const ritardo = di("in_ritardo");
@@ -39,15 +39,16 @@ export function Fatture({ ora: oraFissa }: { ora?: number } = {}) {
     perMese.set(m, [...(perMese.get(m) ?? []), f]);
   }
   return (
-    <div className="mx-auto grid max-w-[720px] gap-6 p-4">
-      <Intestazione titolo="Fatture" numero={euro(somma([...ritardo, ...di("emessa")]))} coda="da incassare" eyebrow={eyebrow}>
+    // Ogni gruppo (in ritardo, emesse, da emettere, incassate) è una colonna: sul largo si leggono affiancati.
+    <div className="grid items-start gap-6 p-4 md:px-0 md:pt-0 md:pb-8 @5xl:grid-cols-2 @7xl:grid-cols-3">
+      <div className="@5xl:col-span-full"><Intestazione titolo="Fatture" numero={euro(somma([...ritardo, ...di("emessa")]))} coda="da incassare" eyebrow={eyebrow}>
         {ritardo.length > 0 && <p className="text-corpo text-errore">{ritardo.length === 1 ? "1 in ritardo" : `${ritardo.length} in ritardo`}</p>}
-      </Intestazione>
-      {fatture.length === 0 && <StatoVuoto titolo="Nessuna fattura" testo="La prima nasce dal +." />}
+      </Intestazione></div>
+      {fatture.length === 0 && <div className="@5xl:col-span-full"><StatoVuoto titolo="Nessuna fattura" testo="La prima nasce dal +." /></div>}
       {APERTI.map((s) => di(s).length > 0 && (
         <Sezione key={s} titolo={ETICHETTE_FATTURA[s]}>
           <ul className="grid grid-cols-1 gap-2">{di(s).map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} onClick={() => setAperta(f)} /></li>)}</ul>
-          {s === "in_ritardo" && <Pulsante variante="primario" misura="lg" className="w-full sm:w-auto" onClick={() => setAperta(ritardo[0])}>Segna incassata</Pulsante>}
+          {s === "in_ritardo" && <Pulsante variante="primario" misura="lg" className="w-full sm:w-auto sm:justify-self-start" onClick={() => setAperta(ritardo[0])}>Segna incassata</Pulsante>}
         </Sezione>
       ))}
       {perMese.size > 0 && (

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FunnelSimple, ListBullets, MagnifyingGlass, SquaresFour } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, FunnelSimple, ListBullets, MagnifyingGlass, SquaresFour } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import { BarraSelezione, FoglioSposta } from "./AzioniScaletta";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFiltri } from "./FoglioFiltri";
 import { MenuRapido } from "./MenuRapido";
+import { useTavolo } from "./tavolo";
 import { ETICHETTE_VISTE, MAX_SELEZIONE, aggiungiAllaSelezione, fonteFase, sopratitolo, FILTRI_VUOTI, TUTTE, applicaCerca, filtriAttivi, listaTelefono, opzioniFase, ordinate, parametri, perFase, totali, type Filtri } from "./filtriScaletta";
 
 type Corpo = { ids: string[]; azione: "responsabile" | "fase" | "cestino"; valore?: string | null };
@@ -42,6 +43,7 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const aperte = useMemo(() => tutte.filter((f) => f.kind === "open"), [tutte]);
   const etichetta = useMemo(() => new Map(tutte.map((f) => [f.id, f.label])), [tutte]);
   const gruppi = useMemo(() => perFase(leads.data ?? []), [leads.data]);
+  const tavolo = useTavolo(aperte.length);
 
   // PV6: con ?cerca=1 il campo si apre col fuoco e il parametro si toglie. Oggi nessun link lo usa più
   // (la lente della testata apre il foglio di ricerca): resta per gli indirizzi salvati e per il test PV6.
@@ -98,10 +100,18 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
   const scegli = (id: string, si: boolean) => setScelti((s) => { if (si) return aggiungiAllaSelezione(s, id); const n = new Set(s); n.delete(id); return n; });
 
   return (
-    <div className="flex flex-col gap-4 pb-8">
+    <div className={`flex flex-col gap-4 pb-8 ${modo === "colonne" ? "md:pb-6" : ""}`}>
       <div className="flex items-start justify-between gap-3">
         <Intestazione titolo="Scaletta" eyebrow={sopratitolo(modo, faseTelefono, { aperti: nAperti, fase: listaTel.length, vista: righe.length })} />
         <div className="flex shrink-0 items-center gap-2 pt-5">
+          {modo === "colonne" && (tavolo.bordi.prima || tavolo.bordi.dopo) && (
+            <div className="mr-2 hidden gap-1 md:flex" role="group" aria-label="Scorri le colonne">
+              <Pulsante variante="fantasma" aria-label="Colonne precedenti" className="w-11 px-0! disabled:bg-transparent!" disabled={!tavolo.bordi.prima} onClick={() => tavolo.scorri(-1)}
+                icona={<CaretLeft size={20} weight="bold" aria-hidden />} />
+              <Pulsante variante="fantasma" aria-label="Colonne successive" className="w-11 px-0! disabled:bg-transparent!" disabled={!tavolo.bordi.dopo} onClick={() => tavolo.scorri(1)}
+                icona={<CaretRight size={20} weight="bold" aria-hidden />} />
+            </div>
+          )}
           <Pulsante variante="icona" aria-label="Cerca" aria-expanded={cercaAperta} className="w-11 px-0!" icona={<MagnifyingGlass size={20} weight="bold" aria-hidden />}
             onClick={() => { if (cercaAperta && filtri.q) return ricerca.current?.focus(); setCercaAperta((a) => !a); }} />
           <Pulsante variante="icona" aria-label={conFiltri ? "Filtri, alcuni attivi" : "Filtri"} className="relative w-11 px-0!" icona={<FunnelSimple size={20} weight="bold" aria-hidden />}
@@ -130,17 +140,21 @@ export function Scaletta({ ora }: { ora?: number } = {}) {
           {righe.length === 0 ? (
             <div className="hidden md:block">{vuoto}</div>
           ) : (
-            <div className="hidden gap-4 overflow-x-auto pb-4 md:-mx-8 md:flex md:px-8">
+            // Tavolo a tutta larghezza e tutta altezza: solo colonne intere, allineate a sinistra; di lato si scorre
+            // a scatti di una colonna (anche con le frecce in testata), ogni colonna scorre in verticale per conto suo.
+            <div ref={tavolo.ref} style={tavolo.misure ? { height: tavolo.misure.altezza } : undefined}
+              className="hidden snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain md:flex">
               {aperte.map((f) => {
                 const lista = gruppi.get(f.id) ?? [];
                 const t = totali(lista);
                 return (
-                  <section key={f.id} className="flex w-[300px] shrink-0 flex-col gap-3" aria-label={f.label}>
+                  <section key={f.id} className="flex min-h-0 w-[300px] shrink-0 snap-start flex-col gap-3" aria-label={f.label}
+                    style={tavolo.misure ? { width: tavolo.misure.colonna } : undefined}>
                     <header className="border-b border-sabbia pb-2">
-                      <p className="text-titolo-card">{f.label} <span className="text-grigio">{lista.length}</span></p>
+                      <p className="flex items-baseline gap-2 text-titolo-card"><span className="min-w-0">{f.label}</span> <span className="shrink-0 text-grigio tabular-nums">{lista.length}</span></p>
                       <p className="text-meta text-grigio tabular-nums">{euro(t.setupCents)} | {euro(t.feeCents)}</p>
                     </header>
-                    <ul className="flex flex-col gap-3">{lista.map(card)}</ul>
+                    <ul className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-y-contain px-1 pb-3">{lista.map(card)}</ul>
                   </section>
                 );
               })}

@@ -34,7 +34,9 @@ export function Funnel({ ora = Date.now() }: { ora?: number }) {
       {q.isLoading ? <Skeleton righe={6} /> : q.error || !f ? <Errore errore={q.error} onRiprova={() => void q.refetch()} /> : f.tappe[0].numero === 0 ? (
         <StatoVuoto titolo="Nessun lead nel periodo" testo="Scegli un periodo più lungo per vedere i numeri." />
       ) : (
-        <>
+        // Computer largo: il funnel a sinistra (la barra di ogni tappa è già il grafico), tempi, call e motivi a destra.
+        <div className="grid items-start gap-6 @5xl:grid-cols-12 @5xl:gap-8">
+          <div className="flex flex-col gap-6 @5xl:col-span-7 @7xl:col-span-6">
           <Gruppo titolo="Dal lead al cliente" meta={nomePeriodo}>
             {f.tappe.map((t) => t.chiave === "arrivati" ? (
               <Voce key={t.chiave} nome={t.nome} numero={t.numero} />
@@ -44,6 +46,9 @@ export function Funnel({ ora = Date.now() }: { ora?: number }) {
               <Voce key={t.chiave} nome={t.nome} numero={t.numero} dettaglio={`${percentualeOppureNd(t.percentuale)} degli arrivati`} quota={t.percentuale} />
             ))}
           </Gruppo>
+          </div>
+          <div className="grid items-start gap-6 @5xl:col-span-5 @7xl:col-span-6 @7xl:grid-cols-2 @7xl:gap-8">
+          <div className="flex flex-col gap-6">
           <Gruppo titolo="Tempi" nota="Tempi dei lead arrivati nel periodo, compresi i passaggi avvenuti dopo.">
             <Voce
               nome="Prima risposta media"
@@ -57,13 +62,17 @@ export function Funnel({ ora = Date.now() }: { ora?: number }) {
             <Voce nome="Call di presentazione fatte" numero={f.call.presentazione} />
             <Voce nome="Dalla conoscenza alla presentazione" numero={percentualeOppureNd(f.call.rapporto)} quota={f.call.rapporto} />
           </Gruppo>
+          </div>
+          <div className="flex flex-col gap-6">
           {f.motivi.length > 0 && (
             <Gruppo titolo="Motivi di perdita">
-              {f.motivi.map((m) => <Voce key={m.id} nome={m.etichetta} numero={m.numero} />)}
+              {f.motivi.map((m) => <Voce key={m.id} nome={m.etichetta} numero={m.numero} quota={(m.numero / Math.max(...f.motivi.map((x) => x.numero), 1)) * 100} />)}
             </Gruppo>
           )}
           <p className="text-meta text-grigio">Le percentuali con meno di 5 lead non si calcolano: scrivono "n.d.". I doppioni non si contano.</p>
-        </>
+          </div>
+          </div>
+        </div>
       )}
     </div>
   );

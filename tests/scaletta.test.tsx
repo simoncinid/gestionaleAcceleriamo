@@ -63,7 +63,7 @@ describe("Scaletta, pagina", () => {
     expect(html).toContain('data-selettore="Fase"');
     // Il selettore parte da "Tutte" (prototipo 10-scaletta, spec 6.5).
     expect(html).toMatch(/aria-expanded="false"[^>]*>(?:(?!<\/button>).)*>Tutte</s);
-    expect(html).toMatch(/Da richiamare(?:<!-- -->)? <span class="text-grigio">2<\/span>/);
+    expect(html).toMatch(/Da richiamare<\/span>(?:<!-- -->)? <span class="shrink-0 text-grigio tabular-nums">2<\/span>/);
     expect(html).not.toContain("<select");
     // Le colonne del computer sono solo le fasi aperte.
     expect(html).not.toMatch(/>Chiuso</);

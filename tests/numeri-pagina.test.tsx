@@ -47,8 +47,8 @@ describe("Numeri a tre segmenti", () => {
     expect(html).not.toContain("48 min");
     expect(html).toContain("dei lead arrivati nel periodo");
     expect(html).toContain("1,5 giorni");
-    // Le barre della quota: SLA, quattro tappe e rapporto delle call; nessuna su "Lead arrivati".
-    expect(html.match(/data-barra/g)?.length).toBe(6);
+    // Le barre della quota: SLA, quattro tappe, rapporto delle call e un motivo di perdita; nessuna su "Lead arrivati".
+    expect(html.match(/data-barra/g)?.length).toBe(7);
     expect(html).toContain("width:78%");
   });
   it("Funnel: periodo vuoto", () => {

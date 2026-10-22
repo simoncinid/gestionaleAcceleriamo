@@ -36,13 +36,17 @@ export function Voce({ nome, numero, dettaglio, punto, etichettaPunto, quota, ev
   quota?: number | null; evidenza?: boolean;
 }) {
   return (
-    <li className="flex min-h-14 items-center gap-4 px-4 py-3">
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex items-center gap-2 text-corpo">{punto && <Punto colore={punto} etichetta={etichettaPunto ?? nome} />}<span className="min-w-0 [overflow-wrap:anywhere]">{nome}</span></span>
-        {dettaglio && <span className="text-secondaria text-grigio tabular-nums">{dettaglio}</span>}
-        {quota != null && <Barra quota={quota} evidenza={evidenza} />}
+    // La barra corre sotto tutta la riga (numero compreso): così le barre di un gruppo hanno lo stesso binario
+    // e si confrontano a occhio come un grafico a barre.
+    <li className="flex min-h-14 flex-col justify-center gap-0.5 px-4 py-3">
+      <div className="flex items-center gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-center gap-2 text-corpo">{punto && <Punto colore={punto} etichetta={etichettaPunto ?? nome} />}<span className="min-w-0 [overflow-wrap:anywhere]">{nome}</span></span>
+          {dettaglio && <span className="text-secondaria text-grigio tabular-nums">{dettaglio}</span>}
+        </div>
+        {numero !== "" && <span className="shrink-0 whitespace-nowrap text-corpo font-semibold tabular-nums">{numero}</span>}
       </div>
-      {numero !== "" && <span className="shrink-0 whitespace-nowrap text-corpo font-semibold tabular-nums">{numero}</span>}
+      {quota != null && <Barra quota={quota} evidenza={evidenza} />}
     </li>
   );
 }

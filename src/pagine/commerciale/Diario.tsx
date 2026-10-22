@@ -39,10 +39,10 @@ export function Diario({ ora = Date.now() }: { ora?: number }) {
     perGiorno.set(g, [...(perGiorno.get(g) ?? []), v]);
   }
   return (
-    <div className="mx-auto flex max-w-[720px] flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 p-4 md:p-0 md:pb-8">
       <Intestazione titolo="Diario" eyebrow="Chi ha fatto cosa" />
       <SegmentiOggi attivo="diario" />
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 @4xl:grid @4xl:grid-cols-3 @4xl:gap-4">
         <Selettore etichetta="Chi" opzioni={persone} valore={chi} onCambia={setChi} />
         <Selettore etichetta="Area" opzioni={AREE} valore={area} onCambia={setArea} />
         <Selettore etichetta="Tipo" opzioni={TIPI} valore={tipo} onCambia={setTipo} />
@@ -50,7 +50,9 @@ export function Diario({ ora = Date.now() }: { ora?: number }) {
       {q.isLoading ? <Skeleton righe={8} /> : q.error ? <Errore errore={q.error} onRiprova={() => void q.refetch()} /> : voci.length === 0 ? (
         <StatoVuoto titolo="Nessuna voce" testo="Cambia i filtri per vedere altro." />
       ) : (
-        [...perGiorno.entries()].map(([g, elenco]) => (
+        // Schermo largo: i giorni affiancati, dal più recente, come pagine di un'agenda.
+        <div className="flex flex-col gap-6 @5xl:grid @5xl:grid-cols-[repeat(auto-fill,minmax(420px,1fr))] @5xl:items-start @5xl:gap-x-8">
+        {[...perGiorno.entries()].map(([g, elenco]) => (
           <section key={g} className="flex flex-col gap-2">
             <h2 className="font-display text-titolo-blocco">{g}</h2>
             <ul className="flex flex-col divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio">
@@ -74,7 +76,8 @@ export function Diario({ ora = Date.now() }: { ora?: number }) {
               ))}
             </ul>
           </section>
-        ))
+        ))}
+        </div>
       )}
       {q.hasNextPage && <div><Pulsante variante="fantasma" inCorso={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>Mostra le voci prima</Pulsante></div>}
     </div>

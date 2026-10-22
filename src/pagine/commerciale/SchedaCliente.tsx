@@ -29,8 +29,8 @@ export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number 
     onSuccess: () => { toast.success("Salvato"); ricarica(); },
     onError: (e) => toast.error(e.message),
   });
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:p-0 md:pb-8"><Skeleton righe={8} /></div>;
+  if (q.error) return <div className="p-4 md:p-0 md:pb-8"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const { cliente: k, canoni, automazioni, fatture, lead } = q.data!;
   const lavori = q.data!.lavori ?? [];
   const task = q.data!.task ?? [];
@@ -41,10 +41,12 @@ export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number 
     patch.mutate({ [campo]: campo === "name" ? t : t || null });
   };
   return (
-    <div key={`${k.name}:${k.sector}:${k.city}`} className="mx-auto grid max-w-[720px] gap-6 p-4">
+    <div key={`${k.name}:${k.sector}:${k.city}`} className="grid gap-6 p-4 md:p-0 md:pb-8 @4xl:grid-cols-2 @4xl:items-start @4xl:gap-x-8 @7xl:grid-cols-3">
+      <div className="@4xl:col-span-full">
       <Intestazione titolo={k.name} eyebrow="Cliente">
         <div className="flex items-center gap-2"><LogoCliente logo={k.logo} nome={k.name} misura={32} /><p className="text-secondaria text-grigio">{ETICHETTE_CLIENTE[k.stato]}</p></div>
       </Intestazione>
+      </div>
       <Sezione titolo="Lavori">
         {lavori.length === 0 ? <p className="text-secondaria text-grigio">Nessun lavoro</p> : (
           <ul className="grid gap-2">{lavori.map((l) => <li key={l.id}><Riga titolo={l.name} secondaria={`Avviato il ${giorno(l.startAt, ora)}${l.feeCents ? `, ${euro(l.feeCents)} al mese` : ""}`} meta={l.status === "concluso" ? "Concluso" : undefined} /></li>)}</ul>

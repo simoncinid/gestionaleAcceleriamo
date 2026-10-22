@@ -43,8 +43,8 @@ export function Proposte({ ora: oraFissa }: { ora?: number } = {}) {
   const q = useQuery({ queryKey: ["proposte"], queryFn: () => api<{ proposte: PropostaRiga[] }>("/proposals").then((r) => r.proposte) });
   const [abbina, setAbbina] = useState<PropostaRiga | null>(null);
   const intestazione = (n?: number) => <Intestazione titolo="Proposte" numero={n} coda="aperte" eyebrow={MESE.format(ora)} />;
-  if (q.isLoading) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Skeleton righe={6} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:p-0 md:pb-8">{intestazione()}<Skeleton righe={6} /></div>;
+  if (q.error) return <div className="p-4 md:p-0 md:pb-8">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
 
   const tutte = q.data ?? [];
   const daAbbinare = tutte.filter((p) => !p.leadId && APERTE.includes(p.status));
@@ -56,10 +56,12 @@ export function Proposte({ ora: oraFissa }: { ora?: number } = {}) {
   );
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 p-4 md:p-0 md:pb-8">
       {intestazione(tutte.filter((p) => APERTE.includes(p.status)).length)}
       {tutte.length === 0 && <StatoVuoto titolo="Nessuna proposta" testo="Arrivano dal wiki quando stampi un preventivo, oppure dal +." />}
 
+      {/* Sullo schermo largo gli stati stanno affiancati, come colonne di un tavolo. */}
+      <div className="flex flex-col gap-6 empty:hidden @5xl:grid @5xl:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] @5xl:items-start @5xl:gap-x-8">
       {daAbbinare.length > 0 && (
         <Gruppo titolo="Da abbinare" righe={daAbbinare.length}>
           {daAbbinare.map((p) => (
@@ -80,11 +82,12 @@ export function Proposte({ ora: oraFissa }: { ora?: number } = {}) {
       <Gruppo titolo="Bozze" righe={di("bozza").length}>{di("bozza").map(riga)}</Gruppo>
       <Gruppo titolo="Registrate, da presentare" righe={di("registrata").length}>{di("registrata").map(riga)}</Gruppo>
       <Gruppo titolo="Presentate" righe={di("presentata").length}>{di("presentata").map(riga)}</Gruppo>
+      </div>
 
       {chiuse.length > 0 && (
         <details className="group border-t border-sabbia pt-3">
           <summary className="flex cursor-pointer items-baseline justify-between gap-3 py-2 font-display text-titolo-card">Chiuse <span className="font-sans text-secondaria text-grigio tabular-nums">{chiuse.length}</span></summary>
-          <ul className="flex flex-col gap-2 pt-2">{chiuse.map(riga)}</ul>
+          <ul className="flex flex-col gap-2 pt-2 @5xl:grid @5xl:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] @5xl:gap-x-8">{chiuse.map(riga)}</ul>
         </details>
       )}
 

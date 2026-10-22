@@ -13,7 +13,7 @@ describe("QA Piano B", () => {
   it("Avvisi: la lista non allarga la pagina e dice da quanto è nato l'avviso", () => {
     const avvisi = [{ id: "1", evento: "sla_scaduto", titolo: "Prima chiamata scaduta: Carpenteria Metallica Fratelli Bertolucci", testo: null, href: "/commerciale/lead/L1", createdAt: Date.now() - 23 * 60_000, letto: true }];
     const html = render(<Avvisi />, { percorso: "/impostazioni/avvisi", dati: [[["notifications"], { nonLetti: 0, avvisi }]] });
-    expect(html).toMatch(/<ul class="grid grid-cols-1 gap-2">/);
+    expect(html).toMatch(/<ul class="grid grid-cols-1 gap-2[^"]*">/);
     expect(html).toContain("23 min fa");
     expect(html).not.toContain("scaduta da");
   });

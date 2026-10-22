@@ -19,13 +19,16 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
   const s = useStatoSistema();
   // Stessa chiave della pagina Avvisi: aprendola dopo, l'elenco è già in cache.
   const avvisi = useQuery({ queryKey: ["notifications"], queryFn: () => api<{ avvisi: unknown[]; nonLetti: number }>("/notifications") });
-  if (s.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
-  if (s.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={s.error} onRiprova={() => void s.refetch()} /></div>;
+  if (s.isLoading) return <div className="p-4 md:px-0 md:pt-0"><Skeleton righe={8} /></div>;
+  if (s.error) return <div className="p-4 md:px-0 md:pt-0"><Errore errore={s.error} onRiprova={() => void s.refetch()} /></div>;
   const d = { ...s.data!, integrazioni: conGiroInRitardo(s.data!.integrazioni, ora) };
   const rossi = d.integrazioni.filter((i) => i.stato === "errore").length;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-28">
+    // Sul largo le sezioni scorrono in due colonne (CSS columns): a sinistra avvisi e collegamenti, a destra il resto.
+    // L'ordine nel codice è quello del telefono; lì il contenitore si scioglie ("contents").
+    <div className="grid gap-8 p-4 pb-28 md:px-0 md:pt-0">
       <Intestazione eyebrow="Impostazioni" titolo="Stato del sistema" />
+      <div className="contents @5xl:block @5xl:columns-2 @5xl:gap-8 @5xl:*:mb-8 @5xl:*:break-inside-avoid">
       <Riga titolo={avvisi.data?.avvisi.length ? `Avvisi (${avvisi.data.avvisi.length})` : "Avvisi"} href="/impostazioni/avvisi" />
       <Sezione titolo="Collegamenti" coda={rossi ? `${rossi} da controllare` : undefined}>
         <ul className="grid grid-cols-1 gap-2">
@@ -64,6 +67,7 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
         <ul className="grid grid-cols-1 gap-2">{VOCI.map((v) => <li key={v.href}><Riga titolo={v.titolo} href={v.href} /></li>)}</ul>
         <Pulsante variante="fantasma" className="justify-self-start" onClick={onEsci}>Esci dall'account</Pulsante>
       </Sezione>
+      </div>
     </div>
   );
 }

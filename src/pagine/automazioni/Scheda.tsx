@@ -40,8 +40,8 @@ export function SchedaAutomazione({ id }: { id: string }) {
     onSuccess: () => { toast.success("Automazione attiva"); ricarica(); },
     onError: (e) => toast.error(e.message),
   });
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:px-0"><Skeleton righe={8} /></div>;
+  if (q.error) return <div className="p-4 md:px-0"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const a = q.data!;
   // Voce dello stato legata a questa scheda (battito esterno): il passo dell'ultimo errore evidenzia il passaggio rotto.
   const voce = stato.data?.find((v) => v.automationId === id);
@@ -62,7 +62,7 @@ export function SchedaAutomazione({ id }: { id: string }) {
     if (c !== a.monthlyCostCents) patch.mutate({ monthlyCostCents: c });
   };
   return (
-    <div key={a.updatedAt} className="mx-auto grid max-w-[1100px] gap-6 p-4 pb-28">
+    <div key={a.updatedAt} className="grid gap-6 p-4 pb-28 md:px-0">
       <Intestazione titolo={a.name} eyebrow="Automazione">
         {anonimo ? <p className="text-corpo">{nomeCliente(a, true)}</p> : (
           <Link to={`/commerciale/clienti/${a.clientId}`} className="flex min-h-11 w-fit items-center gap-2 text-corpo hover:underline">
@@ -72,6 +72,9 @@ export function SchedaAutomazione({ id }: { id: string }) {
         {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
         <p className="flex items-center gap-2 text-secondaria"><Punto colore={a.status === "attiva" ? "verde" : a.status === "in_costruzione" ? "giallo" : "grigio"} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
       </Intestazione>
+      {/* Sul computer largo: stato e flusso a sinistra, i dati della scheda a destra (in due colonne quando c'è spazio). */}
+      <div className="grid gap-6 @5xl:grid-cols-2 @5xl:items-start @7xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="grid gap-6">
       {voce && (
         <Link to="/automazioni/stato" className="grid max-w-[720px] gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3 hover:bg-crema">
           <span className="flex items-center gap-2 text-corpo font-semibold"><Punto colore={voce.colore} etichetta={ETICHETTE_COLORE[voce.colore]} />{`Stato: ${ETICHETTE_COLORE[voce.colore].toLowerCase()}`}</span>
@@ -85,7 +88,8 @@ export function SchedaAutomazione({ id }: { id: string }) {
           : <p className="text-secondaria text-grigio">Il flusso non è ancora descritto.</p>}
         <Pulsante variante="secondario" className="self-start" onClick={() => setModifica(true)}>Modifica passaggi</Pulsante>
       </Sezione>
-      <div className="grid max-w-[720px] gap-6">
+      </div>
+      <div className="grid max-w-[720px] gap-6 @5xl:max-w-none @7xl:grid-cols-2 @7xl:items-start">
       <Sezione titolo="Cosa fa">
         <Selettore<Famiglia> etichetta="Famiglia" opzioni={[...FAMIGLIE]} valore={(a.family as Famiglia | null) ?? null} onCambia={(v) => patch.mutate({ family: v })} />
       </Sezione>
@@ -105,10 +109,13 @@ export function SchedaAutomazione({ id }: { id: string }) {
           <Riga titolo={a.proposta ?? "Proposta"} href={`/commerciale/proposte/${a.proposalId}`} />
         </Sezione>
       )}
+      <div className="grid @7xl:col-span-2">
       <Sezione titolo="Note">
         {a.description && <AreaTesto etichetta="Descrizione" cresce defaultValue={a.description} onBlur={(e) => alBlur("description", e.target.value)} />}
         <AreaTesto etichetta="Note" cresce defaultValue={a.notes ?? ""} onBlur={(e) => alBlur("notes", e.target.value)} />
       </Sezione>
+      </div>
+      </div>
       </div>
       {passo && passiQ.data && <FoglioPasso passo={passo} numero={ordinaFlusso(passiQ.data).sigle.get(passo.id) ?? ""} onChiudi={() => setPasso(null)} />}
       {modifica && <FoglioPassaggi automazioneId={id} iniziali={passiQ.data ?? []} onChiudi={() => setModifica(false)} />}

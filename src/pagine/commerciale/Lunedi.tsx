@@ -72,9 +72,12 @@ export function Lunedi() {
   const precedente = r.commento != null && COMMENTO_NUOVO[r.commentoStato] != null;
   const statoCommento = precedente ? COMMENTO_NUOVO[r.commentoStato] : COMMENTO[r.commentoStato];
   return (
-    <div className="mx-auto flex max-w-[720px] flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 p-4 md:p-0 md:pb-8">
       <Intestazione titolo="Lunedì" numero={n.arrivati} coda="lead" eyebrow={`Settimana ${conArticolo("dal", partiRoma(n.da).giorno, GIORNO_MESE.format(n.da))} ${conArticolo("al", partiRoma(n.a - 1).giorno, GIORNO_MESE.format(n.a - 1))}`} />
       <SegmentiOggi attivo="lunedi" />
+      {/* Schermo largo: a sinistra numeri, soldi, decisioni e commento; a destra l'elenco (lungo) di ciò che è fermo. */}
+      <div className="flex flex-col gap-6 @5xl:grid @5xl:grid-cols-2 @5xl:grid-rows-[auto_auto_auto_auto_1fr] @5xl:items-start @5xl:gap-x-8">
+      <div className="@5xl:col-start-1">
       <Gruppo titolo="Numeri della settimana">
         <Voce nome="Lead arrivati" numero={n.arrivati} />
         {n.perFonte.map((f) => <Voce key={f.source} nome={f.source === "manuale" ? "Di cui a mano" : `Di cui da ${SOURCE_LABELS[f.source] ?? f.source}`} numero={f.n} />)}
@@ -84,7 +87,8 @@ export function Lunedi() {
         <Voce nome="Proposte" numero={n.proposte} />
         <Voce nome="Vinti" numero={n.vinti} />
       </Gruppo>
-      <section className="flex flex-col gap-2">
+      </div>
+      <section className="flex flex-col gap-2 @5xl:col-start-2 @5xl:row-span-5 @5xl:row-start-1">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-display text-titolo-blocco">Cosa è fermo</h2>
           <span className="text-meta text-grigio tabular-nums">{fermi}</span>
@@ -96,11 +100,13 @@ export function Lunedi() {
           </div>
         )}
       </section>
+      <div className="@5xl:col-start-1">
       <Gruppo titolo="Soldi">
         <Voce nome="Ricorrente firmato" numero={`${euro(n.ricorrenteCents)} su ${euro(n.obiettivoCents)}`} />
         <Voce nome="Spesa ads del mese" numero={euro(n.spesaAdsMeseCents)} />
       </Gruppo>
-      <section className="flex flex-col gap-3">
+      </div>
+      <section className="flex flex-col gap-3 @5xl:col-start-1">
         <h2 className="font-display text-titolo-blocco">Tre decisioni</h2>
         {decisioni.map((d, i) => (
           <AreaTesto
@@ -115,7 +121,7 @@ export function Lunedi() {
           />
         ))}
       </section>
-      <section className="flex flex-col gap-2">
+      <section className="flex flex-col gap-2 @5xl:col-start-1">
         <h2 className="font-display text-titolo-blocco">Commento di Claude</h2>
         {statoCommento && <p className="text-secondaria text-grigio">{statoCommento}</p>}
         {precedente && <p className="text-meta text-grigio">Commento precedente</p>}
@@ -125,6 +131,7 @@ export function Lunedi() {
           <div><Pulsante variante="secondario" inCorso={commento.isPending} onClick={() => commento.mutate()}>{r.commento ? "Riscrivi il commento" : "Scrivi il commento"}</Pulsante></div>
         )}
       </section>
+      </div>
       {chiusa ? (
         <p className="text-meta text-grigio">Chiusa da {nomeDi(r.chiusaDa)} {momento(r.chiusaAt!)}</p>
       ) : (

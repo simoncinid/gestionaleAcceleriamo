@@ -7,8 +7,9 @@ export function Utenti() {
   const u = useUsers();
   const me = useMe();
   return (
-    <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-28">
-      <Intestazione eyebrow="Impostazioni" titolo="Utenti e profilo" />
+    // Sul largo utenti e profilo affiancati.
+    <div className="grid items-start gap-8 p-4 pb-28 md:px-0 md:pt-0 @5xl:grid-cols-2">
+      <div className="@5xl:col-span-full"><Intestazione eyebrow="Impostazioni" titolo="Utenti e profilo" /></div>
       <section aria-label="Utenti" className="grid gap-3">
         <h2 className="font-display text-titolo-card">Utenti</h2>
         {u.isLoading ? <Skeleton righe={2} /> : u.error ? <Errore errore={u.error} onRiprova={() => void u.refetch()} /> : (

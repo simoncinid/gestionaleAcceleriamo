@@ -71,8 +71,8 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
   const intestazione = (n?: number) => (
     <Intestazione titolo="Call" numero={n} coda="questa settimana" eyebrow={`Settimana ${conArticolo("dal", partiRoma(lunedi).giorno, String(partiRoma(lunedi).giorno))} ${conArticolo("al", domenica.giorno, String(domenica.giorno))}`} />
   );
-  if (q.isLoading) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Skeleton righe={6} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[1100px] p-4">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:p-0 md:pb-8">{intestazione()}<Skeleton righe={6} /></div>;
+  if (q.error) return <div className="p-4 md:p-0 md:pb-8">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
 
   const tutte = q.data ?? [];
   const settimana = tutte.filter((k) => k.scheduledAt >= lunedi);
@@ -89,12 +89,14 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1100px] flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 p-4 md:p-0 md:pb-8">
       {intestazione(settimana.length)}
       {settimana.length === 0 && daCompletare.length === 0 && (
         <StatoVuoto titolo="Nessuna call questa settimana" testo="Le call fissate dal foglio dell'esito o dalla scheda lead compaiono qui." />
       )}
       {settimana.length > 0 && inAgenda.length === 0 && <p className="text-secondaria text-grigio">Nessun'altra call in programma questa settimana.</p>}
+      {/* Sullo schermo largo i giorni stanno affiancati come colonne di un'agenda. */}
+      <div className="flex flex-col gap-6 empty:hidden @5xl:grid @5xl:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] @5xl:items-start @5xl:gap-x-8">
       {[...giorni.entries()].map(([g, ks]) => (
         <Gruppo key={g} titolo={titoloGiorno(g, oggi)} n={ks.length}>
           {ks.map((k) => (
@@ -112,10 +114,11 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
         <Gruppo titolo="Da completare" n={daCompletare.length}>
           {daCompletare.map((k) => (
             <BloccoCall key={k.id} k={k} secondaria={`Call di ${k.kind}, ${momento(k.scheduledAt, ora)}`} meta={k.outcome ? "Mancano le note" : "Manca l'esito"} onApri={() => setAperta(k)}
-              azione={<Pulsante variante="secondario" misura="sm" onClick={() => setAperta(k)}>{k.outcome ? "Note" : "Esito"}</Pulsante>} />
+              azione={<Pulsante variante="secondario" onClick={() => setAperta(k)}>{k.outcome ? "Note" : "Esito"}</Pulsante>} />
           ))}
         </Gruppo>
       )}
+      </div>
       {aperta && <FoglioCall key={aperta.id} k={aperta} onChiudi={() => setAperta(null)} />}
     </div>
   );

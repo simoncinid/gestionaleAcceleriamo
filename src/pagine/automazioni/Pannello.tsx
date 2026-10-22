@@ -42,26 +42,29 @@ export function Pannello({ ora: oraFissa }: { ora?: number } = {}) {
   const anonimo = useAnonimo();
   const eyebrow = oggiLungo(ora);
   const interruttore = <Interruttore etichetta="Nomi dei clienti nascosti" aiuto="Settore e città al posto del nome, per mostrare lo schermo" acceso={anonimo} onCambia={setAnonimo} />;
-  if (q.isLoading) return <div className="mx-auto grid max-w-[1100px] gap-6 p-4"><Intestazione titolo="Automazioni" eyebrow={eyebrow} />{interruttore}<Skeleton righe={6} /></div>;
-  if (q.error) return <div className="mx-auto grid max-w-[1100px] gap-6 p-4"><Intestazione titolo="Automazioni" eyebrow={eyebrow} />{interruttore}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="grid gap-6 p-4 md:px-0"><Intestazione titolo="Automazioni" eyebrow={eyebrow} />{interruttore}<Skeleton righe={6} /></div>;
+  if (q.error) return <div className="grid gap-6 p-4 md:px-0"><Intestazione titolo="Automazioni" eyebrow={eyebrow} />{interruttore}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const { automazioni, totali } = q.data!;
   const vive = automazioni.filter((a) => a.status !== "dismessa");
   const dismesse = automazioni.filter((a) => a.status === "dismessa");
   return (
-    <div className="mx-auto grid max-w-[1100px] gap-6 p-4">
+    <div className="grid gap-6 p-4 md:px-0">
       <Intestazione titolo="Automazioni" numero={totali.attive} coda={totali.attive === 1 ? "attiva" : "attive"} eyebrow={eyebrow} />
-      {interruttore}
-      <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
-        <p className="text-corpo tabular-nums">{totali.attive === 1 ? "1 attiva" : `${totali.attive} attive`}</p>
-        <p className="text-corpo tabular-nums">{`${totali.inCostruzione} in costruzione`}</p>
-        <p className="text-corpo tabular-nums">{`${euro(totali.costiViviCents)} di costi vivi al mese`}</p>
+      {/* Sul computer largo riepilogo e interruttore stanno affiancati, sopra la griglia delle automazioni. */}
+      <div className="grid gap-6 @5xl:grid-cols-2 @5xl:items-start">
+        {interruttore}
+        <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
+          <p className="text-corpo tabular-nums">{totali.attive === 1 ? "1 attiva" : `${totali.attive} attive`}</p>
+          <p className="text-corpo tabular-nums">{`${totali.inCostruzione} in costruzione`}</p>
+          <p className="text-corpo tabular-nums">{`${euro(totali.costiViviCents)} di costi vivi al mese`}</p>
+        </div>
       </div>
       {vive.length === 0 && <StatoVuoto titolo="Nessuna automazione" testo="La prima nasce dal +." />}
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{vive.map((a) => <li key={a.id}><CardAutomazione a={a} anonimo={anonimo} /></li>)}</ul>
+      <ul className="grid gap-3 sm:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4">{vive.map((a) => <li key={a.id}><CardAutomazione a={a} anonimo={anonimo} /></li>)}</ul>
       {dismesse.length > 0 && (
         <details>
           <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold">{`Dismesse, ${dismesse.length}`}</summary>
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{dismesse.map((a) => <li key={a.id}><CardAutomazione a={a} anonimo={anonimo} /></li>)}</ul>
+          <ul className="grid gap-3 sm:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4">{dismesse.map((a) => <li key={a.id}><CardAutomazione a={a} anonimo={anonimo} /></li>)}</ul>
         </details>
       )}
     </div>

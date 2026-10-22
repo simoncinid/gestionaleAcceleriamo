@@ -22,20 +22,24 @@ export function Lavori({ ora: oraFissa }: { ora?: number } = {}) {
   const me = useMe();
   const eyebrow = oggiLungo(ora);
   const nome = (t: TaskRiga) => (chi === "tutte" && t.assigneeId !== me?.id ? (utenti.data?.find((u) => u.id === t.assigneeId)?.name ?? "Senza responsabile") : undefined);
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Lavori" eyebrow={eyebrow} /><Skeleton righe={5} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Lavori" eyebrow={eyebrow} /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:px-0"><Intestazione titolo="Lavori" eyebrow={eyebrow} /><Skeleton righe={5} /></div>;
+  if (q.error) return <div className="p-4 md:px-0"><Intestazione titolo="Lavori" eyebrow={eyebrow} /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const task = q.data!;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-8">
+    <div className="grid gap-6 p-4 pb-8 md:px-0">
+      {/* Sul computer largo il filtro sta accanto al titolo e i tre gruppi diventano colonne affiancate. */}
+      <div className="grid gap-6 @5xl:grid-cols-[1fr_auto] @5xl:items-end">
       <Intestazione titolo="Lavori" numero={task.length} coda="da fare" eyebrow={eyebrow} />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 @5xl:pb-1">
         <span className="text-secondaria text-grigio">Di chi</span>
         <div className="flex gap-2" role="group" aria-label="Di chi">
           <Chip selezionato={chi === "mie"} onClick={() => setChi("mie")}>Mie</Chip>
           <Chip selezionato={chi === "tutte"} onClick={() => setChi("tutte")}>Tutte</Chip>
         </div>
       </div>
+      </div>
       {task.length === 0 && <StatoVuoto titolo="Niente da fare" testo="Le task di un lavoro nascono da sole. Una a mano nasce dal +." />}
+      <div className="grid gap-6 @5xl:grid-cols-[repeat(auto-fit,minmax(320px,1fr))] @5xl:items-start">
       {GRUPPI.map((g) => {
         const righe = task.filter((t) => gruppoTask(t.dueAt, ora) === g.id);
         if (!righe.length) return null;
@@ -51,6 +55,7 @@ export function Lavori({ ora: oraFissa }: { ora?: number } = {}) {
           </section>
         );
       })}
+      </div>
     </div>
   );
 }

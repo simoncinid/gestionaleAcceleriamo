@@ -38,8 +38,8 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
     onSuccess: (_, s) => { toast.success(`Proposta segnata ${STATI[s].toLowerCase()}`); setChiede(false); aggiornaDopoProposta(qc, id, leadId); },
     onError: (e) => toast.error(e.message),
   });
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={6} /></div>;
-  if (q.error || !q.data) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:p-0 md:pb-8"><Skeleton righe={6} /></div>;
+  if (q.error || !q.data) return <div className="p-4 md:p-0 md:pb-8"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
 
   const { proposta: p, ricontatti, storico } = q.data;
   const l = lead.data?.lead;
@@ -50,11 +50,14 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
   const scrivi = dovuto && l && (l.email || l.phone);
 
   return (
-    <div className="mx-auto flex max-w-[720px] flex-col gap-5 p-4">
+    <div className="flex flex-col gap-5 p-4 md:p-0 md:pb-8">
       <Intestazione titolo={p.company || p.number} eyebrow={p.number}>
         <p><Tag>{STATI[p.status]}</Tag></p>
       </Intestazione>
 
+      {/* Schermo largo: a sinistra prezzo, documenti e azioni; a destra lo storico. */}
+      <div className="flex flex-col gap-5 @4xl:grid @4xl:grid-cols-2 @4xl:items-start @4xl:gap-x-8">
+      <div className="flex flex-col gap-5">
       <Blocco titolo="Prezzo">
         <p className="text-corpo tabular-nums">{prezzo(p)}</p>
         {p.hoursEstimate != null && <p className="text-secondaria text-grigio tabular-nums">{p.hoursEstimate} ore stimate</p>}
@@ -111,6 +114,7 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
         {p.leadId && <Link to={`/commerciale/lead/${p.leadId}`} className="self-start py-2 text-secondaria font-semibold underline underline-offset-4">Apri la scheda del lead</Link>}
       </div>
 
+      </div>
       <Blocco titolo="Storico">
         {storico.length === 0 ? <p className="text-secondaria text-grigio">Nessuna voce.</p> : (
           <ul className="flex flex-col gap-3">
@@ -123,6 +127,7 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
           </ul>
         )}
       </Blocco>
+      </div>
 
       {foglio === "accettata" && <FoglioAccettazione proposta={p} onChiudi={() => setFoglio(null)} />}
       {foglio === "pdf" && <FoglioLinkPdf proposta={p} onChiudi={() => setFoglio(null)} />}

@@ -17,15 +17,15 @@ const RigaCliente = ({ c }: { c: ClienteRiga }) => (
 const Gruppo = ({ titolo, clienti }: { titolo: string; clienti: ClienteRiga[] }) => clienti.length === 0 ? null : (
   <section className="grid gap-2">
     <h2 className="text-etichetta uppercase text-grigio">{titolo}</h2>
-    <ul className="grid grid-cols-1 gap-2">{clienti.map((c) => <li key={c.id}><RigaCliente c={c} /></li>)}</ul>
+    <ul className="grid grid-cols-1 gap-2 @3xl:grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">{clienti.map((c) => <li key={c.id}><RigaCliente c={c} /></li>)}</ul>
   </section>
 );
 
 // Spec 6.10: "per chi lavoriamo, e quanto ci paga ogni mese". Il cliente nuovo nasce dal "+".
 export function Clienti() {
   const q = useClienti();
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Clienti" eyebrow="Per chi lavoriamo" /><Skeleton righe={5} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Clienti" eyebrow="Per chi lavoriamo" /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:p-0 md:pb-8"><Intestazione titolo="Clienti" eyebrow="Per chi lavoriamo" /><Skeleton righe={5} /></div>;
+  if (q.error) return <div className="p-4 md:p-0 md:pb-8"><Intestazione titolo="Clienti" eyebrow="Per chi lavoriamo" /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   // Il canone in pausa resta "a canone": il cliente c'è ancora, il canone riprende. Prima gli attivi.
   // Come nel prototipo 18, i fuori perimetro (non cessati) hanno il loro gruppo.
   const nostri = q.data!.filter((c) => c.scope !== "fuori_perimetro" && c.stato !== "cessato");
@@ -34,7 +34,7 @@ export function Clienti() {
   const fuori = q.data!.filter((c) => c.scope === "fuori_perimetro" && c.stato !== "cessato");
   const cessati = q.data!.filter((c) => c.stato === "cessato");
   return (
-    <div className="mx-auto grid max-w-[720px] gap-4 p-4">
+    <div className="grid gap-4 p-4 md:p-0 md:pb-8">
       <Intestazione titolo="Clienti" numero={q.data!.length} eyebrow="Per chi lavoriamo" />
       {q.data!.length === 0 && <StatoVuoto titolo="Nessun cliente" testo="Il primo nasce dal +." />}
       <Gruppo titolo="A canone" clienti={aCanone} />
@@ -43,7 +43,7 @@ export function Clienti() {
       {cessati.length > 0 && (
         <details>
           <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold">{`Cessati, ${cessati.length}`}</summary>
-          <ul className="grid gap-2 pb-2">{cessati.map((c) => <li key={c.id}><RigaCliente c={c} /></li>)}</ul>
+          <ul className="grid gap-2 pb-2 @3xl:grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">{cessati.map((c) => <li key={c.id}><RigaCliente c={c} /></li>)}</ul>
         </details>
       )}
     </div>

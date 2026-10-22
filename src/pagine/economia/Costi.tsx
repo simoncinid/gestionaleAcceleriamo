@@ -7,7 +7,7 @@ import { meseRoma } from "../../../worker/lib/roma";
 import { useCosti } from "../dati-gestione";
 
 const ListaCosti = ({ costi, ora }: { costi: CostoRiga[]; ora: number }) => (
-  <ul className="grid grid-cols-1 gap-2">
+  <ul className="grid grid-cols-1 gap-2 @5xl:grid-cols-2 @7xl:grid-cols-3">
     {costi.map((k) => (
       <li key={k.id}>
         <Riga titolo={k.note ?? k.automazione ?? k.cliente ?? ETICHETTE_COSTO[k.category]} secondaria={euro(k.amountCents)} meta={giorno(k.date, ora)} destra={<Tag>{ETICHETTE_COSTO[k.category]}</Tag>} />
@@ -21,11 +21,11 @@ export function Costi({ ora: oraFissa }: { ora?: number } = {}) {
   const ora = useOra(60_000, oraFissa);
   const q = useCosti();
   const eyebrow = nomeMese(meseRoma(ora));
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Costi" eyebrow={eyebrow} /><Skeleton righe={6} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Intestazione titolo="Costi" eyebrow={eyebrow} /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:px-0 md:pt-0"><Intestazione titolo="Costi" eyebrow={eyebrow} /><Skeleton righe={6} /></div>;
+  if (q.error) return <div className="p-4 md:px-0 md:pt-0"><Intestazione titolo="Costi" eyebrow={eyebrow} /><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const [corrente, ...prima] = q.data!;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-4 p-4">
+    <div className="grid gap-4 p-4 md:px-0 md:pt-0 md:pb-8">
       <Intestazione titolo="Costi" numero={euro(corrente.totaleCents)} coda="questo mese" eyebrow={eyebrow} />
       {corrente.costi.length === 0 ? <StatoVuoto titolo="Nessun costo questo mese" testo="Il costo nuovo nasce dal +." /> : <ListaCosti costi={corrente.costi} ora={ora} />}
       {prima.filter((m) => m.costi.length > 0).map((m) => (

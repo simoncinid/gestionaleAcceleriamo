@@ -20,16 +20,18 @@ export function Cruscotto({ ora: oraFissa }: { ora?: number } = {}) {
   const q = useCruscotto();
   const [aperta, setAperta] = useState<FatturaRiga | null>(null);
   const intestazione = (ricorrente?: number) => <Intestazione titolo="Economia" numero={ricorrente != null ? euro(ricorrente) : undefined} coda="al mese" eyebrow={nomeMese(meseRoma(ora))} />;
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4">{intestazione()}<Skeleton righe={6} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:px-0 md:pt-0">{intestazione()}<Skeleton righe={6} /></div>;
+  if (q.error) return <div className="p-4 md:px-0 md:pt-0">{intestazione()}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const d = q.data!;
   const quota = Math.min(100, Math.round((d.ricorrenteCents / Math.max(1, d.obiettivoCents)) * 100));
   const mancano = d.obiettivoCents - d.ricorrenteCents;
   const daFare = [...d.inRitardo, ...(d.inScadenzaOggi ?? [])];
   const [prima, ...altre] = daFare;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-6 p-4">
-      {intestazione(d.ricorrenteCents)}
+    // Su schermo largo: in alto le due cose che contano (cosa incassare, a che punto è il ricorrente) affiancate,
+    // sotto i tre numeri di contorno in fila. Sul telefono resta una colonna.
+    <div className="grid items-start gap-6 p-4 md:px-0 md:pt-0 md:pb-8 @5xl:grid-cols-2">
+      <div className="@5xl:col-span-full">{intestazione(d.ricorrenteCents)}</div>
       {prima && (
         <Sezione titolo="Da fare" coda={daFare.length > 1 ? `${daFare.length} da incassare` : undefined}>
           <Carta tinta>
@@ -59,6 +61,7 @@ export function Cruscotto({ ora: oraFissa }: { ora?: number } = {}) {
           <p className="text-secondaria text-grigio tabular-nums">{mancano > 0 ? `Mancano ${euro(mancano)} all'obiettivo` : "Obiettivo raggiunto"}</p>
         </Carta>
       </Sezione>
+      <div className={`grid items-start gap-6 @5xl:col-span-full @5xl:grid-cols-3`}>
       <Sezione titolo="Setup incassati">
         <Carta>
           <p className="text-corpo tabular-nums">{`Nel mese: ${euro(d.setupMeseCents)}`}</p>
@@ -71,6 +74,7 @@ export function Cruscotto({ ora: oraFissa }: { ora?: number } = {}) {
       <Sezione titolo="Costi del mese">
         <Riga titolo={euro(d.costiMeseCents)} secondaria="Vedi i costi" href="/economia/costi" />
       </Sezione>
+      </div>
       {aperta && <FoglioFattura f={aperta} ora={ora} onChiudi={() => setAperta(null)} />}
     </div>
   );

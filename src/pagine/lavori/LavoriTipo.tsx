@@ -99,14 +99,14 @@ function FoglioLavoroTipo({ iniziale, onChiudi }: { iniziale: Bozza; onChiudi: (
 export function LavoriTipo() {
   const q = useModelliLavoro();
   const [aperto, setAperto] = useState<Bozza | null>(null);
-  if (q.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={4} /></div>;
-  if (q.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="p-4 md:px-0 md:pt-0"><Skeleton righe={4} /></div>;
+  if (q.error) return <div className="p-4 md:px-0 md:pt-0"><Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const modelli = q.data!;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-4 p-4 pb-28">
+    <div className="grid gap-4 p-4 pb-28 md:px-0 md:pt-0">
       <Intestazione eyebrow="Impostazioni" titolo="Lavori tipo" />
       {modelli.length === 0 && <StatoVuoto titolo="Nessun lavoro tipo" testo="Il primo nasce dal link qui sotto." />}
-      <ul className="grid gap-2">
+      <ul className="grid gap-2 @5xl:grid-cols-2 @7xl:grid-cols-3">
         {modelli.map((m) => (
           <li key={m.id}><Riga titolo={m.name} secondaria={TIPI_LAVORO[m.kind]} meta={`${m.tasks.length} task standard`} onClick={() => setAperto(daModello(m))} /></li>
         ))}

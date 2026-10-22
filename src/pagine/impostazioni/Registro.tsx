@@ -20,14 +20,14 @@ export function Registro() {
   });
   const voci = q.data?.pages.flatMap((p) => p.voci) ?? [];
   return (
-    <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">
+    <div className="grid gap-6 p-4 pb-28 md:px-0 md:pt-0">
       <Intestazione eyebrow="Dati" titolo="Registro delle modifiche" />
       {q.isLoading ? <Skeleton righe={8} /> : q.error ? <Errore errore={q.error} onRiprova={() => void q.refetch()} /> : voci.length === 0 ? (
         <StatoVuoto titolo="Nessuna modifica registrata" testo="Qui compaiono le modifiche a lead, impostazioni ed economia, con chi le ha fatte." />
       ) : (
         <ul className="grid divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio">
           {voci.map((v) => (
-            <li key={v.id} className="grid gap-0.5 px-4 py-3">
+            <li key={v.id} className="grid gap-0.5 px-4 py-3 @5xl:grid-cols-[minmax(0,1fr)_14rem_14rem] @5xl:items-baseline @5xl:gap-6">
               <span className="text-secondaria text-ink">{`${ENTITA[v.entita] ?? v.entita}: ${v.azione}`}</span>
               <span className="text-meta text-grigio">{v.chi}</span>
               <span className="text-meta text-grigio tabular-nums">{momento(v.at)}</span>

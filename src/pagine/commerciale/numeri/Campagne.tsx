@@ -115,15 +115,17 @@ export function Campagne({ ora = Date.now() }: { ora?: number }) {
   const aperta = (c: string) => toccate[c] ?? d?.campagne.length === 1;
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        <Selettore etichetta="Mese" opzioni={mesi} valore={mese} onCambia={(m) => { setMese(m); setToccate({}); }} />
+      {/* Sul computer mese e spesa stanno su una riga; il selettore non si allunga per tutta la pagina. */}
+      <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-center">
+        <div className="@3xl:w-sm"><Selettore etichetta="Mese" opzioni={mesi} valore={mese} onCambia={(m) => { setMese(m); setToccate({}); }} /></div>
         {d && <div><Pulsante variante="secondario" onClick={() => setSpesaAperta(true)}>Scrivi la spesa del mese</Pulsante></div>}
       </div>
       {q.isLoading ? <Skeleton righe={6} /> : q.error || !d ? <Errore errore={q.error} onRiprova={() => void q.refetch()} /> : d.campagne.length === 0 ? (
         <StatoVuoto titolo="Nessun lead da campagne nel mese" testo="I lead arrivano da Meta e dal foglio di Andrea con il nome della campagna." />
       ) : (
         <>
-          <div className="flex flex-col gap-3">
+          {/* Una campagna per colonna sul computer: il dettaglio si apre sotto la sua riga senza spostare le altre colonne. */}
+          <div className="grid items-start gap-3 @5xl:grid-cols-2 @5xl:gap-x-8 @7xl:grid-cols-3">
             {d.campagne.map((c, i) => (
               <section key={c.campagna} className="flex flex-col gap-2">
                 <RigaChiusa c={c} aperta={aperta(c.campagna)} idDettaglio={`${idBase}-${i}`} onTocca={() => setToccate((t) => ({ ...t, [c.campagna]: !aperta(c.campagna) }))} />

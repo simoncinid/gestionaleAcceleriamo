@@ -118,21 +118,22 @@ export function IntegrazioneDettaglio({ ora = Date.now() }: { ora?: number } = {
   const { key = "" } = useParams();
   const s = useStatoSistema();
   const imp = useImpostazioni();
-  if (s.isLoading || imp.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
+  if (s.isLoading || imp.isLoading) return <div className="p-4 md:px-0 md:pt-0"><Skeleton righe={8} /></div>;
   const errore = s.error ?? imp.error;
-  if (errore || !s.data || !imp.data) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={errore} onRiprova={() => { void s.refetch(); void imp.refetch(); }} /></div>;
+  if (errore || !s.data || !imp.data) return <div className="p-4 md:px-0 md:pt-0"><Errore errore={errore} onRiprova={() => { void s.refetch(); void imp.refetch(); }} /></div>;
   const i = s.data.integrazioni.find((x) => x.key === key);
   if (!i || key === "giro") return <Navigate to="/impostazioni/integrazioni" replace />;
   const d = s.data;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">
-      <Intestazione eyebrow="Integrazioni" titolo={i.etichetta} />
+    // Sul largo lo stato sta a sinistra e la configurazione a destra, con righe di lettura contenute.
+    <div className="grid items-start gap-6 p-4 pb-28 md:px-0 md:pt-0 @5xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] @5xl:gap-x-8">
+      <div className="@5xl:col-span-full"><Intestazione eyebrow="Integrazioni" titolo={i.etichetta} /></div>
       <div className="grid gap-1">
         <p className="flex items-center gap-2 text-corpo"><Punto colore={COLORE[i.stato]} etichetta={ETICHETTA_STATO[i.stato]} />{ETICHETTA_STATO[i.stato]}</p>
         <p className="text-secondaria text-grigio">{rigaStato(i, ora)}</p>
         {i.stato === "errore" && i.ultimaOk != null && <p className="text-meta text-grigio">{`Ultima volta riuscita ${momento(i.ultimaOk, ora)}`}</p>}
       </div>
-      <div className="grid gap-3 rounded-blocco border border-sabbia bg-avorio p-4">
+      <div className="grid gap-3 rounded-blocco border border-sabbia bg-avorio p-4 @5xl:max-w-[48rem]">
         {key === "meta" && <Meta d={d} i={i} />}
         {key === "foglio" && <SezioneFoglio d={d} foglio={imp.data.foglio} ora={ora} />}
         {key === "aggancio" && <SezioneAggancio d={d} ora={ora} />}

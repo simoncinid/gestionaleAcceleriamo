@@ -14,12 +14,12 @@ export function Cestino() {
     onError: (e) => toast.error(e.message),
   });
   return (
-    <div className="mx-auto flex max-w-[720px] flex-col gap-4 p-4">
+    <div className="flex flex-col gap-4 p-4 md:px-0 md:pt-0 md:pb-8">
       <Intestazione titolo="Cestino" numero={c.data?.length || undefined} coda="lead" />
       {c.isLoading ? <Skeleton righe={4} /> : c.error ? <Errore errore={c.error} onRiprova={() => void c.refetch()} /> : c.data?.length === 0 ? (
         <StatoVuoto titolo="Il cestino è vuoto" testo="I lead messi nel cestino dalla scheda compaiono qui e si possono ripristinare." />
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="grid grid-cols-1 gap-2 @5xl:grid-cols-2 @7xl:grid-cols-3">
           {c.data?.map((l) => (
             <li key={l.id}>
               <Riga titolo={l.company} secondaria={l.deletedAt ? `Messo nel cestino ${trascorso(l.deletedAt)}` : undefined}

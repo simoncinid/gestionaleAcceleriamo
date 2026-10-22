@@ -15,9 +15,9 @@ export function Dati() {
   const r = q.data;
   const cestino = !r ? undefined : r.cestino === 0 ? "Vuoto" : `${r.cestino} lead: restano lì finché non li ripristini`;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-6 p-4 pb-28">
+    <div className="grid gap-6 p-4 pb-28 md:px-0 md:pt-0">
       <Intestazione eyebrow="Impostazioni" titolo="Dati" />
-      <ul className="grid grid-cols-1 gap-2">
+      <ul className="grid grid-cols-1 gap-2 @5xl:grid-cols-2 @7xl:grid-cols-3">
         <li><Riga titolo="Cestino" secondaria={cestino} href="/impostazioni/dati/cestino" /></li>
         <li><Riga titolo="Importa lead da CSV" secondaria="Con anteprima e controllo dei doppioni" href="/impostazioni/dati/importa" /></li>
         <li><Riga titolo="Esporta" secondaria="Lead, proposte, fatture in CSV" onClick={() => setEsporta(true)} /></li>

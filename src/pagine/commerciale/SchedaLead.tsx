@@ -100,8 +100,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
     onError: (e) => toast.error(e.message),
   });
 
-  if (d.isLoading) return <div className="mx-auto max-w-[1100px] p-4"><Skeleton righe={8} /></div>;
-  if (d.error || !d.data) return <div className="mx-auto max-w-[1100px] p-4"><Errore errore={d.error ?? new Error("Lead non trovato")} onRiprova={() => void d.refetch()} /></div>;
+  if (d.isLoading) return <div className="p-4 md:p-0 md:pb-8"><Skeleton righe={8} /></div>;
+  if (d.error || !d.data) return <div className="p-4 md:p-0 md:pb-8"><Errore errore={d.error ?? new Error("Lead non trovato")} onRiprova={() => void d.refetch()} /></div>;
   const { lead, activities, documents, duplicateOf } = d.data;
   const fase = fasi.data?.find((f) => f.id === lead.stageId);
   const responsabile = utenti.data?.find((u) => u.id === lead.ownerId)?.name;
@@ -110,7 +110,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const chiudi = () => { setFoglio(null); setChiede(null); };
 
   return (
-    <div className="mx-auto grid max-w-[1100px] gap-4 p-4 lg:grid-cols-2 lg:items-start lg:gap-6">
+    <div className="grid gap-4 p-4 md:p-0 md:pb-8 lg:grid-cols-2 lg:items-start lg:gap-6 @7xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.15fr)] @7xl:gap-8">
       <div className="flex min-w-0 flex-col gap-4">
         <header className="flex items-start gap-3">
           {/* Voce 41: si torna da dove si è venuti; aperta da un link diretto, la scheda torna alla Scaletta. */}
@@ -183,11 +183,15 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         </dl>
       </div>
 
-      <div className="flex min-w-0 flex-col gap-3">
+      {/* Sullo schermo largo la colonna destra si divide in due: appuntamenti e proposta | storico e dati. */}
+      <div className="flex min-w-0 flex-col gap-3 @7xl:contents">
+        <div className="flex min-w-0 flex-col gap-3">
         <div data-sezione="call"><SezioneCall leadId={lead.id} ora={ora} lead={lead} /></div>
         <div data-sezione="proposta"><SezioneProposta leadId={lead.id} /></div>
         <div data-sezione="scheda-azienda"><SezioneSchedaAzienda leadId={lead.id} manuale={lead.source === "manuale"} /></div>
 
+        </div>
+        <div className="flex min-w-0 flex-col gap-3">
         <Piega titolo="Storico" aperta riassunto={activities[0] ? `ultima voce ${momento(activities[0].createdAt, ora)}` : "nessuna voce"}>
           <Timeline leadId={lead.id} activities={activities} ora={ora} />
         </Piega>
@@ -212,6 +216,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
             </div>
           ) : <p className="text-secondaria text-grigio">Nessun lead con lo stesso telefono o email.</p>}
         </Piega>
+        </div>
       </div>
 
       {foglio === "esito" && <FoglioEsito lead={lead} onChiudi={chiudi} />}

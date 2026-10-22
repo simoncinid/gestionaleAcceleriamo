@@ -69,14 +69,14 @@ export function Modelli() {
   const m = useModelli();
   const fasi = useStages();
   const [aperto, setAperto] = useState<BozzaModello | null>(null);
-  if (m.isLoading || fasi.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={8} /></div>;
-  if (m.error) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={m.error} onRiprova={() => void m.refetch()} /></div>;
+  if (m.isLoading || fasi.isLoading) return <div className="p-4 md:px-0 md:pt-0"><Skeleton righe={8} /></div>;
+  if (m.error) return <div className="p-4 md:px-0 md:pt-0"><Errore errore={m.error} onRiprova={() => void m.refetch()} /></div>;
   const nomeFase = (id: string | null) => fasi.data?.find((f) => f.id === id)?.label;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-4 p-4">
+    <div className="grid gap-4 p-4 md:px-0 md:pt-0 md:pb-8">
       <Intestazione eyebrow="Impostazioni" titolo="Modelli" numero={m.data?.length || undefined} coda={m.data?.length === 1 ? "modello" : "modelli"} />
       {m.data?.length === 0 && <StatoVuoto titolo="Nessun modello" testo="Aggiungine uno qui sotto." />}
-      <ul className="grid grid-cols-1 gap-2">
+      <ul className="grid grid-cols-1 gap-2 @5xl:grid-cols-2 @7xl:grid-cols-3">
         {m.data?.map((t) => (
           <li key={t.id}>
             <Riga titolo={t.title} secondaria={t.channel === "email" ? "Email" : "WhatsApp"} meta={nomeFase(t.stageId) ? `Fase: ${nomeFase(t.stageId)}` : undefined} onClick={() => setAperto(bozzaModello(t))} />

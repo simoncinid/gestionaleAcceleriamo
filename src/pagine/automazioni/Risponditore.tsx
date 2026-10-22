@@ -171,16 +171,23 @@ export function Risponditore({ ora: oraFissa }: { ora?: number } = {}) {
   const q = useRisponditore();
   const [aperto, setAperto] = useState<Aperto>(null);
   const testata = <Intestazione titolo="Risponditore" eyebrow="Commenti di Instagram" />;
-  if (q.isLoading) return <div className="mx-auto grid max-w-[720px] gap-6 p-4">{testata}<Skeleton righe={6} /></div>;
-  if (q.error) return <div className="mx-auto grid max-w-[720px] gap-6 p-4">{testata}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="grid gap-6 p-4 md:px-0">{testata}<Skeleton righe={6} /></div>;
+  if (q.error) return <div className="grid gap-6 p-4 md:px-0">{testata}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const d = q.data!;
   return (
-    <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-12">
+    <div className="grid gap-8 p-4 pb-12 md:px-0">
       {testata}
-      <Account account={d.account} ora={ora} onCollega={() => setAperto("account")} />
-      <Campagne campagne={d.campagne} onApri={setAperto} onNuova={() => setAperto("nuova")} />
-      <Richieste richieste={d.richieste} ora={ora} />
-      <Registro eventi={d.eventi} ora={ora} />
+      {/* Sul computer largo: account e campagne a sinistra, richieste e registro a destra (in due colonne quando c'è spazio). */}
+      <div className="grid gap-8 @5xl:grid-cols-2 @5xl:items-start @7xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <div className="grid gap-8">
+          <Account account={d.account} ora={ora} onCollega={() => setAperto("account")} />
+          <Campagne campagne={d.campagne} onApri={setAperto} onNuova={() => setAperto("nuova")} />
+        </div>
+        <div className="grid gap-8 @7xl:grid-cols-2 @7xl:items-start">
+          <Richieste richieste={d.richieste} ora={ora} />
+          <Registro eventi={d.eventi} ora={ora} />
+        </div>
+      </div>
       {aperto === "account" && <FoglioAccount onChiudi={() => setAperto(null)} />}
       {aperto !== null && aperto !== "account" && (
         <FoglioCampagna campagna={aperto === "nuova" ? null : aperto} risorse={d.risorse} onChiudi={() => setAperto(null)} />

@@ -144,8 +144,11 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
   });
 
   return (
-    <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-28">
+    // Sul largo le sezioni scorrono in due colonne (CSS columns): l'ordine nel codice resta quello del telefono,
+    // quindi lettura e tasto Tab seguono lo stesso percorso. Sul telefono il contenitore si scioglie ("contents").
+    <div className="grid gap-8 p-4 pb-28 md:px-0 md:pt-0">
       <Intestazione eyebrow="Impostazioni" titolo="Fasi e regole" />
+      <div className="contents @5xl:block @5xl:columns-2 @5xl:gap-8 @5xl:*:mb-8 @5xl:*:break-inside-avoid">
       <Sezione titolo="Fasi">
         <p className="text-secondaria text-grigio">Tocca una fase per cambiarne nome, probabilità o azione proposta.</p>
         <ListaFasi fasi={fasi} regole={regole} aperta={faseAperta} setAperta={setFaseAperta} />
@@ -229,9 +232,10 @@ function ModuloRegole({ fasi, regole, imp, utenti }: { fasi: Stage[]; regole: Re
         <Campo etichetta="Moltiplicatore della proprietà, da 5 a 10" inputMode="decimal" value={b.moltiplicatore} onChange={(e) => setB({ ...b, moltiplicatore: e.target.value })} />
       </Sezione>
 
+      </div>
       {!faseAperta && !riordina && (
-        <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4">
-          <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva le regole</Pulsante>
+        <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4 @5xl:flex @5xl:justify-end">
+          <Pulsante variante="primario" misura="lg" className="w-full @5xl:w-auto @5xl:min-w-72" inCorso={salva.isPending} onClick={() => salva.mutate()}>Salva le regole</Pulsante>
         </div>
       )}
     </div>
@@ -243,8 +247,8 @@ export function Fasi() {
   const regole = useRegole();
   const imp = useImpostazioni();
   const utenti = useUsers();
-  if (fasi.isLoading || regole.isLoading || imp.isLoading || utenti.isLoading) return <div className="mx-auto max-w-[720px] p-4"><Skeleton righe={10} /></div>;
+  if (fasi.isLoading || regole.isLoading || imp.isLoading || utenti.isLoading) return <div className="p-4 md:px-0 md:pt-0"><Skeleton righe={10} /></div>;
   const errore = fasi.error ?? regole.error ?? imp.error ?? utenti.error;
-  if (errore) return <div className="mx-auto max-w-[720px] p-4"><Errore errore={errore} onRiprova={() => { void fasi.refetch(); void regole.refetch(); void imp.refetch(); void utenti.refetch(); }} /></div>;
+  if (errore) return <div className="p-4 md:px-0 md:pt-0"><Errore errore={errore} onRiprova={() => { void fasi.refetch(); void regole.refetch(); void imp.refetch(); void utenti.refetch(); }} /></div>;
   return <ModuloRegole fasi={fasi.data!} regole={regole.data!} imp={imp.data!} utenti={utenti.data!} />;
 }

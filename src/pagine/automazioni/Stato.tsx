@@ -175,22 +175,25 @@ export function StatoAutomazioni({ ora: oraFissa }: { ora?: number } = {}) {
   const q = useStato();
   const [aperto, setAperto] = useState<null | "nuova" | VoceStato>(null);
   const testata = <Intestazione titolo="Stato" eyebrow="Le automazioni, nostre e dei clienti" />;
-  if (q.isLoading) return <div className="mx-auto grid max-w-[720px] gap-6 p-4">{testata}<Skeleton righe={6} /></div>;
-  if (q.error) return <div className="mx-auto grid max-w-[720px] gap-6 p-4">{testata}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
+  if (q.isLoading) return <div className="grid gap-6 p-4 md:px-0">{testata}<Skeleton righe={6} /></div>;
+  if (q.error) return <div className="grid gap-6 p-4 md:px-0">{testata}<Errore errore={q.error} onRiprova={() => void q.refetch()} /></div>;
   const voci = q.data!;
   const per = (c: Colore[]) => voci.filter((v) => c.includes(v.colore));
   const guardare = per(["rosso", "giallo"]);
   const vanno = per(["verde"]);
   const spente = per(["grigio"]);
   return (
-    <div className="mx-auto grid max-w-[720px] gap-8 p-4 pb-12">
+    <div className="grid gap-8 p-4 pb-12 md:px-0">
       {testata}
+      {/* Sul computer largo: riepilogo in una colonna stretta a sinistra, le sezioni a destra (affiancate quando c'è spazio). */}
+      <div className="grid gap-8 @5xl:grid-cols-[minmax(260px,340px)_minmax(0,1fr)] @5xl:items-start">
       <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
         <p className="text-corpo tabular-nums">{per(["rosso"]).length === 1 ? "1 in errore" : `${per(["rosso"]).length} in errore`}</p>
         <p className="text-corpo tabular-nums">{`${per(["giallo"]).length} in ritardo`}</p>
         <p className="text-corpo tabular-nums">{vanno.length === 1 ? "1 funziona" : `${vanno.length} funzionano`}</p>
         <p className="text-corpo tabular-nums">{spente.length === 1 ? "1 spenta o mai partita" : `${spente.length} spente o mai partite`}</p>
       </div>
+      <div className="grid gap-8 @7xl:grid-cols-2 @7xl:items-start">
       <Sezione titolo="Da guardare" coda={guardare.length ? String(guardare.length) : undefined}>
         {guardare.length === 0 ? <StatoVuoto titolo="Niente da guardare" testo="Tutto quello che è acceso gira nei tempi." /> : <Elenco voci={guardare} ora={ora} onApri={setAperto} />}
       </Sezione>
@@ -203,6 +206,8 @@ export function StatoAutomazioni({ ora: oraFissa }: { ora?: number } = {}) {
           <Elenco voci={spente} ora={ora} onApri={setAperto} />
         </details>
       )}
+      </div>
+      </div>
       <Pulsante variante="primario" misura="lg" className="w-full sm:w-auto sm:justify-self-start" onClick={() => setAperto("nuova")}>Segui un'automazione esterna</Pulsante>
       {aperto === "nuova" && <FoglioNuova onChiudi={() => setAperto(null)} />}
       {aperto && aperto !== "nuova" && <FoglioVoce v={aperto} ora={ora} onChiudi={() => setAperto(null)} />}

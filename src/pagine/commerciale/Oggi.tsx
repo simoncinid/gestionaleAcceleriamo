@@ -96,9 +96,11 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
           <RigaLink titolo="La revisione della settimana è pronta" meta={`${revisione.data.numeri.arrivati} lead arrivati, ${revisione.data.numeri.fermi.length + revisione.data.numeri.proposteFerme.length} cose ferme`} href="/commerciale/oggi/lunedi" />
         </div>
       )}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-4">
+      {/* Tre colonne sullo schermo largo: adesso, lavori, nuovi e call | da fare | proposte e numeri.
+          Sotto i 1280 px di contenuto restano due colonne, sul telefono una sola nell'ordine di sempre. */}
+      <div className="grid grid-cols-1 gap-8 @4xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] @4xl:items-start @7xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-8 @7xl:grid @7xl:grid-cols-2 @7xl:grid-rows-[auto_auto_auto_auto_1fr] @7xl:items-start @7xl:gap-x-8">
+          <div className="flex flex-col gap-4 @7xl:col-start-1">
             {adesso ? (
               <BloccoAdesso voce={adesso} ora={ora}
                 onEsito={() => adesso.tipo === "lead" && setEsito(adesso)}
@@ -118,18 +120,23 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
             const domani = inizioGiornoRoma(ora + 36 * 3_600_000);
             const oggi = (lavori.data ?? []).filter((t) => t.dueAt != null && t.dueAt < domani);
             return (
-              <Gruppo titolo="Lavori da fare oggi" n={oggi.length}>
-                <ul className={elenco}>{oggi.map((t) => <RigaTask key={t.id} t={t} ora={ora} />)}</ul>
-              </Gruppo>
+              <div className="empty:hidden @7xl:col-start-1">
+                <Gruppo titolo="Lavori da fare oggi" n={oggi.length}>
+                  <ul className={elenco}>{oggi.map((t) => <RigaTask key={t.id} t={t} ora={ora} />)}</ul>
+                </Gruppo>
+              </div>
             );
           })()}
-          <Gruppo titolo="Lead nuovi da chiamare" n={d.nuovi.length}>
-            <ul className={elenco}>{d.nuovi.map(riga)}</ul>
-          </Gruppo>
+          <div className="empty:hidden @7xl:col-start-1">
+            <Gruppo titolo="Lead nuovi da chiamare" n={d.nuovi.length}>
+              <ul className={elenco}>{d.nuovi.map(riga)}</ul>
+            </Gruppo>
+          </div>
+          <div className="empty:hidden @7xl:col-start-2 @7xl:row-span-5 @7xl:row-start-1">
           <Gruppo titolo="Da fare" n={d.daFare.length}>
             <ul className={dueColonne ? `${elenco} md:hidden` : elenco}>{d.daFare.map(riga)}</ul>
             {dueColonne && (
-              <div className="hidden gap-4 md:grid md:grid-cols-2 md:items-start">
+              <div className="hidden gap-4 md:grid md:grid-cols-2 md:items-start @7xl:grid-cols-1">
                 {colonne.map(([t, righe]) => (
                   <div key={t} className="flex flex-col gap-2">
                     <p className="text-secondaria font-semibold">{t}</p>
@@ -139,6 +146,8 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
               </div>
             )}
           </Gruppo>
+          </div>
+          <div className="empty:hidden @7xl:col-start-1">
           <Gruppo titolo="Call di oggi" n={d.call.length}>
             <ul className={elenco}>
               {d.call.map((k) => (
@@ -156,6 +165,7 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
               ))}
             </ul>
           </Gruppo>
+          </div>
         </div>
         <div className="flex flex-col gap-8">
           <Gruppo titolo="Proposte da seguire oggi" n={d.proposte.length}>

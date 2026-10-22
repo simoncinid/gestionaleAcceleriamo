@@ -52,7 +52,9 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
             <BannerDemo />
             <Testata nome={nome} puntoAvatar={badge?.avatar ?? false} avvisi={badge?.avvisi ?? 0} onCerca={() => setCerca(true)} onPiu={piu} />
           </div>
-          <main className="mx-auto w-full max-w-[1100px] px-4 pt-4 md:px-8 md:pt-8"><Outlet /></main>
+          {/* Tutta la larghezza a destra della barra laterale. Le pagine si impaginano sulla larghezza del contenitore
+              (varianti @5xl, @7xl di Tailwind), non su quella della finestra: la barra laterale non conta. */}
+          <main className="@container w-full px-4 pt-4 md:px-8 md:pt-8"><Outlet /></main>
         </div>
       </div>
       <BarraBasso badge={badge} />
