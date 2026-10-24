@@ -17,6 +17,10 @@ async function chiudi(env: Env, id: string, stato: RispEvento["stato"], now: num
     .run();
 }
 
+// Facebook spesso non dice chi ha commentato (niente `from`, sia nel recupero sia su certe inserzioni): il commento
+// vale lo stesso e l'autore diventa il commento. Il link dopo il tocco si aggancia comunque al commento.
+export const autoreFb = (id: string | null | undefined, commentoId: string): string => (id ? String(id) : `commento:${commentoId}`);
+
 export async function trattaCommento(env: Env, c: Commento, now: number): Promise<RispEvento["stato"]> {
   const piattaforma = c.piattaforma ?? "ig";
   const canale = await leggiCanale(env, piattaforma);

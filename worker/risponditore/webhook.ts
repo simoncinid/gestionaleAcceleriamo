@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv, Env } from "../env";
 import { verifyMetaSignature } from "../meta/signature";
-import { trattaCommento } from "./commenti";
+import { autoreFb, trattaCommento } from "./commenti";
 import { mandaLink } from "./link";
 
 type Payload = {
@@ -106,7 +106,7 @@ export async function lavoroPagina(env: Env, entry: AvvisoPagina[]): Promise<voi
       try {
         await trattaCommento(
           env,
-          { id: String(v.comment_id), testo: v.message ?? "", autoreId: v.from?.id ? String(v.from.id) : null, autoreNome: v.from?.name ?? null, mediaId: String(v.post_id), parentId, piattaforma: "fb" },
+          { id: String(v.comment_id), testo: v.message ?? "", autoreId: autoreFb(v.from?.id, v.comment_id), autoreNome: v.from?.name ?? null, mediaId: String(v.post_id), parentId, piattaforma: "fb" },
           Date.now(),
         );
       } catch (err) {

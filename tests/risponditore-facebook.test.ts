@@ -122,6 +122,14 @@ describe("webhook della Pagina: commenti e tocchi", () => {
     expect(percorsi()).toEqual([`/${POST}_9/comments`, `/${PAGINA}/messages`]);
   });
 
+  it("commento senza autore (Facebook a volte non manda from): trattato lo stesso, l'autore diventa il commento", async () => {
+    const { from: _, ...senzaAutore } = commentoFeed() as Record<string, unknown>;
+    const res = await postMeta(feed(senzaAutore));
+    expect(res.status).toBe(200);
+    expect(await evento(`${POST}_9`)).toMatchObject({ stato: "inviato", piattaforma: "fb", autore_id: `commento:${POST}_9` });
+    expect(privati()).toBe(1);
+  });
+
   it("tocco sul pulsante: link al PSID da graph.facebook.com e link_inviato sull'evento del commento", async () => {
     await trattaCommento(ENV, fb({ id: `${POST}_1`, autoreId: "persona-fb" }), NOW - 2000);
     await trattaCommento(ENV, fb({ id: `${POST}_2`, autoreId: "altra", mediaId: `${PAGINA}_777` }), NOW - 1000);

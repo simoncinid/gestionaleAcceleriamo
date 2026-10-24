@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 import type { Env } from "../env";
 import { rispCampagne } from "../db/schema";
-import { trattaCommento, type Commento } from "./commenti";
+import { autoreFb, trattaCommento, type Commento } from "./commenti";
 import { graphGet, leggiCanale, type Canale } from "./graph";
 
 const SETTE_GIORNI = 7 * 86_400_000;
@@ -78,7 +78,7 @@ export async function recuperaCommenti(env: Env, now: number, maxPost: number, b
       const gia = await env.DB.prepare("SELECT 1 FROM risp_eventi WHERE commento_id = ?").bind(String(c.id)).first();
       if (gia) continue;
       const commento: Commento = suFb
-        ? { id: String(c.id), testo: c.message ?? "", autoreId: c.from?.id ?? null, autoreNome: c.from?.name ?? null, mediaId, parentId: c.parent?.id ?? null, piattaforma: "fb" }
+        ? { id: String(c.id), testo: c.message ?? "", autoreId: autoreFb(c.from?.id, String(c.id)), autoreNome: c.from?.name ?? null, mediaId, parentId: c.parent?.id ?? null, piattaforma: "fb" }
         : { id: String(c.id), testo: c.text ?? "", autoreId: c.from?.id ?? null, autoreNome: c.from?.username ?? c.username ?? null, mediaId, parentId: c.parent_id ?? null };
       try {
         const stato = await trattaCommento(env, commento, now);
