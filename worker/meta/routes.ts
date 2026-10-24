@@ -5,8 +5,9 @@ import { fillMetaLead, registerMetaLead } from "./ingest";
 import { verifyMetaSignature } from "./signature";
 import { scriviEsiti } from "../stato/service";
 import { VOCE_WEBHOOK_META } from "../stato/voci";
+import { haLavoroPagina, lavoroPagina, type AvvisoPagina } from "../risponditore/webhook";
 
-type Payload = { entry?: { changes?: { field?: string; value?: { leadgen_id?: string | number; form_id?: string | number } }[] }[] };
+type Payload = { entry?: ({ changes?: { field?: string; value?: { leadgen_id?: string | number; form_id?: string | number } }[] } & AvvisoPagina)[] };
 
 export const metaRoutes = new Hono<AppEnv>();
 
@@ -52,5 +53,8 @@ metaRoutes.post("/", async (c) => {
   }
   if (ricevuti) await segna("ok", created.length ? `${created.length} lead nuovi su ${ricevuti} ricevuti` : `${ricevuti} lead già registrati`);
   if (created.length) c.executionCtx.waitUntil(Promise.all(created.map((id) => fillMetaLead(c.env, id))));
+  // Commenti e tocchi della Pagina per il risponditore: dopo la risposta, mai nello spazio demo.
+  const entry = payload.entry ?? [];
+  if (c.env.SPAZIO !== "demo" && haLavoroPagina(entry)) c.executionCtx.waitUntil(lavoroPagina(c.env, entry));
   return c.json({ ok: true, created: created.length });
 });

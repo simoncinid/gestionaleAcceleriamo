@@ -5,11 +5,11 @@ import { inviaPrivato } from "./commenti";
 import { MOTIVI_NON_RITENTABILI, motivoErrore, registraFallimento, TENTATIVI_MAX } from "./errori";
 import { scegliCampagna } from "./parola";
 import { recuperaCommenti } from "./recupero";
-import { leggiToken } from "./token";
+import { leggiCanale, type Canale, type Piattaforma } from "./graph";
 
 const ATTESA = 10 * 60_000;
 
-type Riga = { commento_id: string; media_id: string; autore_id: string; testo: string; campagna_id: string | null; stato: string };
+type Riga = { commento_id: string; media_id: string; autore_id: string; testo: string; campagna_id: string | null; stato: string; piattaforma: Piattaforma };
 
 // Rifà solo il passo 6 (il messaggio privato) per gli eventi in errore ritentabile, con meno di 3 tentativi e fermi da
 // più di 10 minuti, e per quelli rimasti in_corso oltre i 10 minuti (un tentativo interrotto: conta come tentativo).
@@ -17,9 +17,14 @@ type Riga = { commento_id: string; media_id: string; autore_id: string; testo: s
 // fatte davvero (ritentativi più recupero), che il cron restituisce al giro.
 export async function giroRisponditore(env: Env, now: number, limite: number): Promise<{ ritentati: number; sottorichieste: number }> {
   if (limite <= 0) return { ritentati: 0, sottorichieste: 0 };
-  const account = await leggiToken(env);
-  if (!account) return { ritentati: 0, sottorichieste: 0 };
-  const ritentati = await ritenta(env, now, limite, account);
+  // Si ritenta solo sui canali collegati: gli eventi di un canale spento restano fermi.
+  const canali: Partial<Record<Piattaforma, Canale>> = {};
+  for (const p of ["ig", "fb"] as const) {
+    const canale = await leggiCanale(env, p);
+    if (canale) canali[p] = canale;
+  }
+  if (!canali.ig && !canali.fb) return { ritentati: 0, sottorichieste: 0 };
+  const ritentati = await ritenta(env, now, limite, canali);
   // Il cron riserva sottoPerUnita (2) a unità; i ritentativi ne usano una ciascuno, il resto è del recupero.
   const budget = limite * 2 - ritentati;
   let recupero = 0;
@@ -33,16 +38,17 @@ export async function giroRisponditore(env: Env, now: number, limite: number): P
   return { ritentati, sottorichieste: ritentati + recupero };
 }
 
-async function ritenta(env: Env, now: number, limite: number, account: NonNullable<Awaited<ReturnType<typeof leggiToken>>>): Promise<number> {
+async function ritenta(env: Env, now: number, limite: number, canali: Partial<Record<Piattaforma, Canale>>): Promise<number> {
   const soglia = now - ATTESA;
   const nonRitentabili = MOTIVI_NON_RITENTABILI.map(() => "?").join(",");
+  const piattaforme = Object.keys(canali);
   const { results } = await env.DB.prepare(
-    `SELECT commento_id, media_id, autore_id, testo, campagna_id, stato FROM risp_eventi
-     WHERE tentativi < ? AND aggiornato_il < ?
+    `SELECT commento_id, media_id, autore_id, testo, campagna_id, stato, piattaforma FROM risp_eventi
+     WHERE tentativi < ? AND aggiornato_il < ? AND piattaforma IN (${piattaforme.map(() => "?").join(",")})
        AND (stato = 'in_corso' OR (stato = 'errore' AND COALESCE(motivo, '') NOT IN (${nonRitentabili})))
      ORDER BY aggiornato_il LIMIT ?`,
   )
-    .bind(TENTATIVI_MAX, soglia, ...MOTIVI_NON_RITENTABILI, limite)
+    .bind(TENTATIVI_MAX, soglia, ...piattaforme, ...MOTIVI_NON_RITENTABILI, limite)
     .all<Riga>();
   if (!results.length) return 0;
 
@@ -69,12 +75,13 @@ async function ritenta(env: Env, now: number, limite: number, account: NonNullab
       await env.DB.prepare(`UPDATE risp_eventi SET tentativi = tentativi + 1, campagna_id = ?, aggiornato_il = ? WHERE commento_id = ?`).bind(campagna.id, now, r.commento_id).run();
     }
     ritentati++;
+    const canale = canali[r.piattaforma]!;
     try {
-      const priv = await inviaPrivato(env, account.token, campagna, r.commento_id);
+      const priv = await inviaPrivato(env, canale, campagna, r.commento_id);
       if (priv.ok) {
         await env.DB.prepare(`UPDATE risp_eventi SET stato = 'inviato', aggiornato_il = ? WHERE commento_id = ?`).bind(now, r.commento_id).run();
       } else {
-        await registraFallimento(env, r.commento_id, motivoErrore(priv.codice, priv.messaggio).motivo, now, { campagnaId: campagna.id });
+        await registraFallimento(env, r.commento_id, motivoErrore(priv.codice, priv.messaggio, r.piattaforma).motivo, now, { campagnaId: campagna.id });
       }
     } catch (err) {
       await registraFallimento(env, r.commento_id, (err instanceof Error ? err.message : String(err)).slice(0, 200), now, { campagnaId: campagna.id });

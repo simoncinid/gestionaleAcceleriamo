@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import type { AppEnv } from "../env";
+import type { AppEnv, Env } from "../env";
 import { verifyMetaSignature } from "../meta/signature";
 import { trattaCommento } from "./commenti";
 import { mandaLink } from "./link";
@@ -68,3 +68,50 @@ webhookInstagram.post("/", async (c) => {
   c.executionCtx.waitUntil(lavoro());
   return c.json({ ok: true });
 });
+
+// Pagina Facebook: gli avvisi arrivano nel webhook dei lead (/api/webhooks/meta, oggetto page). Qui solo i commenti
+// nuovi (feed, item comment, verb add) e i tocchi su Messenger; i leadgen restano a meta/routes.ts.
+export type AvvisoPagina = {
+  messaging?: { sender?: { id?: string }; postback?: { payload?: string } }[];
+  changes?: {
+    field?: string;
+    value?: { item?: string; verb?: string; comment_id?: string; post_id?: string; parent_id?: string; message?: string; from?: { id?: string; name?: string } };
+  }[];
+};
+
+// C'è lavoro per il risponditore? Serve a non aprire waitUntil per i soli lead.
+export const haLavoroPagina = (entry: AvvisoPagina[]) =>
+  entry.some((e) => (e.messaging?.length ?? 0) > 0 || (e.changes ?? []).some((ch) => ch.field === "feed"));
+
+export async function lavoroPagina(env: Env, entry: AvvisoPagina[]): Promise<void> {
+  for (const e of entry) {
+    for (const m of e.messaging ?? []) {
+      const p = m.postback?.payload;
+      if (!m.sender?.id || typeof p !== "string" || !p.startsWith("RISORSA:")) continue;
+      // RISORSA:<campagna>:<commento>: il PSID di chi tocca non è l'autore del commento.
+      const resto = p.slice("RISORSA:".length);
+      const due = resto.indexOf(":");
+      if (due <= 0 || due === resto.length - 1) continue;
+      try {
+        await mandaLink(env, String(m.sender.id), resto.slice(0, due), Date.now(), { piattaforma: "fb", commentoId: resto.slice(due + 1) });
+      } catch (err) {
+        console.error("risponditore_link", err instanceof Error ? err.message : "errore");
+      }
+    }
+    for (const ch of e.changes ?? []) {
+      const v = ch.value;
+      if (ch.field !== "feed" || v?.item !== "comment" || v.verb !== "add" || !v.comment_id || !v.post_id) continue;
+      // Un commento diretto al post ha parent_id uguale al post: è una risposta solo se il genitore è un altro commento.
+      const parentId = v.parent_id && v.parent_id !== v.post_id ? String(v.parent_id) : null;
+      try {
+        await trattaCommento(
+          env,
+          { id: String(v.comment_id), testo: v.message ?? "", autoreId: v.from?.id ? String(v.from.id) : null, autoreNome: v.from?.name ?? null, mediaId: String(v.post_id), parentId, piattaforma: "fb" },
+          Date.now(),
+        );
+      } catch (err) {
+        console.error("risponditore_commento", err instanceof Error ? err.message : "errore");
+      }
+    }
+  }
+}

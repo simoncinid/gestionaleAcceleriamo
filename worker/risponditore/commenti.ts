@@ -1,12 +1,12 @@
 import { drizzle } from "drizzle-orm/d1";
 import type { Env } from "../env";
 import { rispCampagne, type RispCampagna, type RispEvento } from "../db/schema";
-import { MOTIVO_NON_COLLEGATO, motivoErrore, registraFallimento } from "./errori";
-import { igPost, type EsitoGraph } from "./graph";
+import { MOTIVO_FB_NON_COLLEGATO, MOTIVO_NON_COLLEGATO, motivoErrore, registraFallimento } from "./errori";
+import { graphPost, leggiCanale, type Canale, type EsitoGraph, type Piattaforma } from "./graph";
 import { scegliCampagna } from "./parola";
-import { leggiToken } from "./token";
 
-export type Commento = { id: string; testo: string; autoreId: string | null; autoreNome: string | null; mediaId: string; parentId: string | null };
+// piattaforma assente: Instagram. Su Facebook mediaId è l'id del post e parentId c'è solo per le risposte in thread.
+export type Commento = { id: string; testo: string; autoreId: string | null; autoreNome: string | null; mediaId: string; parentId: string | null; piattaforma?: Piattaforma };
 
 async function chiudi(env: Env, id: string, stato: RispEvento["stato"], now: number, extra: { motivo?: string | null; campagnaId?: string; rispostaPubblicaId?: string | null; errore?: boolean } = {}) {
   await env.DB.prepare(
@@ -18,17 +18,20 @@ async function chiudi(env: Env, id: string, stato: RispEvento["stato"], now: num
 }
 
 export async function trattaCommento(env: Env, c: Commento, now: number): Promise<RispEvento["stato"]> {
-  const account = await leggiToken(env);
-  if (!c.autoreId || c.parentId || c.autoreId === account?.igUserId) return "ignorato";
+  const piattaforma = c.piattaforma ?? "ig";
+  const canale = await leggiCanale(env, piattaforma);
+  // La Pagina si riconosce dall'id anche senza token: i suoi commenti non diventano mai eventi.
+  const proprioId = piattaforma === "fb" ? env.META_PAGE_ID : canale?.proprioId;
+  if (!c.autoreId || c.parentId || c.autoreId === proprioId) return "ignorato";
   const ins = await env.DB.prepare(
-    `INSERT OR IGNORE INTO risp_eventi (commento_id, media_id, autore_id, autore_nome, testo, stato, tentativi, creato_il, aggiornato_il)
-     VALUES (?, ?, ?, ?, ?, 'in_corso', 0, ?, ?)`,
+    `INSERT OR IGNORE INTO risp_eventi (commento_id, media_id, autore_id, autore_nome, testo, stato, tentativi, piattaforma, creato_il, aggiornato_il)
+     VALUES (?, ?, ?, ?, ?, 'in_corso', 0, ?, ?, ?)`,
   )
-    .bind(c.id, c.mediaId, c.autoreId, c.autoreNome, c.testo, now, now)
+    .bind(c.id, c.mediaId, c.autoreId, c.autoreNome, c.testo, piattaforma, now, now)
     .run();
   if (!ins.meta.changes) return "ignorato";
   try {
-    return await lavora(env, c, account, now);
+    return await lavora(env, c, piattaforma, canale, now);
   } catch (err) {
     const motivo = (err instanceof Error ? err.message : String(err)).slice(0, 200);
     await chiudi(env, c.id, "errore", now, { motivo, errore: true });
@@ -36,7 +39,7 @@ export async function trattaCommento(env: Env, c: Commento, now: number): Promis
   }
 }
 
-async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof leggiToken>>, now: number): Promise<RispEvento["stato"]> {
+async function lavora(env: Env, c: Commento, piattaforma: Piattaforma, canale: Canale | null, now: number): Promise<RispEvento["stato"]> {
   // 3. Campagna.
   const campagne = await drizzle(env.DB).select().from(rispCampagne).all();
   const campagna = scegliCampagna(campagne, c.mediaId, c.testo);
@@ -56,8 +59,9 @@ async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof 
     return "ignorato";
   }
 
-  if (!account) {
-    await chiudi(env, c.id, "errore", now, { campagnaId: campagna.id, motivo: MOTIVO_NON_COLLEGATO, errore: true });
+  if (!canale) {
+    const motivo = piattaforma === "fb" ? MOTIVO_FB_NON_COLLEGATO : MOTIVO_NON_COLLEGATO;
+    await chiudi(env, c.id, "errore", now, { campagnaId: campagna.id, motivo, errore: true });
     return "errore";
   }
 
@@ -74,15 +78,16 @@ async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof 
     motivo = "Risposte pubbliche mancanti o non leggibili";
   } else {
     const message = String(varianti[Math.floor(Math.random() * varianti.length)]);
-    const pub = await igPost(env, account.token, `/${c.id}/replies`, { message });
+    // Instagram risponde con /replies, Facebook con /comments sul commento.
+    const pub = await graphPost(env, canale, `/${c.id}/${piattaforma === "fb" ? "comments" : "replies"}`, { message });
     if (pub.ok) rispostaPubblicaId = pub.dati?.id ? String(pub.dati.id) : null;
     else motivo = `Risposta pubblica non riuscita: ${pub.messaggio}`;
   }
 
   // 6. Messaggio privato con il pulsante.
-  const priv = await inviaPrivato(env, account.token, campagna, c.id);
+  const priv = await inviaPrivato(env, canale, campagna, c.id);
   if (!priv.ok) {
-    await registraFallimento(env, c.id, motivoErrore(priv.codice, priv.messaggio).motivo, now, { campagnaId: campagna.id, rispostaPubblicaId });
+    await registraFallimento(env, c.id, motivoErrore(priv.codice, priv.messaggio, piattaforma).motivo, now, { campagnaId: campagna.id, rispostaPubblicaId });
     return "errore";
   }
 
@@ -92,8 +97,10 @@ async function lavora(env: Env, c: Commento, account: Awaited<ReturnType<typeof 
 }
 
 // Passo 6, anche per il giro dei ritentativi: il messaggio privato in risposta al commento, con il pulsante.
-export function inviaPrivato(env: Env, token: string, campagna: RispCampagna, commentoId: string): Promise<EsitoGraph> {
-  return igPost(env, token, "/me/messages", {
+// Su Messenger chi tocca ha un id (PSID) diverso dall'autore del commento: il payload porta anche il commento.
+export function inviaPrivato(env: Env, canale: Canale, campagna: RispCampagna, commentoId: string): Promise<EsitoGraph> {
+  const payload = canale.piattaforma === "fb" ? `RISORSA:${campagna.id}:${commentoId}` : `RISORSA:${campagna.id}`;
+  return graphPost(env, canale, `/${canale.mittente}/messages`, {
     recipient: { comment_id: commentoId },
     message: {
       attachment: {
@@ -101,7 +108,7 @@ export function inviaPrivato(env: Env, token: string, campagna: RispCampagna, co
         payload: {
           template_type: "button",
           text: campagna.testoPrivato,
-          buttons: [{ type: "postback", title: campagna.etichettaPulsante, payload: `RISORSA:${campagna.id}` }],
+          buttons: [{ type: "postback", title: campagna.etichettaPulsante, payload }],
         },
       },
     },

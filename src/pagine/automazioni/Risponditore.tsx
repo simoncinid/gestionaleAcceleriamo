@@ -12,7 +12,7 @@ import { FoglioCampagna, type RisorsaBreve } from "./RisponditoreCampagna";
 type StatoEvento = "in_corso" | "inviato" | "link_inviato" | "ignorato" | "errore";
 export type EventoRisponditore = {
   commentoId: string; mediaId: string; autoreNome: string | null; testo: string; campagnaId: string | null;
-  parola: string | null; stato: StatoEvento; motivo: string | null; creatoIl: number;
+  parola: string | null; stato: StatoEvento; motivo: string | null; creatoIl: number; piattaforma?: "ig" | "fb";
 };
 export type RichiestaChiamata = { id: string; nome: string; azienda: string; telefono: string; slug: string; risorsa: string | null; creataIl: number };
 export type DatiRisponditore = {
@@ -144,9 +144,9 @@ function Registro({ eventi, ora }: { eventi: EventoRisponditore[]; ora: number }
                 const s = STATI_EVENTO[e.stato];
                 return (
                   <li key={e.commentoId} className="grid gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3">
-                    <p className="text-corpo font-semibold">{e.autoreNome ? `@${e.autoreNome}` : "Autore senza nome"}</p>
+                    <p className="text-corpo font-semibold">{e.autoreNome ? (e.piattaforma === "fb" ? e.autoreNome : `@${e.autoreNome}`) : "Autore senza nome"}</p>
                     <p className="line-clamp-2 text-secondaria">{e.testo}</p>
-                    <p className="text-meta text-grigio">{e.parola ? `Parola: ${e.parola}` : "Nessuna campagna"}</p>
+                    <p className="text-meta text-grigio">{`${e.piattaforma === "fb" ? "Facebook" : "Instagram"} · ${e.parola ? `Parola: ${e.parola}` : "Nessuna campagna"}`}</p>
                     <p className="flex items-center gap-2 text-secondaria font-medium"><Punto colore={s.colore} etichetta={s.etichetta} />{s.etichetta}</p>
                     {e.motivo && <p className="text-meta text-grigio">{e.motivo}</p>}
                     <p className="text-meta text-grigio tabular-nums">{momento(e.creatoIl, ora)}</p>

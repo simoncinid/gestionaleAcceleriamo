@@ -2,10 +2,9 @@ import type { Env } from "../env";
 import { rispCampagne } from "../db/schema";
 import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
-import { igPost, type EsitoGraph } from "./graph";
+import { graphPost, leggiCanale, type EsitoGraph } from "./graph";
 import { GRAFICHE, type Grafiche } from "./grafiche-risorse";
 import { firmaPassi, passiSchema, type Passo } from "../../src/pagine/pubbliche/corpoRisorsa";
-import { leggiToken } from "./token";
 
 // Secondo passo: la persona ha toccato il pulsante, le mandiamo la risorsa. Arriva sempre, anche se non ci segue
 // (l'invito a seguirci sta dentro testoLink). Campagna sconosciuta o nessun messaggio precedente: non parte nulla (una riga di log, senza segreti).
@@ -15,32 +14,36 @@ import { leggiToken } from "./token";
 //   tocchi successivi: solo il carosello.
 // Catena di riserva: animazione rifiutata, si salta; carosello rifiutato, la scheda singola; scheda rifiutata, il testo con il link.
 // Senza grafiche si parte direttamente dalla scheda singola. Lo stato link_inviato si scrive una volta sola, quando il link è arrivato.
-export async function mandaLink(env: Env, autoreId: string, campagnaId: string, now: number): Promise<void> {
+// Su Facebook (fb) destinatarioId è il PSID di Messenger e l'evento si trova dal commento scritto nel payload del pulsante.
+export async function mandaLink(env: Env, destinatarioId: string, campagnaId: string, now: number, fb?: { piattaforma: "fb"; commentoId: string }): Promise<void> {
   const campagna = await drizzle(env.DB).select().from(rispCampagne).where(eq(rispCampagne.id, campagnaId)).get();
   if (!campagna) {
     console.warn("risponditore_link: campagna sconosciuta", campagnaId);
     return;
   }
-  const evento = await env.DB.prepare(
-    `SELECT commento_id, stato, aggiornato_il FROM risp_eventi WHERE campagna_id = ? AND autore_id = ? AND stato IN ('inviato','link_inviato')
-     ORDER BY aggiornato_il DESC, creato_il DESC LIMIT 1`,
-  )
-    .bind(campagnaId, autoreId)
-    .first<{ commento_id: string; stato: string; aggiornato_il: number }>();
+  const evento = await (fb
+    ? env.DB.prepare(
+      `SELECT commento_id, stato, aggiornato_il FROM risp_eventi WHERE commento_id = ? AND campagna_id = ? AND piattaforma = 'fb' AND stato IN ('inviato','link_inviato')`,
+    ).bind(fb.commentoId, campagnaId)
+    : env.DB.prepare(
+      `SELECT commento_id, stato, aggiornato_il FROM risp_eventi WHERE campagna_id = ? AND autore_id = ? AND piattaforma = 'ig' AND stato IN ('inviato','link_inviato')
+       ORDER BY aggiornato_il DESC, creato_il DESC LIMIT 1`,
+    ).bind(campagnaId, destinatarioId)
+  ).first<{ commento_id: string; stato: string; aggiornato_il: number }>();
   if (!evento) {
     console.warn("risponditore_link: nessun messaggio precedente per la campagna", campagnaId);
     return;
   }
-  const account = await leggiToken(env);
-  if (!account) {
-    console.warn("risponditore_link: account Instagram non collegato");
+  const canale = await leggiCanale(env, fb ? "fb" : "ig");
+  if (!canale) {
+    console.warn(fb ? "risponditore_link: Pagina Facebook non collegata" : "risponditore_link: account Instagram non collegato");
     return;
   }
   const slug = campagna.risorsaSlug;
   const base = (env.APP_URL ?? "").replace(/\/$/, "");
   const url = `${base}/r/${slug}`;
   const risorsa = await env.DB.prepare("SELECT titolo, corpo FROM risorse WHERE slug = ?").bind(slug).first<{ titolo: string; corpo: string }>();
-  const invia = (message: unknown) => igPost(env, account.token, "/me/messages", { recipient: { id: autoreId }, message });
+  const invia = (message: unknown) => graphPost(env, canale, `/${canale.mittente}/messages`, { recipient: { id: destinatarioId }, message });
 
   // Le grafiche valgono solo se i passi di oggi sono quelli da cui sono state disegnate.
   const passi = risorsa ? passiSchema(risorsa.corpo) : [];

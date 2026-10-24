@@ -91,6 +91,7 @@ risponditoreRoutes.get("/", async (c) => {
     db.select({
       commentoId: rispEventi.commentoId, mediaId: rispEventi.mediaId, autoreNome: rispEventi.autoreNome, testo: rispEventi.testo,
       campagnaId: rispEventi.campagnaId, parola: rispCampagne.parola, stato: rispEventi.stato, motivo: rispEventi.motivo, creatoIl: rispEventi.creatoIl,
+      piattaforma: rispEventi.piattaforma,
     }).from(rispEventi).leftJoin(rispCampagne, eq(rispCampagne.id, rispEventi.campagnaId)).orderBy(desc(rispEventi.creatoIl)).limit(100),
     db.select({
       id: risorseRichieste.id, nome: risorseRichieste.nome, azienda: risorseRichieste.azienda, telefono: risorseRichieste.telefono,

@@ -41,6 +41,13 @@ describe("schermata del risponditore", () => {
     expect(contaPrimari(html)).toBe(1);
     expect(html).not.toMatch(/[\u2013\u2014]/);
   });
+  it("registro: etichetta Instagram o Facebook per riga, su Facebook il nome senza @", () => {
+    const html = pagina({ ...pieni, eventi: [evento("a", "inviato"), { ...evento("f", "inviato"), piattaforma: "fb", autoreNome: "Mario Bianchi" }] });
+    expect(html).toContain("Instagram · Parola: casa");
+    expect(html).toContain("Facebook · Parola: casa");
+    expect(html).toContain("@utente_a");
+    expect(html).toContain(">Mario Bianchi</p>");
+  });
   it("senza account e senza dati: stati vuoti disegnati", () => {
     const html = pagina({ account: null, campagne: [], eventi: [], richieste: [], risorse: [] });
     expect(html).toContain("Nessun account collegato");

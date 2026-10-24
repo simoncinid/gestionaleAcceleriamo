@@ -602,6 +602,7 @@ export const rispCampagne = sqliteTable("risp_campagne", {
 export type RispCampagna = typeof rispCampagne.$inferSelect;
 
 export const RISP_STATI = ["in_corso", "inviato", "link_inviato", "ignorato", "errore"] as const;
+export const RISP_PIATTAFORME = ["ig", "fb"] as const;
 
 export const rispEventi = sqliteTable("risp_eventi", {
   commentoId: text("commento_id").primaryKey(),
@@ -614,6 +615,8 @@ export const rispEventi = sqliteTable("risp_eventi", {
   motivo: text("motivo"),
   tentativi: integer("tentativi").notNull().default(0),
   rispostaPubblicaId: text("risposta_pubblica_id"),
+  // Da dove arriva il commento: Instagram o Pagina Facebook (sceglie il canale per ritentativi e link).
+  piattaforma: text("piattaforma", { enum: RISP_PIATTAFORME }).notNull().default("ig"),
   creatoIl: integer("creato_il").notNull(),
   aggiornatoIl: integer("aggiornato_il").notNull(),
 }, (t) => [

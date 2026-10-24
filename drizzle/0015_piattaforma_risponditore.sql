@@ -1,0 +1,1 @@
+ALTER TABLE `risp_eventi` ADD `piattaforma` text DEFAULT 'ig' NOT NULL;
