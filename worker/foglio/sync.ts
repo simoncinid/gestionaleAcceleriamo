@@ -31,8 +31,12 @@ type ImpFoglio = Impostazioni["foglio"];
 // Intervalli di righe del foglio (numerate da 1, estremi inclusi) → righe di ciascun intervallo.
 type Lettore = (intervalli: [number, number][]) => Promise<string[][][]>;
 
-export async function impronta(data: string, email: string) {
-  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${data.trim()}|${email.trim().toLowerCase()}`));
+// Con l'email l'impronta resta "data|email" (le righe già lette non cambiano chiave). Senza email entrano telefono e nome:
+// prima tutte le righe dello stesso giorno senza email avevano la stessa impronta e dalla seconda non nasceva il lead.
+export async function impronta(r: { data: string; email: string; telefono?: string; referente?: string; azienda?: string }) {
+  const email = r.email.trim().toLowerCase();
+  const testo = email ? `${r.data.trim()}|${email}` : `${r.data.trim()}||${(r.telefono ?? "").trim()}|${(r.referente || r.azienda || "").trim()}`;
+  const h = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(testo));
   return [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
@@ -125,7 +129,7 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
     let righe = nuove;
     if (ultima > 1) {
       const r = mappaRiga(controllo[0] ?? []);
-      if ((await impronta(r.data, r.email)) !== st?.lastRowHash) {
+      if ((await impronta(r)) !== st?.lastRowHash) {
         esito.riletto = true;
         da = 2;
         [righe] = await leggi([[2, RILETTURA + 1]]);
@@ -147,14 +151,14 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
       if (esito.create >= massimoCreati || spesa + (nuovoBlocco ? SPESA.ricerca : 0) + SPESA.creato > budget) { fermato = true; break; }
       if (nuovoBlocco) {
         const blocco = mappate.slice(i, i + RIGHE_PER_RICERCA);
-        const chiavi = await Promise.all(blocco.map((b) => (b.data || b.email ? impronta(b.data, b.email) : null)));
+        const chiavi = await Promise.all(blocco.map((b) => (b.data || b.email ? impronta(b) : null)));
         impronte.push(...chiavi);
         const visti = new Set(esistenti.map((l) => l.id));
         esistenti.push(...(await candidati(db, blocco, chiavi)).filter((l) => !visti.has(l.id)));
         spesa += SPESA.ricerca;
       }
       fine = da + i;
-      ultimaImpronta = await impronta(r.data, r.email);
+      ultimaImpronta = await impronta(r);
       esito.lette++;
       if (r.vuota || r.prova) { esito.scartate++; continue; }
       const chiave = impronte[i];

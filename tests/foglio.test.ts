@@ -59,6 +59,17 @@ describe("Foglio Andrea con l'account di servizio", () => {
     setEmailFetch(async () => { email++; return Response.json({ id: `re_${email}` }); });
   });
 
+  // Riunione del 26/10, "meno lead di quelli arrivati": con la sola data del giorno e senza email l'impronta
+  // della riga era uguale per tutto il giorno, e dal secondo giro le righe nuove venivano "agganciate" e mai create.
+  it("righe dello stesso giorno senza email sono lead diversi anche in giri diversi", async () => {
+    const senzaEmail = (azienda: string, tel: string) => ["2026-10-12", azienda, `Referente ${azienda}`, tel, "", "Autunno", ""];
+    foglio = [TESTATA, senzaEmail("Idraulica Uno Finta", "333 100 0001")];
+    expect(await giroFoglio(envFoglio, NOW)).toMatchObject({ create: 1 });
+    foglio.push(senzaEmail("Idraulica Due Finta", "333 100 0002"));
+    expect(await giroFoglio(envFoglio, NOW + 300_000)).toMatchObject({ create: 1, agganciate: 0 });
+    expect((await lead("SELECT company FROM leads ORDER BY company")).map((l) => l.company)).toEqual(["Idraulica Due Finta", "Idraulica Uno Finta"]);
+  });
+
   it("crea i lead delle righe nuove, scarta la riga di prova e quella vuota, parte la catena", async () => {
     expect(await giroFoglio(envFoglio, NOW)).toEqual({ lette: 4, create: 2, agganciate: 0, scartate: 2, riletto: false, ancora: false });
     const nuovi = await lead("SELECT company, phone, source, meta_campaign, owner_id, score, meta_answers FROM leads ORDER BY company");
