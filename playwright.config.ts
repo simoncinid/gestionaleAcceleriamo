@@ -1,7 +1,8 @@
 import { defineConfig } from "@playwright/test";
 
 // Spec 19.2: controlli visivi e automatici sullo spazio demo locale (D1 locale, nessuna rete esterna).
-const PORTA = 5199;
+// PORTA_E2E: un'altra porta quando più copie del repo provano insieme sullo stesso Mac.
+const PORTA = Number(process.env.PORTA_E2E ?? 5199);
 export default defineConfig({
   testDir: "e2e",
   globalSetup: "./e2e/prepara.ts",
