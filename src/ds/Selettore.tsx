@@ -25,8 +25,9 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
     if (aperto && !nelFoglio) (contenitore.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? contenitore.current?.querySelector<HTMLElement>('[role="option"]'))?.focus();
   }, [aperto, nelFoglio]);
   // Frecce, Home e Fine spostano il fuoco tra le opzioni; Esc chiude e riporta il fuoco sulla riga.
+  // preventDefault: dentro un foglio l'Esc del browser chiuderebbe anche il dialog intorno (collaudo 26/10, voce 1).
   const tasti = (e: KeyboardEvent<HTMLElement>) => {
-    if (e.key === "Escape" && aperto) { e.stopPropagation(); return chiudi(); }
+    if (e.key === "Escape" && aperto) { e.preventDefault(); e.stopPropagation(); return chiudi(); }
     const voci = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]'));
     const i = voci.indexOf(document.activeElement as HTMLButtonElement);
     if (i < 0) return;

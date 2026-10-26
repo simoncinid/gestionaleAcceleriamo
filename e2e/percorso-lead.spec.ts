@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { PASSWORD_DEMO } from "./controlli";
+import prepara from "./prepara";
 
 // Riunione del 26/10/2026: il percorso vero di un lead, dalla prima telefonata al contratto, con le fasi nuove.
 // Orologio vero (niente setFixedTime): il server rifiuta le call nel passato.
@@ -10,6 +11,9 @@ async function entraOraVera(page: Page) {
   await page.getByRole("button", { name: "Entra" }).click();
   await page.waitForURL(/\/commerciale\/oggi/);
 }
+
+// Il percorso scrive nei dati della demo: alla fine si rimettono come all'inizio, così le foto degli altri test non cambiano.
+test.afterAll(() => prepara());
 
 const fase = (page: Page) => page.getByRole("button", { name: /^Fase/ }).first();
 
@@ -80,4 +84,20 @@ test("scegliere la fase dentro il foglio dell'esito non chiude il foglio", async
   await page.getByRole("option", { name: "In attesa decisione" }).click();
   await expect(foglio).toBeVisible();
   await expect(foglio.getByRole("button", { name: /^Fase/ })).toContainText("In attesa decisione");
+});
+
+// Collaudo del 26/10, voce 1: Esc con il selettore della fase aperto chiudeva tutto il foglio e la nota scritta andava persa.
+test("Esc nel selettore della fase chiude solo il selettore", async ({ page }) => {
+  await entraOraVera(page);
+  await page.goto("/commerciale/lead/demo-lead-18");
+  await page.getByRole("button", { name: "Segna esito" }).click();
+  const foglio = page.getByRole("dialog", { name: "Com'è andata?" });
+  await foglio.getByRole("option", { name: "Richiamare", exact: true }).click();
+  const fase = foglio.getByRole("button", { name: /^Fase/ });
+  await fase.focus();
+  await page.keyboard.press("Enter");
+  await expect(fase).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(fase).toHaveAttribute("aria-expanded", "false");
+  await expect(foglio).toBeVisible();
 });
