@@ -13,7 +13,7 @@ describe("catena del lead nuovo", () => {
     await createUser("diego", "password-lunga-2", "Diego");
     const res = await call("/api/leads", { method: "POST", json: { company: "Officina Prova", phone: "333 000 0001", email: "luca@officina-prova.it", website: "officina-prova.it" } }, cookie);
     const { lead: creato } = (await res.json()) as { lead: { id: string } };
-    expect(await lead(creato.id)).toEqual({ owner_id: "tommaso", score: "verde", phone: "+393330000001" });
+    expect(await lead(creato.id)).toEqual({ owner_id: "diego", score: "verde", phone: "+393330000001" });
   });
 
   it("se chi fa la prima chiamata è via, il lead va all'altro", async () => {
@@ -55,6 +55,30 @@ describe("catena del lead nuovo", () => {
     await env.DB.prepare("UPDATE users SET active = 0 WHERE id = 'diego'").run();
     const due = (await (await call("/api/leads", { method: "POST", json: { company: "Due Prova" } }, cookie)).json()) as { lead: { id: string } };
     expect((await lead(due.lead.id))?.owner_id).toBe("anna");
+  });
+});
+
+// Riunione del 26/10: i lead nuovi restavano senza responsabile. Le Impostazioni salvano l'id dell'utente,
+// la catena cercava il nome utente; e i nomi veri sono "diego.simoncini" e "tommaso.rovini", non "diego".
+describe("assegnazione con gli utenti veri", () => {
+  const utente = (id: string, username: string, name: string) =>
+    env.DB.prepare("INSERT INTO users (id, username, name, password_hash, active, created_at) VALUES (?, ?, ?, 'x', 1, 1)").bind(id, username, name).run();
+  const nuovo = async (id: string) => {
+    await env.DB.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at) VALUES (?, 'Officina Prova', 'meta', 'da-chiamare-prima-volta', 1, 1, 1)").bind(id).run();
+    await catenaLeadNuovo(env, id, "manuale", Date.now());
+    return (await lead(id))?.owner_id;
+  };
+  it("senza Impostazioni salvate la prima chiamata va a Diego", async () => {
+    await utente("u-tom", "tommaso.rovini", "Tommaso");
+    await utente("u-diego", "diego.simoncini", "Diego");
+    expect(await nuovo("L1")).toBe("u-diego");
+  });
+  it("con le Impostazioni salvate dalla pagina (id dell'utente) va a chi è scelto", async () => {
+    await utente("u-tom", "tommaso.rovini", "Tommaso");
+    await utente("u-diego", "diego.simoncini", "Diego");
+    await env.DB.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('assegnazione', ?, 1)")
+      .bind(JSON.stringify({ primaChiamata: "u-tom", presentazione: "u-diego", proposta: "u-diego", via: { utente: null, fino: null } })).run();
+    expect(await nuovo("L2")).toBe("u-tom");
   });
 });
 

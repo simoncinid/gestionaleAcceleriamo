@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { getDb, type Db } from "../db/client";
 import { avvisa } from "../avvisi/service";
 import { mandaConferma } from "../email/conferma";
@@ -9,19 +9,18 @@ import { leggiImpostazioni } from "../impostazioni/service";
 import { calcolaPunteggio, datiPerPunteggio } from "./punteggio";
 import { conScadenzaSla, leggiSla } from "./sla";
 
-// Prima chiamata a chi dice Impostazioni; se è via, all'altro (spec 6.3, Assegnazione).
+// Prima chiamata a chi dice Impostazioni (di base Diego, processo di vendita dal 19/10/2026); se è via o non c'è, all'altro (spec 6.3).
+// Una query sola: gli utenti attivi sono pochi e la scelta si fa qui.
 export async function assegnaResponsabile(db: Db, imp: Impostazioni, ora: number): Promise<string | null> {
   const { primaChiamata, presentazione, via } = imp.assegnazione;
-  const attivo = (username: string) => db.select({ id: users.id }).from(users).where(and(eq(users.active, true), eq(users.username, username))).get();
+  const attivi = await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.active, true)).orderBy(asc(users.name)).all();
+  // La pagina Impostazioni salva l'id dell'utente; il default usa il nome ("diego" vale anche per "diego.simoncini").
+  const e = (chi: string) => (u: { id: string; username: string }) => u.id === chi || u.username === chi || u.username.startsWith(`${chi}.`);
   const assente = via.utente === primaChiamata && via.fino != null && via.fino > ora;
-  if (!assente) return (await attivo(primaChiamata))?.id ?? null;
-  // Prima chi fa la presentazione, poi gli altri attivi in ordine di nome: scelta sempre uguale.
-  if (presentazione !== primaChiamata) {
-    const p = await attivo(presentazione);
-    if (p) return p.id;
-  }
-  const altro = await db.select({ id: users.id }).from(users).where(and(eq(users.active, true), ne(users.username, primaChiamata))).orderBy(asc(users.name)).get();
-  return altro?.id ?? null;
+  const io = assente ? undefined : attivi.find(e(primaChiamata));
+  // Via, disattivato o inesistente: prima chi fa la presentazione, poi gli altri attivi in ordine di nome.
+  const sostituto = (presentazione !== primaChiamata ? attivi.find(e(presentazione)) : undefined) ?? attivi.find((u) => !e(primaChiamata)(u));
+  return (io ?? sostituto)?.id ?? null;
 }
 
 // Catena del lead nuovo (spec 6.1): responsabile, punteggio, email di conferma.
