@@ -45,8 +45,9 @@ export function Foglio({ aperto, titolo, onChiudi, principale, ritorno, lato = f
       setTimeout(() => { if (d && !d.isConnected) doveTorna(ritorno?.current, p)?.focus(); }, 0);
     };
   }, []);
+  // React fa risalire "close" del foglio figlio (un selettore lungo) fino a questo: si chiude solo per il proprio.
   return (
-    <dialog ref={ref} onClose={onChiudi} onClick={(e) => e.target === ref.current && onChiudi()} aria-labelledby={id}
+    <dialog ref={ref} onClose={(e) => e.target === ref.current && onChiudi()} onClick={(e) => e.target === ref.current && onChiudi()} aria-labelledby={id}
       className={`m-0 mt-auto w-full max-w-none max-h-[90dvh] rounded-t-blocco bg-avorio text-ink shadow-galleggiante backdrop:bg-ink/40 ${lato ? "md:ml-auto md:mr-0 md:mt-0 md:h-dvh md:max-h-dvh md:w-[440px] md:rounded-none md:rounded-l-blocco" : "md:m-auto md:w-[480px] md:rounded-blocco"} open:animate-[sale_var(--durata-foglio)_var(--ease-foglio)] md:open:animate-[appare_var(--durata-foglio)_var(--ease-foglio)]`}>
       <div className="mx-auto mt-2 h-1 w-9 rounded-full bg-sabbia-2 md:hidden" aria-hidden />
       <header className="flex items-center justify-between px-4 pt-3">
