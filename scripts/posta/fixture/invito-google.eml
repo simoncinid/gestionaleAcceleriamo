@@ -1,0 +1,67 @@
+From: Google Calendar <calendar-notification@google.com>
+To: tommaso@acceleriamo.it
+Subject: =?UTF-8?Q?Invito:_Acceleriamo_x_Officina_Rossi_Finta_-_gio_5_nov_2026_10:00_-_10:45?=
+Date: Mon, 26 Oct 2026 16:00:00 +0100
+Message-ID: <invito-finto-1@google.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="esterno"
+
+--esterno
+Content-Type: multipart/alternative; boundary="interno"
+
+--interno
+Content-Type: text/plain; charset="UTF-8"; format=flowed; delsp=yes
+Content-Transfer-Encoding: quoted-printable
+
+Acceleriamo x Officina Rossi Finta
+gioved=C3=AC 5 novembre 2026 =E2=8B=85 10:00 - 10:45
+Partecipa con Google Meet: https://meet.google.com/abc-defg-hij
+
+--interno
+Content-Type: text/html; charset="UTF-8"
+
+<p>Acceleriamo x Officina Rossi Finta</p>
+
+--interno
+Content-Type: text/calendar; charset="UTF-8"; method=REQUEST
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+VERSION:2.0
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+DTSTART;TZID=Europe/Rome:20261105T100000
+DTEND;TZID=Europe/Rome:20261105T104500
+DTSTAMP:20261026T150000Z
+ORGANIZER;CN=Tommaso Rovini:mailto:tommaso@acceleriamo.it
+UID:abc123finto@google.com
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;CN=Mario Rossi;X-NUM-GUESTS=0:mailto:mario@officina-rossi-finta.it
+X-GOOGLE-CONFERENCE:https://meet.google.com/abc-defg-hij
+SUMMARY:Acceleriamo x Officina Rossi Finta
+SEQUENCE:0
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR
+
+--interno--
+
+--esterno
+Content-Type: application/ics; name="invite.ics"
+Content-Disposition: attachment; filename="invite.ics"
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpQUk9ESUQ6LS8vR29vZ2xlIEluYy8vR29vZ2xlIENhbGVuZGFyIDcw
+LjkwNTQvL0VODQpWRVJTSU9OOjIuMA0KQ0FMU0NBTEU6R1JFR09SSUFODQpNRVRIT0Q6UkVRVUVT
+VA0KQkVHSU46VkVWRU5UDQpEVFNUQVJUO1RaSUQ9RXVyb3BlL1JvbWU6MjAyNjExMDVUMTAwMDAw
+DQpEVEVORDtUWklEPUV1cm9wZS9Sb21lOjIwMjYxMTA1VDEwNDUwMA0KRFRTVEFNUDoyMDI2MTAy
+NlQxNTAwMDBaDQpPUkdBTklaRVI7Q049VG9tbWFzbyBSb3Zpbmk6bWFpbHRvOnRvbW1hc29AYWNj
+ZWxlcmlhbW8uaXQNClVJRDphYmMxMjNmaW50b0Bnb29nbGUuY29tDQpBVFRFTkRFRTtDVVRZUEU9
+SU5ESVZJRFVBTDtST0xFPVJFUS1QQVJUSUNJUEFOVDtQQVJUU1RBVD1ORUVEUy1BQ1RJT047Q049
+TWFyaW8gUm9zc2k7WC1OVU0tR1VFU1RTPTA6bWFpbHRvOm1hcmlvQG9mZmljaW5hLXJvc3NpLWZp
+bnRhLml0DQpYLUdPT0dMRS1DT05GRVJFTkNFOmh0dHBzOi8vbWVldC5nb29nbGUuY29tL2FiYy1k
+ZWZnLWhpag0KU1VNTUFSWTpBY2NlbGVyaWFtbyB4IE9mZmljaW5hIFJvc3NpIEZpbnRhDQpTRVFV
+RU5DRTowDQpTVEFUVVM6Q09ORklSTUVEDQpFTkQ6VkVWRU5UDQpFTkQ6VkNBTEVOREFSDQo=
+
+--esterno--
