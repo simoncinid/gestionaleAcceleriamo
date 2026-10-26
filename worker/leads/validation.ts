@@ -1,12 +1,18 @@
 import { z } from "zod";
 
 // Link web: solo http o https (niente javascript:, data: e simili).
+// Un link incollato senza schema ("meet.google.com/abc") prende https davanti: era il "link non valido" del 26/10.
+const conSchema = (v: unknown) =>
+  typeof v === "string" && /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(v.trim()) ? `https://${v.trim()}` : v;
 export const linkHttp = (messaggio: string) =>
-  z
-    .string()
-    .trim()
-    .url(messaggio)
-    .refine((u) => /^https?:\/\//i.test(u), "Il link deve iniziare con http o https");
+  z.preprocess(
+    conSchema,
+    z
+      .string()
+      .trim()
+      .url(messaggio)
+      .refine((u) => /^https?:\/\//i.test(u), "Il link deve iniziare con http o https"),
+  );
 
 // I campi assenti restano assenti (undefined): così un PATCH non svuota quello che non manda.
 const text = (max = 2000) =>
