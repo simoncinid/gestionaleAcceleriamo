@@ -63,7 +63,7 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
   const lead = await getLead(db, leadId);
   const stage = await getStage(db, input.stageId);
   const cambiaFase = stage.id !== lead.stageId;
-  await assertMotivo(db, input.lostReason);
+  const motivo = await assertMotivo(db, input.lostReason);
   // Come nel PATCH del lead: motivo e blocco su Chiuso solo quando la fase cambia davvero.
   if (cambiaFase && stage.requiresReason && !input.lostReason) throw new HTTPException(422, { message: "Scegli il motivo" });
   if (cambiaFase && stage.kind === "won") throw new HTTPException(422, { message: "Per segnare Cliente usa il cambio di fase nella scheda lead" });
@@ -86,7 +86,8 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
   const tentativo = TENTATIVI.includes(input.esito);
   const attemptNo = tentativo ? lead.attemptCount + 1 : null;
   const callId = input.call ? crypto.randomUUID() : null;
-  const corpo = [ETICHETTE[input.esito], input.note].filter(Boolean).join(". ");
+  // Collaudo 26/10, voce 3: il motivo del lead perso si legge anche nello storico.
+  const corpo = [ETICHETTE[input.esito], motivo && `Motivo: ${motivo}`, input.note].filter(Boolean).join(". ");
 
   const patch: Partial<Lead> = {
     stageId: stage.id,

@@ -42,10 +42,13 @@ export async function getStage(db: Db, id: string): Promise<Stage> {
 }
 
 // I motivi di perdita validi sono quelli in Impostazioni, non l'elenco fisso dello schema.
-export async function assertMotivo(db: Db, motivo: string | null | undefined) {
-  if (!motivo) return;
+// Restituisce l'etichetta del motivo, per lo storico.
+export async function assertMotivo(db: Db, motivo: string | null | undefined): Promise<string | null> {
+  if (!motivo) return null;
   const { motivi } = await leggiImpostazioni(db);
-  if (!motivi.some((m) => m.id === motivo)) throw new HTTPException(422, { message: "Motivo non valido" });
+  const trovato = motivi.find((m) => m.id === motivo);
+  if (!trovato) throw new HTTPException(422, { message: "Motivo non valido" });
+  return trovato.etichetta;
 }
 
 export async function firstOpenStage(db: Db): Promise<Stage> {

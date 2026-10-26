@@ -198,6 +198,8 @@ describe("motivi da Impostazioni e controlli solo al cambio di fase", () => {
     const esitoOk = await esito("m4", { requestId: crypto.randomUUID(), esito: "non_interessato", stageId: "non-chiuso", nextAction: null, nextActionAt: null, lostReason: "concorrente" }, cookie);
     expect(esitoOk.status).toBe(200);
     expect((await leadRow("m4"))?.lost_reason).toBe("concorrente");
+    // Collaudo 26/10, voce 3: il motivo si legge nello storico.
+    expect(await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'm4' AND type = 'esito'").first("body")).toBe("Non interessato. Motivo: Ha scelto un concorrente");
   });
 
   it("un lead 1A già perso senza motivo accetta una modifica che non cambia fase", async () => {
