@@ -232,7 +232,7 @@ export const campaignSpend = sqliteTable("campaign_spend", {
 
 export const EVENTI_AVVISO = [
   "lead_nuovo", "sla_90", "sla_scaduto", "proposta_oggi", "fine_pausa", "claude_tetto", "meta_48h", "integrazione_rotta", "risponditore_errore", "risorsa_richiesta",
-  "automazione_rotta",
+  "automazione_rotta", "mail_da_abbinare",
 ] as const;
 export type EventoAvviso = (typeof EVENTI_AVVISO)[number];
 
@@ -336,6 +336,10 @@ export const calls = sqliteTable(
     inviteSentAt: integer("invite_sent_at"),
     // Invito chiesto quando Resend non era collegato: lo manda il giro programmato appena c'è la chiave.
     inviteQueuedAt: integer("invite_queued_at"),
+    // Dall'invito di Google Calendar letto nella casella (worker/posta): durata in minuti, UID e versione dell'evento.
+    durationMin: integer("duration_min"),
+    icsUid: text("ics_uid"),
+    icsSequence: integer("ics_sequence"),
     createdBy: text("created_by"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
@@ -344,6 +348,7 @@ export const calls = sqliteTable(
   (t) => [
     index("idx_calls_scheduled").on(t.scheduledAt),
     index("idx_calls_lead").on(t.leadId),
+    index("idx_calls_ics_uid").on(t.icsUid),
     index("idx_calls_invito_in_coda").on(t.inviteQueuedAt).where(sql`invite_sent_at IS NULL`),
   ],
 );
@@ -681,3 +686,13 @@ export const statoGiri = sqliteTable("stato_giri", {
 }, (t) => [index("idx_stato_giri_voce").on(t.voceId, t.at)]);
 
 export type StatoVoce = typeof statoVoci.$inferSelect;
+
+// Mail della casella tommaso@acceleriamo.it già passate dal lettore (scripts/posta): una riga per Message-ID,
+// così una mail rimandata non crea due lead né due attività. Del corpo non si tiene niente.
+export const mailLette = sqliteTable("mail_lette", {
+  messageId: text("message_id").primaryKey(),
+  at: integer("at").notNull(),
+  tipo: text("tipo", { enum: ["invito", "modulo", "risposta", "altro"] }).notNull(),
+  esito: text("esito").notNull(),
+  leadId: text("lead_id"),
+}, (t) => [index("idx_mail_lette_at").on(t.at)]);

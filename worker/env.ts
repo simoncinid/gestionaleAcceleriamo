@@ -11,6 +11,8 @@ export type Env = {
   RESEND_API_KEY: string;
   // Chiave dell'aggancio dal wiki (wrangler secret put PROPOSAL_HOOK_KEY). Vuota o assente: l'aggancio risponde sempre 401.
   PROPOSAL_HOOK_KEY: string;
+  // Chiave del lettore della casella tommaso@acceleriamo.it (wrangler secret put MAIL_HOOK_KEY). Vuota: la posta non entra.
+  MAIL_HOOK_KEY?: string;
   // Account di servizio Google (wrangler secret put), via alternativa per il Foglio Andrea.
   // Vuoti o assenti: il foglio si legge dal CSV del link condiviso, senza credenziali.
   GOOGLE_SA_EMAIL: string;

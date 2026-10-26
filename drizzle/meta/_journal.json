@@ -120,6 +120,13 @@
       "when": 1792900000000,
       "tag": "0016_fasi_processo",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793036156994,
+      "tag": "0017_posta",
+      "breakpoints": true
     }
   ]
 }

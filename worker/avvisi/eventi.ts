@@ -13,4 +13,5 @@ export const EVENTI: Record<EventoAvviso, { etichetta: string; chi: "tutti" | "r
   risponditore_errore: { etichetta: "Risponditore: messaggio non partito", chi: "tutti", push: true, telegram: true },
   risorsa_richiesta: { etichetta: "Richiesta di chiamata da una risorsa", chi: "tutti", push: true, telegram: true },
   automazione_rotta: { etichetta: "Automazione in errore o ferma", chi: "tutti", push: true, telegram: true },
+  mail_da_abbinare: { etichetta: "Invito Meet senza lead", chi: "tutti", push: true, telegram: false },
 };

@@ -10,7 +10,7 @@ import { contaPrimari, render } from "./render";
 const ORA = daRoma(2026, 10, 13, 10, 0); // martedì
 const k = (id: string, scheduledAt: number, extra: Partial<CallAgenda> = {}): CallAgenda => ({
   id, leadId: id, company: `Officina ${id}`, contactName: "Luca Prova", phone: null, email: null, kind: "conoscenza", scheduledAt,
-  meetLink: "https://meet.google.com/abc", notes: null, outcome: null, inviteSentAt: null, ...extra,
+  meetLink: "https://meet.google.com/abc", notes: null, outcome: null, inviteSentAt: null, durationMin: null, ...extra,
 });
 const lunedi = daRoma(2026, 10, 12);
 const chiave = ["calls", lunedi];

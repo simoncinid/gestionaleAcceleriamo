@@ -371,6 +371,38 @@ Al lead nuovo che arriva da Meta o dal Foglio Andrea (non a quelli inseriti a ma
 - **Regola delle 48 ore:** quando Resend viene collegato, le richieste arrivate più di 48 ore prima non ricevono la conferma (un'email di benvenuto dopo giorni sembra strana): vengono segnate "Non mandata: richiesta arrivata più di 48 ore prima del collegamento di Resend", senza ritentativi.
 - Con la conferma spenta in Impostazioni, i lead già in coda restano in coda e ripartono quando la si riaccende (sempre con il limite delle 48 ore).
 
+## Posta di Tommaso (tommaso@acceleriamo.it)
+
+Il gestionale legge la casella in sola lettura: non segna niente come letto, non sposta, non cancella e non manda mail.
+Tre cose entrano da sole:
+
+- **Inviti di Google Meet** (mail con l'invito di calendario): aggiornano la call del lead giusto con data, ora, durata e link.
+  Il lead si trova prima dall'email dei partecipanti, poi dal nome del partecipante o dall'azienda nel titolo.
+  Se non lo trova, o ne trova più di uno, non inventa: arriva l'avviso "Invito Meet senza lead".
+  Un invito spostato sposta la stessa call; uno annullato lascia la call e scrive nello storico che va riprogrammata.
+- **Richieste dal modulo di acceleriamo.it**: diventano lead nuovi (fonte Sito), con le risposte del modulo nelle note.
+  Se l'email o il telefono sono già di un lead, nessun doppione: la richiesta finisce nello storico di quel lead.
+- **Risposte dei lead** (mail da un indirizzo già di un lead): nello storico del lead, solo la parte nuova senza le citazioni.
+
+Come funziona: il Worker sul piano gratuito ha 10 ms di CPU e 50 richieste a giro, già usati dal cron, quindi la casella
+non la legge lui. La legge lo script `scripts/posta/leggi_posta.py` (Python, solo libreria standard), che gira su una
+macchina sempre accesa e passa ogni mail nuova a `POST /api/hooks/posta`, protetta dalla chiave `MAIL_HOOK_KEY`.
+Lo stato in Impostazioni > Integrazioni, riga "Posta di Tommaso".
+
+Per accenderla:
+
+1. Generare una chiave lunga a caso e metterla nel Worker: `npx wrangler secret put MAIL_HOOK_KEY` (account di Diego).
+   Prima del deploy va applicata la migrazione `0017_posta` (`npm run db:migrate:remote`).
+2. Sulla macchina che legge: password della casella e stessa chiave come variabili d'ambiente
+   (`MAIL_TOMMASO_PASSWORD`, `MAIL_HOOK_KEY`) oppure nel portachiavi del Mac
+   (servizi `acceleriamo-mail-tommaso` e `acceleriamo-mail-hook`). Mai nel codice.
+3. Prova senza mandare niente: `python3 scripts/posta/leggi_posta.py --mostra`.
+4. Giro vero ogni 5 minuti (launchd sul Mac o timer sul server): `python3 scripts/posta/leggi_posta.py`.
+   Al primo giro legge solo le mail degli ultimi 14 giorni (`MAIL_GIORNI_INIZIALI`).
+
+Server: `imaps.aruba.it`, porta 993 (verificato il 26/10/2026). Prove: `tests/posta.test.ts` e
+`python3 -m unittest scripts/posta/test_leggi_posta.py`, con mail finte in `scripts/posta/fixture/`.
+
 ## Proposte dal wiki: lo script `dopo-il-pdf`
 
 Nel wiki, quando si rende il PDF di un preventivo di Acceleriamo (`_system/scripts/render-pdf.sh`), parte da solo lo script `companies/acceleriamo/automazioni/dopo-il-pdf`, che registra la proposta nel gestionale chiamando `POST /api/hooks/proposals`.

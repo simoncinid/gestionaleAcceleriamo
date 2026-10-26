@@ -1,0 +1,38 @@
+[
+ {
+  "messageId": "<invito-finto-1@google.com>",
+  "data": 1793026800000,
+  "da": {
+   "email": "calendar-notification@google.com",
+   "nome": "Google Calendar"
+  },
+  "rispondiA": null,
+  "oggetto": "Invito: Acceleriamo x Officina Rossi Finta - gio 5 nov 2026 10:00 - 10:45",
+  "testo": "Acceleriamo x Officina Rossi Finta\r\ngiovedì 5 novembre 2026 ⋅ 10:00 - 10:45\r\nPartecipa con Google Meet: https://meet.google.com/abc-defg-hij\r\n",
+  "calendario": "BEGIN:VCALENDAR\r\r\nPRODID:-//Google Inc//Google Calendar 70.9054//EN\r\r\nVERSION:2.0\r\r\nCALSCALE:GREGORIAN\r\r\nMETHOD:REQUEST\r\r\nBEGIN:VEVENT\r\r\nDTSTART;TZID=Europe/Rome:20261105T100000\r\r\nDTEND;TZID=Europe/Rome:20261105T104500\r\r\nDTSTAMP:20261026T150000Z\r\r\nORGANIZER;CN=Tommaso Rovini:mailto:tommaso@acceleriamo.it\r\r\nUID:abc123finto@google.com\r\r\nATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;CN=Mario Rossi;X-NUM-GUESTS=0:mailto:mario@officina-rossi-finta.it\r\r\nX-GOOGLE-CONFERENCE:https://meet.google.com/abc-defg-hij\r\r\nSUMMARY:Acceleriamo x Officina Rossi Finta\r\r\nSEQUENCE:0\r\r\nSTATUS:CONFIRMED\r\r\nEND:VEVENT\r\r\nEND:VCALENDAR\r\r\n"
+ },
+ {
+  "messageId": "<modulo-finto-1@acceleriamo.it>",
+  "data": 1793031120000,
+  "da": {
+   "email": "noreply@acceleriamo.it",
+   "nome": "Sito Acceleriamo"
+  },
+  "rispondiA": "giulia@carpenteria-neri-finta.it",
+  "oggetto": "Nuova richiesta di valutazione gratuita",
+  "testo": "Nuova richiesta\n\nNome e cognome\nGiulia Neri\n\nAzienda\nCarpenteria Neri Finta\n\nTelefono\n347 123 4567\n\nCosa ti fa perdere più tempo?\nFare i preventivi\n\nQuante persone se ne occupano?\n1–2",
+  "calendario": null
+ },
+ {
+  "messageId": "<risposta-finta-1@officina-rossi-finta.it>",
+  "data": 1793034060000,
+  "da": {
+   "email": "mario@officina-rossi-finta.it",
+   "nome": "Mario Rossi"
+  },
+  "rispondiA": null,
+  "oggetto": "Re: Consulenza",
+  "testo": "Buongiorno Tommaso,\r\nva bene giovedì, vi aspetto.\r\n\r\nIl giorno lun 26 ott 2026 alle 10:12 Tommaso Rovini <tommaso@acceleriamo.it> ha scritto:\r\n> Buongiorno Mario\r\n",
+  "calendario": null
+ }
+]

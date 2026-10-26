@@ -29,7 +29,7 @@ export function SezioneCall({ leadId, ora, lead }: { leadId: string; ora?: numbe
           const sintesi = n.problema?.trim() || n.reazione?.trim();
           return (
             <li key={k.id}>
-              <Riga titolo={`Call di ${k.kind}, ${momento(k.scheduledAt, ora)}`} secondaria={k.outcome ? STATO[k.outcome] : "In programma"} meta={sintesi || undefined} onClick={() => setAperta(k)} />
+              <Riga titolo={`Call di ${k.kind}, ${momento(k.scheduledAt, ora)}${k.durationMin ? `, ${k.durationMin} min` : ""}`} secondaria={k.outcome ? STATO[k.outcome] : "In programma"} meta={sintesi || undefined} onClick={() => setAperta(k)} />
               {lead && k.outcome === "fatta" && <CoachCall callId={k.id} leadId={leadId} lead={lead} />}
             </li>
           );

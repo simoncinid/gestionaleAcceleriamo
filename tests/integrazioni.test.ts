@@ -33,7 +33,7 @@ describe("Impostazioni, integrazioni", () => {
     await env.DB.prepare("INSERT INTO integration_status (key, ok, last_ok_at, last_error_at, last_error, error_id) VALUES ('resend', 0, ?, ?, 'Resend 500: errore finto', 'ab12cd34')").bind(now - 86_400_000, now - 60_000).run();
     await env.DB.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at) VALUES ('f1', 'Officina Prova', 'foglio_andrea', 'da-chiamare-prima-volta', ?1, ?1, ?1)").bind(now).run();
     const s = await stato(cookie);
-    expect(s.integrazioni.map((i) => i.key)).toEqual(["meta", "foglio", "aggancio", "resend", "push", "telegram", "claude", "giro"]);
+    expect(s.integrazioni.map((i) => i.key)).toEqual(["meta", "foglio", "aggancio", "posta", "resend", "push", "telegram", "claude", "giro"]);
     expect(voce(s, "foglio")).toMatchObject({ stato: "spento", nota: "Non collegato: manca il link del foglio" });
     expect(voce(s, "giro").stato).toBe("mai");
     expect(voce(s, "push").stato).toBe("spento");

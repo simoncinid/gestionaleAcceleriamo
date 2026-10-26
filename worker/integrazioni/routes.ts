@@ -30,13 +30,15 @@ export type StatoSistema = {
 export type VoceRegistro = { id: string; at: number; status: number; number: string | null; outcome: string | null };
 
 const ETICHETTE: Record<string, string> = {
-  meta: "Meta", foglio: "Foglio Andrea", aggancio: "Aggancio proposte", resend: "Resend",
+  meta: "Meta", foglio: "Foglio Andrea", aggancio: "Aggancio proposte", posta: "Posta di Tommaso", resend: "Resend",
   push: "Push", telegram: "Telegram", claude: "Claude", giro: "Giro programmato",
 };
 const SETTIMANA = 7 * 86_400_000;
 export const SENZA_CHIAVE_RESEND = "Non collegato: manca la chiave di Resend";
 export const SENZA_CHIAVE_AGGANCIO = "Non collegato: manca la chiave dell'aggancio";
 const SENZA_SEGRETI_META = "Non collegato: mancano i segreti di Meta";
+// Il lettore della casella gira fuori dal Worker (scripts/posta): qui si vede solo se la chiave c'è e l'ultima mail arrivata.
+const SENZA_CHIAVE_POSTA = "Non collegato: manca la chiave della posta";
 const SENZA_LINK_FOGLIO = "Non collegato: manca il link del foglio";
 export const SENZA_CHIAVI_PUSH = "Non collegato: mancano le chiavi VAPID";
 export const SENZA_BOT_TELEGRAM = "Non collegato: manca il token del bot";
@@ -109,6 +111,7 @@ integrazioniRoutes.get("/status", async (c) => {
       meta,
       daRiga("foglio", foglioSpento),
       daRiga("aggancio", segreti.aggancio ? null : SENZA_CHIAVE_AGGANCIO),
+      daRiga("posta", c.env.MAIL_HOOK_KEY ? null : SENZA_CHIAVE_POSTA),
       daRiga("resend", segreti.resend ? null : SENZA_CHIAVE_RESEND),
       push, telegram, claude,
       daRiga("giro", null),

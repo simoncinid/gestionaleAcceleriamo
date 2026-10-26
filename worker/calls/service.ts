@@ -28,11 +28,14 @@ export type CallAgenda = {
   id: string; leadId: string; company: string; contactName: string | null; phone: string | null; email: string | null;
   kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null; notes: string | null;
   outcome: "fatta" | "saltata" | "rimandata" | null; inviteSentAt: number | null;
+  // Dall'invito di Google letto nella casella (worker/posta); null per le call fissate a mano.
+  durationMin: number | null;
 };
 
 const COLONNE = {
   id: calls.id, leadId: calls.leadId, company: leads.company, contactName: leads.contactName, phone: leads.phone, email: leads.email,
   kind: calls.kind, scheduledAt: calls.scheduledAt, meetLink: calls.meetLink, notes: calls.notes, outcome: calls.outcome, inviteSentAt: calls.inviteSentAt,
+  durationMin: calls.durationMin,
 };
 
 export const agenda = (db: Db, da: number, a: number): Promise<CallAgenda[]> =>

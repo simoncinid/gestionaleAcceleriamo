@@ -28,6 +28,7 @@ export default defineWorkersConfig(async () => {
               IG_GRAPH_VERSION: "v25.0",
               RESEND_API_KEY: "re_test",
               PROPOSAL_HOOK_KEY: "chiave-aggancio-test",
+              MAIL_HOOK_KEY: "chiave-posta-test",
               GOOGLE_SA_EMAIL: "",
               GOOGLE_SA_PRIVATE_KEY: "",
               ANTHROPIC_API_KEY: "sk-ant-test",

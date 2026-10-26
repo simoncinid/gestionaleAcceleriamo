@@ -24,7 +24,7 @@ export async function assegnaResponsabile(db: Db, imp: Impostazioni, ora: number
 }
 
 // Catena del lead nuovo (spec 6.1): responsabile, punteggio, email di conferma.
-export async function catenaLeadNuovo(env: Env, leadId: string, origine: "meta" | "foglio" | "manuale", now: number): Promise<void> {
+export async function catenaLeadNuovo(env: Env, leadId: string, origine: "meta" | "foglio" | "manuale" | "sito", now: number): Promise<void> {
   const db = getDb(env.DB);
   const lead = await db.select().from(leads).where(eq(leads.id, leadId)).get();
   if (!lead) return;

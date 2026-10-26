@@ -15,6 +15,7 @@ import { badgeRoutes } from "./badge/routes";
 import { analisiRoutes, coachRoutes } from "./calls/coach-routes";
 import { callRoutes } from "./calls/routes";
 import { agganciRoutes } from "./proposte/aggancio";
+import { postaRoutes } from "./posta/routes";
 import { proposalRoutes } from "./proposte/routes";
 import { metaRoutes } from "./meta/routes";
 import { webhookInstagram } from "./risponditore/webhook";
@@ -46,7 +47,7 @@ app.onError((err, c) => {
   return c.json({ error: "Errore del server", errorId }, 500);
 });
 
-const PUBLIC_PATHS = ["/api/health", "/api/_boom", "/api/auth/login", "/api/hooks/proposals", "/api/stato/battito"];
+const PUBLIC_PATHS = ["/api/health", "/api/_boom", "/api/auth/login", "/api/hooks/proposals", "/api/hooks/posta", "/api/stato/battito"];
 
 app.use("/api/*", async (c, next) => {
   if (PUBLIC_PATHS.includes(c.req.path) || c.req.path.startsWith("/api/webhooks/") || c.req.path.startsWith("/api/pubblico/")) return next();
@@ -74,6 +75,7 @@ app.route("/api/calls", coachRoutes);
 app.route("/api/calls", callRoutes);
 app.route("/api/call-analyses", analisiRoutes);
 app.route("/api/proposals", proposalRoutes);
+app.route("/api/hooks/posta", postaRoutes);
 app.route("/api/hooks", agganciRoutes);
 app.route("/api/economia", economiaRoutes);
 app.route("/api/clients", clientiRoutes);

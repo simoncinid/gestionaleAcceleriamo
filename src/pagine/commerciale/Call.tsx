@@ -100,7 +100,7 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
       {[...giorni.entries()].map(([g, ks]) => (
         <Gruppo key={g} titolo={titoloGiorno(g, oggi)} n={ks.length}>
           {ks.map((k) => (
-            <BloccoCall key={k.id} k={k} secondaria={`Call di ${k.kind}`} meta={k.inviteSentAt ? "Invito mandato" : undefined} onApri={() => setAperta(k)}
+            <BloccoCall key={k.id} k={k} secondaria={`Call di ${k.kind}${k.durationMin ? `, ${k.durationMin} min` : ""}`} meta={k.inviteSentAt ? "Invito mandato" : undefined} onApri={() => setAperta(k)}
               azione={k.meetLink
                 ? (k.id === prossimaOggi?.id
                   ? <Contatto tipo="meet" lead={k} variante="primario" misura="md" intero />
