@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { AppEnv } from "../env";
 import { getDb } from "../db/client";
 import { daRoma, partiRoma } from "../lib/roma";
+import { AZIONE_PAUSA } from "../regole/motore";
 import { conScadenzaSla } from "../regole/sla";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { scegliAdesso } from "./adesso";
@@ -70,7 +71,7 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
       ORDER BY l.next_action_at`, fine),
     // I nuovi hanno già il loro gruppo, i bloccati sono in pausa: nessuno dei due è "fermo".
     tutti<RigaOggi>(`SELECT ${COLONNE} ${FROM}
-      WHERE ${APERTI} ${chi} AND l.stage_id NOT IN ('probabilmente-bloccato', 'da-chiamare-prima-volta')
+      WHERE ${APERTI} ${chi} AND l.paused_until IS NULL AND l.stage_id <> 'da-chiamare-prima-volta'
         AND l.stage_changed_at <= ?2 ORDER BY l.stage_changed_at LIMIT 20`, ora - giorniFermo * GIORNO),
     tutti<CallGrezza>(`SELECT k.id, k.lead_id AS leadId, l.company, l.contact_name AS contactName, l.phone, k.kind, k.scheduled_at AS scheduledAt, k.meet_link AS meetLink,
         -- Come statoScheda: durante "Rigenera" resta pronta se una versione pronta c'è già.
@@ -96,7 +97,7 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
   });
   const idProposte = new Set(proposte.map((x) => x.leadId));
   const daFareTutti = dovuti
-    .filter((l) => l.stageId !== "da-chiamare-prima-volta" && !idProposte.has(l.id) && l.stageId !== "probabilmente-bloccato")
+    .filter((l) => l.stageId !== "da-chiamare-prima-volta" && !idProposte.has(l.id) && l.nextAction !== AZIONE_PAUSA)
     .map((l) => ({ ...l, slaScadenza: null }));
   const adesso = scegliAdesso({ nuovi: nuoviTutti, daFare: daFareTutti, call: callOggi }, ora);
 
@@ -116,7 +117,7 @@ export async function calcolaOggi(db: D1Database, io: string, chiScelto: "mie" |
   const daFare = prendi(daFareTutti, (l) => l.id);
   // Un lead con proposta compare una volta sola: nel blocco proposte (con "Segna presentata" se registrata).
   const proposteVisibili = prendi(proposte, (x) => x.leadId);
-  const finePausa = prendi(dovuti.filter((l) => l.stageId === "probabilmente-bloccato").map((l) => ({ ...l, slaScadenza: null })), (l) => l.id);
+  const finePausa = prendi(dovuti.filter((l) => l.nextAction === AZIONE_PAUSA).map((l) => ({ ...l, slaScadenza: null })), (l) => l.id);
   // I fermi sono a scomparsa e non entrano nel totale.
   const fermi = prendi(fermiGrezzi.map((l) => ({ ...l, slaScadenza: null })), (l) => l.id);
 

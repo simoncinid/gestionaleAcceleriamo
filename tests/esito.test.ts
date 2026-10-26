@@ -13,6 +13,30 @@ const conta = async (sql: string, ...b: unknown[]) => (await env.DB.prepare(sql)
 const leadRow = (id: string) => env.DB.prepare("SELECT * FROM leads WHERE id = ?").bind(id).first<Record<string, unknown>>();
 const esito = (id: string, json: unknown, cookie: string) => call(`/api/leads/${id}/esito`, { method: "PATCH", json }, cookie);
 
+describe("esito della consulenza e della presentazione", () => {
+  it("consulenza fatta: fase In attesa preventivo e la call di conoscenza in programma diventa fatta", async () => {
+    const cookie = await authed();
+    await insertLead("c1", { stage_id: "appuntamento-confermato" });
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_by, created_at, updated_at) VALUES ('k1', 'c1', 'conoscenza', ?, 'x', 1, 1)").bind(NOW - 3_600_000).run();
+    const res = await esito("c1", { requestId: crypto.randomUUID(), esito: "consulenza_fatta", stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: NOW + 86_400_000 }, cookie);
+    expect(res.status).toBe(200);
+    expect(await leadRow("c1")).toMatchObject({ stage_id: "in-attesa-preventivo", next_action: "Preparare il preventivo" });
+    expect(await env.DB.prepare("SELECT outcome FROM calls WHERE id = 'k1'").first()).toEqual({ outcome: "fatta" });
+    const a = await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'c1' AND type = 'esito'").first();
+    expect(a).toEqual({ body: "Consulenza fatta" });
+  });
+
+  it("presentazione fissata: crea la call di presentazione e sposta in Presentazione fissata", async () => {
+    const cookie = await authed();
+    await insertLead("c2", { stage_id: "in-attesa-preventivo" });
+    const quando = NOW + 2 * 86_400_000;
+    const res = await esito("c2", { requestId: crypto.randomUUID(), esito: "presentazione_fissata", stageId: "presentazione-confermata", nextAction: "Call di presentazione", nextActionAt: quando, call: { kind: "presentazione", scheduledAt: quando, meetLink: "meet.google.com/abc-defg-hij" } }, cookie);
+    expect(res.status).toBe(200);
+    expect(await env.DB.prepare("SELECT kind, meet_link FROM calls WHERE lead_id = 'c2'").first()).toEqual({ kind: "presentazione", meet_link: "https://meet.google.com/abc-defg-hij" });
+    expect((await leadRow("c2"))?.stage_id).toBe("presentazione-confermata");
+  });
+});
+
 describe("PATCH /leads/:id/esito", () => {
   it("401 senza sessione", async () => {
     expect((await call("/api/leads/x/esito", { method: "PATCH", json: {} })).status).toBe(401);
@@ -147,7 +171,7 @@ describe("PATCH /leads/:id con motivo e vinto", () => {
     expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "fake", lostReason: "fake" } }, cookie)).status).toBe(200);
     await insertLead("v2");
     const senza = await call("/api/leads/v2", { method: "PATCH", json: { stageId: "chiuso" } }, cookie);
-    expect(((await senza.json()) as { error: string }).error).toBe("Per Chiuso servono setup, canone e data di inizio");
+    expect(((await senza.json()) as { error: string }).error).toBe("Per Cliente servono setup, canone e data di inizio");
     const con = await call("/api/leads/v2", { method: "PATCH", json: { stageId: "chiuso", setupCents: 200_000, feeCents: 15_000, wonStartAt: NOW } }, cookie);
     expect(con.status).toBe(200);
   });

@@ -1,6 +1,6 @@
 import { linkHttp } from "./validation";
 import { assertCallFutura } from "../calls/service";
-import { and, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -33,10 +33,15 @@ const ETICHETTE: Record<Esito, string> = {
   non_risponde: "Non risponde",
   occupato: "Occupato",
   richiamare: "Richiamare",
-  appuntamento: "Appuntamento fissato",
+  appuntamento: "Consulenza fissata",
   non_interessato: "Non interessato",
-  fuori_target: "Fuori target",
+  fuori_target: "Non profilato",
+  consulenza_fatta: "Consulenza fatta",
+  presentazione_fissata: "Presentazione fissata",
+  presentazione_fatta: "Presentazione fatta",
 };
+// Gli esiti che chiudono la call in programma di quel tipo (resta una sola strada per dire "fatta").
+const CALL_FATTA: Partial<Record<Esito, "conoscenza" | "presentazione">> = { consulenza_fatta: "conoscenza", presentazione_fatta: "presentazione" };
 const TENTATIVI: Esito[] = ["non_risponde", "occupato"];
 
 export async function primoTentativoAt(db: Db, leadId: string): Promise<number | null> {
@@ -61,7 +66,7 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
   await assertMotivo(db, input.lostReason);
   // Come nel PATCH del lead: motivo e blocco su Chiuso solo quando la fase cambia davvero.
   if (cambiaFase && stage.requiresReason && !input.lostReason) throw new HTTPException(422, { message: "Scegli il motivo" });
-  if (cambiaFase && stage.kind === "won") throw new HTTPException(422, { message: "Per segnare Chiuso usa il cambio di fase nella scheda lead" });
+  if (cambiaFase && stage.kind === "won") throw new HTTPException(422, { message: "Per segnare Cliente usa il cambio di fase nella scheda lead" });
   if (stage.kind === "open" && (!input.nextAction || !input.nextActionAt)) throw new HTTPException(422, { message: "Serve una prossima azione con data per i lead aperti" });
   if (input.call) assertCallFutura(input.call.scheduledAt, now);
   // Come nel PATCH del lead (Q14): nelle fasi che esistono solo con una call fissata si entra con la call nell'esito
@@ -73,6 +78,11 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
     if (!esistente) throw new HTTPException(422, { message: "Per questa fase serve la call: scegli giorno e ora" });
   }
 
+  const kindFatta = CALL_FATTA[input.esito];
+  const callAperta = kindFatta
+    ? await db.select({ id: calls.id }).from(calls)
+      .where(and(eq(calls.leadId, leadId), eq(calls.kind, kindFatta), isNull(calls.deletedAt), isNull(calls.outcome))).orderBy(asc(calls.scheduledAt)).get()
+    : undefined;
   const tentativo = TENTATIVI.includes(input.esito);
   const attemptNo = tentativo ? lead.attemptCount + 1 : null;
   const callId = input.call ? crypto.randomUUID() : null;
@@ -100,6 +110,7 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
     const da = await getStage(db, lead.stageId);
     passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "cambio_fase", body: `Da "${da.label}" a "${stage.label}"`, authorId: userId, createdAt: now }));
   }
+  if (callAperta) passi.push(db.update(calls).set({ outcome: "fatta", outcomeAt: now, updatedAt: now }).where(eq(calls.id, callAperta.id)));
   if (input.call && callId) {
     passi.push(db.insert(calls).values({ id: callId, leadId, kind: input.call.kind, scheduledAt: input.call.scheduledAt, meetLink: input.call.meetLink, createdBy: userId, createdAt: now, updatedAt: now }));
   }

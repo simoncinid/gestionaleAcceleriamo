@@ -15,9 +15,9 @@ describe("filtri della Scaletta", () => {
   it("viste fisse, punteggio, fonte Foglio Andrea e date", async () => {
     const cookie = await authed();
     await insertLead("nuovo", { stage_id: "da-chiamare-prima-volta", score: "verde", source: "foglio_andrea" });
-    await insertLead("richiamo", { stage_id: "non-chiamato", score: "grigio" });
+    await insertLead("richiamo", { stage_id: "da-richiamare", score: "grigio" });
     await insertLead("attesa", { stage_id: "in-attesa-decisione" });
-    await insertLead("pausa", { stage_id: "probabilmente-bloccato" });
+    await insertLead("pausa", { stage_id: "in-attesa-decisione", paused_until: NOW + 30 * 86_400_000 });
     await insertLead("perso", { stage_id: "fake", lost_reason: "fake" });
     await insertLead("vecchio", { created_at: NOW - 40 * 86_400_000 });
     expect(await elenco(cookie, "vista=nuovi")).toEqual(["nuovo"]);
@@ -71,7 +71,7 @@ describe("azioni multiple", () => {
   it("le fasi perse con motivo vanno scelte lead per lead", async () => {
     const cookie = await authed();
     await insertLead("a");
-    for (const fase of ["non-chiuso", "fuori-target", "fake", "chiuso"]) {
+    for (const fase of ["non-chiuso", "fake", "fake", "chiuso"]) {
       const r = await call("/api/leads/bulk", { method: "POST", json: { ids: ["a"], azione: "fase", valore: fase } }, cookie);
       expect(r.status).toBe(422);
       expect(await r.json()).toEqual({ error: "Questa fase va scelta lead per lead" });

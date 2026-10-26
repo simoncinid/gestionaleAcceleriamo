@@ -148,7 +148,7 @@ describe("API delle call", () => {
     expect(await lead("l5")).toMatchObject({ stage_id: "in-attesa-decisione", next_action: "Follow-up preventivo", sequence_step: 1 });
     expect(await env.DB.prepare("SELECT status, presented_at IS NOT NULL p FROM proposals WHERE id = 'p5'").first()).toEqual({ status: "presentata", p: 1 });
     const fase = await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'l5' AND type = 'cambio_fase'").first<{ body: string }>();
-    expect(fase?.body).toBe('Da "Presentazione confermata" a "In attesa decisione"');
+    expect(fase?.body).toBe('Da "Presentazione fissata" a "In attesa decisione"');
   });
 
   it("call saltata: si torna a richiamare", async () => {

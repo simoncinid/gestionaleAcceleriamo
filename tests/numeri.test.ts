@@ -38,12 +38,12 @@ describe("funzioni pure", () => {
     expect(percentualeOnesta(4, 5)).toBe(80);
   });
   it("tempi per fase dai cambi di fase della 1A", () => {
-    const fasi = [{ id: "da-richiamare", label: "Da richiamare" }, { id: "appuntamento-confermato", label: "Appuntamento confermato" }];
+    const fasi = [{ id: "da-richiamare", label: "Da richiamare" }, { id: "appuntamento-confermato", label: "Consulenza fissata" }];
     const t = tempiPerFase([
       { leadId: "A", at: 0, body: 'Da "Da chiamare la prima volta" a "Da richiamare"' },
-      { leadId: "A", at: 2 * 86_400_000, body: 'Da "Da richiamare" a "Appuntamento confermato"' },
+      { leadId: "A", at: 2 * 86_400_000, body: 'Da "Da richiamare" a "Consulenza fissata"' },
       { leadId: "B", at: 0, body: 'Da "Da chiamare la prima volta" a "Da richiamare"' },
-      { leadId: "B", at: 86_400_000, body: 'Da "Da richiamare" a "Appuntamento confermato"' },
+      { leadId: "B", at: 86_400_000, body: 'Da "Da richiamare" a "Consulenza fissata"' },
     ], fasi);
     expect(t).toEqual([{ stageId: "da-richiamare", label: "Da richiamare", giorniMedi: 1.5, passaggi: 2 }]);
   });

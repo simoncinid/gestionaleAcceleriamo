@@ -375,7 +375,7 @@ describe("giro con i lavori veri insieme", () => {
   // Con gli avvisi pieni di lavoro: 12 lead con lo SLA scaduto, 3 pause finite, il foglio rotto da avvisare.
   async function conAvvisi() {
     for (let i = 0; i < 12; i++) await insertLead(`s${i}`, { stage_id: "da-chiamare-prima-volta", created_at: r(8, 0) - i, owner_id: "tommaso" });
-    for (let i = 0; i < 3; i++) await insertLead(`pz${i}`, { stage_id: "probabilmente-bloccato", paused_until: r(8, 0), owner_id: "tommaso" });
+    for (let i = 0; i < 3; i++) await insertLead(`pz${i}`, { stage_id: "in-attesa-decisione", paused_until: r(8, 0), owner_id: "tommaso" });
     await env.DB.prepare("INSERT INTO integration_status (key, ok, last_error, error_id) VALUES ('resend', 0, 'giù', 'ab12cd34')").run();
   }
   const casiAvvisi: [string, number, number, string[]][] = [

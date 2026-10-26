@@ -4,8 +4,8 @@ import { contaPrimari, render } from "./render";
 
 describe("Q14: foglio della call aperto dal cambio di fase", () => {
   it("titolo con la fase, niente scelta del tipo, un solo primario", () => {
-    const html = render(<FoglioFissaCall leadId="abc" haEmail={false} fase={{ label: "Appuntamento confermato", kind: "conoscenza" }} onChiudi={() => {}} />);
-    expect(html).toContain("Appuntamento confermato: quando è la call");
+    const html = render(<FoglioFissaCall leadId="abc" haEmail={false} fase={{ label: "Consulenza fissata", kind: "conoscenza" }} onChiudi={() => {}} />);
+    expect(html).toContain("Consulenza fissata: quando è la call");
     expect(html).not.toContain('data-selettore="Tipo"');
     expect(html).toContain("Giorno e ora");
     expect(contaPrimari(html)).toBe(1);

@@ -56,11 +56,11 @@ const NOMI = ["Marco", "Giulia", "Luca", "Sara", "Andrea", "Elena", "Paolo", "Ch
 const COGNOMI = ["Rossi", "Bianchi", "Conti", "Ricci", "Greco", "Bruno", "Gallo", "Costa", "Fontana", "Moretti"];
 // Distribuzione sulle fasi della 1A (drizzle/0001): 40 lead, quasi tutti aperti.
 const FASI: [string, number][] = [
-  ["da-chiamare-prima-volta", 6], ["non-chiamato", 4], ["da-richiamare", 6], ["appuntamento-confermato", 4],
-  ["presentazione-confermata", 3], ["in-attesa-preventivo", 3], ["in-attesa-decisione", 4], ["probabilmente-bloccato", 2],
-  ["chiuso", 3], ["non-chiuso", 3], ["fuori-target", 2],
+  ["da-chiamare-prima-volta", 6], ["da-richiamare", 4], ["da-richiamare", 6], ["appuntamento-confermato", 4],
+  ["presentazione-confermata", 3], ["in-attesa-preventivo", 3], ["in-attesa-decisione", 4], ["in-attesa-decisione", 2],
+  ["chiuso", 3], ["non-chiuso", 3], ["fake", 2],
 ];
-const CHIUSE = ["chiuso", "non-chiuso", "fuori-target"];
+const CHIUSE = ["chiuso", "non-chiuso", "fake"];
 const CON_PREZZO = ["in-attesa-preventivo", "in-attesa-decisione", "chiuso"];
 const CON_CALL = ["appuntamento-confermato", "presentazione-confermata", "in-attesa-preventivo", "in-attesa-decisione", "chiuso", "non-chiuso"];
 const CAMPAGNE = ["Lavoro ripetuto, video", "Excel e gestionale, carosello", "Telefonate perse, video"];
@@ -116,11 +116,11 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
       website: `https://${slug(a.nome)}.esempio.invalid`, notes: a.settore, source: meta ? "meta" : i % 2 ? "foglio_andrea" : "manuale",
       metaCampaign: meta ? CAMPAGNE[i % 3] : null, metaAd: meta ? `Inserzione ${(i % 5) + 1}` : null,
       stageId: fase, stageChangedAt: creato + GIORNO, ownerId: "demo",
-      nextAction: chiusa || fase === "non-chiamato" ? null : "Richiamare",
+      nextAction: chiusa ? null : "Richiamare",
       nextActionAt: chiusa ? null : ora + ((i % 5) - 2) * 3_600_000,
       setupCents: conPrezzo ? setup : null, feeCents: conPrezzo ? canone : null,
       score: (["verde", "giallo", "grigio"] as const)[i % 3],
-      lostReason: fase === "non-chiuso" ? "budget" : fase === "fuori-target" ? "fuori_target" : null,
+      lostReason: fase === "non-chiuso" ? "budget" : fase === "fake" ? "fuori_target" : null,
       firstResponseAt: fase === "da-chiamare-prima-volta" ? null : creato + 40 * 60_000,
       wonStartAt: fase === "chiuso" ? ora - 30 * GIORNO : null,
       createdBy: meta ? null : "demo", createdAt: creato, updatedAt: creato + GIORNO,
@@ -221,7 +221,7 @@ const letterale = (v: unknown): string => {
 // UPDATE delle migrazioni su queste tabelle. Le impostazioni non hanno righe di partenza: vuote valgono i default.
 // Anche il lavoro tipo predefinito con le sue task torna come dopo la migrazione 0008_dati_lavori.
 export const TABELLE_BASE = ["settings", "stage_rules", "message_templates", "stages", "job_templates", "job_template_tasks"] as const;
-const SU_BASE = new RegExp(`^\\s*(INSERT INTO|UPDATE)\\s+[\`"]?(${TABELLE_BASE.join("|")})[\`"]?[\\s(]`, "i");
+const SU_BASE = new RegExp(`^\\s*(INSERT INTO|UPDATE|DELETE FROM)\\s+[\`"]?(${TABELLE_BASE.join("|")})[\`"]?[\\s(]`, "i");
 
 // Una riga sola per istruzione: fuori dalle stringhe gli a capo diventano spazi, dentro diventano char(10)
 // (il modello della conferma ha un a capo nel testo).
@@ -236,7 +236,7 @@ function suUnaRiga(q: string): string {
   return out;
 }
 
-// Le istruzioni delle migrazioni (in ordine, già divise ai "statement-breakpoint") che scrivono le tabelle di base.
+// Le istruzioni delle migrazioni (in ordine, comprese le DELETE della 0016 che toglie tre fasi, già divise ai "statement-breakpoint") che scrivono le tabelle di base.
 const senzaCommenti = (q: string) => q.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n").trim();
 export const istruzioniBase = (istruzioni: string[]): string[] =>
   istruzioni.map(senzaCommenti).filter((q) => SU_BASE.test(q)).map((q) => `${suUnaRiga(q.replace(/;\s*$/, ""))};`);

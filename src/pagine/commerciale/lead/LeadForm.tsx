@@ -57,7 +57,7 @@ export function LeadForm({ lead, users, ora, onSave, pending }: { lead: Lead; us
       {sola && (
         <dl aria-label="Dati di sola lettura" className="flex flex-col divide-y divide-sabbia border-t border-sabbia pt-1">
           {lead.estimatedValue != null && <Dato etichetta="Valore stimato">{euro(lead.estimatedValue * 100)}</Dato>}
-          {lead.appointmentAt != null && <Dato etichetta="Appuntamento">{momento(lead.appointmentAt, ora)}</Dato>}
+          {lead.appointmentAt != null && <Dato etichetta="Consulenza">{momento(lead.appointmentAt, ora)}</Dato>}
           {lead.meetLink && <Dato etichetta="Link Meet"><a href={lead.meetLink} target="_blank" rel="noreferrer" className="text-accento-testo underline-offset-4 hover:underline">{lead.meetLink}</a></Dato>}
           {lead.proposalUrl && <Dato etichetta="Link preventivo"><a href={lead.proposalUrl} target="_blank" rel="noreferrer" className="text-accento-testo underline-offset-4 hover:underline">{lead.proposalUrl}</a></Dato>}
         </dl>

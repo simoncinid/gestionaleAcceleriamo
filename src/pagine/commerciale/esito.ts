@@ -6,13 +6,30 @@ export const ETICHETTE_ESITO: Record<Esito, string> = {
   non_risponde: "Non risponde",
   occupato: "Occupato",
   richiamare: "Richiamare",
-  appuntamento: "Appuntamento fissato",
+  appuntamento: "Consulenza fissata",
   non_interessato: "Non interessato",
-  fuori_target: "Fuori target",
+  fuori_target: "Non profilato",
+  consulenza_fatta: "Consulenza fatta",
+  presentazione_fissata: "Presentazione fissata",
+  presentazione_fatta: "Presentazione fatta",
 };
 
 // Ordine del selettore dell'esito: dal più frequente al più raro, come nel prototipo.
 export const ESITI_PER_FREQUENZA: Esito[] = ["non_risponde", "richiamare", "risposto", "appuntamento", "occupato", "non_interessato", "fuori_target"];
+
+// Gli esiti dipendono da dove è il lead nel processo: telefonate prima della consulenza,
+// poi consulenza, preventivo e presentazione. Gli esiti di chiusura restano sempre in fondo.
+const PERSI: Esito[] = ["non_interessato", "fuori_target"];
+const PER_FASE: Record<string, Esito[]> = {
+  "appuntamento-confermato": ["consulenza_fatta", "presentazione_fissata", "richiamare", "non_risponde"],
+  "in-attesa-preventivo": ["presentazione_fissata", "richiamare", "non_risponde", "risposto"],
+  "presentazione-confermata": ["presentazione_fatta", "richiamare", "non_risponde"],
+  "in-attesa-decisione": ["risposto", "richiamare", "non_risponde", "presentazione_fissata"],
+};
+export const esitiPerFase = (stageId: string): Esito[] => [...(PER_FASE[stageId] ?? ESITI_PER_FREQUENZA.filter((e) => !PERSI.includes(e))), ...PERSI];
+
+// Esiti che fissano una call nel foglio, e di che tipo.
+export const CALL_DELL_ESITO: Partial<Record<Esito, "conoscenza" | "presentazione">> = { appuntamento: "conoscenza", presentazione_fissata: "presentazione" };
 
 // Prossime azioni del selettore: la proposta del motore in cima, poi le più usate.
 export const AZIONI_FREQUENTI = ["Richiamare", "WhatsApp: Non ti ho trovato", "Email: Ti ho cercato", "Call di conoscenza", "Preparare il preventivo", "Fissare la call di presentazione", "Follow-up preventivo"];
@@ -26,7 +43,7 @@ export type StatoEsito = {
 
 export type EsitoBody = {
   requestId: string; esito: Esito; stageId: string; nextAction: string | null; nextActionAt: number | null; lostReason: string | null;
-  note?: string; call?: { kind: "conoscenza"; scheduledAt: number; meetLink: string | null };
+  note?: string; call?: { kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null };
 };
 
 // email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
@@ -45,7 +62,7 @@ export const statoIniziale = (
 
 // Gli esiti che decidono da soli fase e prossima azione: una call fissata o un lead perso. Con questi vincono le regole
 // anche quando il foglio arriva dal coach; con gli altri restano i suggerimenti del coach.
-export const ESITI_DELLE_REGOLE: Esito[] = ["appuntamento", "non_interessato", "fuori_target"];
+export const ESITI_DELLE_REGOLE: Esito[] = ["appuntamento", "non_interessato", "fuori_target", "consulenza_fatta", "presentazione_fissata", "presentazione_fatta"];
 
 // Unisce la proposta delle regole (arrivata dopo la scelta dell'esito) allo stato del foglio.
 export function applicaProposta(
@@ -70,7 +87,7 @@ export const testoTentativo = (attemptCount: number, massimo = 5) => `Tentativo 
 
 export function validaEsito(s: StatoEsito, motivoObbligatorio: boolean): string | null {
   if (!s.esito) return "Scegli un esito";
-  if (s.esito === "appuntamento" && s.callAt == null) return "Scegli data e ora della call";
+  if (CALL_DELL_ESITO[s.esito] && s.callAt == null) return "Scegli data e ora della call";
   if (motivoObbligatorio && !s.lostReason) return "Scegli il motivo";
   return null;
 }
@@ -81,6 +98,7 @@ export function corpoEsito(s: StatoEsito): EsitoBody {
     nextAction: s.nextAction.trim() || null, nextActionAt: s.nextActionAt, lostReason: s.lostReason,
   };
   if (s.note.trim()) corpo.note = s.note.trim();
-  if (s.esito === "appuntamento" && s.callAt != null) corpo.call = { kind: "conoscenza", scheduledAt: s.callAt, meetLink: s.meetLink.trim() || null };
+  const kind = CALL_DELL_ESITO[s.esito!];
+  if (kind && s.callAt != null) corpo.call = { kind, scheduledAt: s.callAt, meetLink: s.meetLink.trim() || null };
   return corpo;
 }

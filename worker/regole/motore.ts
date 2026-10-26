@@ -3,11 +3,15 @@ import { ORARIO_DEFAULT, alleOre, type Orario } from "./orario";
 
 // Le regole propongono, le persone salvano (spec 6.3). Qui solo funzioni pure.
 
-export const ESITI = ["risposto", "non_risponde", "occupato", "richiamare", "appuntamento", "non_interessato", "fuori_target"] as const;
+// "appuntamento" è solo la prima call (la consulenza); la seconda è la presentazione del preventivo.
+export const ESITI = [
+  "risposto", "non_risponde", "occupato", "richiamare", "appuntamento", "non_interessato", "fuori_target",
+  "consulenza_fatta", "presentazione_fissata", "presentazione_fatta",
+] as const;
 export type Esito = (typeof ESITI)[number];
 
 export type Contesto = { ora: number; orario: Orario; sequenze: boolean; ricontatti: number[]; pausaMesi: number; oreProposta: number; massimoTentativi: number };
-export const CONTESTO_BASE: Omit<Contesto, "ora"> = { orario: ORARIO_DEFAULT, sequenze: false, ricontatti: [3, 7, 14], pausaMesi: 2, oreProposta: 48, massimoTentativi: 5 };
+export const CONTESTO_BASE: Omit<Contesto, "ora"> = { orario: ORARIO_DEFAULT, sequenze: false, ricontatti: [3, 7, 14], pausaMesi: 2, oreProposta: 24, massimoTentativi: 5 };
 
 export type Proposta = {
   stageId: string | null; nextAction: string | null; nextActionAt: number | null;
@@ -16,6 +20,10 @@ export type Proposta = {
 
 const ORA_MS = 3_600_000;
 const domaniAlle10 = (c: Contesto) => alleOre(c.ora, 1, 10, 0, c.orario);
+// Dopo la consulenza: preparare il preventivo il giorno dopo alle 10 (con la regola a 24 ore; 48 ore = due giorni).
+const quandoPreventivo = (c: Contesto) => alleOre(c.ora, Math.max(1, Math.round(c.oreProposta / 24)), 10, 0, c.orario);
+// Azione della fine pausa: la usano il motore, il giro degli avvisi e il gruppo "Fine pausa" di Oggi.
+export const AZIONE_PAUSA = "Richiamare dopo la pausa";
 // Con le sequenze spente nessuna proposta avanza un passo di sequenza.
 const passoSequenza = (c: Contesto, n: number) => (c.sequenze ? { sequenceStep: n } : {});
 
@@ -32,7 +40,7 @@ function tentativo(lead: { stageId: string; attemptCount: number; primoTentativo
   const fatti = lead.attemptCount + 1;
   const passo = `Tentativo ${fatti} di ${c.massimoTentativi}`;
   if (fatti >= c.massimoTentativi) return { stageId: "non-chiuso", lostReason: "non_raggiungibile", nextAction: null, nextActionAt: null, attemptCount: fatti, passo };
-  const stageId = lead.stageId === "da-chiamare-prima-volta" ? "non-chiamato" : null;
+  const stageId = lead.stageId === "da-chiamare-prima-volta" ? "da-richiamare" : null;
   // Oltre i passi previsti (massimo tentativi alzato in Impostazioni) si richiama e basta.
   const passoPrevisto = PASSI[fatti - 1];
   if (!c.sequenze || !seguiSequenza || !passoPrevisto) return { stageId, nextAction: "Richiamare", nextActionAt: prossimaSenzaSequenza(), attemptCount: fatti, passo };
@@ -56,7 +64,13 @@ export function propostaEsito(esito: Esito, lead: { stageId: string; attemptCoun
     case "non_interessato":
       return { stageId: "non-chiuso", lostReason: "non_interessato", nextAction: null, nextActionAt: null };
     case "fuori_target":
-      return { stageId: "fuori-target", lostReason: "fuori_target", nextAction: null, nextActionAt: null };
+      return { stageId: "fake", lostReason: "fuori_target", nextAction: null, nextActionAt: null };
+    case "consulenza_fatta":
+      return { stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: quandoPreventivo(c) };
+    case "presentazione_fissata":
+      return { stageId: "presentazione-confermata", nextAction: "Call di presentazione", nextActionAt: call?.scheduledAt ?? null };
+    case "presentazione_fatta":
+      return { stageId: "in-attesa-decisione", nextAction: "Follow-up preventivo", nextActionAt: alleOre(c.ora, c.ricontatti[0], 10, 0, c.orario), ...passoSequenza(c, 1) };
   }
 }
 
@@ -74,7 +88,7 @@ function pausa(c: Contesto): Proposta {
   // Il 31 più un mese non deve sforare nel mese dopo: ci si ferma all'ultimo giorno.
   const ultimo = partiRoma(daRoma(p.anno, p.mese + c.pausaMesi + 1, 0, 12, 0)).giorno;
   const fine = alleOre(daRoma(p.anno, p.mese + c.pausaMesi, Math.min(p.giorno, ultimo), 10, 0), 0, 10, 0, c.orario);
-  return { stageId: "probabilmente-bloccato", nextAction: "Richiamare dopo la pausa", nextActionAt: fine, pausedUntil: fine, sequenceStep: 0 };
+  return { stageId: "in-attesa-decisione", nextAction: AZIONE_PAUSA, nextActionAt: fine, pausedUntil: fine, sequenceStep: 0 };
 }
 
 export function propostaEvento(e: Evento, c: Contesto): Proposta {
@@ -85,7 +99,7 @@ export function propostaEvento(e: Evento, c: Contesto): Proposta {
         : { stageId: "presentazione-confermata", nextAction: "Call di presentazione", nextActionAt: e.scheduledAt };
     case "call_fatta":
       if (e.kind === "conoscenza") {
-        return { stageId: e.presentazioneAt ? "presentazione-confermata" : "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: c.ora + c.oreProposta * ORA_MS };
+        return { stageId: e.presentazioneAt ? "presentazione-confermata" : "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: quandoPreventivo(c) };
       }
       return { stageId: "in-attesa-decisione", nextAction: "Follow-up preventivo", nextActionAt: alleOre(c.ora, c.ricontatti[0], 10, 0, c.orario), ...passoSequenza(c, 1) };
     case "call_saltata":
@@ -102,7 +116,7 @@ export function propostaEvento(e: Evento, c: Contesto): Proposta {
   }
 }
 
-export function finePausa(lead: { stageId: string; pausedUntil: number | null }, ora: number) {
-  if (lead.stageId !== "probabilmente-bloccato" || lead.pausedUntil == null || lead.pausedUntil > ora) return null;
-  return { nextAction: "Richiamare dopo la pausa", nextActionAt: ora };
+export function finePausa(lead: { pausedUntil: number | null }, ora: number) {
+  if (lead.pausedUntil == null || lead.pausedUntil > ora) return null;
+  return { nextAction: AZIONE_PAUSA, nextActionAt: ora };
 }

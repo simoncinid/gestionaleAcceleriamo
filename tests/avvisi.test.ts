@@ -67,7 +67,7 @@ describe("controllaAvvisi", () => {
   });
 
   it("fine pausa: la regola rimette il lead in giro e avvisa il responsabile", async () => {
-    await lead("L4", { stage_id: "probabilmente-bloccato", paused_until: lun(8), owner_id: "diego" });
+    await lead("L4", { stage_id: "in-attesa-decisione", paused_until: lun(8), owner_id: "diego" });
     await controllaAvvisi(env, lun(9), 10);
     const l = await env.DB.prepare("SELECT paused_until, next_action FROM leads WHERE id = 'L4'").first<{ paused_until: number | null; next_action: string }>();
     expect(l).toEqual({ paused_until: null, next_action: "Richiamare dopo la pausa" });
@@ -113,7 +113,7 @@ describe("controllaAvvisi", () => {
 
 describe("turni dello stesso evento", () => {
   it("seconda pausa: dopo la prima chiusa nasce un avviso nuovo", async () => {
-    await lead("L5", { stage_id: "probabilmente-bloccato", paused_until: lun(8), owner_id: "diego" });
+    await lead("L5", { stage_id: "in-attesa-decisione", paused_until: lun(8), owner_id: "diego" });
     await controllaAvvisi(env, lun(9), 10);
     await env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES ('a1', 'L5', 'nota', 'Sentito, richiamo a fine mese', 'diego', ?)").bind(lun(9, 30)).run();
     await controllaAvvisi(env, lun(9, 35), 10);
@@ -126,7 +126,7 @@ describe("turni dello stesso evento", () => {
   });
 
   it("la nota di sistema della fine pausa non chiude l'avviso", async () => {
-    await lead("L6", { stage_id: "probabilmente-bloccato", paused_until: lun(8), owner_id: "diego" });
+    await lead("L6", { stage_id: "in-attesa-decisione", paused_until: lun(8), owner_id: "diego" });
     await controllaAvvisi(env, lun(9), 10);
     await env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES ('a2', 'L6', 'nota', 'automatica', NULL, ?)").bind(lun(9, 30)).run();
     await controllaAvvisi(env, lun(9, 35), 10);
@@ -154,7 +154,7 @@ describe("costo del lavoro", () => {
     const c = { query: 0 };
     await controllaAvvisi({ ...env, DB: contaD1(env.DB, c) }, lun(10), COSTO_AVVISI.max);
     expect(c.query).toBe(8);
-    for (const id of ["P1", "P2", "P3", "P4"]) await lead(id, { stage_id: "probabilmente-bloccato", paused_until: lun(8) });
+    for (const id of ["P1", "P2", "P3", "P4"]) await lead(id, { stage_id: "in-attesa-decisione", paused_until: lun(8) });
     for (let i = 0; i < 12; i++) await lead(`S${i}`);
     c.query = 0;
     const r = await controllaAvvisi({ ...env, DB: contaD1(env.DB, c) }, lun(11, 1), COSTO_AVVISI.max);

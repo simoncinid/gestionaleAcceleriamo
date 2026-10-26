@@ -113,6 +113,13 @@
       "when": 1792840966545,
       "tag": "0015_piattaforma_risponditore",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1792900000000,
+      "tag": "0016_fasi_processo",
+      "breakpoints": true
     }
   ]
 }

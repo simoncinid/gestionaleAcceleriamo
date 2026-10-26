@@ -124,7 +124,7 @@ describe("scheda lead, correzioni della revisione", () => {
     const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], conDati], [["stages"], FASI]] });
     expect(html).toContain(">Valore stimato</dt>");
     expect(html).toContain(">Link Meet</dt>");
-    expect(html).toContain(">Appuntamento</dt>");
+    expect(html).toContain(">Consulenza</dt>");
     expect(html).not.toContain(">Link preventivo</dt>");
     for (const etichetta of ["Link Meet", "Link preventivo", "Appuntamento", "Valore stimato (euro)"]) expect(html).not.toContain(`>${etichetta}</label>`);
     const senza = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });

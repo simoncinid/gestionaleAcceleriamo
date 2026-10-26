@@ -58,7 +58,7 @@ describe("lead", () => {
     expect(lead.nextAction).toBeNull();
     expect(lead.nextActionAt).toBeNull();
     const detail = (await (await call(`/api/leads/${body.lead.id}`, {}, cookie)).json()) as { activities: { type: string; body: string }[] };
-    expect(detail.activities.find((a) => a.type === "cambio_fase")?.body).toBe('Da "Da chiamare prima volta" a "Chiuso"');
+    expect(detail.activities.find((a) => a.type === "cambio_fase")?.body).toBe('Da "Nuovo, da chiamare" a "Cliente"');
   });
 
   it("riaprire un lead chiuso senza prossima azione dà 422, con la prossima azione funziona", async () => {

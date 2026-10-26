@@ -72,7 +72,7 @@ export function FoglioSposta({ ids, singolo, opzioni, inCorso, onSposta, onChiud
       <div className="flex flex-col gap-3">
         <Selettore etichetta="Fase" apertoAllInizio valore={fase} opzioni={opzioni}
           onCambia={(v) => { setFase(v); if (singolo) guardia.prova(() => onSposta(v)); }} />
-        <p className="text-meta text-grigio">Chiuso, le fasi perse e quelle con una call si scelgono dalla scheda del lead: chiedono il motivo, i dati del vinto o la data della call.</p>
+        <p className="text-meta text-grigio">Cliente, le fasi perse e quelle con una call si scelgono dalla scheda del lead: chiedono il motivo, i dati del vinto o la data della call.</p>
       </div>
     </Foglio>
   );

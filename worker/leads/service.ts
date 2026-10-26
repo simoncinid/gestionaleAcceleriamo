@@ -138,11 +138,12 @@ export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: 
       const setup = patch.setupCents !== undefined ? patch.setupCents : current.setupCents;
       const canone = patch.feeCents !== undefined ? patch.feeCents : current.feeCents;
       const inizio = patch.wonStartAt !== undefined ? patch.wonStartAt : current.wonStartAt;
-      if (setup == null || canone == null || inizio == null) throw new HTTPException(422, { message: "Per Chiuso servono setup, canone e data di inizio" });
+      if (setup == null || canone == null || inizio == null) throw new HTTPException(422, { message: "Per Cliente servono setup, canone e data di inizio" });
     }
   }
   const next: Partial<Lead> = { ...patch, updatedAt: now };
-  if (stageChanged) next.stageChangedAt = now;
+  // La pausa vale solo nella fase in cui è nata: cambiando fase si toglie.
+  if (stageChanged) { next.stageChangedAt = now; next.pausedUntil = null; }
 
   if (stage.kind === "open") {
     const at = patch.nextActionAt !== undefined ? patch.nextActionAt : current.nextActionAt;
@@ -254,10 +255,11 @@ export async function mergeLeads(db: Db, sourceId: string, targetId: string, act
 export type Vista = "nuovi" | "da-richiamare" | "in-attesa" | "in-pausa" | "scartati";
 export const VISTE: Record<Vista, string[]> = {
   nuovi: ["da-chiamare-prima-volta"],
-  "da-richiamare": ["non-chiamato", "da-richiamare"],
+  "da-richiamare": ["da-richiamare"],
   "in-attesa": ["in-attesa-preventivo", "in-attesa-decisione"],
-  "in-pausa": ["probabilmente-bloccato"],
-  scartati: ["non-chiuso", "fuori-target", "fake"],
+  // In pausa non è una fase: sono i lead con paused_until (vedi listLeads).
+  "in-pausa": [],
+  scartati: ["non-chiuso", "fake"],
 };
 
 export type LeadFilters = {
@@ -276,7 +278,10 @@ export async function listLeads(db: Db, f: LeadFilters) {
     conds.push(or(like(leads.company, p), like(leads.contactName, p), like(leads.email, p), like(leads.phone, p), like(leads.notes, p)));
   }
   if (f.score) conds.push(eq(leads.score, f.score));
-  if (f.vista && Object.hasOwn(VISTE, f.vista)) conds.push(inArray(leads.stageId, VISTE[f.vista]));
+  // In attesa e in pausa non si sovrappongono: il lead in pausa sta solo nella sua vista.
+  if (f.vista === "in-pausa") conds.push(isNotNull(leads.pausedUntil));
+  else if (f.vista === "in-attesa") conds.push(isNull(leads.pausedUntil), inArray(leads.stageId, VISTE[f.vista]));
+  else if (f.vista && Object.hasOwn(VISTE, f.vista)) conds.push(inArray(leads.stageId, VISTE[f.vista]));
   if (f.da) conds.push(gte(leads.createdAt, f.da));
   if (f.a) conds.push(lte(leads.createdAt, f.a));
   return db
@@ -352,7 +357,7 @@ export async function azioniMultiple(db: Db, input: AzioneMultipla, actorId: str
       const aperta = nuova.kind === "open";
       const nextAction = aperta ? (l.nextAction ?? nuova.suggestedNextAction ?? DEFAULT_NEXT_ACTION) : null;
       const nextActionAt = aperta ? (l.nextActionAt ?? now + (nuova.suggestedDelayHours ?? 0) * 3_600_000) : null;
-      passi.push(db.update(leads).set({ stageId: nuova.id, stageChangedAt: now, nextAction, nextActionAt, updatedAt: now }).where(eq(leads.id, l.id)));
+      passi.push(db.update(leads).set({ stageId: nuova.id, stageChangedAt: now, pausedUntil: null, nextAction, nextActionAt, updatedAt: now }).where(eq(leads.id, l.id)));
       passi.push(attivita(l.id, "cambio_fase", `Da "${etichette.get(l.stageId) ?? l.stageId}" a "${nuova.label}"`));
       const changes: Record<string, { from: unknown; to: unknown }> = { stageId: { from: l.stageId, to: nuova.id } };
       if (nextAction !== l.nextAction) changes.nextAction = { from: l.nextAction, to: nextAction };

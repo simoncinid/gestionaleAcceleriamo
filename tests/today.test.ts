@@ -27,7 +27,7 @@ describe("GET /today", () => {
     await insertLead("proposta", { stage_id: "in-attesa-decisione", next_action: "Follow-up preventivo", next_action_at: NOW - 1000 });
     await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('p1', 'proposta', 'ACC-2026-001', 'registrata', 'aggancio', ?, ?)").bind(NOW, NOW).run();
     await insertLead("fermo", { stage_changed_at: NOW - 9 * GIORNO });
-    await insertLead("pausa", { stage_id: "probabilmente-bloccato", next_action: "Richiamare dopo la pausa", next_action_at: NOW - 1000, paused_until: null });
+    await insertLead("pausa", { stage_id: "in-attesa-decisione", next_action: "Richiamare dopo la pausa", next_action_at: NOW - 1000, paused_until: null });
     await insertLead("chiuso", { stage_id: "chiuso", next_action_at: NOW - GIORNO });
     await insertLead("cestino", { next_action_at: NOW - GIORNO, deleted_at: NOW });
     await insertLead("con-call", { stage_id: "appuntamento-confermato" });
@@ -115,7 +115,7 @@ describe("numeri", () => {
     expect(s.bySource).toContainEqual({ source: "meta", total: 3, won: 1, lost: 1 });
     expect(s.byCampaign).toContainEqual({ campaign: "Campagna A", total: 2, won: 1, lost: 0 });
     expect(s.byStage.find((x) => x.stageId === "chiuso")?.count).toBe(1);
-    expect(s.byStage).toHaveLength(12);
+    expect(s.byStage).toHaveLength(9);
     expect(s.firstResponse).toEqual({ avgMs: 5_400_000, count: 2 });
   });
 });

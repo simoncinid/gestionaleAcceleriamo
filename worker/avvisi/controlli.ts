@@ -45,7 +45,7 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
         WHERE stage_id = ?1 AND first_response_at IS NULL AND deleted_at IS NULL AND created_at > ?2 ORDER BY created_at DESC LIMIT 20)
       UNION ALL
       SELECT * FROM (SELECT 'pausa' AS tipo, id, company, owner_id AS ownerId, created_at AS createdAt, stage_id AS stageId, paused_until AS pausedUntil FROM leads
-        WHERE stage_id = 'probabilmente-bloccato' AND paused_until IS NOT NULL AND paused_until <= ?3 AND deleted_at IS NULL ORDER BY paused_until LIMIT ?4)`)
+        WHERE paused_until IS NOT NULL AND stage_id IN (SELECT id FROM stages WHERE kind = 'open') AND paused_until <= ?3 AND deleted_at IS NULL ORDER BY paused_until LIMIT ?4)`)
       .bind(FASE_PRIMA_CHIAMATA, settimanaFa, now, pauseMax).all<RigaLead>(),
     raw.prepare(`SELECT p.number, l.id, l.company, l.owner_id AS ownerId, l.next_action_at AS nextActionAt FROM proposals p JOIN leads l ON l.id = p.lead_id
       WHERE p.status = 'presentata' AND p.deleted_at IS NULL AND l.deleted_at IS NULL AND l.stage_id = 'in-attesa-decisione'

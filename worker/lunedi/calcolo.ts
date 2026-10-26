@@ -51,7 +51,7 @@ export async function calcolaSettimana(db: D1Database, now: number): Promise<Num
   // Stessi criteri del gruppo "Fermi" di Oggi (worker/today/routes.ts).
   const [fermi, proposteFerme] = await Promise.all([
     db.prepare(`SELECT l.id, l.company, l.stage_changed_at AS da FROM leads l JOIN stages s ON s.id = l.stage_id
-      WHERE l.deleted_at IS NULL AND s.kind = 'open' AND l.stage_id NOT IN ('probabilmente-bloccato', 'da-chiamare-prima-volta')
+      WHERE l.deleted_at IS NULL AND s.kind = 'open' AND l.paused_until IS NULL AND l.stage_id <> 'da-chiamare-prima-volta'
         AND l.stage_changed_at <= ?1 ORDER BY l.stage_changed_at LIMIT 20`).bind(now - giorniFermo * GIORNO).all<{ id: string; company: string; da: number }>(),
     db.prepare(`SELECT p.id, p.lead_id AS leadId, COALESCE(l.company, p.company) AS company, COALESCE(p.presented_at, p.sent_at, p.created_at) AS da
       FROM proposals p LEFT JOIN leads l ON l.id = p.lead_id

@@ -8,7 +8,7 @@ import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
 import type { Precompilato } from "../../../worker/calls/coach-routes";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
-import { ESITI_PER_FREQUENZA, ETICHETTE_ESITO, applicaProposta, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
+import { CALL_DELL_ESITO, ETICHETTE_ESITO, esitiPerFase, applicaProposta, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
 
 // Foglio "Com'è andata?": l'esito propone fase e prossima azione (le regole propongono, la persona salva).
 // "iniziale": i suggerimenti del coach. Il lead cambia solo con "Salva esito".
@@ -22,7 +22,8 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
   const ultimaRichiesta = useRef(0);
   const senzaEmail = lead.email === null;
   const [invito, setInvito] = useState(!senzaEmail);
-  const mandaInvito = s.esito === "appuntamento" && invito && !senzaEmail;
+  const kindCall = s.esito ? CALL_DELL_ESITO[s.esito] : undefined;
+  const mandaInvito = !!kindCall && invito && !senzaEmail;
   // Senza Resend l'invito va in coda: il pulsante non promette un invio che non parte adesso.
   const resend = useResendCollegato();
   const fase = fasi.data?.find((f) => f.id === s.stageId);
@@ -86,18 +87,19 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
       <div className="flex flex-col gap-3">
         <div className="text-secondaria text-grigio">
           <p>{lead.company}</p>
-          <p className="tabular-nums">{testoTentativo(lead.attemptCount)}</p>
+          {/* I tentativi contano solo prima della consulenza. */}
+          {["da-chiamare-prima-volta", "da-richiamare"].includes(lead.stageId) && <p className="tabular-nums">{testoTentativo(lead.attemptCount)}</p>}
         </div>
-        <Selettore etichetta="Esito" apertoAllInizio opzioni={ESITI_PER_FREQUENZA.map((e) => ({ valore: e, etichetta: ETICHETTE_ESITO[e] }))} valore={s.esito} onCambia={(e) => void scegli(e)} />
+        <Selettore etichetta="Esito" apertoAllInizio opzioni={esitiPerFase(lead.stageId).map((e) => ({ valore: e, etichetta: ETICHETTE_ESITO[e] }))} valore={s.esito} onCambia={(e) => void scegli(e)} />
         {s.esito && (
           <Selettore etichetta="Fase" valore={s.stageId || null} opzioni={opzioniFase}
             onCambia={(id) => setS((p) => ({ ...p, stageId: id, lostReason: id === lead.stageId ? null : p.lostReason }))} />
         )}
-        {s.esito === "appuntamento" && (
+        {kindCall && s.esito && (
           <div className="flex flex-col gap-3 pt-1">
-            <p className="text-secondaria font-medium">Call di conoscenza</p>
+            <p className="text-secondaria font-medium">{kindCall === "conoscenza" ? "Consulenza (call di conoscenza)" : "Presentazione del preventivo"}</p>
             <CampoQuando etichetta="Data della call" valore={s.callAt}
-              onCambia={(ms) => { setErroreData(null); setS((p) => ({ ...p, callAt: ms })); if (ms != null) void scegli("appuntamento", ms); }} errore={erroreData} />
+              onCambia={(ms) => { setErroreData(null); setS((p) => ({ ...p, callAt: ms })); if (ms != null && s.esito) void scegli(s.esito, ms); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={s.meetLink} onChange={(e) => setS((p) => ({ ...p, meetLink: e.target.value }))} />
             <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
             <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} inCoda={!resend} />

@@ -32,7 +32,7 @@ describe("impostazioni", () => {
   it("regole: si leggono e si spostano su un'altra fase", async () => {
     const cookie = await authed();
     const { rules } = (await (await call("/api/stage-rules", {}, cookie)).json()) as { rules: { id: string; stageId: string | null; params: unknown; active: boolean }[] };
-    expect(rules).toHaveLength(7);
+    expect(rules).toHaveLength(6);
     const sla = rules.find((r) => r.id === "sla-prima")!;
     const res = await call("/api/stage-rules", { method: "PUT", json: { rules: [{ ...sla, params: { minuti: 60, avvisoMinuti: 45 } }] } }, cookie);
     expect(res.status).toBe(200);
@@ -83,7 +83,7 @@ describe("impostazioni", () => {
     const cookie = await authed();
     const db = getDb(env.DB);
     const base = await contestoRegole(db, 1_000);
-    expect(base).toMatchObject({ ora: 1_000, sequenze: false, ricontatti: [3, 7, 14], pausaMesi: 2, oreProposta: 48, massimoTentativi: 5 });
+    expect(base).toMatchObject({ ora: 1_000, sequenze: false, ricontatti: [3, 7, 14], pausaMesi: 2, oreProposta: 24, massimoTentativi: 5 });
     await call("/api/settings", { method: "PUT", json: { key: "sequenze", value: { attive: true } } }, cookie);
     const { rules } = (await (await call("/api/stage-rules", {}, cookie)).json()) as { rules: { id: string; stageId: string | null; event: string | null; params: unknown; active: boolean }[] };
     const ric = rules.find((r) => r.id === "ricontatti-decisione")!;

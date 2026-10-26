@@ -2,15 +2,19 @@ import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
 
 describe("schema", () => {
-  it("ha le 12 fasi del prototipo nell'ordine giusto", async () => {
-    const { results } = await env.DB.prepare("SELECT id, kind FROM stages ORDER BY sort_order").all<{ id: string; kind: string }>();
-    expect(results.map((r) => r.id)).toEqual([
-      "da-chiamare-prima-volta", "non-chiamato", "da-richiamare", "appuntamento-confermato",
-      "presentazione-confermata", "in-attesa-preventivo", "in-attesa-decisione", "probabilmente-bloccato",
-      "chiuso", "non-chiuso", "fuori-target", "fake",
+  it("ha le 9 fasi del processo di vendita nell'ordine giusto (0016)", async () => {
+    const { results } = await env.DB.prepare("SELECT id, label, kind, tone FROM stages ORDER BY sort_order").all<{ id: string; label: string; kind: string; tone: string }>();
+    expect(results.map((r) => r.label)).toEqual([
+      "Nuovo, da chiamare", "Da richiamare", "Consulenza fissata", "In attesa preventivo",
+      "Presentazione fissata", "In attesa decisione", "Cliente", "Non interessato", "Non profilato",
     ]);
-    expect(results.find((r) => r.id === "chiuso")?.kind).toBe("won");
-    expect(results.filter((r) => r.kind === "lost").map((r) => r.id)).toEqual(["non-chiuso", "fuori-target", "fake"]);
+    expect(results.map((r) => r.id)).toEqual([
+      "da-chiamare-prima-volta", "da-richiamare", "appuntamento-confermato", "in-attesa-preventivo",
+      "presentazione-confermata", "in-attesa-decisione", "chiuso", "non-chiuso", "fake",
+    ]);
+    expect(results.find((r) => r.id === "chiuso")).toMatchObject({ kind: "won", tone: "green" });
+    expect(results.filter((r) => r.kind === "lost").map((r) => r.id)).toEqual(["non-chiuso", "fake"]);
+    expect(results.some((r) => r.tone === "violet")).toBe(false);
   });
 
   it("ha le tabelle per il rilascio 1B già pronte", async () => {

@@ -16,7 +16,7 @@ describe("le regole sanno quale call c'è stata (spec 6.3)", () => {
   });
   it("call di conoscenza fatta con la presentazione fissata", () => {
     expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: r(20, 11) }, ctx()))
-      .toMatchObject({ stageId: "presentazione-confermata", nextAction: "Preparare il preventivo", nextActionAt: ORA + 48 * 3_600_000 });
+      .toMatchObject({ stageId: "presentazione-confermata", nextAction: "Preparare il preventivo", nextActionAt: r(14, 10) });
   });
   it("call di conoscenza fatta senza data della presentazione", () => {
     expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: null }, ctx()))
@@ -43,7 +43,7 @@ describe("le regole sanno quale call c'è stata (spec 6.3)", () => {
   });
   it("dopo il 14 senza risposta: probabilmente bloccato con pausa di 2 mesi", () => {
     const p = propostaEvento({ tipo: "ricontatto_senza_risposta", base: r(13, 10), passo: 3 }, ctx());
-    expect(p).toMatchObject({ stageId: "probabilmente-bloccato", nextAction: "Richiamare dopo la pausa" });
+    expect(p).toMatchObject({ stageId: "in-attesa-decisione", nextAction: "Richiamare dopo la pausa" });
     expect(p.pausedUntil).toBe(Date.UTC(2026, 11, 14, 9, 0)); // 14 dicembre alle 10 di Roma (ora solare), primo giorno di lavoro dopo il 13
     expect(p.nextActionAt).toBe(p.pausedUntil);
   });
@@ -57,7 +57,7 @@ describe("tentativi da 1 a 5", () => {
   const lead = (attemptCount: number) => ({ stageId: "da-richiamare", attemptCount, primoTentativoAt: attemptCount === 0 ? null : r(13, 9) });
   it("1: dopo la prima chiamata, WhatsApp Non ti ho trovato subito", () => {
     expect(propostaEsito("non_risponde", { ...lead(0), stageId: "da-chiamare-prima-volta" }, ctx()))
-      .toMatchObject({ stageId: "non-chiamato", nextAction: "WhatsApp: Non ti ho trovato", nextActionAt: ORA, attemptCount: 1, passo: "Tentativo 1 di 5" });
+      .toMatchObject({ stageId: "da-richiamare", nextAction: "WhatsApp: Non ti ho trovato", nextActionAt: ORA, attemptCount: 1, passo: "Tentativo 1 di 5" });
   });
   it("2: dopo il WhatsApp, seconda chiamata il giorno dopo alle 10", () => {
     expect(propostaEsito("non_risponde", lead(1), ctx())).toMatchObject({ nextAction: "Seconda chiamata", nextActionAt: r(14, 10), attemptCount: 2 });
@@ -84,7 +84,7 @@ describe("esiti del Foglio Esito (DS 6.6)", () => {
     ["occupato", { stageId: null, nextAction: "Richiamare", nextActionAt: ORA + 3_600_000 }],
     ["richiamare", { stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: r(14, 10) }],
     ["non_interessato", { stageId: "non-chiuso", lostReason: "non_interessato", nextAction: null }],
-    ["fuori_target", { stageId: "fuori-target", lostReason: "fuori_target", nextAction: null }],
+    ["fuori_target", { stageId: "fake", lostReason: "fuori_target", nextAction: null }],
   ] as const)("%s", (esito, attesa) => {
     expect(propostaEsito(esito, lead, ctx())).toMatchObject(attesa);
   });
@@ -94,11 +94,36 @@ describe("esiti del Foglio Esito (DS 6.6)", () => {
   });
 });
 
+// Riunione del 26/10: dopo la consulenza la prossima azione è preparare il preventivo il giorno dopo,
+// non di nuovo "Call di conoscenza"; dopo la presentazione si aspetta la decisione.
+describe("esiti dopo la consulenza e la presentazione", () => {
+  const lead = (stageId: string) => ({ stageId, attemptCount: 0, primoTentativoAt: null });
+  it("consulenza fatta: In attesa preventivo, preparare il preventivo domani alle 10", () => {
+    expect(propostaEsito("consulenza_fatta", lead("appuntamento-confermato"), ctx()))
+      .toEqual({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: r(14, 10) });
+  });
+  it("con la regola a 48 ore il preventivo va a due giorni dopo", () => {
+    expect(propostaEsito("consulenza_fatta", lead("appuntamento-confermato"), ctx({ oreProposta: 48 })).nextActionAt).toBe(r(15, 10));
+  });
+  it("presentazione fissata usa la data della call", () => {
+    expect(propostaEsito("presentazione_fissata", lead("in-attesa-preventivo"), ctx(), { scheduledAt: r(16, 15) }))
+      .toEqual({ stageId: "presentazione-confermata", nextAction: "Call di presentazione", nextActionAt: r(16, 15) });
+  });
+  it("presentazione fatta: In attesa decisione con il primo follow-up", () => {
+    expect(propostaEsito("presentazione_fatta", lead("presentazione-confermata"), ctx()))
+      .toMatchObject({ stageId: "in-attesa-decisione", nextAction: "Follow-up preventivo", nextActionAt: r(16, 10) });
+  });
+  it("la call di conoscenza fatta porta anche lei al preventivo di domani", () => {
+    expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: null }, ctx()))
+      .toEqual({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: r(14, 10) });
+  });
+});
+
 describe("fine pausa", () => {
   it("scrive la prossima azione solo quando la pausa è finita", () => {
-    expect(finePausa({ stageId: "probabilmente-bloccato", pausedUntil: ORA + 1 }, ORA)).toBeNull();
-    expect(finePausa({ stageId: "probabilmente-bloccato", pausedUntil: ORA - 1 }, ORA)).toEqual({ nextAction: "Richiamare dopo la pausa", nextActionAt: ORA });
-    expect(finePausa({ stageId: "da-richiamare", pausedUntil: ORA - 1 }, ORA)).toBeNull();
+    expect(finePausa({ pausedUntil: ORA + 1 }, ORA)).toBeNull();
+    expect(finePausa({ pausedUntil: ORA - 1 }, ORA)).toEqual({ nextAction: "Richiamare dopo la pausa", nextActionAt: ORA });
+    expect(finePausa({ pausedUntil: null }, ORA)).toBeNull();
   });
 });
 

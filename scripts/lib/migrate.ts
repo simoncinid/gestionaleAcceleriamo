@@ -14,6 +14,7 @@ export const STAGE_IDS = [
   "in-attesa-preventivo", "in-attesa-decisione", "probabilmente-bloccato", "chiuso", "non-chiuso", "fuori-target", "fake",
 ];
 const OPEN_STAGE_IDS = STAGE_IDS.slice(0, 8);
+const FASI_TOLTE: Record<string, string> = { "non-chiamato": "da-richiamare", "probabilmente-bloccato": "in-attesa-decisione", "fuori-target": "fake" };
 export const IMPORTED_NEXT_ACTION = "Riprendere il contatto (importato)";
 
 // Offset (ms) di Europe/Rome rispetto a UTC in un dato istante, indipendente dal fuso della macchina.
@@ -75,7 +76,9 @@ export function buildMigrationSql(old: OldDashboard, opts: { now: number; oldBas
   const companies = new Map<string, string>();
 
   for (const l of old.leads) {
-    const stageId = l.statusId && STAGE_IDS.includes(l.statusId) ? l.statusId : "da-chiamare-prima-volta";
+    const vecchia = l.statusId && STAGE_IDS.includes(l.statusId) ? l.statusId : "da-chiamare-prima-volta";
+    // Fasi tolte il 26/10/2026 (drizzle/0016_fasi_processo.sql): finiscono nella fase che le ha assorbite.
+    const stageId = FASI_TOLTE[vecchia] ?? vecchia;
     const isOpen = OPEN_STAGE_IDS.includes(stageId);
     const createdAt = parseOldDate(l.createdAt) ?? opts.now;
     const company = l.company?.trim() || l.contactName?.trim() || "Senza nome";

@@ -39,14 +39,14 @@ export function FoglioChiusura({ lead, fase, onChiudi }: { lead: LeadChiusura; f
   const salva = useMutation({
     mutationFn: () => api(`/leads/${lead.id}`, { method: "PATCH", json: corpo }),
     onSuccess: () => {
-      toast.success(vinto ? "Chiuso, ottimo" : `Spostato in ${fase.label}`);
+      toast.success(vinto ? "Cliente, ottimo" : `Spostato in ${fase.label}`);
       for (const k of [["lead", lead.id], ["leads"], ["today"], ["badge"], ["clienti"]]) void qc.invalidateQueries({ queryKey: k });
       onChiudi();
     },
     onError: (e) => toast.error(e.message),
   });
   return (
-    <Foglio aperto titolo={vinto ? "Chiuso: i dati del cliente" : `${fase.label}: perché`} onChiudi={onChiudi}
+    <Foglio aperto titolo={vinto ? "Cliente: i dati del contratto" : `${fase.label}: perché`} onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>{vinto && cambia ? "Chiudi e crea il cliente" : "Salva la chiusura"}</Pulsante>}>
       <div className="flex flex-col gap-3">
         {vinto ? (

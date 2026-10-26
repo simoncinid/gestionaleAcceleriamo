@@ -13,10 +13,11 @@ async function insertLead(id: string, extra: Record<string, unknown> = {}) {
 describe("migrazioni del Piano A", () => {
   it("le fasi hanno probabilità, azione proposta e motivo obbligatorio solo per le perse", async () => {
     const { results } = await env.DB.prepare("SELECT id, probability, suggested_next_action, requires_reason FROM stages ORDER BY sort_order").all<{ id: string; probability: number; suggested_next_action: string | null; requires_reason: number }>();
-    expect(results).toHaveLength(12);
+    // Stato finale, dopo la 0016 che ha tolto tre fasi.
+    expect(results).toHaveLength(9);
     expect(results.find((s) => s.id === "da-chiamare-prima-volta")).toMatchObject({ probability: 10, suggested_next_action: "Prima chiamata", requires_reason: 0 });
-    expect(results.filter((s) => s.requires_reason === 1).map((s) => s.id)).toEqual(["non-chiuso", "fuori-target", "fake"]);
-    const aperte = results.slice(0, 7).map((s) => s.probability);
+    expect(results.filter((s) => s.requires_reason === 1).map((s) => s.id)).toEqual(["non-chiuso", "fake"]);
+    const aperte = results.slice(0, 6).map((s) => s.probability);
     expect(Math.min(...aperte)).toBe(10);
     expect(Math.max(...aperte)).toBe(80);
   });
@@ -24,8 +25,8 @@ describe("migrazioni del Piano A", () => {
   it("scrive la mappa regola e fase di partenza", async () => {
     const { results } = await env.DB.prepare("SELECT rule_key, stage_id, event, params, active FROM stage_rules ORDER BY rule_key, stage_id").all<{ rule_key: string; stage_id: string | null; event: string | null; params: string; active: number }>();
     expect(results.map((r) => `${r.rule_key}:${r.stage_id ?? r.event ?? "tutte"}`)).toEqual([
-      "fermo:tutte", "pausa:probabilmente-bloccato", "preventivo_48h:call_conoscenza_fatta", "ricontatti:in-attesa-decisione",
-      "sla:da-chiamare-prima-volta", "tentativi:da-richiamare", "tentativi:non-chiamato",
+      "fermo:tutte", "pausa:in-attesa-decisione", "preventivo_48h:call_conoscenza_fatta", "ricontatti:in-attesa-decisione",
+      "sla:da-chiamare-prima-volta", "tentativi:da-richiamare",
     ]);
     expect(JSON.parse(results.find((r) => r.rule_key === "sla")!.params)).toEqual({ minuti: 120, avvisoMinuti: 90 });
     expect(results.every((r) => r.active === 1)).toBe(true);
@@ -93,13 +94,11 @@ describe("migrazioni del Piano A", () => {
     const { results } = await env.DB.prepare("SELECT id, probability, suggested_next_action AS azione, suggested_delay_hours AS ore FROM stages").all<{ id: string; probability: number; azione: string | null; ore: number | null }>();
     const attese: Record<string, [number, string | null, number | null]> = {
       "da-chiamare-prima-volta": [10, "Prima chiamata", 0],
-      "non-chiamato": [10, "Richiamare", 24],
       "da-richiamare": [15, "Richiamare", 24],
       "appuntamento-confermato": [30, "Call di conoscenza", null],
-      "presentazione-confermata": [45, "Call di presentazione", null],
-      "in-attesa-preventivo": [55, "Preparare il preventivo", 48],
+      "presentazione-confermata": [55, "Call di presentazione", null],
+      "in-attesa-preventivo": [45, "Preparare il preventivo", 24],
       "in-attesa-decisione": [80, "Follow-up preventivo", 72],
-      "probabilmente-bloccato": [20, "Richiamare dopo la pausa", 1440],
       chiuso: [100, null, null],
     };
     for (const [id, [prob, azione, ore]] of Object.entries(attese)) {
@@ -122,7 +121,45 @@ describe("migrazioni del Piano A", () => {
     const att = await db.prepare("SELECT type, body, created_at, request_id, outcome FROM activities WHERE id = 'att1'").first();
     expect(att).toEqual({ type: "nota", body: "testo 1A", created_at: 8, request_id: null, outcome: null });
     const stages = await db.prepare("SELECT COUNT(*) AS n, SUM(requires_reason) AS motivo FROM stages").first<{ n: number; motivo: number }>();
-    expect(stages).toEqual({ n: 12, motivo: 3 });
+    expect(stages).toEqual({ n: 9, motivo: 2 });
+  });
+});
+
+describe("migrazione 0016: fasi del processo di vendita", () => {
+  it("porta i lead delle fasi tolte nelle nuove senza perdere dati, con una voce nello storico", async () => {
+    const all = env.TEST_MIGRATIONS;
+    const db = (env as unknown as { DB_PRE: D1Database }).DB_PRE;
+    await applyD1Migrations(db, all.filter((m) => !m.name.startsWith("0016")));
+    await db.prepare("INSERT INTO users (id, username, name, password_hash, active, created_at) VALUES ('u-diego', 'diego.simoncini', 'Diego', 'x', 1, 1), ('u-tom', 'tommaso.rovini', 'Tommaso', 'x', 1, 1)").run();
+    const lead = (id: string, fase: string, extra = "NULL, NULL, NULL") =>
+      db.prepare(`INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at, notes, owner_id, paused_until, lost_reason) VALUES ('${id}', 'Azienda ${id}', 'meta', '${fase}', 5, 6, 7, 'nota ${id}', ${extra})`).run();
+    await lead("a", "non-chiamato");
+    await lead("b", "probabilmente-bloccato", "'u-tom', 999, NULL");
+    await lead("c", "fuori-target");
+    await lead("d", "fake", "NULL, NULL, 'fake'");
+    await lead("e", "da-chiamare-prima-volta");
+    await lead("f", "presentazione-confermata", "'u-tom', NULL, NULL");
+    await db.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('assegnazione', '{\"primaChiamata\":\"u-tom\",\"presentazione\":\"u-diego\",\"proposta\":\"u-diego\",\"via\":{\"utente\":null,\"fino\":null}}', 1)").run();
+
+    await applyD1Migrations(db, all);
+
+    const righe = (await db.prepare("SELECT id, stage_id, notes, owner_id, paused_until, lost_reason, stage_changed_at FROM leads ORDER BY id").all()).results;
+    expect(righe).toEqual([
+      { id: "a", stage_id: "da-richiamare", notes: "nota a", owner_id: "u-diego", paused_until: null, lost_reason: null, stage_changed_at: 5 },
+      { id: "b", stage_id: "in-attesa-decisione", notes: "nota b", owner_id: "u-tom", paused_until: 999, lost_reason: null, stage_changed_at: 5 },
+      { id: "c", stage_id: "fake", notes: "nota c", owner_id: null, paused_until: null, lost_reason: "fuori_target", stage_changed_at: 5 },
+      { id: "d", stage_id: "fake", notes: "nota d", owner_id: null, paused_until: null, lost_reason: "fake", stage_changed_at: 5 },
+      { id: "e", stage_id: "da-chiamare-prima-volta", notes: "nota e", owner_id: "u-diego", paused_until: null, lost_reason: null, stage_changed_at: 5 },
+      { id: "f", stage_id: "presentazione-confermata", notes: "nota f", owner_id: "u-tom", paused_until: null, lost_reason: null, stage_changed_at: 5 },
+    ]);
+    const storico = (await db.prepare("SELECT lead_id, body FROM activities WHERE type = 'cambio_fase' ORDER BY lead_id").all<{ lead_id: string; body: string }>()).results;
+    expect(storico).toEqual([
+      { lead_id: "a", body: 'Da "Non chiamato" a "Da richiamare" (fasi riordinate il 26/10/2026)' },
+      { lead_id: "b", body: 'Da "Probabilmente bloccato" a "In attesa decisione" (fasi riordinate il 26/10/2026)' },
+      { lead_id: "c", body: 'Da "Fuori target" a "Non profilato" (fasi riordinate il 26/10/2026)' },
+    ]);
+    const imp = await db.prepare("SELECT value FROM settings WHERE key = 'assegnazione'").first<{ value: string }>();
+    expect(JSON.parse(imp!.value)).toMatchObject({ primaChiamata: "u-diego", presentazione: "u-diego" });
   });
 });
 

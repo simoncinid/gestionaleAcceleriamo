@@ -10,7 +10,7 @@ async function nuovoLead(cookie: string, company: string) {
 }
 
 describe("Q14: fase che richiede una call", () => {
-  it("verso Appuntamento confermato senza data: 422 con messaggio italiano", async () => {
+  it("verso Consulenza fissata senza data: 422 con messaggio italiano", async () => {
     const cookie = await authed();
     const id = await nuovoLead(cookie, "Senza Data Srl");
     const res = await call(`/api/leads/${id}`, { method: "PATCH", json: { stageId: "appuntamento-confermato" } }, cookie);
@@ -32,7 +32,7 @@ describe("Q14: fase che richiede una call", () => {
     expect(k).toEqual({ kind: "conoscenza", scheduled_at: quando });
   });
 
-  it("Presentazione confermata crea una call di presentazione", async () => {
+  it("Presentazione fissata crea una call di presentazione", async () => {
     const cookie = await authed();
     const id = await nuovoLead(cookie, "Presenta Srl");
     const quando = Date.now() + 3 * 86_400_000;
