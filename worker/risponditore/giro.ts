@@ -3,7 +3,7 @@ import type { Env } from "../env";
 import { rispCampagne } from "../db/schema";
 import { inviaPrivato } from "./commenti";
 import { MOTIVI_NON_RITENTABILI, motivoErrore, registraFallimento, TENTATIVI_MAX } from "./errori";
-import { scegliCampagna } from "./parola";
+import { MOTIVO_NON_DEL_POST, postDellaCampagna, scegliCampagna } from "./parola";
 import { recuperaCommenti } from "./recupero";
 import { leggiCanale, type Canale, type Piattaforma } from "./graph";
 
@@ -77,6 +77,11 @@ async function ritenta(env: Env, now: number, limite: number, canali: Partial<Re
     ritentati++;
     const canale = canali[r.piattaforma]!;
     try {
+      // Anche nei ritentativi la parola vale solo sotto il suo post.
+      if (!(await postDellaCampagna(env, canale, campagna, r.media_id))) {
+        await env.DB.prepare(`UPDATE risp_eventi SET stato = 'ignorato', campagna_id = ?, motivo = ?, aggiornato_il = ? WHERE commento_id = ?`).bind(campagna.id, MOTIVO_NON_DEL_POST, now, r.commento_id).run();
+        continue;
+      }
       const priv = await inviaPrivato(env, canale, campagna, r.commento_id);
       if (priv.ok) {
         await env.DB.prepare(`UPDATE risp_eventi SET stato = 'inviato', aggiornato_il = ? WHERE commento_id = ?`).bind(now, r.commento_id).run();
