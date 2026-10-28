@@ -82,15 +82,17 @@ export function VoceTendina({ scelta, onClick, children, ruolo = "menuitemradio"
 
 // Selettore a espansione compatto della riga dei filtri: riga chiusa con etichetta, valore e freccia;
 // aperto mostra le voci una per riga. "multipla": ogni tocco accende o spegne una voce e l'elenco resta aperto.
-export function Filtro<T extends string>({ etichetta, opzioni, valori, onCambia, multipla = false, tutte = "Tutte", larghezza = 260 }: {
+export function Filtro<T extends string>({ etichetta, opzioni, valori, onCambia, multipla = false, tutte = "Tutte", chiuso, larghezza = 260 }: {
   etichetta: string; opzioni: { valore: T; etichetta: string; prima?: ReactNode }[]; valori: T[]; onCambia: (v: T[]) => void;
   multipla?: boolean; tutte?: string; larghezza?: number;
+  // Testo da chiuso quando non c'è scelta (di default quello della voce "tutte"); vuoto = solo l'etichetta.
+  chiuso?: string;
 }) {
   const [aperta, setAperta] = useState(false);
   const ancora = useRef<HTMLButtonElement>(null);
   const id = useId();
   const scelte = opzioni.filter((o) => valori.includes(o.valore));
-  const valore = scelte.length === 0 ? tutte : scelte.length === 1 ? scelte[0].etichetta : `${scelte.length} scelte`;
+  const valore = scelte.length === 0 ? chiuso ?? tutte : scelte.length === 1 ? scelte[0].etichetta : `${scelte.length} scelte`;
   return (
     <>
       <button ref={ancora} type="button" aria-expanded={aperta} aria-haspopup="dialog" aria-controls={aperta ? id : undefined} onClick={() => setAperta((a) => !a)}
@@ -98,7 +100,7 @@ export function Filtro<T extends string>({ etichetta, opzioni, valori, onCambia,
         className={cx("flex h-11 min-w-0 items-center gap-2 rounded-controllo border-[1.5px] bg-avorio px-3 text-secondaria transition-colors duration-(--durata-veloce) hover:border-ink",
           scelte.length ? "border-ink" : "border-sabbia-2")}>
         <span className="shrink-0 font-medium">{etichetta}</span>
-        <span className={cx("min-w-0 truncate", scelte.length ? "font-semibold text-ink" : "text-grigio")}>{valore}</span>
+        {valore && <span className={cx("min-w-0 truncate", scelte.length ? "font-semibold text-ink" : "text-grigio")}>{valore}</span>}
         <CaretDown size={14} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperta && "rotate-180")} />
       </button>
       <Tendina ancora={ancora} aperta={aperta} onChiudi={() => setAperta(false)} etichetta={etichetta} larghezza={larghezza}>

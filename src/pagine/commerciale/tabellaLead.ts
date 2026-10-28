@@ -147,17 +147,20 @@ const MESI_BREVI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set
 const due = (n: number) => String(n).padStart(2, "0");
 const numeroGiorno = (p: { anno: number; mese: number; giorno: number }) => Math.round(Date.UTC(p.anno, p.mese - 1, p.giorno) / 86_400_000);
 
-// Scadenza corta per la colonna da 11% e la riga del telefono: "scaduta da 3 h", "scaduta da 2 g", "oggi 15:00",
-// "domani 10:00", "gio 30 ott". La distanza nel tempo, non la data intera.
-export function scadenzaBreve(ms: number, ora: number): string {
-  if (ms < ora) {
+// Scadenza corta per la colonna da 11% e la riga del telefono: "scaduta da 2 g", "ieri 18:00", "oggi 15:00",
+// "domani 10:00", "gio 30 ott". "Scaduta" solo per lo stato scaduto (oltre un giorno di ritardo, la riga rossa):
+// una scadenza di stamattina è ancora "oggi 08:30", così la parola non contraddice il segmento Scaduti.
+export function scadenzaBreve(ms: number, ora: number, stato?: ProssimaAzione["stato"]): string {
+  if (stato === "scaduto" && ms < ora) {
     const d = ora - ms;
-    const n = d < 3_600_000 ? `${Math.max(1, Math.floor(d / 60_000))} min` : d < 86_400_000 ? `${Math.floor(d / 3_600_000)} h` : `${Math.floor(d / 86_400_000)} g`;
+    const n = d < 86_400_000 ? `${Math.max(1, Math.floor(d / 3_600_000))} h` : `${Math.floor(d / 86_400_000)} g`;
     return `scaduta da ${n}`;
   }
   const p = partiRoma(ms);
   const diff = numeroGiorno(p) - numeroGiorno(partiRoma(ora));
-  if (diff === 0) return `oggi ${due(p.ore)}:${due(p.minuti)}`;
-  if (diff === 1) return `domani ${due(p.ore)}:${due(p.minuti)}`;
+  const orario = `${due(p.ore)}:${due(p.minuti)}`;
+  if (diff === 0) return `oggi ${orario}`;
+  if (diff === 1) return `domani ${orario}`;
+  if (diff === -1) return `ieri ${orario}`;
   return `${GIORNI_BREVI[p.settimana]} ${p.giorno} ${MESI_BREVI[p.mese - 1]}`;
 }
