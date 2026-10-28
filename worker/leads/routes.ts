@@ -17,6 +17,7 @@ import { proposteDelLead } from "../proposte/service";
 import { conScadenzaSla, leggiSla } from "../regole/sla";
 import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
 import { conProssima } from "../processo/leggi";
+import { collegamentiDelLead } from "./collegamenti";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -128,6 +129,7 @@ leadRoutes.post("/:id/contatti", async (c) => {
 
 leadRoutes.get("/:id/calls", async (c) => c.json({ calls: await callDelLead(getDb(c.env.DB), c.req.param("id")) }));
 leadRoutes.get("/:id/proposals", async (c) => c.json({ proposte: await proposteDelLead(getDb(c.env.DB), c.req.param("id")) }));
+leadRoutes.get("/:id/collegamenti", async (c) => c.json(await collegamentiDelLead(getDb(c.env.DB), c.req.param("id"))));
 
 leadRoutes.post("/:id/calls", async (c) => {
   const input = callNuovaSchema.parse(await c.req.json());

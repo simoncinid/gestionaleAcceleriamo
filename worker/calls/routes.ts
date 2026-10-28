@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getDb } from "../db/client";
 import type { AppEnv } from "../env";
+import { dettaglioCall } from "./dettaglio";
 import { ERRORE_NON_COLLEGATO, ERRORE_SENZA_EMAIL, agenda, aggiornaCall, callPatchSchema, icsDellaCall, mandaInvito, unaCall } from "./service";
 
 export const callRoutes = new Hono<AppEnv>();
@@ -24,6 +25,8 @@ callRoutes.post("/:id/invito", async (c) => {
   const stato = r.errore === ERRORE_SENZA_EMAIL ? 422 : r.errore === ERRORE_NON_COLLEGATO ? 503 : 502;
   return c.json({ error: r.errore }, stato);
 });
+
+callRoutes.get("/:id", async (c) => c.json(await dettaglioCall(getDb(c.env.DB), c.req.param("id"))));
 
 callRoutes.get("/:id/ics", async (c) => {
   const db = getDb(c.env.DB);
