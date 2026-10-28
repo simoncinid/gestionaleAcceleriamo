@@ -35,7 +35,10 @@ describe("modifica 18: tabella dei lead", () => {
   it("pagina: titolo, otto colonne, righe da 44 px, niente totali in euro né avatar", () => {
     const html = pagina();
     expect(html).toContain("4 lead aperti, 2 scaduti");
-    for (const t of ["Azienda", "Fase", "Da fare", "Responsabile", "Ultimo contatto"]) expect(html).toContain(`>${t}<`);
+    const testa = html.slice(html.indexOf("<thead"), html.indexOf("</thead>"));
+    for (const t of ["Azienda", "Fase", "Da fare", "Ultimo contatto"]) expect(testa).toContain(`>${t}<`);
+    // Blocco 1 bis, seconda passata: Responsabile non è più una colonna (resta nel filtro, nel CSV e nella scheda).
+    expect(testa).not.toContain("Responsabile");
     // Blocco 1 bis: la scadenza sta sotto l'azione, non in una colonna sua.
     expect(html).not.toContain(">Scadenza<");
     expect(html).toMatch(/<td class="h-11 /);

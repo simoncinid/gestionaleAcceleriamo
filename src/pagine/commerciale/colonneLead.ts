@@ -3,15 +3,16 @@ import { partiRoma } from "../../../worker/lib/roma";
 import type { RigaLead } from "./tabellaLead";
 
 // Blocco 1 bis, punto 4: le colonne del foglio "CRM LEAD" di Diego nella tabella dei lead, scelte da chi la usa.
-// Tredici colonne in tutto (Azioni a parte, sempre in fondo); Azienda, Fase e Da fare non si tolgono.
+// Dodici colonne in tutto (Azioni a parte, sempre in fondo); Azienda, Fase e Da fare non si tolgono.
+// Seconda passata: Responsabile non è più una colonna (resta il filtro in alto, il CSV e la scheda).
 // La scelta vive nel browser, una per utente (localStorage), non nell'indirizzo: è un'abitudine, non un filtro.
 export type IdColonna =
-  | "azienda" | "telefono" | "fase" | "dafare" | "responsabile" | "contatto" | "arrivato"
+  | "azienda" | "telefono" | "fase" | "dafare" | "contatto" | "arrivato"
   | "email" | "inserzione" | "settore" | "attivita" | "offerta" | "fonte";
 
 export type DefColonna = { id: IdColonna; titolo: string; px: number; fissa?: boolean; ordine?: "azienda" | "fase" | "scadenza" | "contatto" };
 
-// Ordine di lettura nella tabella. Larghezze in px: le sette di partenza più Azioni fanno 1103 px e stanno nei
+// Ordine di lettura nella tabella. Larghezze in px: le sei di partenza più Azioni fanno 1001 px e stanno nei
 // 1118 px che restano a 1440 accanto alla barra laterale (Fase larga quanto "Nuovo, da chiamare" con la freccia);
 // con più colonne la tabella scorre di lato dentro il suo contenitore.
 export const COLONNE: DefColonna[] = [
@@ -19,7 +20,6 @@ export const COLONNE: DefColonna[] = [
   { id: "telefono", titolo: "Telefono", px: 150 },
   { id: "fase", titolo: "Fase", px: 186, fissa: true, ordine: "fase" },
   { id: "dafare", titolo: "Da fare", px: 195, fissa: true, ordine: "scadenza" },
-  { id: "responsabile", titolo: "Responsabile", px: 102 },
   { id: "contatto", titolo: "Ultimo contatto", px: 115, ordine: "contatto" },
   { id: "arrivato", titolo: "Arrivato il", px: 86 },
   { id: "email", titolo: "Email", px: 220 },
@@ -31,7 +31,7 @@ export const COLONNE: DefColonna[] = [
 ];
 export const PX_AZIONI = 104;
 
-export const VISIBILI_BASE: IdColonna[] = ["azienda", "telefono", "fase", "dafare", "responsabile", "contatto", "arrivato"];
+export const VISIBILI_BASE: IdColonna[] = ["azienda", "telefono", "fase", "dafare", "contatto", "arrivato"];
 
 const chiave = (utente: string | null | undefined) => `lead-colonne:${utente ?? "ospite"}`;
 

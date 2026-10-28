@@ -122,7 +122,7 @@ function FoglioFiltriLead({ filtri: iniziali, onCambia, fasi, utenti, campagne, 
 }
 
 // Blocco 1 bis: scelta delle colonne della tabella, selettore a espansione a destra sopra la tabella.
-// Chiuso: "Colonne 7 di 13" con la freccia; aperto: una colonna per riga con la spunta. Azienda, Fase e Da fare
+// Chiuso: "Colonne 6 di 12" con la freccia; aperto: una colonna per riga con la spunta. Azienda, Fase e Da fare
 // restano sempre (la riga lo dice); la scelta si salva nel browser per chi è entrato.
 export function SceltaColonne({ visibili, onCambia }: { visibili: IdColonna[]; onCambia: (v: IdColonna[]) => void }) {
   const [aperta, setAperta] = useState(false);

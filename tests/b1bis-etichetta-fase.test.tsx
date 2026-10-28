@@ -43,8 +43,11 @@ describe("blocco 1 bis: colonne del foglio CRM LEAD", async () => {
     expect(c.leggiColonne(null)).toEqual(c.VISIBILI_BASE);
     expect(c.leggiColonne("rotto")).toEqual(c.VISIBILI_BASE);
     expect(c.leggiColonne(JSON.stringify(["fonte", "boh", "email"]))).toEqual(["azienda", "fase", "dafare", "email", "fonte"]);
-    expect(c.COLONNE).toHaveLength(13);
-    expect(c.VISIBILI_BASE).toHaveLength(7);
+    expect(c.COLONNE).toHaveLength(12);
+    expect(c.VISIBILI_BASE).toHaveLength(6);
+    // Seconda passata: Responsabile non è più una colonna; una scelta vecchia che lo conteneva lo perde.
+    expect(c.COLONNE.map((x) => x.titolo)).not.toContain("Responsabile");
+    expect(c.leggiColonne(JSON.stringify(["responsabile", "email"]))).toEqual(["azienda", "fase", "dafare", "email"]);
   });
   it("inserzione accorciata, risposte del modulo leggibili, offerta e data brevi", () => {
     expect(c.inserzioneBreve("Lavoro ripetuto video 3.mp4 copia 2")).toBe("Lavoro ripetuto video 3");

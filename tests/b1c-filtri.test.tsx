@@ -67,13 +67,13 @@ describe("modifica 19: filtri, ricerca e ordinamento", () => {
     expect(html).not.toContain("Officina futuro");
   });
 
-  it("blocco 1 bis: colonne del foglio, sette visibili di base (Telefono leggibile col link), le altre a scelta", () => {
+  it("blocco 1 bis: colonne del foglio, sei visibili di base (Telefono leggibile col link), le altre a scelta", () => {
     const html = pagina("/commerciale/lead");
-    for (const t of ["Azienda", "Telefono", "Fase", "Da fare", "Responsabile", "Ultimo contatto", "Arrivato il"]) expect(html).toContain(`>${t}<`);
+    for (const t of ["Azienda", "Telefono", "Fase", "Da fare", "Ultimo contatto", "Arrivato il"]) expect(html).toContain(`>${t}<`);
     for (const t of ["Email", "Inserzione", "Settore", "Attività", "Offerta", "Fonte"]) expect(html).not.toContain(`>${t}</th>`);
     expect(html).toContain("+39 347 998 8776");
     expect(html).toContain('href="tel:');
-    expect(html).toContain("7 di 13");
+    expect(html).toContain("6 di 12");
   });
 
   it("la parola scaduta solo sulle righe rosse; stamattina resta oggi", () => {

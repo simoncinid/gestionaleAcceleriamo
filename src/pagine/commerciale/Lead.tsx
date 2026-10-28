@@ -67,8 +67,6 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   if (fasi.error) return <Errore errore={fasi.error} onRiprova={() => void fasi.refetch()} />;
 
   const n = conteggi(tutti, filtri);
-  // Nella colonna stretta basta il nome di battesimo; quello intero sta nel title.
-  const nome = new Map((utenti.data ?? []).map((u) => [u.id, u.name]));
   const apri = (id: string) => vai(`/commerciale/lead/${id}`);
   // Il clic su un link o un pulsante dentro la riga fa il suo lavoro, non apre la scheda.
   const clicRiga = (e: MouseEvent, id: string) => { if (!(e.target as HTMLElement).closest("a, button, [role=dialog], [role=menu]")) apri(id); };
@@ -92,7 +90,6 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
           <span className={cx("block truncate text-[13px] leading-4 tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>
         )}
       </>;
-      case "responsabile": return <span title={l.ownerId ? nome.get(l.ownerId) : undefined} className="block truncate">{l.ownerId ? (nome.get(l.ownerId) ?? "").split(" ")[0] : manca("Nessuno")}</span>;
       case "contatto": return <span className={cx("block truncate", l.ultimoContatto == null && "text-grigio")}>{l.ultimoContatto != null ? trascorso(l.ultimoContatto, ora) : "Mai"}</span>;
       case "arrivato": return <span className="block truncate">{arrivatoBreve(l.createdAt, ora)}</span>;
       case "inserzione": return testo(inserzioneBreve(l.metaAd), l.metaAd ?? undefined);
