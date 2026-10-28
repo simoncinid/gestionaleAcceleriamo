@@ -53,13 +53,18 @@ describe("modifica 18: tabella dei lead", () => {
     expect(REDIRECT_1A.find((r) => r.da === "/scaletta")?.a).toBe("/commerciale/lead");
   });
 
-  it("GET /api/leads dà l'ultimo contatto: chiamate ed esiti contano, le note no", async () => {
+  it("GET /api/leads dà l'ultimo contatto: chiamate, esiti, note di una persona e call contano; note automatiche no", async () => {
     const cookie = await authed();
     const ora = Date.now();
-    await env.DB.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at) VALUES ('L1', 'Officina', 'manuale', 'da-richiamare', ?1, ?1, ?1), ('L2', 'Forno', 'manuale', 'da-richiamare', ?1, ?1, ?1)").bind(ora).run();
-    await env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, created_at) VALUES ('a1', 'L1', 'contatto', '', ?1), ('a2', 'L1', 'nota', '', ?2), ('a3', 'L2', 'nota', '', ?2)").bind(ora - 5000, ora - 10).run();
+    await env.DB.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at) VALUES ('L1', 'Officina', 'manuale', 'da-richiamare', ?1, ?1, ?1), ('L2', 'Forno', 'manuale', 'da-richiamare', ?1, ?1, ?1), ('L3', 'Vetreria', 'manuale', 'appuntamento-confermato', ?1, ?1, ?1), ('L4', 'Sartoria', 'manuale', 'da-richiamare', ?1, ?1, ?1)").bind(ora).run();
+    const autore = (await env.DB.prepare("SELECT id FROM users LIMIT 1").first<{ id: string }>())!.id;
+    await env.DB.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES ('a1', 'L1', 'contatto', '', NULL, ?1), ('a2', 'L1', 'nota', '', NULL, ?2), ('a3', 'L2', 'nota', '', NULL, ?2), ('a4', 'L4', 'nota', 'Sentito al bar', ?3, ?2)").bind(ora - 5000, ora - 10, autore).run();
+    // Call fissata ieri per domani: conta da quando è stata fissata.
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('c1', 'L3', 'conoscenza', ?1, ?2, ?2)").bind(ora + 86_400_000, ora - 86_400_000).run();
     const r = (await (await call("/api/leads", {}, cookie)).json()) as { leads: { id: string; ultimoContatto: number | null }[] };
     expect(r.leads.find((l) => l.id === "L1")?.ultimoContatto).toBe(ora - 5000);
     expect(r.leads.find((l) => l.id === "L2")?.ultimoContatto).toBeNull();
+    expect(r.leads.find((l) => l.id === "L3")?.ultimoContatto).toBe(ora - 86_400_000);
+    expect(r.leads.find((l) => l.id === "L4")?.ultimoContatto).toBe(ora - 10);
   });
 });
