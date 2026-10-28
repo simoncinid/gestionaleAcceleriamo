@@ -36,3 +36,28 @@ describe("blocco 1 bis: etichetta della fase", () => {
     expect(classeScadenza("futuro", ora + 86_400_000, ora)).toBe("text-grigio");
   });
 });
+
+describe("blocco 1 bis: colonne del foglio CRM LEAD", async () => {
+  const c = await import("../src/pagine/commerciale/colonneLead");
+  it("scelta salvata: si scartano le voci sconosciute, le fisse ci sono sempre, l'ordine è quello della tabella", () => {
+    expect(c.leggiColonne(null)).toEqual(c.VISIBILI_BASE);
+    expect(c.leggiColonne("rotto")).toEqual(c.VISIBILI_BASE);
+    expect(c.leggiColonne(JSON.stringify(["fonte", "boh", "email"]))).toEqual(["azienda", "fase", "dafare", "email", "fonte"]);
+    expect(c.COLONNE).toHaveLength(13);
+    expect(c.VISIBILI_BASE).toHaveLength(7);
+  });
+  it("inserzione accorciata, risposte del modulo leggibili, offerta e data brevi", () => {
+    expect(c.inserzioneBreve("Lavoro ripetuto video 3.mp4 copia 2")).toBe("Lavoro ripetuto video 3");
+    expect(c.inserzioneBreve("Campagna autunno con un nome davvero molto lungo")).toBe("Campagna autunno con un nome dav…");
+    const meta = JSON.stringify({ "in_che_settore_opera_la_tua_azienda?": "edilizia", "quale_di_queste_attività_ti_fa_perdere_più_tempo_oggi?": "fare_i_preventivi" });
+    expect(c.settoreDi({ metaAnswers: meta })).toBe("Edilizia");
+    expect(c.attivitaDi({ metaAnswers: meta })).toBe("Fare i preventivi");
+    const foglio = JSON.stringify({ "In che settore opera la tua azienda?": "Ristorazione" });
+    expect(c.settoreDi({ metaAnswers: foglio })).toBe("Ristorazione");
+    expect(c.attivitaDi({ metaAnswers: foglio })).toBe("");
+    expect(c.offertaBreve(150_000, 15_000)).toBe("1.500 € + 150/mese");
+    expect(c.offertaBreve(null, 15_000)).toBe("150/mese");
+    expect(c.offertaBreve(null, null)).toBe("");
+    expect(c.arrivatoBreve(Date.UTC(2026, 9, 21, 10), Date.UTC(2026, 9, 28, 10))).toBe("21/10");
+  });
+});

@@ -1,13 +1,15 @@
-import { FunnelSimple, MagnifyingGlass, X } from "@phosphor-icons/react";
-import { useState } from "react";
+import { CaretDown, FunnelSimple, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { useRef, useState } from "react";
 import { Foglio, Pulsante, Selettore, SelettoreMultiplo, cx } from "../../ds";
 import type { Stage } from "../../types";
 import { EtichettaFase } from "./EtichettaFase";
-import { Filtro } from "./Tendina";
-import { COLONNE_EXTRA, FILTRI_BASE, NESSUNO, SEGMENTI, fasiDelSegmento, quantiFiltri, type ColonnaExtra, type Filtri, type Segmento } from "./tabellaLead";
+import { COLONNE, type IdColonna } from "./colonneLead";
+import { Filtro, Tendina, VoceTendina } from "./Tendina";
+import { FILTRI_BASE, NESSUNO, SEGMENTI, fasiDelSegmento, quantiFiltri, type Filtri, type Segmento } from "./tabellaLead";
 
 type Persona = { id: string; name: string };
-type Props = { filtri: Filtri; onCambia: (f: Filtri) => void; fasi: Stage[]; utenti: Persona[]; campagne: string[]; senzaResponsabile: boolean; conta: (f: Filtri) => number };
+type Props = { filtri: Filtri; onCambia: (f: Filtri) => void; fasi: Stage[]; utenti: Persona[]; campagne: string[]; senzaResponsabile: boolean; conta: (f: Filtri) => number;
+  colonne?: IdColonna[]; onColonne?: (v: IdColonna[]) => void };
 
 // Segmento a tre voci: un solo gruppo con bordo, la voce attiva piena. Sul telefono prende tutta la riga.
 export function Segmenti({ valore, onCambia }: { valore: Segmento; onCambia: (s: Segmento) => void }) {
@@ -46,7 +48,7 @@ export function Ricerca({ valore, onCambia, className }: { valore: string; onCam
 }
 
 // Riga dei filtri del computer (contratto, sezione 4): segmento, Fase a più scelte, Responsabile, Campagna, ricerca, Colonne.
-export function FiltriComputer({ filtri, onCambia, fasi, utenti, campagne, senzaResponsabile }: Props) {
+export function FiltriComputer({ filtri, onCambia, fasi, utenti, campagne, senzaResponsabile, colonne, onColonne }: Props) {
   const cambia = (p: Partial<Filtri>) => onCambia({ ...filtri, ...p });
   return (
     <div className="hidden flex-wrap items-center gap-2 md:flex">
@@ -64,8 +66,7 @@ export function FiltriComputer({ filtri, onCambia, fasi, utenti, campagne, senza
         <Filtro etichetta="Scadenza" valori={["oggi"]} onCambia={([s]) => cambia({ scad: s === "oggi" ? "oggi" : "" })} opzioni={[{ valore: "oggi", etichetta: "Entro oggi" }]} />
       )}
       <Ricerca valore={filtri.q} onCambia={(q) => cambia({ q })} className="min-w-[200px] flex-1" />
-      <Filtro<ColonnaExtra> etichetta="Colonne" tutte="Solo le principali" chiuso="" multipla valori={filtri.col} onCambia={(col) => cambia({ col })}
-        opzioni={COLONNE_EXTRA.map((c) => ({ valore: c.id, etichetta: c.etichetta }))} />
+      {colonne && onColonne && <SceltaColonne visibili={colonne} onCambia={onColonne} />}
     </div>
   );
 }
@@ -111,11 +112,43 @@ function FoglioFiltriLead({ filtri: iniziali, onCambia, fasi, utenti, campagne, 
         <Selettore etichetta="Scadenza" opzioni={[{ valore: "", etichetta: "Tutte" }, { valore: "oggi", etichetta: "Entro oggi" }]}
           valore={filtri.scad} onCambia={(scad) => cambia({ scad: scad === "oggi" ? "oggi" : "" })} />
         {n > 0 && (
-          <Pulsante variante="fantasma" className="self-start" onClick={() => setFiltri({ ...FILTRI_BASE, seg: filtri.seg, q: filtri.q, ord: filtri.ord, dir: filtri.dir, col: filtri.col })}>
+          <Pulsante variante="fantasma" className="self-start" onClick={() => setFiltri({ ...FILTRI_BASE, seg: filtri.seg, q: filtri.q, ord: filtri.ord, dir: filtri.dir })}>
             Togli i filtri
           </Pulsante>
         )}
       </div>
     </Foglio>
+  );
+}
+
+// Blocco 1 bis: scelta delle colonne della tabella, selettore a espansione a destra sopra la tabella.
+// Chiuso: "Colonne 7 di 13" con la freccia; aperto: una colonna per riga con la spunta. Azienda, Fase e Da fare
+// restano sempre (la riga lo dice); la scelta si salva nel browser per chi è entrato.
+export function SceltaColonne({ visibili, onCambia }: { visibili: IdColonna[]; onCambia: (v: IdColonna[]) => void }) {
+  const [aperta, setAperta] = useState(false);
+  const ancora = useRef<HTMLButtonElement>(null);
+  return (
+    <>
+      <button ref={ancora} type="button" aria-expanded={aperta} aria-haspopup="menu" onClick={() => setAperta((a) => !a)} data-filtro="Colonne"
+        className="ml-auto flex h-11 shrink-0 items-center gap-2 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio px-3 text-secondaria transition-colors duration-(--durata-veloce) hover:border-ink">
+        <span className="font-medium">Colonne</span>
+        <span className="tabular-nums text-grigio">{visibili.length} di {COLONNE.length}</span>
+        <CaretDown size={14} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperta && "rotate-180")} />
+      </button>
+      <Tendina ancora={ancora} aperta={aperta} onChiudi={() => setAperta(false)} etichetta="Colonne" larghezza={260}>
+        <div role="menu" aria-label="Colonne della tabella">
+          {COLONNE.map((c) => {
+            const scelta = visibili.includes(c.id);
+            return (
+              <VoceTendina key={c.id} ruolo="menuitemcheckbox" scelta={scelta}
+                onClick={() => { if (!c.fissa) onCambia(scelta ? visibili.filter((v) => v !== c.id) : [...visibili, c.id]); }}>
+                <span className={cx("min-w-0 flex-1 truncate", c.fissa && "text-grigio")}>{c.titolo}</span>
+                {c.fissa && <span className="shrink-0 text-[12px] text-grigio">sempre</span>}
+              </VoceTendina>
+            );
+          })}
+        </div>
+      </Tendina>
+    </>
   );
 }

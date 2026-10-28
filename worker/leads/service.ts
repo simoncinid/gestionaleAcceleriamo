@@ -402,6 +402,10 @@ export async function listLeads(db: Db, f: LeadFilters) {
       phone: leads.phone,
       source: leads.source,
       metaCampaign: leads.metaCampaign,
+      // Blocco 1 bis: inserzione, modulo e risposte per le colonne del foglio nella tabella dei lead.
+      metaAd: leads.metaAd,
+      metaFormId: leads.metaFormId,
+      metaAnswers: leads.metaAnswers,
       metaStatus: leads.metaStatus,
       stageId: leads.stageId,
       stageChangedAt: leads.stageChangedAt,

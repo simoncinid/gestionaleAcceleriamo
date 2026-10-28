@@ -83,7 +83,8 @@ export const percentuale = (parte: number, totale: number) => (totale < 5 ? "n.d
 
 export function telefonoMostrato(e164?: string | null): string {
   if (!e164) return "";
-  const m = /^\+39(\d{3})(\d{3})(\d{4})$/.exec(e164);
+  // Anche i numeri salvati con gli spazi (Foglio Andrea, inserimento a mano) escono nello stesso formato.
+  const m = /^\+39(\d{3})(\d{3})(\d{4})$/.exec(e164.replace(/\s+/g, ""));
   return m ? `+39 ${m[1]} ${m[2]} ${m[3]}` : e164;
 }
 

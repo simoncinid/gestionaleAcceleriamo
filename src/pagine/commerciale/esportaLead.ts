@@ -2,6 +2,7 @@ import { partiRoma } from "../../../worker/lib/roma";
 import { SOURCE_LABELS } from "../../format";
 import type { Stage } from "../../types";
 import type { RigaLead } from "./tabellaLead";
+import { attivitaDi, settoreDi } from "./colonneLead";
 
 // "Esporta CSV" della tabella dei lead (contratto blocco 1, sezione 4, modifica 21): le righe filtrate, tutte le
 // colonne (anche quelle nascoste), pronto per Excel italiano: UTF-8 con BOM (accenti giusti), separatore ";",
@@ -39,6 +40,11 @@ export function csvLead(righe: RigaLead[], fasi: Stage[], utenti: { id: string; 
     ["Responsabile", (l) => (l.ownerId ? nome.get(l.ownerId) ?? l.ownerId : "")],
     ["Fonte", (l) => SOURCE_LABELS[l.source] ?? l.source],
     ["Campagna", (l) => l.metaCampaign],
+    // Blocco 1 bis: le colonne del foglio "CRM LEAD" (inserzione per intero, risposte del modulo, id del modulo).
+    ["Inserzione", (l) => l.metaAd],
+    ["Settore", (l) => settoreDi(l)],
+    ["Attività", (l) => attivitaDi(l)],
+    ["Modulo", (l) => l.metaFormId],
     ["Ultimo contatto", (l) => dataCsv(l.ultimoContatto)],
     ["Telefono", (l) => l.phone],
     ["Email", (l) => l.email],

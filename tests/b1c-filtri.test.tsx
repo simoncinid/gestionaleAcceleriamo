@@ -45,7 +45,7 @@ describe("modifica 19: filtri, ricerca e ordinamento", () => {
   });
 
   it("i filtri stanno nell'indirizzo e tornano uguali (la freccia indietro li ritrova)", () => {
-    const f = { ...FILTRI_BASE, seg: "scaduti" as const, fasi: ["da-richiamare", "in-attesa-decisione"], resp: "anna", q: "333 12", ord: "azienda" as const, dir: "desc" as const, col: ["telefono" as const] };
+    const f = { ...FILTRI_BASE, seg: "scaduti" as const, fasi: ["da-richiamare", "in-attesa-decisione"], resp: "anna", q: "333 12", ord: "azienda" as const, dir: "desc" as const };
     const p = scriviFiltri(f);
     expect(leggiFiltri(new URLSearchParams(p.toString()))).toEqual(f);
     expect(scriviFiltri(FILTRI_BASE).toString()).toBe("");
@@ -67,12 +67,13 @@ describe("modifica 19: filtri, ricerca e ordinamento", () => {
     expect(html).not.toContain("Officina futuro");
   });
 
-  it("colonne a richiesta: Telefono e Proposta compaiono solo se scelte", () => {
-    expect(pagina("/commerciale/lead")).not.toContain(">Telefono<");
-    const html = pagina("/commerciale/lead?col=telefono,proposta");
-    expect(html).toContain(">Telefono<");
-    expect(html).toContain(">Proposta<");
-    expect(html).toContain("+39 347 9988776");
+  it("blocco 1 bis: colonne del foglio, sette visibili di base (Telefono leggibile col link), le altre a scelta", () => {
+    const html = pagina("/commerciale/lead");
+    for (const t of ["Azienda", "Telefono", "Fase", "Da fare", "Responsabile", "Ultimo contatto", "Arrivato il"]) expect(html).toContain(`>${t}<`);
+    for (const t of ["Email", "Inserzione", "Settore", "Attività", "Offerta", "Fonte"]) expect(html).not.toContain(`>${t}</th>`);
+    expect(html).toContain("+39 347 998 8776");
+    expect(html).toContain('href="tel:');
+    expect(html).toContain("7 di 13");
   });
 
   it("la parola scaduta solo sulle righe rosse; stamattina resta oggi", () => {

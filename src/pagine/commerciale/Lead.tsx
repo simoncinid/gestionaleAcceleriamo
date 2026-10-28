@@ -1,13 +1,14 @@
 import { ArrowDown, ArrowUp } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../../api";
 import { Errore, Pulsante, Skeleton, StatoVuoto, cx } from "../../ds";
-import { SOURCE_LABELS, arrivato, euro, trascorso } from "../../format";
-import { useOra, useStages, useUsers } from "../../hooks";
+import { SOURCE_LABELS, linkTel, telefonoMostrato, trascorso } from "../../format";
+import { useMe, useOra, useStages, useUsers } from "../../hooks";
 import { AzioniRiga, CellaFase, FogliRiga, scegliFase, useCestina, useSpostaFase, type FoglioRiga } from "./AzioniLead";
 import { classeScadenza } from "./coloriLead";
+import { COLONNE, PX_AZIONI, arrivatoBreve, attivitaDi, inserzioneBreve, offertaBreve, settoreDi, useColonneLead, type IdColonna } from "./colonneLead";
 import { EtichettaFase, faseDi } from "./EtichettaFase";
 import { csvLead, nomeFileCsv, scaricaCsv } from "./esportaLead";
 import { MenuPunti } from "./Tendina";
@@ -15,41 +16,30 @@ import { toast } from "sonner";
 import { FiltriComputer, FiltriTelefono } from "./FiltriLead";
 import {
   FILTRI_BASE, campagne as campagneDi, conteggi, filtra, leggiFiltri, ordina, scadenzaBreve, scriviFiltri, titoloLead,
-  type ColonnaExtra, type Filtri, type Ordine, type RigaLead,
+  type Filtri, type Ordine, type RigaLead,
 } from "./tabellaLead";
 
 // Tabella dei lead (contratto blocco 1, sezione 4): stile foglio Google, righe da 44 px, intestazione fissa,
 // zebra leggera, testo 14. Sostituisce la Scaletta. Il clic sulla riga apre la scheda.
-// Larghezze (Ruling della corsia C): quelle del contratto (22, 14, 18, 11, 10, 11, 9, 5) a 1440 con la barra laterale
-// lasciano 1120 px e tagliano fasi e azioni; Azioni al 5% non contiene tre bersagli da 32 px. Stesso ordine, pesi rivisti.
-// Con le colonne a richiesta la tabella passa a larghezze fisse in px e scorre di lato dentro il suo contenitore.
-type IdColonna = "azienda" | "fase" | "dafare" | "responsabile" | "fonte" | "contatto" | "azioni";
-export const COLONNE: { id: IdColonna; titolo: string; largo: string; px: number; ordine?: Ordine }[] = [
-  { id: "azienda", titolo: "Azienda", largo: "17%", px: 210, ordine: "azienda" },
-  { id: "fase", titolo: "Fase", largo: "17%", px: 200, ordine: "fase" },
-  // Blocco 1 bis: "Da fare" e "Scadenza" sono una colonna sola, azione sopra e scadenza sotto; si ordina per scadenza.
-  { id: "dafare", titolo: "Da fare", largo: "29%", px: 300, ordine: "scadenza" },
-  { id: "responsabile", titolo: "Responsabile", largo: "8%", px: 110 },
-  { id: "fonte", titolo: "Fonte", largo: "10%", px: 130 },
-  { id: "contatto", titolo: "Ultimo contatto", largo: "9%", px: 130, ordine: "contatto" },
-  { id: "azioni", titolo: "Azioni", largo: "10%", px: 110 },
-];
-const PX_EXTRA: Record<ColonnaExtra, number> = { telefono: 160, email: 230, punteggio: 110, arrivato: 110, tentativi: 100, proposta: 210 };
-const TITOLO_EXTRA: Record<ColonnaExtra, string> = { telefono: "Telefono", email: "Email", punteggio: "Punteggio", arrivato: "Arrivato il", tentativi: "Tentativi", proposta: "Proposta" };
-const PUNTEGGIO = { verde: "Verde", giallo: "Giallo", grigio: "Grigio" } as const;
+// Blocco 1 bis: le colonne del foglio "CRM LEAD" (colonneLead.ts), scelte da chi usa la tabella. Larghezze in px:
+// se la somma sta nel contenitore la tabella lo riempie e l'intestazione resta ferma in cima alla finestra,
+// se non ci sta la tabella scorre di lato dentro il suo contenitore.
 
 const cella = "h-11 px-2.5 align-middle";
 const secondaria = "block truncate text-[13px] leading-4 text-grigio";
+const manca = (testo = "Manca") => <span className="text-grigio">{testo}</span>;
 
-function cellaExtra(c: ColonnaExtra, l: RigaLead, ora: number): ReactNode {
-  switch (c) {
-    case "telefono": return l.phone ?? <span className="text-grigio">Manca</span>;
-    case "email": return l.email ?? <span className="text-grigio">Manca</span>;
-    case "punteggio": return l.score ? PUNTEGGIO[l.score] : <span className="text-grigio">Nessuno</span>;
-    case "arrivato": return arrivato(l.createdAt, ora);
-    case "tentativi": return l.attemptCount;
-    case "proposta": return l.setupCents != null || l.feeCents != null ? `${euro(l.setupCents ?? 0)} + ${euro(l.feeCents ?? 0)} al mese` : <span className="text-grigio">Nessuna</span>;
-  }
+// Larghezza del contenitore della tabella, per decidere se scorre di lato.
+function useLarghezza() {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [larghezza, setLarghezza] = useState(0);
+  useEffect(() => {
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const o = new ResizeObserver(([e]) => setLarghezza(e.contentRect.width));
+    o.observe(el);
+    return () => o.disconnect();
+  }, [el]);
+  return [setEl, larghezza] as const;
 }
 
 export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
@@ -68,6 +58,9 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   const [foglio, setFoglio] = useState<FoglioRiga | null>(null);
   const sposta = useSpostaFase(fasi.data ?? []);
   const cestina = useCestina();
+  const me = useMe();
+  const [visibili, setVisibili] = useColonneLead(me?.id);
+  const [sezione, larghezza] = useLarghezza();
 
   if (leads.isLoading || fasi.isLoading) return <Skeleton righe={8} />;
   if (leads.error) return <Errore errore={leads.error} onRiprova={() => void leads.refetch()} />;
@@ -79,20 +72,55 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   const apri = (id: string) => vai(`/commerciale/lead/${id}`);
   // Il clic su un link o un pulsante dentro la riga fa il suo lavoro, non apre la scheda.
   const clicRiga = (e: MouseEvent, id: string) => { if (!(e.target as HTMLElement).closest("a, button, [role=dialog], [role=menu]")) apri(id); };
+  // Dato del modulo o dell'offerta che manca (lead a mano, offerta non fatta): cella vuota, come nel foglio.
+  const testo = (t: string, title?: string) => (t ? <span title={title ?? t} className="block truncate">{t}</span> : null);
+  const contenuto = (id: IdColonna, l: RigaLead): ReactNode => {
+    switch (id) {
+      case "azienda": return <>
+        <Link to={`/commerciale/lead/${l.id}`} title={l.company} className="block truncate font-semibold text-ink after:absolute after:inset-0 hover:underline">{l.company}</Link>
+        {l.contactName && <span className={secondaria}>{l.contactName}</span>}
+      </>;
+      case "telefono": return l.phone
+        ? <a href={linkTel(l.phone)} className="relative z-[1] block truncate text-ink hover:underline">{telefonoMostrato(l.phone)}</a> : manca();
+      case "email": return l.email
+        ? <a href={`mailto:${l.email}`} title={l.email} className="relative z-[1] block truncate text-ink hover:underline">{l.email}</a> : manca();
+      case "fase": return <CellaFase lead={l} fasi={fasi.data ?? []}
+        onScegli={(f) => scegliFase(l, f, setFoglio, (stageId) => sposta.mutate({ lead: l, stageId, prima: l.stageId }))} />;
+      case "dafare": return <>
+        <span title={l.prossima?.azione ?? undefined} className={cx("block truncate", !l.prossima?.azione && "text-grigio")}>{l.prossima?.azione ?? "Nessuna azione"}</span>
+        {l.prossima?.scadenza != null && (
+          <span className={cx("block truncate text-[13px] leading-4 tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>
+        )}
+      </>;
+      case "responsabile": return <span title={l.ownerId ? nome.get(l.ownerId) : undefined} className="block truncate">{l.ownerId ? (nome.get(l.ownerId) ?? "").split(" ")[0] : manca("Nessuno")}</span>;
+      case "contatto": return <span className={cx("block truncate", l.ultimoContatto == null && "text-grigio")}>{l.ultimoContatto != null ? trascorso(l.ultimoContatto, ora) : "Mai"}</span>;
+      case "arrivato": return <span className="block truncate">{arrivatoBreve(l.createdAt, ora)}</span>;
+      case "inserzione": return testo(inserzioneBreve(l.metaAd), l.metaAd ?? undefined);
+      case "settore": return testo(settoreDi(l));
+      case "attivita": return testo(attivitaDi(l));
+      case "offerta": return testo(offertaBreve(l.setupCents, l.feeCents));
+      case "fonte": return <>
+        <span className="block truncate">{SOURCE_LABELS[l.source] ?? l.source}</span>
+        {l.source === "meta" && l.metaCampaign && <span title={l.metaCampaign} className={secondaria}>{l.metaCampaign}</span>}
+      </>;
+    }
+  };
   const ordinaPer = (o: Ordine) => setFiltri({ ...filtri, ord: o, dir: filtri.ord === o && filtri.dir === "asc" ? "desc" : "asc" });
-  const extra = filtri.col;
-  const largo = extra.length > 0;
-  const larghezzaFissa = COLONNE.reduce((t, c) => t + c.px, 0) + extra.reduce((t, c) => t + PX_EXTRA[c], 0);
+  const colonne = COLONNE.filter((c) => visibili.includes(c.id));
+  const totale = colonne.reduce((t, c) => t + c.px, 0) + PX_AZIONI;
+  // Prima della misura (e nelle prove senza browser) si assume che ci stia.
+  const largo = larghezza > 0 && totale > larghezza;
   const propsFiltri = {
     filtri, onCambia: setFiltri, fasi: fasi.data ?? [], utenti: utenti.data ?? [], campagne: campagneDi(tutti),
     senzaResponsabile: tutti.some((l) => l.ownerId == null), conta: (f: Filtri) => filtra(tutti, f).length,
+    colonne: visibili, onColonne: setVisibili,
   };
-  const conFiltri = JSON.stringify({ ...filtri, ord: "", dir: "", col: [] }) !== JSON.stringify({ ...FILTRI_BASE, seg: filtri.seg, ord: "", dir: "", col: [] });
+  const conFiltri = JSON.stringify({ ...filtri, ord: "", dir: "" }) !== JSON.stringify({ ...FILTRI_BASE, seg: filtri.seg, ord: "", dir: "" });
   const vuoto = tutti.length === 0
     ? <StatoVuoto titolo="Ancora nessun lead" testo="I lead arrivano da Meta, dal Foglio Andrea o dal pulsante Nuovo lead." />
     : <StatoVuoto titolo={filtri.seg === "scaduti" && !conFiltri ? "Nessun lead scaduto" : "Nessun lead con questi filtri"}
         testo={filtri.seg === "scaduti" && !conFiltri ? "Tutte le azioni sono in tempo." : "Togli un filtro o cambia la ricerca."}
-        azione={conFiltri ? <Pulsante variante="secondario" onClick={() => setFiltri({ ...FILTRI_BASE, seg: filtri.seg, col: filtri.col })}>Togli i filtri</Pulsante> : undefined} />;
+        azione={conFiltri ? <Pulsante variante="secondario" onClick={() => setFiltri({ ...FILTRI_BASE, seg: filtri.seg })}>Togli i filtri</Pulsante> : undefined} />;
 
   return (
     <div className="flex flex-col gap-4 pb-8">
@@ -115,19 +143,18 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
         <>
           {/* Computer: scorre la pagina, non un riquadro interno (blocco 1 bis: col riquadro alto quanto la finestra l'ultima
               riga restava a metà e la rotella sulla pagina non portava in fondo). L'intestazione resta ferma in cima alla
-              finestra; overflow-clip taglia gli angoli senza creare un riquadro che scorre. Con le colonne a richiesta la
-              tabella è più larga della pagina e scorre di lato: lì l'intestazione non resta ferma. */}
-          <section aria-label="Tabella dei lead" className="hidden overflow-clip rounded-[10px] border border-[#E5DED4] bg-avorio md:block">
+              finestra; overflow-clip taglia gli angoli senza creare un riquadro che scorre. Se le colonne scelte non ci
+              stanno, la tabella scorre di lato: lì l'intestazione non resta ferma. */}
+          <section ref={sezione} aria-label="Tabella dei lead" className="hidden overflow-clip rounded-[10px] border border-[#E5DED4] bg-avorio md:block">
             <div className={cx(largo && "overflow-x-auto")}>
-              <table className={cx("table-fixed border-collapse text-left text-[14px] leading-5", !largo && "w-full")} style={largo ? { width: larghezzaFissa } : undefined}>
+              <table className="table-fixed border-collapse text-left text-[14px] leading-5" style={largo ? { width: totale } : { width: "100%", minWidth: totale }}>
                 <colgroup>
-                  {COLONNE.filter((c) => c.id !== "azioni").map((c) => <col key={c.id} style={{ width: largo ? c.px : c.largo }} />)}
-                  {extra.map((c) => <col key={c} style={{ width: PX_EXTRA[c] }} />)}
-                  <col style={{ width: largo ? COLONNE.at(-1)!.px : COLONNE.at(-1)!.largo }} />
+                  {colonne.map((c) => <col key={c.id} style={{ width: c.px }} />)}
+                  <col style={{ width: PX_AZIONI }} />
                 </colgroup>
                 <thead className={cx("bg-avorio", !largo && "sticky top-(--sopra-pagina) z-[1] shadow-[0_1px_0_#E5DED4]")}>
                   <tr>
-                    {COLONNE.filter((c) => c.id !== "azioni").map((c) => (
+                    {colonne.map((c) => (
                       <th key={c.id} scope="col" aria-sort={c.ordine && filtri.ord === c.ordine ? (filtri.dir === "asc" ? "ascending" : "descending") : undefined}
                         className={cx(cella, "h-10 whitespace-nowrap border-b border-[#E5DED4] text-[13px] font-medium text-grigio")}>
                         {c.ordine ? (
@@ -139,7 +166,6 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                         ) : c.titolo}
                       </th>
                     ))}
-                    {extra.map((c) => <th key={c} scope="col" className={cx(cella, "h-10 whitespace-nowrap border-b border-[#E5DED4] text-[13px] font-medium text-grigio")}>{TITOLO_EXTRA[c]}</th>)}
                     <th scope="col" className={cx(cella, "h-10 border-b border-[#E5DED4]")}><span className="sr-only">Azioni</span></th>
                   </tr>
                 </thead>
@@ -147,29 +173,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                   {righe.map((l) => (
                     <tr key={l.id} data-lead={l.id} onClick={(e) => clicRiga(e, l.id)}
                       className="cursor-pointer border-b border-[#EFE9E1] last:border-b-0 even:bg-[#FBF8F3] hover:bg-crema">
-                      <td className={cx(cella, "relative")}>
-                        <Link to={`/commerciale/lead/${l.id}`} title={l.company} className="block truncate font-semibold text-ink after:absolute after:inset-0 hover:underline">{l.company}</Link>
-                        {l.contactName && <span className={secondaria}>{l.contactName}</span>}
-                      </td>
-                      <td className={cella}>
-                        <CellaFase lead={l} fasi={fasi.data ?? []}
-                          onScegli={(f) => scegliFase(l, f, setFoglio, (stageId) => sposta.mutate({ lead: l, stageId, prima: l.stageId }))} />
-                      </td>
-                      <td className={cella}>
-                        <span title={l.prossima?.azione ?? undefined} className={cx("block truncate", !l.prossima?.azione && "text-grigio")}>{l.prossima?.azione ?? "Nessuna azione"}</span>
-                        {l.prossima?.scadenza != null && (
-                          <span className={cx("block truncate text-[13px] leading-4 tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>
-                        )}
-                      </td>
-                      <td className={cella}><span title={l.ownerId ? nome.get(l.ownerId) : undefined} className="block truncate">{l.ownerId ? (nome.get(l.ownerId) ?? "").split(" ")[0] : <span className="text-grigio">Nessuno</span>}</span></td>
-                      <td className={cella}>
-                        <span className="block truncate">{SOURCE_LABELS[l.source] ?? l.source}</span>
-                        {l.source === "meta" && l.metaCampaign && <span title={l.metaCampaign} className={secondaria}>{l.metaCampaign}</span>}
-                      </td>
-                      <td className={cx(cella, "tabular-nums")}>
-                        <span className={cx("block truncate", l.ultimoContatto == null && "text-grigio")}>{l.ultimoContatto != null ? trascorso(l.ultimoContatto, ora) : "Mai"}</span>
-                      </td>
-                      {extra.map((c) => <td key={c} className={cx(cella, "tabular-nums")}><span className="block truncate">{cellaExtra(c, l, ora)}</span></td>)}
+                      {colonne.map((c) => <td key={c.id} className={cx(cella, c.id === "azienda" && "relative", ["contatto", "arrivato", "telefono", "offerta"].includes(c.id) && "tabular-nums")}>{contenuto(c.id, l)}</td>)}
                       <td className={cx(cella, "px-1")}><AzioniRiga lead={l} onApri={setFoglio} onCestina={() => cestina.mutate(l)} /></td>
                     </tr>
                   ))}

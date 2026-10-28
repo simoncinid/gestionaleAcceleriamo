@@ -13,6 +13,8 @@ export type LeadListItem = {
   pausedUntil?: number | null; lostReason?: string | null;
   // Blocco 1: assenze alle call (fasi 30 e 50) e responsabile scelto a mano.
   noShow?: number; ownerManual?: boolean;
+  // Blocco 1 bis: colonne del foglio (Inserzione, Settore, Attività) e Modulo nel CSV.
+  metaAd?: string | null; metaFormId?: string | null; metaAnswers?: string | null;
   // Riga "Da fare" della funzione unica (worker/processo/processo.ts): la mostrano scheda, tabella e Oggi.
   prossima?: ProssimaAzione;
 };

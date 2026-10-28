@@ -10,12 +10,11 @@ export type RigaLead = LeadListItem & { prossima?: ProssimaAzione; ultimoContatt
 
 export type Segmento = "aperti" | "scaduti" | "chiusi";
 export type Ordine = "azienda" | "fase" | "scadenza" | "contatto";
-export type ColonnaExtra = "telefono" | "email" | "punteggio" | "arrivato" | "tentativi" | "proposta";
 export type Filtri = {
   seg: Segmento; fasi: string[]; resp: string; camp: string; q: string;
   // "oggi": solo le scadenze entro oggi (scadute comprese), lo stesso insieme della lista di Oggi.
   scad: "" | "oggi";
-  ord: Ordine; dir: "asc" | "desc"; col: ColonnaExtra[];
+  ord: Ordine; dir: "asc" | "desc";
 };
 
 export const SEGMENTI: { id: Segmento; etichetta: string }[] = [
@@ -23,18 +22,10 @@ export const SEGMENTI: { id: Segmento; etichetta: string }[] = [
   { id: "scaduti", etichetta: "Scaduti" },
   { id: "chiusi", etichetta: "Chiusi" },
 ];
-export const COLONNE_EXTRA: { id: ColonnaExtra; etichetta: string }[] = [
-  { id: "telefono", etichetta: "Telefono" },
-  { id: "email", etichetta: "Email" },
-  { id: "punteggio", etichetta: "Punteggio" },
-  { id: "arrivato", etichetta: "Arrivato il" },
-  { id: "tentativi", etichetta: "Tentativi" },
-  { id: "proposta", etichetta: "Proposta" },
-];
 // Responsabile non assegnato: valore del filtro (nell'indirizzo "resp=nessuno").
 export const NESSUNO = "nessuno";
 
-export const FILTRI_BASE: Filtri = { seg: "aperti", fasi: [], resp: "", camp: "", q: "", scad: "", ord: "scadenza", dir: "asc", col: [] };
+export const FILTRI_BASE: Filtri = { seg: "aperti", fasi: [], resp: "", camp: "", q: "", scad: "", ord: "scadenza", dir: "asc" };
 
 const ORDINI: Ordine[] = ["azienda", "fase", "scadenza", "contatto"];
 const lista = (v: string | null) => (v ? v.split(",").filter(Boolean) : []);
@@ -51,7 +42,6 @@ export function leggiFiltri(p: URLSearchParams): Filtri {
     scad: p.get("scad") === "oggi" ? "oggi" : "",
     ord: ORDINI.includes(ord as Ordine) ? (ord as Ordine) : "scadenza",
     dir: p.get("dir") === "desc" ? "desc" : "asc",
-    col: lista(p.get("col")).filter((c): c is ColonnaExtra => COLONNE_EXTRA.some((x) => x.id === c)),
   };
 }
 
@@ -65,7 +55,6 @@ export function scriviFiltri(f: Filtri): URLSearchParams {
   if (f.q) p.set("q", f.q);
   if (f.scad) p.set("scad", f.scad);
   if (f.ord !== "scadenza" || f.dir !== "asc") { p.set("ord", f.ord); p.set("dir", f.dir); }
-  if (f.col.length) p.set("col", f.col.join(","));
   return p;
 }
 

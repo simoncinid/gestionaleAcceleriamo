@@ -35,7 +35,7 @@ describe("modifica 18: tabella dei lead", () => {
   it("pagina: titolo, otto colonne, righe da 44 px, niente totali in euro né avatar", () => {
     const html = pagina();
     expect(html).toContain("4 lead aperti, 2 scaduti");
-    for (const t of ["Azienda", "Fase", "Da fare", "Responsabile", "Fonte", "Ultimo contatto"]) expect(html).toContain(`>${t}<`);
+    for (const t of ["Azienda", "Fase", "Da fare", "Responsabile", "Ultimo contatto"]) expect(html).toContain(`>${t}<`);
     // Blocco 1 bis: la scadenza sta sotto l'azione, non in una colonna sua.
     expect(html).not.toContain(">Scadenza<");
     expect(html).toMatch(/<td class="h-11 /);
