@@ -58,7 +58,7 @@ describe("Oggi: riga della call di conoscenza", () => {
     call: [
       { id: "k1", leadId: "a", company: "Officina a", contactName: null, phone: null, kind: "conoscenza", scheduledAt: ORA + 7_200_000, meetLink: null, scheda: "pronta" },
       { id: "k2", leadId: "b", company: "Officina b", contactName: null, phone: null, kind: "conoscenza", scheduledAt: ORA + 9_000_000, meetLink: null, scheda: "in_preparazione" },
-      { id: "k3", leadId: "c", company: "Officina c", contactName: null, phone: null, kind: "presentazione", scheduledAt: ORA + 10_000_000, meetLink: null, scheda: "pronta" },
+      { id: "k3", leadId: "c", company: "Officina c", contactName: null, phone: null, kind: "offerta", scheduledAt: ORA + 10_000_000, meetLink: null, scheda: "pronta" },
     ],
     totale: 0,
   };

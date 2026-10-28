@@ -1,45 +1,41 @@
 import { MOTIVI_CON_DATA, MOTIVI_CON_TESTO, type CodiceMotivo } from "../../../worker/processo/motivi";
 import type { Esito } from "../../../worker/regole/motore";
 
-// Le stesse parole del prototipo e dello storico (worker/leads/esito.ts).
+import { ESITI_PER_FASE } from "../../../worker/leads/esiti-per-fase";
+import type { CallKind } from "../../../worker/db/schema";
+
+// Le stesse parole dello storico (worker/leads/esito.ts).
 export const ETICHETTE_ESITO: Record<Esito, string> = {
   risposto: "Risposto",
   non_risponde: "Non risponde",
   occupato: "Occupato",
   richiamare: "Richiamare",
-  appuntamento: "Consulenza fissata",
   non_interessato: "Non interessato",
   fuori_target: "Non profilato",
-  consulenza_fatta: "Consulenza fatta",
-  presentazione_fissata: "Presentazione fissata",
-  presentazione_fatta: "Presentazione fatta",
+  conoscenza_fissata: "Conoscenza fissata",
+  conoscenza_fatta: "Conoscenza fatta",
+  offerta_pronta: "Offerta pronta",
+  offerta_fissata: "Offerta fissata",
+  offerta_presentata: "Offerta presentata",
+  analisi_fissata: "Analisi fissata",
+  analisi_fatta: "Analisi fatta",
+  progetto_pronto: "Progetto pronto",
+  progetto_fissato: "Progetto fissato",
+  progetto_presentato: "Progetto presentato",
 };
 
-// Esiti per fase, dalla tabella del contratto (blocco 1, sezione 2). Prima della consulenza (10, 20) le telefonate;
-// in 30 com'è andata la consulenza; in 40 il preventivo pronto; in 50 la presentazione; in 60 la decisione.
-// "firmato" e "rimanda" non sono esiti del motore: aprono il foglio della chiusura e quello del rinvio.
+// Esiti per fase (modifica 25): la copia unica è quella del worker, qui si aggiungono solo le due voci della scheda
+// ("firmato" e "rimanda", che aprono il foglio della chiusura e quello del rinvio) e l'ordine con il passo in cima.
 export type SceltaEsito = Esito | "firmato" | "rimanda";
 export const SCELTE_SPECIALI = ["firmato", "rimanda"] as const;
 export const eSpeciale = (e: SceltaEsito | null): e is "firmato" | "rimanda" => e === "firmato" || e === "rimanda";
+export { ESITI_PER_FASE };
 
-// Copia di ESITI_PER_FASE del worker (worker/leads/esito.ts della corsia A, che rifiuta con 422 gli altri):
-// dopo l'unione si importa da lì. Qui sopra si aggiungono solo le due voci della scheda ("firmato", "rimanda")
-// e l'ordine mette prima il passo della tabella del contratto.
-const CHIUSURE: Esito[] = ["non_interessato", "fuori_target"];
-const TELEFONATE: Esito[] = ["non_risponde", "occupato", "richiamare", "risposto", "appuntamento"];
-export const ESITI_PER_FASE: Record<string, Esito[]> = {
-  "da-chiamare-prima-volta": [...TELEFONATE, ...CHIUSURE],
-  "da-richiamare": [...TELEFONATE, ...CHIUSURE],
-  "appuntamento-confermato": ["consulenza_fatta", "presentazione_fissata", "richiamare", "non_risponde", "occupato", ...CHIUSURE],
-  "in-attesa-preventivo": ["presentazione_fissata", "richiamare", "non_risponde", "occupato", "risposto", ...CHIUSURE],
-  "presentazione-confermata": ["presentazione_fatta", "richiamare", "non_risponde", "occupato", ...CHIUSURE],
-  "in-attesa-decisione": ["risposto", "richiamare", "non_risponde", "occupato", "presentazione_fissata", ...CHIUSURE],
-};
-// Il passo della tabella in cima: in 10 e 20 la consulenza fissata, in 60 la decisione.
+// Il passo della tabella in cima: in 10 e 20 la conoscenza fissata, in 55 il progetto presentato, in 60 la decisione.
 const IN_CIMA: Record<string, SceltaEsito[]> = {
-  "da-chiamare-prima-volta": ["appuntamento"],
-  "da-richiamare": ["appuntamento"],
-  "presentazione-confermata": ["presentazione_fatta", "firmato"],
+  "da-chiamare-prima-volta": ["conoscenza_fissata"],
+  "da-richiamare": ["conoscenza_fissata"],
+  "progetto-fissato": ["progetto_presentato", "firmato"],
   "in-attesa-decisione": ["firmato", "non_interessato", "rimanda"],
 };
 export const esitiPerFase = (stageId: string): SceltaEsito[] => {
@@ -51,16 +47,21 @@ export const esitiPerFase = (stageId: string): SceltaEsito[] => {
 export function etichettaScelta(e: SceltaEsito, stageId: string): string {
   if (e === "firmato") return stageId === "in-attesa-decisione" ? "Sì, firma" : "Ha firmato";
   if (e === "rimanda") return "Rimanda la decisione";
-  if (e === "presentazione_fissata" && stageId === "in-attesa-preventivo") return "Preventivo pronto: fissa la presentazione";
+  if (e === "offerta_fissata" && stageId === "in-attesa-preventivo") return "Offerta pronta: fissa la call dell'offerta";
+  if (e === "progetto_fissato" && stageId === "in-attesa-progetto") return "Progetto pronto: fissa la call del progetto";
   if (e === "non_interessato" && stageId === "in-attesa-decisione") return "No, non firma";
   return ETICHETTE_ESITO[e];
 }
 
-// Esiti che fissano una call nel foglio, e di che tipo.
-export const CALL_DELL_ESITO: Partial<Record<Esito, "conoscenza" | "presentazione">> = { appuntamento: "conoscenza", presentazione_fissata: "presentazione" };
+// Esiti che fissano una call nel foglio, e di che tipo. Con "offerta presentata" la call di analisi è facoltativa.
+export const CALL_DELL_ESITO: Partial<Record<Esito, CallKind>> = {
+  conoscenza_fissata: "conoscenza", offerta_fissata: "offerta", analisi_fissata: "analisi", progetto_fissato: "progetto",
+  offerta_presentata: "analisi",
+};
+const CALL_FACOLTATIVA: Esito[] = ["offerta_presentata"];
 
 // Prossime azioni del selettore: la proposta del motore in cima, poi le più usate.
-export const AZIONI_FREQUENTI = ["Richiamare", "WhatsApp: Non ti ho trovato", "Email: Ti ho cercato", "Call di conoscenza", "Preparare il preventivo", "Fissare la call di presentazione", "Follow-up preventivo"];
+export const AZIONI_FREQUENTI = ["Richiamare", "WhatsApp: Non ti ho trovato", "Email: Ti ho cercato", "Call di conoscenza", "Preparare l'offerta", "Fissare la call dell'offerta", "Fissare la call di analisi", "Preparare il progetto", "Fissare la call del progetto", "Follow-up preventivo"];
 export const opzioniAzione = (proposta: string) =>
   [...new Set([proposta, ...AZIONI_FREQUENTI].filter(Boolean))].map((a) => ({ valore: a, etichetta: a }));
 
@@ -74,7 +75,7 @@ export type StatoEsito = {
 // Fase, azione e scadenza le calcola il server (corsia A, modifica 12): il foglio dice solo cosa è successo.
 export type EsitoBody = {
   requestId: string; esito: Esito; lostReason?: string; lostNote?: string; recontactAt?: number; data?: number;
-  note?: string; call?: { kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null };
+  note?: string; call?: { kind: CallKind; scheduledAt: number; meetLink: string | null };
 };
 
 // email: undefined se chi apre il foglio non la conosce (il server lo dice comunque), null se manca.
@@ -93,7 +94,10 @@ export const statoIniziale = (
 
 // Gli esiti che decidono da soli fase e prossima azione: una call fissata o un lead perso. Con questi vincono le regole
 // anche quando il foglio arriva dal coach; con gli altri restano i suggerimenti del coach.
-export const ESITI_DELLE_REGOLE: Esito[] = ["appuntamento", "non_interessato", "fuori_target", "consulenza_fatta", "presentazione_fissata", "presentazione_fatta"];
+export const ESITI_DELLE_REGOLE: Esito[] = [
+  "non_interessato", "fuori_target", "conoscenza_fissata", "conoscenza_fatta", "offerta_pronta", "offerta_fissata", "offerta_presentata",
+  "analisi_fissata", "analisi_fatta", "progetto_pronto", "progetto_fissato", "progetto_presentato",
+];
 
 // Unisce la proposta delle regole (arrivata dopo la scelta dell'esito) allo stato del foglio.
 export function applicaProposta(
@@ -126,7 +130,7 @@ export function mancaMotivo(m: { lostReason: string | null; lostNote: string; re
 
 export function validaEsito(s: StatoEsito, motivoObbligatorio: boolean, ora = Date.now()): string | null {
   if (!s.esito) return "Scegli un esito";
-  if (CALL_DELL_ESITO[s.esito] && s.callAt == null) return "Scegli data e ora della call";
+  if (CALL_DELL_ESITO[s.esito] && !CALL_FACOLTATIVA.includes(s.esito) && s.callAt == null) return "Scegli data e ora della call";
   if (motivoObbligatorio) return mancaMotivo(s, ora);
   return null;
 }

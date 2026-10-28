@@ -1,3 +1,4 @@
+import { AZIONE_CALL } from "../../../../worker/regole/fasi-call";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { euro } from "../../../format";
@@ -8,7 +9,7 @@ import { dataEOra } from "./daFare";
 import { Sezione } from "./Sezione";
 import { GRIGIO, LINK, SECONDARIO, VERDE } from "./stile";
 
-const TIPO_CALL = { conoscenza: "Consulenza", presentazione: "Presentazione" } as const;
+const TIPO_CALL = AZIONE_CALL;
 const ESITO_CALL = { fatta: "fatta", saltata: "non si è presentato", rimandata: "rimandata" } as const;
 const STATO_AUTOMAZIONE: Record<string, string> = { in_costruzione: "in costruzione", attiva: "attiva", in_pausa: "in pausa", dismessa: "dismessa" };
 const STATO_CANONE: Record<string, string> = { in_attesa: "in attesa", attivo: "attivo", in_pausa: "in pausa", cessato: "cessato" };

@@ -1,3 +1,4 @@
+import { AZIONE_CALL } from "../../../worker/regole/fasi-call";
 import { ArrowLeft } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -14,7 +15,7 @@ import { Sezione, Voce } from "./lead/Sezione";
 import { ELENCO, LINK, SECONDARIO } from "./lead/stile";
 
 const DURATA = 30 * 60_000;
-const TIPO = { conoscenza: "Consulenza", presentazione: "Presentazione del preventivo" } as const;
+const TIPO = AZIONE_CALL;
 const STATO = { fatta: "Fatta", saltata: "Non si è presentato", rimandata: "Rimandata" } as const;
 
 // Pagina di una call, /commerciale/call/:id (contratto blocco 1, modifica 13). Una sezione con i dati della call,

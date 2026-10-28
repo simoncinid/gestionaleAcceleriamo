@@ -6,20 +6,24 @@ import { avviaContatto } from "./chiamata";
 import { classeScadenza } from "./coloriLead";
 import { scadenzaBreve } from "./tabellaLead";
 import { MenuPunti } from "./Tendina";
+import { callDellAssenza, useNonPresentato } from "./nonPresentato";
+import { CALL_DEL_CODICE } from "../../../worker/regole/fasi-call";
 
 // Riga di "Da fare oggi" (contratto blocco 1, sezione 5): azione, azienda e persona, scadenza colorata,
 // il pulsante dell'azione in linea e il menu "..." con le altre. Solo la prima riga ha il pulsante arancione:
 // una sola azione primaria per schermata.
 
 // Cosa fa un comando dalla lista. Quelli che chiedono dati aprono il foglio giusto; quelli che non si fanno
-// da qui (spostare una call, la proposta, il cliente, riaprire, l'assenza) portano alla scheda.
+// da qui (spostare una call, la proposta, il cliente, riaprire) portano alla scheda.
+// "Non si è presentato" si segna da qui, senza aprire la scheda (modifica 25).
 export type Apertura = "esito" | "fissa" | "rimanda";
-export function aperturaDi(codice: Comando["codice"]): Apertura | "chiama" | "meet" | "scheda" {
+export function aperturaDi(codice: Comando["codice"]): Apertura | "chiama" | "meet" | "non_presentato" | "scheda" {
+  if (codice.startsWith("segna_")) return "esito";
+  if (CALL_DEL_CODICE[codice]) return "fissa";
   switch (codice) {
     case "chiama": return "chiama";
     case "apri_videochiamata": return "meet";
-    case "segna_consulenza": case "segna_presentazione": case "segna_esito": case "segna_decisione": return "esito";
-    case "fissa_consulenza": case "fissa_presentazione": return "fissa";
+    case "non_presentato": return "non_presentato";
     case "rimanda": return "rimanda";
     default: return "scheda";
   }
@@ -29,11 +33,13 @@ export function RigaDaFare({ l, ora, primaria, onApri }: {
   l: RigaOggi; ora: number; primaria: boolean; onApri: (a: Apertura, c: Comando) => void;
 }) {
   const vai = useNavigate();
+  const nonPresentato = useNonPresentato();
   const scheda = `/commerciale/lead/${l.id}`;
   const esegui = (c: Comando) => {
     const a = aperturaDi(c.codice);
     if (a === "chiama") { if (l.phone) { avviaContatto(l.id, "chiamata"); window.location.href = linkTel(l.phone); } else vai(scheda); }
     else if (a === "meet") { if (l.meetLink) window.open(l.meetLink, "_blank", "noreferrer"); else vai(scheda); }
+    else if (a === "non_presentato") { const kind = callDellAssenza(l.stageId); if (kind) nonPresentato.mutate({ leadId: l.id, kind }); else vai(scheda); }
     else if (a === "scheda") vai(scheda);
     else onApri(a, c);
   };

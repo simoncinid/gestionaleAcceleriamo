@@ -20,15 +20,18 @@ const OPERATORI: Opzione<Operatore>[] = [
 ];
 type Bozza = Pick<Impostazioni, "orario" | "punteggio" | "motivi" | "assegnazione"> & { setup: string; ore: string; moltiplicatore: string };
 
-// Blocco 1, modifica 4: le regole delle nove fasi sono fisse (worker/processo, contratto sezione 2) e qui si leggono soltanto.
+// Blocco 1, modifica 4: le regole delle dodici fasi sono fisse (worker/processo, contratto sezione 2) e qui si leggono soltanto.
 type RegolaFase = { id: string; nome: string; azione: string; scadenza: string; chi: "primaChiamata" | "presentazione" | null };
 export const REGOLE_FASI: RegolaFase[] = [
   { id: "da-chiamare-prima-volta", nome: "Nuovo, da chiamare", azione: "Prima chiamata", scadenza: "30 minuti dall'arrivo, dentro l'orario di lavoro", chi: "primaChiamata" },
   { id: "da-richiamare", nome: "Da richiamare", azione: "Richiamare (tentativo n di 5)", scadenza: "Il passo dopo dei tentativi, o il giorno detto dal cliente. Dopo il quinto a vuoto: pausa di 2 mesi e un'ultima chiamata", chi: "primaChiamata" },
-  { id: "appuntamento-confermato", nome: "Consulenza fissata", azione: "Fare la consulenza", scadenza: "Data e ora della call. Se non si presenta: rifissare entro 2 ore lavorative; alla seconda assenza pausa di 2 mesi", chi: "primaChiamata" },
-  { id: "in-attesa-preventivo", nome: "In attesa preventivo", azione: "Preparare il preventivo", scadenza: "Il giorno lavorativo prima della presentazione; senza data, 2 giorni lavorativi dopo la consulenza", chi: "presentazione" },
-  { id: "presentazione-confermata", nome: "Presentazione fissata", azione: "Presentare il preventivo", scadenza: "Data e ora della call. Se non si presenta: come la consulenza", chi: "presentazione" },
-  { id: "in-attesa-decisione", nome: "In attesa decisione", azione: "Sentire il cliente per la decisione", scadenza: "Il giorno dopo la data detta dal cliente, altrimenti 3 giorni dopo la presentazione; poi a 7 e 14 giorni, pausa di 2 mesi", chi: "presentazione" },
+  { id: "appuntamento-confermato", nome: "Conoscenza fissata", azione: "Fare la call di conoscenza", scadenza: "Data e ora della call. Se non si presenta: rifissare entro 2 ore lavorative; alla seconda assenza pausa di 2 mesi", chi: "presentazione" },
+  { id: "in-attesa-preventivo", nome: "In attesa offerta", azione: "Preparare l'offerta con la forbice, poi fissare la call dell'offerta", scadenza: "3 giorni lavorativi dopo la conoscenza; la call entro 4", chi: "presentazione" },
+  { id: "presentazione-confermata", nome: "Offerta fissata", azione: "Presentare l'offerta, poi fissare la call di analisi", scadenza: "Data e ora della call. Se non si presenta: come la conoscenza", chi: "presentazione" },
+  { id: "analisi-fissata", nome: "Analisi fissata", azione: "Fare l'analisi", scadenza: "Data e ora della call. Se non si presenta: come la conoscenza", chi: "presentazione" },
+  { id: "in-attesa-progetto", nome: "In attesa progetto", azione: "Preparare il progetto, poi fissare la call del progetto", scadenza: "3 giorni lavorativi dopo l'analisi; la call entro 4", chi: "presentazione" },
+  { id: "progetto-fissato", nome: "Progetto fissato", azione: "Presentare il progetto e chiudere", scadenza: "Data e ora della call. Se non si presenta: come la conoscenza", chi: "presentazione" },
+  { id: "in-attesa-decisione", nome: "In attesa decisione", azione: "Sentire il cliente per la decisione", scadenza: "Il giorno dopo la data detta dal cliente, altrimenti 3 giorni dopo la call del progetto; poi a 7 e 14 giorni, pausa di 2 mesi", chi: "presentazione" },
   { id: "chiuso", nome: "Cliente", azione: "Avviare il lavoro dalla pagina cliente", scadenza: "Nessuna: esce dai lead aperti", chi: "presentazione" },
   { id: "non-chiuso", nome: "Non interessato", azione: "Nessuna, si può riaprire", scadenza: "Nessuna. Il motivo è obbligatorio", chi: null },
   { id: "fake", nome: "Non profilato", azione: "Nessuna, si può riaprire", scadenza: "Nessuna", chi: null },
@@ -140,7 +143,7 @@ function ModuloRegole({ fasi, imp, utenti }: { fasi: Stage[]; imp: Impostazioni;
 
       <Sezione titolo="Assegnazione">
         <Selettore etichetta="Prima chiamata" opzioni={persone} valore={b.assegnazione.primaChiamata} onCambia={(v) => assegna({ primaChiamata: v })} />
-        <Selettore etichetta="Call di presentazione" opzioni={persone} valore={b.assegnazione.presentazione} onCambia={(v) => assegna({ presentazione: v })} />
+        <Selettore etichetta="Dalla call di conoscenza in poi" opzioni={persone} valore={b.assegnazione.presentazione} onCambia={(v) => assegna({ presentazione: v })} />
         <Selettore etichetta="Proposta" opzioni={persone} valore={b.assegnazione.proposta} onCambia={(v) => assegna({ proposta: v })} />
         <Selettore etichetta="Chi è via" opzioni={[{ valore: "nessuno", etichetta: "Nessuno" }, ...persone]} valore={b.assegnazione.via.utente ?? "nessuno"}
           onCambia={(v) => assegna({ via: v === "nessuno" ? { utente: null, fino: null } : { utente: v, fino: b.assegnazione.via.fino } })} />

@@ -13,6 +13,7 @@ import { classePallino } from "./coloriLead";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFissaCall } from "./FoglioFissaCall";
+import { callDellAssenza, useNonPresentato } from "./nonPresentato";
 import { compila, modelloPer } from "./modelli";
 import { MenuPunti, Tendina, VoceTendina } from "./Tendina";
 import { aperto, type RigaLead } from "./tabellaLead";
@@ -101,6 +102,8 @@ function IconaContatto({ href, etichetta, esterno, onAvvio, children }: { href: 
 }
 
 export function AzioniRiga({ lead, onApri, onCestina }: { lead: RigaLead; onApri: (f: FoglioRiga) => void; onCestina: () => void }) {
+  const nonPresentato = useNonPresentato();
+  const assenza = callDellAssenza(lead.stageId);
   const wa = modelloPer(useModelli().data, "whatsapp", lead.stageId, "non_ti_ho_trovato");
   const nome = lead.contactName?.trim().split(/\s+/)[0] ?? lead.company;
   return (
@@ -114,6 +117,7 @@ export function AzioniRiga({ lead, onApri, onCestina }: { lead: RigaLead; onApri
       <MenuPunti piccolo etichetta={`Altre azioni per ${lead.company}`} voci={[
         { testo: "Segna l'esito", onClick: () => onApri({ tipo: "esito", lead }) },
         { testo: "Fissa una call", onClick: () => onApri({ tipo: "fissa", lead }) },
+        ...(assenza ? [{ testo: "Non si è presentato", onClick: () => nonPresentato.mutate({ leadId: lead.id, kind: assenza }) }] : []),
         { testo: "Cambia responsabile", onClick: () => onApri({ tipo: "responsabile", lead }) },
         { testo: "Sposta nel cestino", onClick: onCestina, distruttiva: true },
       ]} />

@@ -81,7 +81,9 @@ export function Lunedi() {
         {n.perFonte.map((f) => <Voce key={f.source} nome={f.source === "manuale" ? "Di cui a mano" : `Di cui da ${SOURCE_LABELS[f.source] ?? f.source}`} numero={f.n} />)}
         <Voce nome="Costo per lead del mese" numero={n.costoPerLeadCents == null ? "n.d." : euro(n.costoPerLeadCents)} />
         <Voce nome="Call di conoscenza" numero={n.conoscenza} />
-        <Voce nome="Call di presentazione" numero={n.presentazione} />
+        <Voce nome="Call dell'offerta" numero={n.offerta} />
+        <Voce nome="Call di analisi" numero={n.analisi} />
+        <Voce nome="Call del progetto" numero={n.progetto} />
         <Voce nome="Proposte" numero={n.proposte} />
         <Voce nome="Vinti" numero={n.vinti} />
       </Gruppo>

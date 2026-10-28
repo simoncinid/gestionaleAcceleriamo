@@ -1,3 +1,4 @@
+import { FASI_CON_CALL as FASI_CALL_WORKER } from "../../../../worker/regole/fasi-call";
 import { daRoma, partiRoma } from "../../../../worker/lib/roma";
 import { dataTesto } from "../../../../worker/processo/processo";
 import type { StatoScadenza } from "../../../types";
@@ -28,7 +29,7 @@ export function distanza(scadenza: number, stato: StatoScadenza, ora: number): s
   return `fra ${giorni} giorni`;
 }
 
-// Fasi in cui la scadenza è l'ora di una call (consulenza e presentazione).
-export const FASI_CON_CALL = ["appuntamento-confermato", "presentazione-confermata"];
+// Fasi in cui la scadenza è l'ora di una call (30, 40, 45, 55: modifica 25).
+export const FASI_CON_CALL = Object.keys(FASI_CALL_WORKER);
 // Fasi in cui contano i tentativi di chiamata.
 export const FASI_TENTATIVI = ["da-chiamare-prima-volta", "da-richiamare"];

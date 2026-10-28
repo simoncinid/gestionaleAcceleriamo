@@ -71,8 +71,8 @@ describe("applicaProposta: chi vince tra coach e regole", () => {
     const s = applicaProposta({ ...statoIniziale("r", { stageId: "appuntamento-confermato" }, iniziale), esito: "risposto" }, regole, iniziale);
     expect(s).toMatchObject({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: 5 });
   });
-  it("appuntamento, non interessato, fuori target: vincono le regole", () => {
-    for (const esito of ["appuntamento", "non_interessato", "fuori_target"] as const) {
+  it("conoscenza fissata, non interessato, fuori target: vincono le regole", () => {
+    for (const esito of ["conoscenza_fissata", "non_interessato", "fuori_target"] as const) {
       const s = applicaProposta({ ...statoIniziale("r", { stageId: "appuntamento-confermato" }, iniziale), esito }, { ...regole, lostReason: "motivo" }, iniziale);
       expect(s).toMatchObject({ stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: 9, lostReason: "motivo" });
     }

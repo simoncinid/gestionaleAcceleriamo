@@ -96,8 +96,8 @@ export function NextActionCard({ lead, kind, ora, inLinea = {}, onComando }: {
           {secondarie.length > 0 && <div className="flex flex-wrap gap-1">{secondarie.map(secondaria)}</div>}
         </div>
       )}
-      {/* Stati vuoti dentro Da fare: link della call mancante, proposta mancante in fase 40. */}
-      {conCall && !lead.meetLink && pulsante?.codice !== "fissa_consulenza" && pulsante?.codice !== "fissa_presentazione" && (
+      {/* Stati vuoti dentro Da fare: link della call mancante, proposta mancante in 35 (In attesa offerta). */}
+      {conCall && !lead.meetLink && !pulsante?.codice.startsWith("fissa_") && (
         <button type="button" className={`${LINK} self-start`} onClick={() => onComando("aggiungi_link")}>Aggiungi il link della call</button>
       )}
       {lead.stageId === "in-attesa-preventivo" && !inLinea.proposta && (

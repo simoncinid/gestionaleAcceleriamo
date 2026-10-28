@@ -55,12 +55,13 @@ describe("modifica 22: Oggi, una lista sola", () => {
 
   it("i comandi aprono il foglio giusto o la scheda", () => {
     expect(aperturaDi("segna_esito")).toBe("esito");
-    expect(aperturaDi("segna_consulenza")).toBe("esito");
-    expect(aperturaDi("fissa_presentazione")).toBe("fissa");
+    for (const c of ["segna_conoscenza", "segna_offerta", "segna_analisi", "segna_progetto", "segna_offerta_pronta", "segna_progetto_pronto"] as const) expect(aperturaDi(c)).toBe("esito");
+    for (const c of ["fissa_conoscenza", "fissa_offerta", "fissa_analisi", "fissa_progetto"] as const) expect(aperturaDi(c)).toBe("fissa");
     expect(aperturaDi("rimanda")).toBe("rimanda");
     expect(aperturaDi("apri_videochiamata")).toBe("meet");
     expect(aperturaDi("sposta_call")).toBe("scheda");
-    expect(aperturaDi("non_presentato")).toBe("scheda");
+    // Modifica 25: l'assenza si segna da qui, senza aprire la scheda.
+    expect(aperturaDi("non_presentato")).toBe("non_presentato");
   });
 
   it("badge del Commerciale: il numero intero, niente 9+, a zero sparisce", () => {

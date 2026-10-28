@@ -39,3 +39,6 @@ export function callAttesa(stageId: string, fatte: CallKind[]): CallKind {
   const daFase = ORDINE.indexOf(MINIMA_DELLA_FASE[stageId] ?? "conoscenza");
   return ORDINE[Math.min(Math.max(dopoFatte, daFase), ORDINE.length - 1)];
 }
+
+// Call che si può fissare nello stesso foglio quando quella prima è fatta (server e foglio della call).
+export const CALL_SEGUENTE: Partial<Record<CallKind, CallKind>> = { conoscenza: "offerta", offerta: "analisi" };

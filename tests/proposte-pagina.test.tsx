@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Route, Routes } from "react-router";
 import { DettaglioProposta } from "../src/pagine/commerciale/DettaglioProposta";
+import { motivoForbice } from "../src/pagine/commerciale/FoglioProposta";
 import { FoglioAccettazione, motivoLinkPdf } from "../src/pagine/commerciale/FoglioProposta";
 import { Proposte } from "../src/pagine/commerciale/Proposte";
 import { SezioneProposta } from "../src/pagine/commerciale/SezioneProposta";
@@ -10,7 +11,7 @@ import { contaPrimari, render } from "./render";
 const ORA = Date.UTC(2026, 9, 13, 8, 0);
 const p = (id: string, status: PropostaRiga["status"], extra: Partial<PropostaRiga> = {}): PropostaRiga => ({
   id, number: `ACC-2026-${id}`, leadId: "l", company: `Officina ${id}`, status, option: "standard", setupCents: 200_000, feeCents: 15_000, hoursEstimate: 40,
-  alternativeCents: null, validUntil: null, sentAt: ORA, presentedAt: null, pdfUrl: null, sourcePath: null, objections: null, nextActionAt: ORA + 3 * 86_400_000, version: 1, ...extra,
+  alternativeCents: null, validUntil: null, forbiceDaCents: null, forbiceACents: null, sentAt: ORA, presentedAt: null, pdfUrl: null, sourcePath: null, objections: null, nextActionAt: ORA + 3 * 86_400_000, version: 1, ...extra,
 });
 
 const MODELLO = { id: "mod-follow-up", channel: "email", key: "follow_up_preventivo", title: "Follow-up", subject: "La proposta per {azienda}", body: "Ciao {referente}, la {numero}", stageId: "in-attesa-decisione", sortOrder: 70 };
@@ -75,6 +76,19 @@ describe("sezione proposta nella scheda lead", () => {
     expect(html).toContain("ACC-2026-009");
     expect(html).toContain("Setup € 2.000, canone € 150");
     expect(html).toContain("PDF nel wiki");
+  });
+});
+
+describe("forbice dell'offerta (modifica 25)", () => {
+  it("il dettaglio mostra la forbice su una riga, senza calcoli", () => {
+    expect(dettaglio(p("009", "registrata", { forbiceDaCents: 300_000, forbiceACents: 500_000 }))).toContain("Forbice: da € 3.000 a € 5.000");
+    expect(dettaglio(p("010", "registrata"))).not.toContain("Forbice");
+  });
+  it("nel foglio a mano: se c'è un estremo serve l'altro, e il primo non supera il secondo", () => {
+    expect(motivoForbice("", "")).toBeUndefined();
+    expect(motivoForbice("3000", "")).toBe("Scrivi tutti e due gli estremi della forbice");
+    expect(motivoForbice("5000", "3000")).toBe("Il primo estremo non può superare il secondo");
+    expect(motivoForbice("3000", "5000")).toBeUndefined();
   });
 });
 

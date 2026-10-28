@@ -3,17 +3,18 @@ import { Fasi } from "../src/pagine/impostazioni/Fasi";
 import { IMPOSTAZIONI_DEFAULT } from "../worker/impostazioni/default";
 import { contaPrimari, render } from "./render";
 
-// Blocco 1, modifica 4: Impostazioni > Fasi mostra le nove fasi con la regola scritta e non le modifica.
+// Blocco 1, modifiche 4 e 25: Impostazioni > Fasi mostra le dodici fasi con la regola scritta e non le modifica.
 const NOVE = [
-  ["da-chiamare-prima-volta", "Nuovo, da chiamare", "open"], ["da-richiamare", "Da richiamare", "open"], ["appuntamento-confermato", "Consulenza fissata", "open"],
-  ["in-attesa-preventivo", "In attesa preventivo", "open"], ["presentazione-confermata", "Presentazione fissata", "open"], ["in-attesa-decisione", "In attesa decisione", "open"],
+  ["da-chiamare-prima-volta", "Nuovo, da chiamare", "open"], ["da-richiamare", "Da richiamare", "open"], ["appuntamento-confermato", "Conoscenza fissata", "open"],
+  ["in-attesa-preventivo", "In attesa offerta", "open"], ["presentazione-confermata", "Offerta fissata", "open"], ["analisi-fissata", "Analisi fissata", "open"],
+  ["in-attesa-progetto", "In attesa progetto", "open"], ["progetto-fissato", "Progetto fissato", "open"], ["in-attesa-decisione", "In attesa decisione", "open"],
   ["chiuso", "Cliente", "won"], ["non-chiuso", "Non interessato", "lost"], ["fake", "Non profilato", "lost"],
 ].map(([id, label, kind], i) => ({ id, label, kind, sortOrder: (i + 1) * 10, tone: "neutral", requiresReason: false, probability: 10, suggestedNextAction: null, suggestedDelayHours: null }));
 const utenti = [{ id: "diego", name: "Diego" }, { id: "tommaso", name: "Tommaso" }];
 const pagina = () => render(<Fasi />, { percorso: "/impostazioni/fasi", dati: [[["stages"], NOVE], [["stage-rules"], []], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], utenti]] });
 
 describe("Impostazioni > Fasi in sola lettura", () => {
-  it("le nove fasi con azione, scadenza e chi, senza campi né pulsanti per cambiarle", () => {
+  it("le dodici fasi con azione, scadenza e chi, senza campi né pulsanti per cambiarle", () => {
     const html = pagina();
     const righe = [...html.matchAll(/<li [^>]*data-fase="([^"]+)"[^>]*>(.*?)<\/li>/gs)];
     expect(righe.map((r) => r[1])).toEqual(NOVE.map((f) => f.id));

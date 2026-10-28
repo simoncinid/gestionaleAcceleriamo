@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Call } from "../src/pagine/commerciale/Call";
-import { FoglioCall } from "../src/pagine/commerciale/FoglioCall";
+import { FoglioCall, corpoCall, seguenteDi } from "../src/pagine/commerciale/FoglioCall";
 import { FoglioFissaCall } from "../src/pagine/commerciale/FoglioFissaCall";
 import { leggiNote, noteVuote } from "../src/pagine/commerciale/note-call";
 import { daRoma } from "../worker/lib/roma";
@@ -60,6 +60,14 @@ describe("fogli della call", () => {
     expect(contaPrimari(html)).toBe(1);
     expect(html).toContain("Reazione alla proposta");
     expect(html).not.toContain("Cosa fa durante il giorno");
+  });
+  it("call fatta: nello stesso foglio si fissa la call seguente, con il nome giusto e il campo prossima", () => {
+    expect(corpoCall({ kind: "conoscenza", outcome: null }, "fatta", { scheduledAt: 5, meetLink: "" })).toEqual({ outcome: "fatta", prossima: { scheduledAt: 5, meetLink: null } });
+    expect(seguenteDi({ kind: "conoscenza", outcome: null }, "fatta")).toBe("offerta");
+    expect(seguenteDi({ kind: "offerta", outcome: null }, "fatta")).toBe("analisi");
+    expect(seguenteDi({ kind: "analisi", outcome: null }, "fatta")).toBeNull();
+    expect(seguenteDi({ kind: "conoscenza", outcome: "fatta" }, "fatta")).toBeNull();
+    expect(corpoCall({ kind: "progetto", outcome: null }, "fatta", { scheduledAt: 5, meetLink: "" })).toEqual({ outcome: "fatta" });
   });
   it("note: JSON, testo semplice e vuote", () => {
     expect(leggiNote('{"problema":"Excel"}')).toEqual({ problema: "Excel" });

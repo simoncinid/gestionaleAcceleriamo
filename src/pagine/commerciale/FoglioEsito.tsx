@@ -8,6 +8,7 @@ import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
 import type { Precompilato } from "../../../worker/calls/coach-routes";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
+import { AZIONE_CALL } from "../../../worker/regole/fasi-call";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioRimanda } from "./FoglioRimanda";
 import { CampiMotivo } from "./lead/CampiMotivo";
@@ -29,7 +30,7 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
   const senzaEmail = lead.email === null;
   const [invito, setInvito] = useState(!senzaEmail);
   const kindCall = s.esito ? CALL_DELL_ESITO[s.esito] : undefined;
-  const mandaInvito = !!kindCall && invito && !senzaEmail;
+  const mandaInvito = !!kindCall && s.callAt != null && invito && !senzaEmail;
   // Senza Resend l'invito va in coda: il pulsante non promette un invio che non parte adesso.
   const resend = useResendCollegato();
   const verso = fasi.data?.find((f) => f.id === s.stageId);
@@ -90,13 +91,13 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
       <div className="flex flex-col gap-3">
         <div className="text-secondaria text-grigio">
           <p>{lead.company}</p>
-          {/* I tentativi contano solo prima della consulenza. */}
+          {/* I tentativi contano solo prima della conoscenza. */}
           {["da-chiamare-prima-volta", "da-richiamare"].includes(lead.stageId) && <p className="tabular-nums">{testoTentativo(lead.attemptCount)}</p>}
         </div>
         <Selettore etichetta="Esito" apertoAllInizio opzioni={esitiPerFase(lead.stageId).map((e) => ({ valore: e, etichetta: etichettaScelta(e, lead.stageId) }))} valore={s.esito as SceltaEsito | null} onCambia={scegliVoce} />
         {kindCall && s.esito && (
           <div className="flex flex-col gap-3 pt-1">
-            <p className="text-secondaria font-medium">{kindCall === "conoscenza" ? "Consulenza (call di conoscenza)" : "Presentazione del preventivo"}</p>
+            <p className="text-secondaria font-medium">{AZIONE_CALL[kindCall]}{s.esito === "offerta_presentata" ? ", se è già fissata" : ""}</p>
             <CampoQuando etichetta="Data della call" valore={s.callAt}
               onCambia={(ms) => { setErroreData(null); setS((p) => ({ ...p, callAt: ms })); if (ms != null && s.esito) void scegli(s.esito, ms); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={s.meetLink} onChange={(e) => setS((p) => ({ ...p, meetLink: e.target.value }))} />

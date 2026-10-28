@@ -59,8 +59,10 @@ export function Funnel({ ora = Date.now() }: { ora?: number }) {
           </Gruppo>
           <Gruppo titolo="Call">
             <Voce nome="Call di conoscenza fatte" numero={f.call.conoscenza} />
-            <Voce nome="Call di presentazione fatte" numero={f.call.presentazione} />
-            <Voce nome="Dalla conoscenza alla presentazione" numero={percentualeOppureNd(f.call.rapporto)} quota={f.call.rapporto} />
+            <Voce nome="Call dell'offerta fatte" numero={f.call.offerta} />
+            <Voce nome="Call di analisi fatte" numero={f.call.analisi} />
+            <Voce nome="Call del progetto fatte" numero={f.call.progetto} />
+            <Voce nome="Dalla conoscenza all'offerta" numero={percentualeOppureNd(f.call.rapporto)} quota={f.call.rapporto} />
           </Gruppo>
           </div>
           <div className="flex flex-col gap-6">

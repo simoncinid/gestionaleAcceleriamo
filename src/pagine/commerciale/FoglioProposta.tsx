@@ -59,19 +59,27 @@ export function FoglioAbbina({ proposta, onChiudi }: { proposta: PropostaRiga; o
 // Come il server: solo link https:// (niente javascript: o http://). Vuoto non è un errore.
 export const motivoLinkPdf = (testo: string) => (testo.trim() && !/^https:\/\/\S+$/.test(testo.trim()) ? "Il link deve iniziare con https://" : undefined);
 
+// Forbice dell'offerta (modifica 25): due estremi in euro, tutti e due o nessuno, il primo non oltre il secondo. Come il server.
+export function motivoForbice(da: string, a: string): string | undefined {
+  const x = centesimi(da), y = centesimi(a);
+  if (x == null && y == null) return undefined;
+  if (x == null || y == null) return "Scrivi tutti e due gli estremi della forbice";
+  return x > y ? "Il primo estremo non può superare il secondo" : undefined;
+}
+
 const OPZIONI = [{ valore: "standard" as const, etichetta: "Standard" }, { valore: "proprieta" as const, etichetta: "Proprietà del codice" }];
 
 // Proposta inserita a mano dal "+" (quando il preventivo non passa dal wiki).
 export function FoglioPropostaManuale({ leadIniziale, onChiudi }: { leadIniziale?: LeadListItem; onChiudi: () => void }) {
   const qc = useQueryClient();
   const [lead, setLead] = useState<LeadListItem | null>(leadIniziale ?? null);
-  const [v, setV] = useState({ number: "", setup: "", canone: "", ore: "", alternativa: "", pdfUrl: "" });
+  const [v, setV] = useState({ number: "", setup: "", canone: "", ore: "", alternativa: "", forbiceDa: "", forbiceA: "", pdfUrl: "" });
   const [opzione, setOpzione] = useState<"standard" | "proprieta">("standard");
   const [validita, setValidita] = useState<number | null>(null);
   const [stato, setStato] = useState<"bozza" | "registrata">("registrata");
   const corpo = {
     leadId: lead?.id, number: v.number.trim(), option: opzione, setupCents: centesimi(v.setup), feeCents: opzione === "proprieta" ? null : centesimi(v.canone),
-    hoursEstimate: v.ore.trim() ? Number(v.ore) : null, alternativeCents: centesimi(v.alternativa), validUntil: validita, pdfUrl: v.pdfUrl.trim() || null, status: stato,
+    hoursEstimate: v.ore.trim() ? Number(v.ore) : null, alternativeCents: centesimi(v.alternativa), forbiceDaCents: centesimi(v.forbiceDa), forbiceACents: centesimi(v.forbiceA), validUntil: validita, pdfUrl: v.pdfUrl.trim() || null, status: stato,
   };
   const salva = useMutation({
     mutationFn: () => api("/proposals", { method: "POST", json: corpo }),
@@ -79,7 +87,7 @@ export function FoglioPropostaManuale({ leadIniziale, onChiudi }: { leadIniziale
     onError: (e) => toast.error(e.message),
   });
   const campo = (k: keyof typeof v) => ({ value: v[k], onChange: (e: ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value })) });
-  const manca = !lead ? "Scegli il lead" : !corpo.number ? "Serve il numero" : corpo.hoursEstimate != null && !Number.isInteger(corpo.hoursEstimate) ? "Ore in numero intero" : motivoLinkPdf(v.pdfUrl);
+  const manca = !lead ? "Scegli il lead" : !corpo.number ? "Serve il numero" : corpo.hoursEstimate != null && !Number.isInteger(corpo.hoursEstimate) ? "Ore in numero intero" : (motivoForbice(v.forbiceDa, v.forbiceA) ?? motivoLinkPdf(v.pdfUrl));
   return (
     <Foglio aperto titolo="Proposta a mano" onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Salva proposta</Pulsante>}>
@@ -91,6 +99,8 @@ export function FoglioPropostaManuale({ leadIniziale, onChiudi }: { leadIniziale
         {opzione === "standard" && <Campo etichetta="Canone mensile in euro" inputMode="decimal" {...campo("canone")} />}
         <Campo etichetta="Ore stimate" inputMode="numeric" {...campo("ore")} />
         <Campo etichetta="Prezzo con la proprietà del codice" aiuto="Facoltativo" inputMode="decimal" {...campo("alternativa")} />
+        <Campo etichetta="Forbice da, in euro" aiuto="Facoltativo, per l'offerta" inputMode="decimal" {...campo("forbiceDa")} />
+        <Campo etichetta="Forbice fino a, in euro" aiuto="Facoltativo, per l'offerta" inputMode="decimal" {...campo("forbiceA")} />
         <CampoQuando etichetta="Valida fino al" valore={validita} onCambia={setValidita} />
         <Campo etichetta="Link al PDF" aiuto="Facoltativo" type="url" inputMode="url" {...campo("pdfUrl")} />
         <Selettore etichetta="Stato" opzioni={[{ valore: "registrata", etichetta: "Mandata al cliente" }, { valore: "bozza", etichetta: "Bozza" }]} valore={stato} onCambia={setStato} />

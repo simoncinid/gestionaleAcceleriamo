@@ -98,7 +98,7 @@ describe("Impostazioni", () => {
   it("QA 11 rivista dal blocco 1: le fasi sono un elenco in sola lettura, niente foglio e niente riordino", () => {
     const html = render(<Fasi />, { dati: [[["stages"], fasi], [["stage-rules"], regole], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], utenti]] });
     const righe = [...html.matchAll(/<li [^>]*data-fase="([^"]+)"[^>]*>(.*?)<\/li>/gs)];
-    expect(righe).toHaveLength(9);
+    expect(righe).toHaveLength(12);
     for (const [, , r] of righe) {
       expect(r).not.toContain("truncate");
       expect(r).not.toContain("<input");

@@ -10,7 +10,8 @@ import type { LeadDetail, Stage } from "../../types";
 import type { CollegamentiScheda } from "../../../worker/leads/collegamenti";
 import { FoglioNuovaAutomazione } from "../automazioni/FoglioAutomazione";
 import { FoglioNuovoCanone } from "../economia/Fogli";
-import { callPerFase } from "../../../worker/regole/fasi-call";
+import { AZIONE_CALL, CALL_DEL_CODICE, callPerFase } from "../../../worker/regole/fasi-call";
+import type { CallKind } from "../../../worker/db/schema";
 import { FoglioAvvioLavoro } from "../lavori/FoglioAvvioLavoro";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioNuovoCliente } from "./FoglioCliente";
@@ -35,9 +36,10 @@ import { LINK, coloreFase } from "./lead/stile";
 import { Timeline } from "./lead/Timeline";
 import { confermaNonPartita, idPerPreventivo } from "./scheda";
 import { useCambioFase } from "./StepperFasi";
+import { useNonPresentato } from "./nonPresentato";
 
 type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase"
-  | "sposta" | "link" | "rimanda" | "proposta" | "automazione" | "canone" | { fase: Stage } | { fissa: "conoscenza" | "presentazione" };
+  | "sposta" | "link" | "rimanda" | "proposta" | "automazione" | "canone" | { fase: Stage } | { fissa: CallKind };
 
 // Avviso in riga in cima alla scheda: una frase, al massimo un link. Mai finestre del browser.
 function Avviso({ children }: { children: ReactNode }) {
@@ -95,11 +97,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
     onSuccess: () => { esci(); toast.success("Spostato nel cestino"); vai("/commerciale/lead"); },
     onError: (e) => toast.error(e.message),
   });
-  const nonPresentato = useMutation({
-    mutationFn: (kind: "conoscenza" | "presentazione") => api(`/leads/${id}/no-show`, { method: "POST", json: { kind } }),
-    onSuccess: () => { toast.success("Segnato: non si è presentato"); for (const k of [["lead", id], ["leads"], ["today"], ["badge"], ["calls"]]) void qc.invalidateQueries({ queryKey: k }); },
-    onError: (e) => toast.error(e.message),
-  });
+  const nonPresentato = useNonPresentato();
   const unisci = useMutation({
     mutationFn: (intoId: string) => api<{ lead: { id: string } }>(`/leads/${id}/merge`, { method: "POST", json: { intoId } }),
     onSuccess: ({ lead }) => { esci(); toast.success("Lead uniti"); vai(`/commerciale/lead/${lead.id}`); },
@@ -116,15 +114,14 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const trovata = aperte.find((c) => c.scheduledAt === lead.appointmentAt) ?? aperte[0];
   const prossimaCall = trovata ? { id: trovata.id, scheduledAt: trovata.scheduledAt, meetLink: lead.meetLink } : null;
   const ultimaProposta = coll.data?.proposte[0] ?? null;
-  const kindCall = lead.stageId === "presentazione-confermata" ? "presentazione" : "conoscenza";
+  const kindCall = callPerFase(lead.stageId) ?? "conoscenza";
   // Ogni codice della tabella apre il suo foglio; chiamare, aprire la videochiamata e il cliente sono link nel Da fare.
   const comando = (c: ComandoScheda) => {
-    if (c === "segna_consulenza" || c === "segna_presentazione" || c === "segna_preventivo" || c === "segna_esito" || c === "segna_decisione") setFoglio("esito");
-    else if (c === "fissa_consulenza") setFoglio({ fissa: "conoscenza" });
-    else if (c === "fissa_presentazione") setFoglio({ fissa: "presentazione" });
+    if (c.startsWith("segna_")) setFoglio("esito");
+    else if (CALL_DEL_CODICE[c]) setFoglio({ fissa: CALL_DEL_CODICE[c] });
     else if (c === "sposta_call") setFoglio(prossimaCall ? "sposta" : { fissa: kindCall });
     else if (c === "aggiungi_link") setFoglio(prossimaCall ? "link" : { fissa: kindCall });
-    else if (c === "non_presentato") nonPresentato.mutate(kindCall);
+    else if (c === "non_presentato") nonPresentato.mutate({ leadId: lead.id, kind: kindCall });
     else if (c === "rimanda") setFoglio("rimanda");
     else if (c === "riapri") setFoglio("fase");
     else if (c === "apri_cliente") setCreaCliente(true);
@@ -209,7 +206,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       {(foglio === "whatsapp" || foglio === "email") && <FoglioScrivi lead={lead} canale={foglio} onChiudi={chiudi} />}
       {foglio === "fase" && <FoglioFase attuale={lead.stageId} ordinate={cambioFase.ordinate} scegli={cambioFase.scegli} onChiudi={chiudi} />}
       {foglio && typeof foglio === "object" && "fissa" in foglio && (
-        <FoglioFissaCall leadId={lead.id} haEmail={!!lead.email} fase={{ label: foglio.fissa === "presentazione" ? "Presentazione" : "Consulenza", kind: foglio.fissa }} onChiudi={chiudi} />
+        <FoglioFissaCall leadId={lead.id} haEmail={!!lead.email} fase={{ label: AZIONE_CALL[foglio.fissa], kind: foglio.fissa }} onChiudi={chiudi} />
       )}
       {(foglio === "sposta" || foglio === "link") && prossimaCall && <FoglioSpostaCall leadId={lead.id} call={prossimaCall} soloLink={foglio === "link"} onChiudi={chiudi} />}
       {foglio === "rimanda" && <FoglioRimanda leadId={lead.id} onChiudi={() => { chiudi(); void qc.invalidateQueries({ queryKey: ["lead", id] }); }} />}

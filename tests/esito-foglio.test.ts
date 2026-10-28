@@ -11,19 +11,19 @@ describe("Foglio Esito, logica", () => {
     expect(testoTentativo(7)).toBe("Tentativo 5 di 5");
   });
 
-  it("senza esito non si salva; appuntamento chiede data della call; le perse chiedono il motivo", () => {
+  it("senza esito non si salva; la conoscenza fissata chiede data della call; le perse chiedono il motivo", () => {
     const s = statoIniziale(RID, { stageId: "da-richiamare" });
     expect(validaEsito(s, false)).toBe("Scegli un esito");
-    expect(validaEsito({ ...s, esito: "appuntamento" }, false)).toBe("Scegli data e ora della call");
+    expect(validaEsito({ ...s, esito: "conoscenza_fissata" }, false)).toBe("Scegli data e ora della call");
     expect(validaEsito({ ...s, esito: "non_interessato", stageId: "non-chiuso" }, true)).toBe("Scegli il motivo");
     expect(validaEsito({ ...s, esito: "non_risponde" }, false)).toBeNull();
   });
 
-  it("il corpo porta sempre lo stesso requestId e la call solo con l'appuntamento", () => {
+  it("il corpo porta sempre lo stesso requestId e la call solo con la conoscenza fissata", () => {
     const s = { ...statoIniziale(RID, { stageId: "da-richiamare" }), esito: "non_risponde" as const, nextAction: "Seconda chiamata", nextActionAt: 1_800_000_000_000 };
     // Fase e scadenza le calcola il server (blocco 1, modifica 12): il corpo non le porta.
     expect(corpoEsito(s)).toEqual({ requestId: RID, esito: "non_risponde" });
-    const a = { ...s, esito: "appuntamento" as const, callAt: 1_800_100_000_000, meetLink: " https://meet.google.com/abc-defg-hij " };
+    const a = { ...s, esito: "conoscenza_fissata" as const, callAt: 1_800_100_000_000, meetLink: " https://meet.google.com/abc-defg-hij " };
     expect(corpoEsito(a).call).toEqual({ kind: "conoscenza", scheduledAt: 1_800_100_000_000, meetLink: "https://meet.google.com/abc-defg-hij" });
     expect(corpoEsito(a).requestId).toBe(RID);
   });

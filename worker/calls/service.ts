@@ -12,7 +12,7 @@ import { partiRoma } from "../lib/roma";
 import { passiProposta } from "../regole/applica";
 import { propostaEvento, type Contesto } from "../regole/motore";
 import { dataTesto } from "../processo/processo";
-import { AZIONE_CALL, CALL_DELL_FASE } from "../regole/fasi-call";
+import { AZIONE_CALL, CALL_DELL_FASE, CALL_SEGUENTE } from "../regole/fasi-call";
 import { transizione } from "../processo/transizione";
 import { creaIcs } from "./ics";
 import { linkHttp } from "../leads/validation";
@@ -57,8 +57,6 @@ export async function unaCall(db: Db, id: string): Promise<CallAgenda> {
 
 const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
 // Orari mostrati sempre sul fuso di Roma.
-// Call che si può fissare nello stesso foglio quando quella prima è fatta.
-export const CALL_SEGUENTE: Partial<Record<CallKind, CallKind>> = { conoscenza: "offerta", offerta: "analisi" };
 
 const quandoTesto = (ms: number) => {
   const p = partiRoma(ms);

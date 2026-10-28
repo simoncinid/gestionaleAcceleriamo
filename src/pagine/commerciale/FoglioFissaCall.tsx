@@ -5,17 +5,21 @@ import { api } from "../../api";
 import { eCallNelPassato } from "../../errori";
 import { Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
+import type { CallKind } from "../../../worker/db/schema";
+import { AZIONE_CALL } from "../../../worker/regole/fasi-call";
+
+const TIPI = (Object.keys(AZIONE_CALL) as CallKind[]).map((k) => ({ valore: k, etichetta: AZIONE_CALL[k] }));
 
 type Risposta = { invito: "mandato" | "in_coda" | "non_mandato" | "non_richiesto"; errore?: string };
 
 // Foglio "Fissa call" dalla scheda lead: fissare è l'azione esplicita che applica fase e prossima azione del motore.
 // Q14: aperto dal cambio di fase, il tipo è fissato dalla fase e il titolo dice dove va il lead.
 export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase, ritorno }: {
-  leadId: string; haEmail: boolean; onChiudi: () => void; fase?: { label: string; kind: "conoscenza" | "presentazione" };
+  leadId: string; haEmail: boolean; onChiudi: () => void; fase?: { label: string; kind: CallKind };
   ritorno?: RefObject<HTMLElement | null>;
 }) {
   const qc = useQueryClient();
-  const [kind, setKind] = useState<"conoscenza" | "presentazione">(fase?.kind ?? "conoscenza");
+  const [kind, setKind] = useState<CallKind>(fase?.kind ?? "conoscenza");
   const [quando, setQuando] = useState<number | null>(null);
   const [meet, setMeet] = useState("");
   const [invito, setInvito] = useState(haEmail);
@@ -41,7 +45,7 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase, ritorno }: {
         </Pulsante>
       }>
       <div className="flex flex-col gap-3">
-        {!fase && <Selettore etichetta="Tipo" opzioni={[{ valore: "conoscenza", etichetta: "Conoscenza" }, { valore: "presentazione", etichetta: "Presentazione del preventivo" }]} valore={kind} onCambia={setKind} />}
+        {!fase && <Selettore etichetta="Tipo" opzioni={TIPI} valore={kind} onCambia={setKind} />}
         <CampoQuando etichetta="Giorno e ora" valore={quando} onCambia={(ms) => { setQuando(ms); setErroreData(null); }} errore={erroreData} />
         <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={meet} onChange={(e) => setMeet(e.target.value)} />
         <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>

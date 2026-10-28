@@ -11,6 +11,7 @@ import { useRitornoChiamata } from "./chiamata";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFissaCall } from "./FoglioFissaCall";
 import { FoglioRimanda } from "./FoglioRimanda";
+import { CALL_DEL_CODICE, CALL_DELL_FASE } from "../../../worker/regole/fasi-call";
 import { RigaDaFare, type Apertura } from "./RigaOggi";
 import { useTask } from "../lavori/dati";
 import { RigaTask } from "../lavori/RigaTask";
@@ -139,10 +140,9 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
       {aperto?.tipo === "esito" && <FoglioEsito lead={aperto.lead} onChiudi={chiudi} />}
       {aperto?.tipo === "rimanda" && <FoglioRimanda leadId={aperto.lead.id} onChiudi={chiudi} />}
       {aperto?.tipo === "fissa" && (() => {
-        // Fissare la consulenza o la presentazione sposta anche il lead nella sua fase (come dalla scheda).
-        const kind = aperto.comando?.codice === "fissa_presentazione" ? "presentazione" : "conoscenza";
-        const id = kind === "presentazione" ? "presentazione-confermata" : "appuntamento-confermato";
-        const label = fasi.data?.find((f) => f.id === id)?.label;
+        // Fissare una call sposta anche il lead nella sua fase (come dalla scheda): il tipo viene dal codice, senza ricalcoli.
+        const kind = CALL_DEL_CODICE[aperto.comando?.codice ?? ""] ?? "conoscenza";
+        const label = fasi.data?.find((f) => f.id === CALL_DELL_FASE[kind])?.label;
         return <FoglioFissaCall leadId={aperto.lead.id} haEmail={!!(aperto.lead as RigaOggi).email} onChiudi={chiudi} fase={label ? { label, kind } : undefined} />;
       })()}
     </div>

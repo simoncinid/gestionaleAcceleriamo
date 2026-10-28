@@ -62,6 +62,7 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
       <div className="flex flex-col gap-5">
       <Blocco titolo="Prezzo">
         <p className="text-corpo tabular-nums">{prezzo(p)}</p>
+        {p.forbiceDaCents != null && p.forbiceACents != null && <p className="text-corpo tabular-nums">Forbice: da {euro(p.forbiceDaCents)} a {euro(p.forbiceACents)}</p>}
         {p.hoursEstimate != null && <p className="text-secondaria text-grigio tabular-nums">{p.hoursEstimate} ore stimate</p>}
         {p.option === "standard" && p.alternativeCents != null && <p className="text-secondaria text-grigio tabular-nums">Con la proprietà del codice: {euro(p.alternativeCents)}</p>}
         {p.validUntil != null && <p className="text-secondaria text-grigio tabular-nums">Valida fino a {quando(p.validUntil, ora)}</p>}

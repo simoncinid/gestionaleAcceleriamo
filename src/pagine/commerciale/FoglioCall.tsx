@@ -8,6 +8,8 @@ import { momento } from "../../format";
 import type { CallAgenda } from "../../types";
 import { ContattoDalLead } from "./lead/ContattoDa";
 import { NOTE_CALL, leggiNote } from "./note-call";
+import type { CallKind } from "../../../worker/db/schema";
+import { AZIONE_CALL, CALL_SEGUENTE } from "../../../worker/regole/fasi-call";
 
 type Esito = "fatta" | "saltata" | "rimandata";
 const ESITI: { valore: Esito; etichetta: string }[] = [
@@ -16,7 +18,20 @@ const ESITI: { valore: Esito; etichetta: string }[] = [
   { valore: "rimandata", etichetta: "Rimandata" },
 ];
 
-// Foglio della call: esito, eventuale nuova data o presentazione nello stesso foglio, poi le note dello schema 6.7.
+// La call che si fissa nello stesso foglio quando questa è appena fatta: dopo la conoscenza l'offerta, dopo l'offerta l'analisi.
+export const seguenteDi = (k: { kind: CallKind; outcome: string | null }, esito: Esito | null): CallKind | null =>
+  esito === "fatta" && k.outcome !== "fatta" ? (CALL_SEGUENTE[k.kind] ?? null) : null;
+
+// Corpo del PATCH senza le note: esito, nuova data se rimandata, call seguente nel campo "prossima".
+export function corpoCall(k: { kind: CallKind; outcome: string | null }, esito: Esito | null, pros: { scheduledAt: number | null; meetLink: string }, nuovaData: number | null = null) {
+  const corpo: Record<string, unknown> = {};
+  if (esito !== k.outcome) corpo.outcome = esito;
+  if (esito === "rimandata" && nuovaData != null) corpo.scheduledAt = nuovaData;
+  if (seguenteDi(k, esito) && pros.scheduledAt != null) corpo.prossima = { scheduledAt: pros.scheduledAt, meetLink: pros.meetLink.trim() || null };
+  return corpo;
+}
+
+// Foglio della call: esito, eventuale nuova data o call seguente nello stesso foglio, poi le note dello schema 6.7.
 export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => void }) {
   const qc = useQueryClient();
   const [note, setNote] = useState(() => leggiNote(k.notes));
@@ -24,11 +39,8 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
   const [nuovaData, setNuovaData] = useState<number | null>(null);
   const [pres, setPres] = useState<number | null>(null);
   const [meet, setMeet] = useState("");
-  const conPresentazione = esito === "fatta" && k.kind === "conoscenza" && k.outcome !== "fatta";
-  const corpo: Record<string, unknown> = { notes: JSON.stringify(note) };
-  if (esito !== k.outcome) corpo.outcome = esito;
-  if (esito === "rimandata" && nuovaData != null) corpo.scheduledAt = nuovaData;
-  if (conPresentazione && pres != null) corpo.presentazione = { scheduledAt: pres, meetLink: meet.trim() || null };
+  const seguente = seguenteDi(k, esito);
+  const corpo = { notes: JSON.stringify(note), ...corpoCall(k, esito, { scheduledAt: pres, meetLink: meet }, nuovaData) };
   const [erroreData, setErroreData] = useState<string | null>(null);
   const salva = useMutation({
     mutationFn: () => api(`/calls/${k.id}`, { method: "PATCH", json: corpo }),
@@ -40,7 +52,7 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
     onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
   return (
-    <Foglio aperto titolo={`Call di ${k.kind}`} onChiudi={onChiudi}
+    <Foglio aperto titolo={AZIONE_CALL[k.kind]} onChiudi={onChiudi}
       principale={
         <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={esito === "rimandata" && nuovaData == null ? "Scegli la nuova data" : undefined} onClick={() => salva.mutate()}>
           Salva la call
@@ -53,9 +65,9 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
         </div>
         <Selettore etichetta="Esito" opzioni={ESITI} valore={esito} onCambia={setEsito} />
         {esito === "rimandata" && <CampoQuando etichetta="Nuova data" valore={nuovaData} onCambia={(ms) => { setNuovaData(ms); setErroreData(null); }} errore={erroreData} />}
-        {conPresentazione && (
-          <section className="flex flex-col gap-3 pt-1" aria-label="Fissa la call di presentazione">
-            <p className="text-secondaria font-medium">Call di presentazione</p>
+        {seguente && (
+          <section className="flex flex-col gap-3 pt-1" aria-label={`Fissa la ${AZIONE_CALL[seguente].toLowerCase()}`}>
+            <p className="text-secondaria font-medium">{AZIONE_CALL[seguente]}, se è già fissata</p>
             <CampoQuando etichetta="Giorno e ora" valore={pres} onCambia={(ms) => { setPres(ms); setErroreData(null); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={meet} onChange={(e) => setMeet(e.target.value)} />
           </section>
