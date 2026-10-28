@@ -28,7 +28,7 @@ describe("migrazioni del Piano A", () => {
       "fermo:tutte", "pausa:in-attesa-decisione", "preventivo_48h:call_conoscenza_fatta", "ricontatti:in-attesa-decisione",
       "sla:da-chiamare-prima-volta", "tentativi:da-richiamare",
     ]);
-    expect(JSON.parse(results.find((r) => r.rule_key === "sla")!.params)).toEqual({ minuti: 120, avvisoMinuti: 90 });
+    expect(JSON.parse(results.find((r) => r.rule_key === "sla")!.params)).toEqual({ minuti: 30, avvisoMinuti: 20 }); // la 0018 (blocco 1) porta la prima chiamata a 30 minuti
     expect(results.every((r) => r.active === 1)).toBe(true);
   });
 

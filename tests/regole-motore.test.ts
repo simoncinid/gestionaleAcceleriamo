@@ -16,7 +16,7 @@ describe("le regole sanno quale call c'è stata (spec 6.3)", () => {
   });
   it("call di conoscenza fatta con la presentazione fissata", () => {
     expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: r(20, 11) }, ctx()))
-      .toMatchObject({ stageId: "presentazione-confermata", nextAction: "Preparare il preventivo", nextActionAt: r(14, 10) });
+      .toMatchObject({ stageId: "presentazione-confermata", nextAction: "Preparare il preventivo", nextActionAt: r(15, 19, 30) });
   });
   it("call di conoscenza fatta senza data della presentazione", () => {
     expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: null }, ctx()))
@@ -68,9 +68,15 @@ describe("tentativi da 1 a 5", () => {
   it("4: terza chiamata", () => {
     expect(propostaEsito("non_risponde", lead(3), ctx())).toMatchObject({ nextAction: "Terza chiamata", nextActionAt: r(16, 10), attemptCount: 4 });
   });
-  it("5: propone Non chiuso con motivo Non raggiungibile, senza applicarlo", () => {
+  // Contratto blocco 1, fase 20: dopo il quinto tentativo pausa di 2 mesi, poi un'ultima chiamata, poi Non interessato.
+  // 13 dicembre 2026 è domenica (chiuso): la pausa finisce lunedì 14 alle 10 (Roma = UTC+1).
+  it("5: propone la pausa di due mesi in Da richiamare, senza chiudere", () => {
     expect(propostaEsito("non_risponde", lead(4), ctx()))
-      .toMatchObject({ stageId: "non-chiuso", lostReason: "non_raggiungibile", nextAction: null, nextActionAt: null, attemptCount: 5, passo: "Tentativo 5 di 5" });
+      .toMatchObject({ stageId: "da-richiamare", nextAction: "Richiamare dopo la pausa", pausedUntil: Date.UTC(2026, 11, 14, 9), attemptCount: 5, passo: "Tentativo 5 di 5" });
+  });
+  it("l'ultima chiamata dopo la pausa a vuoto chiude con motivo Non ha mai risposto", () => {
+    expect(propostaEsito("non_risponde", lead(5), ctx()))
+      .toMatchObject({ stageId: "non-chiuso", lostReason: "mai_risposto", nextAction: null, nextActionAt: null, attemptCount: 6 });
   });
   it("con le sequenze spente propone solo Richiamare domani alle 10", () => {
     expect(propostaEsito("non_risponde", lead(1), ctx({ sequenze: false }))).toMatchObject({ stageId: null, nextAction: "Richiamare", nextActionAt: r(14, 10), attemptCount: 2 });
@@ -98,12 +104,14 @@ describe("esiti del Foglio Esito (DS 6.6)", () => {
 // non di nuovo "Call di conoscenza"; dopo la presentazione si aspetta la decisione.
 describe("esiti dopo la consulenza e la presentazione", () => {
   const lead = (stageId: string) => ({ stageId, attemptCount: 0, primoTentativoAt: null });
-  it("consulenza fatta: In attesa preventivo, preparare il preventivo domani alle 10", () => {
+  // Ipotesi 9 del contratto: preventivo entro 2 giorni lavorativi, a fine orario.
+  it("consulenza fatta: In attesa preventivo, preparare il preventivo entro 2 giorni lavorativi", () => {
     expect(propostaEsito("consulenza_fatta", lead("appuntamento-confermato"), ctx()))
-      .toEqual({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: r(14, 10) });
+      .toEqual({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: r(15, 19, 30) });
   });
-  it("con la regola a 48 ore il preventivo va a due giorni dopo", () => {
-    expect(propostaEsito("consulenza_fatta", lead("appuntamento-confermato"), ctx({ oreProposta: 48 })).nextActionAt).toBe(r(15, 10));
+  it("i 2 giorni lavorativi saltano il giorno chiuso", () => {
+    // Venerdì 16 ottobre: sabato lavora, domenica no, quindi lunedì 19.
+    expect(propostaEsito("consulenza_fatta", lead("appuntamento-confermato"), ctx({ ora: r(16, 10) })).nextActionAt).toBe(r(19, 19, 30));
   });
   it("presentazione fissata usa la data della call", () => {
     expect(propostaEsito("presentazione_fissata", lead("in-attesa-preventivo"), ctx(), { scheduledAt: r(16, 15) }))
@@ -113,9 +121,9 @@ describe("esiti dopo la consulenza e la presentazione", () => {
     expect(propostaEsito("presentazione_fatta", lead("presentazione-confermata"), ctx()))
       .toMatchObject({ stageId: "in-attesa-decisione", nextAction: "Follow-up preventivo", nextActionAt: r(16, 10) });
   });
-  it("la call di conoscenza fatta porta anche lei al preventivo di domani", () => {
+  it("la call di conoscenza fatta porta anche lei al preventivo entro 2 giorni lavorativi", () => {
     expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: null }, ctx()))
-      .toEqual({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: r(14, 10) });
+      .toEqual({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: r(15, 19, 30) });
   });
 });
 

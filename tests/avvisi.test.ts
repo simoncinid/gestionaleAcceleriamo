@@ -48,11 +48,11 @@ describe("avvisa", () => {
 
 describe("controllaAvvisi", () => {
   it("preavviso a 90 minuti al responsabile, scaduto a tutti e due", async () => {
-    await lead("L1"); // arrivato lunedì alle 9:00, SLA 120 minuti lavorativi: scade alle 11:00
-    await controllaAvvisi(env, lun(10, 31), 10);
+    await lead("L1"); // arrivato lunedì alle 9:00, SLA 30 minuti lavorativi (blocco 1): scade alle 9:30, preavviso da subito
+    await controllaAvvisi(env, lun(9, 1), 10);
     let righe = await env.DB.prepare("SELECT evento, user_id FROM notifications ORDER BY user_id").all<{ evento: string; user_id: string }>();
     expect(righe.results).toEqual([{ evento: "sla_90", user_id: "tommaso" }]);
-    await controllaAvvisi(env, lun(11, 1), 10);
+    await controllaAvvisi(env, lun(9, 31), 10);
     righe = await env.DB.prepare("SELECT evento, user_id FROM notifications WHERE evento = 'sla_scaduto' ORDER BY user_id").all();
     expect(righe.results).toHaveLength(2);
   });

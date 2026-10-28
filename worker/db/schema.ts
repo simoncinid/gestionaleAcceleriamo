@@ -83,6 +83,9 @@ export const leads = sqliteTable(
     feeCents: integer("fee_cents"),
     score: text("score", { enum: ["verde", "giallo", "grigio"] }),
     attemptCount: integer("attempt_count").notNull().default(0),
+    // Blocco 1: assenze alle call (fasi 30 e 50) e responsabile scelto a mano (la transizione non lo cambia).
+    noShow: integer("no_show").notNull().default(0),
+    ownerManual: integer("owner_manual", { mode: "boolean" }).notNull().default(false),
     sequenceStep: integer("sequence_step").notNull().default(0),
     pausedUntil: integer("paused_until"),
     lostReason: text("lost_reason"),

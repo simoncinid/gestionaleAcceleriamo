@@ -128,7 +128,9 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
     }
     case FASE.richiamare: {
       const n = Math.min(lead.attemptCount + 1, massimo);
-      const azione = inPausa ? `Ultima chiamata dopo la pausa: ${dataTesto(lead.pausedUntil!)}` : `Richiamare: tentativo ${n} di ${massimo}`;
+      // Dopo il quinto tentativo a vuoto: pausa, poi un'ultima chiamata.
+      const azione = inPausa ? `Ultima chiamata dopo la pausa: ${dataTesto(lead.pausedUntil!)}`
+        : lead.attemptCount >= massimo ? "Ultima chiamata dopo la pausa" : `Richiamare: tentativo ${n} di ${massimo}`;
       return fine(azione, salvata, {
         pulsante: chiama, tentativo: n,
         secondarie: [comando("Segna l'esito", "segna_esito"), comando("Fissa una consulenza", "fissa_consulenza")],

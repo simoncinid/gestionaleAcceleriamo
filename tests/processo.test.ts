@@ -103,3 +103,18 @@ describe("statoScadenza", () => {
     expect(statoScadenza(null, ADESSO)).toBeNull();
   });
 });
+
+describe("scadenze e orario di lavoro (modifica 2)", () => {
+  it("un lead arrivato alle 20:00 scade alle 09:00 del giorno lavorativo dopo", () => {
+    const sera = daRoma(2026, 10, 28, 20, 0);
+    const p = prossimaAzione(lead(FASE.nuovo, { createdAt: sera, stageChangedAt: sera, nextActionAt: sera }), sera);
+    expect(p.scadenza).toBe(daRoma(2026, 10, 29, 9, 0));
+  });
+  it("sabato sera salta la domenica chiusa: lunedì alle 09:00", () => {
+    const sabato = daRoma(2026, 10, 31, 21, 0);
+    expect(prossimaAzione(lead(FASE.nuovo, { createdAt: sabato, nextActionAt: sabato }), sabato).scadenza).toBe(daRoma(2026, 11, 2, 9, 0));
+  });
+  it("in orario la prima chiamata scade dopo 30 minuti", () => {
+    expect(prossimaAzione(lead(FASE.nuovo, { createdAt: ADESSO, nextActionAt: ADESSO }), ADESSO).scadenza).toBe(ADESSO + 30 * 60_000);
+  });
+});

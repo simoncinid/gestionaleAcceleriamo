@@ -35,7 +35,7 @@ describe("GET /today", () => {
 
     const o = await oggi(cookie);
     expect(o.nuovi.map((l) => l.id)).toEqual(["nuovo"]);
-    expect(o.nuovi[0].slaScadenza).toBe(NOW + 90 * 60_000);
+    expect(o.nuovi[0].slaScadenza).toBe(NOW); // SLA di 30 minuti (blocco 1): arrivato 30 minuti fa, scade adesso
     // "scaduto" sta in Adesso e non si ripete in Da fare (ogni lead una volta sola).
     expect(o.daFare.map((l) => l.id)).toEqual(["stasera"]);
     expect(o.proposte.map((p) => p.number)).toEqual(["ACC-2026-001"]);

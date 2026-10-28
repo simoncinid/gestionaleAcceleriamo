@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { giro, LAVORI, limiteDi, registraLavoro, scadiProposte, type DefLavoro } from "../worker/cron";
 import { controllaAvvisi } from "../worker/avvisi/controlli";
 import { getDb } from "../worker/db/client";
@@ -540,6 +540,10 @@ describe("giro con i lavori veri insieme", () => {
 });
 
 describe("arretrato nel foglio", () => {
+  // Scenari scritti con lo SLA di 120 minuti: il conto delle query vale con quegli avvisi.
+  beforeEach(async () => {
+    await env.DB.prepare(`UPDATE stage_rules SET params = '{"minuti":120,"avvisoMinuti":90}' WHERE id = 'sla-prima'`).run();
+  });
   it("11:10 con 10 righe nuove, avvisi da creare e un invito in coda: l'invito parte e il totale resta sotto 45", async () => {
     await createUser();
     await foglioFinto(Array.from({ length: 10 }, (_, i) => rigaFoglio(i)));

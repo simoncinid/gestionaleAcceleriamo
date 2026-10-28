@@ -15,7 +15,7 @@ export async function leggiSla(db: Db): Promise<Sla> {
     leggiImpostazioni(db),
     db.select({ params: stageRules.params }).from(stageRules).where(and(eq(stageRules.ruleKey, "sla"), eq(stageRules.active, true))).get(),
   ]);
-  let minuti = 120;
+  let minuti = 30;
   try {
     const v = (JSON.parse(String(regola?.params ?? "{}")) as Record<string, unknown>).minuti;
     if (typeof v === "number") minuti = v;

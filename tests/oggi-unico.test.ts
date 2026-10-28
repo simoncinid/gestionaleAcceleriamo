@@ -9,7 +9,8 @@ const GIORNO = 86_400_000;
 // Venerdì 9 ottobre 2026 alle 23:20 a Roma (UTC+2): fuori orario.
 const VENERDI_SERA = Date.UTC(2026, 9, 9, 21, 20);
 // Sabato 10 ottobre alle 8:30 riapre, più 120 minuti di SLA: 10:30 a Roma.
-const SCADENZA = Date.UTC(2026, 9, 10, 8, 30);
+// Blocco 1: SLA di 30 minuti (sabato 08:30 + 30 minuti).
+const SCADENZA = Date.UTC(2026, 9, 10, 7, 0);
 
 async function insertLead(id: string, extra: Record<string, unknown> = {}) {
   const row = { id, company: id, source: "manuale", stage_id: "da-richiamare", stage_changed_at: VENERDI_SERA, next_action: "Richiamare", next_action_at: VENERDI_SERA + 10 * GIORNO, created_at: VENERDI_SERA - GIORNO, updated_at: VENERDI_SERA, owner_id: "tommaso", ...extra };
@@ -31,8 +32,8 @@ function righe(o: Oggi): [string, string][] {
 }
 
 describe("scadenza della prima chiamata (una sola funzione)", () => {
-  it("lead arrivato venerdì alle 23:20: scade sabato alle 10:30, uguale in Oggi, Scaletta, Elenco e scheda", async () => {
-    expect(scadenzaPrimaChiamata(VENERDI_SERA, { minuti: 120, orario: ORARIO_DEFAULT })).toBe(SCADENZA);
+  it("lead arrivato venerdì alle 23:20: scade sabato alle 09:00, uguale in Oggi, Scaletta, Elenco e scheda", async () => {
+    expect(scadenzaPrimaChiamata(VENERDI_SERA, { minuti: 30, orario: ORARIO_DEFAULT })).toBe(SCADENZA);
     const cookie = await authed();
     // Come la 1A: la prossima azione del lead nuovo ha la data dell'arrivo.
     await insertLead("notturno", { stage_id: "da-chiamare-prima-volta", next_action: "Prima chiamata", next_action_at: VENERDI_SERA, created_at: VENERDI_SERA, stage_changed_at: VENERDI_SERA });
@@ -63,7 +64,7 @@ describe("scadenza della prima chiamata (una sola funzione)", () => {
     const r = await call("/api/leads", { method: "POST", json: { company: "Officina Prova" } }, cookie);
     expect(r.status).toBe(201);
     const { lead } = (await r.json()) as { lead: { id: string; createdAt: number; nextActionAt: number } };
-    const atteso = scadenzaLavorativa(lead.createdAt, 120, ORARIO_DEFAULT);
+    const atteso = scadenzaLavorativa(lead.createdAt, 30, ORARIO_DEFAULT);
     expect(lead.nextActionAt).toBe(atteso);
     const salvato = await env.DB.prepare("SELECT next_action_at n FROM leads WHERE id = ?").bind(lead.id).first<{ n: number }>();
     expect(salvato?.n).toBe(atteso);
