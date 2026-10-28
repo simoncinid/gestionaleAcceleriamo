@@ -69,6 +69,8 @@ export const dataTesto = (ms: number) => {
 };
 
 export const nomeDi = (l: { contactName: string | null; company: string }) => l.contactName?.trim().split(/\s+/)[0] || l.company;
+// Nome e cognome per le call ("Call con Marco Prizzi"): la fase dice già quale call è, la riga dice con chi.
+export const nomeIntero = (l: { contactName: string | null; company: string }) => l.contactName?.trim().replace(/\s+/g, " ") || l.company;
 
 // Rosso solo oltre un giorno di ritardo; arancione quello che scade entro oggi (anche se già passato da poco); grigio il futuro.
 export function statoScadenza(scadenza: number | null, adesso: number): StatoScadenza | null {
@@ -119,22 +121,22 @@ export const AZIONE_FISSA_PROGETTO = "Fissare la call del progetto";
 type FaseCall = { titolo: (nome: string) => string; cosa: string; fissa: Comando; segna: Comando; poi: (salvata: number, nome: string, o: Orario) => string };
 const FASI_CALL: Record<string, FaseCall> = {
   [FASE.conoscenza]: {
-    titolo: (n) => `Conoscenza con ${n}`, cosa: "la conoscenza",
+    titolo: (n) => `Call con ${n}`, cosa: "la conoscenza",
     fissa: { testo: "Fissa la call di conoscenza", codice: "fissa_conoscenza" }, segna: { testo: "Segna com'è andata la conoscenza", codice: "segna_conoscenza" },
     poi: (t, _n, o) => `Preparare l'offerta entro ${dataTesto(giorniLavorativiDopo(t, 3, o))}`,
   },
   [FASE.offerta]: {
-    titolo: (n) => `Offerta con ${n}`, cosa: "l'offerta",
+    titolo: (n) => `Call con ${n}`, cosa: "l'offerta",
     fissa: { testo: "Fissa la call dell'offerta", codice: "fissa_offerta" }, segna: { testo: "Segna com'è andata l'offerta", codice: "segna_offerta" },
     poi: () => AZIONE_FISSA_ANALISI,
   },
   [FASE.analisi]: {
-    titolo: (n) => `Fai l'analisi con ${n}`, cosa: "l'analisi",
+    titolo: (n) => `Call con ${n}`, cosa: "l'analisi",
     fissa: { testo: "Fissa la call di analisi", codice: "fissa_analisi" }, segna: { testo: "Segna com'è andata l'analisi", codice: "segna_analisi" },
     poi: (t, _n, o) => `Preparare il progetto entro ${dataTesto(giorniLavorativiDopo(t, 3, o))}`,
   },
   [FASE.progetto]: {
-    titolo: () => "Presenta il progetto e chiudi", cosa: "la call del progetto",
+    titolo: (n) => `Call con ${n}, per chiudere`, cosa: "la call del progetto",
     fissa: { testo: "Fissa la call del progetto", codice: "fissa_progetto" }, segna: { testo: "Segna com'è andata la call del progetto", codice: "segna_progetto" },
     poi: (_t, n) => `Sentire ${n} per la decisione`,
   },
@@ -142,6 +144,8 @@ const FASI_CALL: Record<string, FaseCall> = {
 
 const comando = (testo: string, codice: CodiceAzione): Comando => ({ testo, codice });
 
+// Testi del "Da fare" (blocco 1 bis): la fase sta già nell'etichetta accanto, qui l'azione con la persona e il
+// dettaglio che la fase non dice ("Richiama Gianbattista, tentativo 2 di 5", "Call con Marco Prizzi").
 export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: RegoleProcesso = REGOLE_BASE): ProssimaAzione {
   const nome = nomeDi(lead);
   const chiama = comando(`Chiama ${nome}`, "chiama");
@@ -159,7 +163,7 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
       const scadenza = lead.nextActionAt != null && lead.nextActionAt > lead.createdAt
         ? lead.nextActionAt
         : scadenzaLavorativa(lead.createdAt, regole.minutiPrimaChiamata, regole.orario);
-      return fine("Prima chiamata", scadenza, {
+      return fine(`Chiama ${nome}`, scadenza, {
         pulsante: chiama, tentativo: lead.attemptCount + 1,
         secondarie: [comando("Segna l'esito", "segna_esito"), FASI_CALL[FASE.conoscenza].fissa],
       });
@@ -168,7 +172,7 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
       const n = Math.min(lead.attemptCount + 1, massimo);
       // Dopo il quinto tentativo a vuoto: pausa, poi un'ultima chiamata.
       const azione = inPausa ? `Ultima chiamata dopo la pausa: ${dataTesto(lead.pausedUntil!)}`
-        : lead.attemptCount >= massimo ? "Ultima chiamata dopo la pausa" : `Richiamare: tentativo ${n} di ${massimo}`;
+        : lead.attemptCount >= massimo ? "Ultima chiamata dopo la pausa" : `Richiama ${nome}, tentativo ${n} di ${massimo}`;
       return fine(azione, salvata, {
         pulsante: chiama, tentativo: n,
         secondarie: [comando("Segna l'esito", "segna_esito"), FASI_CALL[FASE.conoscenza].fissa],
@@ -197,7 +201,7 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
       }
       const iniziata = adesso >= salvata;
       const pulsante = iniziata ? f.segna : lead.meetLink ? comando("Apri la videochiamata", "apri_videochiamata") : chiama;
-      return fine(f.titolo(nome), salvata, {
+      return fine(f.titolo(nomeIntero(lead)), salvata, {
         pulsante, poi: f.poi(salvata, nome, regole.orario),
         // "Non si è presentato" solo dall'ora della call in poi (collaudo di Corrado).
         secondarie: iniziata ? [comando("Sposta la call", "sposta_call"), comando("Non si è presentato", "non_presentato")] : [comando("Sposta la call", "sposta_call")],
@@ -221,7 +225,7 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
       });
     }
     case FASE.decisione: {
-      const azione = inPausa ? `Riprovare il ${dataTesto(lead.pausedUntil!)}` : `Sentire ${nome} per la decisione`;
+      const azione = inPausa ? `Riprovare il ${dataTesto(lead.pausedUntil!)}` : `Senti ${nome} per la risposta`;
       return fine(azione, salvata, { pulsante: chiama, secondarie: [comando("Segna la decisione", "segna_decisione"), comando("Rimanda", "rimanda")] });
     }
     case FASE.cliente:

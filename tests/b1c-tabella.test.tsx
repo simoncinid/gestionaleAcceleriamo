@@ -35,12 +35,14 @@ describe("modifica 18: tabella dei lead", () => {
   it("pagina: titolo, otto colonne, righe da 44 px, niente totali in euro né avatar", () => {
     const html = pagina();
     expect(html).toContain("4 lead aperti, 2 scaduti");
-    for (const t of ["Azienda", "Fase", "Da fare", "Scadenza", "Responsabile", "Fonte", "Ultimo contatto"]) expect(html).toContain(`>${t}<`);
+    for (const t of ["Azienda", "Fase", "Da fare", "Responsabile", "Fonte", "Ultimo contatto"]) expect(html).toContain(`>${t}<`);
+    // Blocco 1 bis: la scadenza sta sotto l'azione, non in una colonna sua.
+    expect(html).not.toContain(">Scadenza<");
     expect(html).toMatch(/<td class="h-11 /);
     expect(html).not.toContain("€");
     expect(html).not.toContain("Officina cliente");
     // La riga "Da fare" viene dalla funzione unica, la scadenza scaduta da più di un giorno è rossa.
-    expect(html).toContain("Richiamare: tentativo 2 di 5");
+    expect(html).toContain("Richiama Marco, tentativo 2 di 5");
     expect(html).toContain("text-[#B42318]");
     expect(html).toContain("2 giorni fa");
   });

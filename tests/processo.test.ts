@@ -14,7 +14,7 @@ const lead = (stageId: string, extra: Partial<LeadPerProcesso> = {}): LeadPerPro
 describe("prossimaAzione: una riga per fase", () => {
   it("10 Nuovo: prima chiamata, Chiama Marco, tentativo 1, responsabile chi chiama", () => {
     const p = prossimaAzione(lead(FASE.nuovo, { nextActionAt: ADESSO - ORA }), ADESSO);
-    expect(p.azione).toBe("Prima chiamata");
+    expect(p.azione).toBe("Chiama Marco");
     expect(p.pulsante).toEqual({ testo: "Chiama Marco", codice: "chiama" });
     expect(p.tentativo).toBe(1);
     expect(p.responsabile).toBe("primaChiamata");
@@ -24,7 +24,7 @@ describe("prossimaAzione: una riga per fase", () => {
 
   it("20 Da richiamare: tentativo n di 5 con la data salvata, responsabile chi chiama", () => {
     const p = prossimaAzione(lead(FASE.richiamare, { attemptCount: 1 }), ADESSO);
-    expect(p.azione).toBe("Richiamare: tentativo 2 di 5");
+    expect(p.azione).toBe("Richiama Marco, tentativo 2 di 5");
     expect(p.tentativo).toBe(2);
     expect(p.scadenza).toBe(ADESSO + 2 * GIORNO);
     expect(p.pulsante?.codice).toBe("chiama");
@@ -33,7 +33,7 @@ describe("prossimaAzione: una riga per fase", () => {
 
   it("30 Conoscenza fissata: prima dell'ora apre la videochiamata, dopo chiede com'è andata, poi l'offerta; Tommaso", () => {
     const prima = prossimaAzione(lead(FASE.conoscenza, { meetLink: "https://meet.example/x" }), ADESSO);
-    expect(prima.azione).toBe("Conoscenza con Marco");
+    expect(prima.azione).toBe("Call con Marco Rossi");
     expect(prima.pulsante).toEqual({ testo: "Apri la videochiamata", codice: "apri_videochiamata" });
     // "Non si è presentato" solo dall'ora della call in poi (collaudo di Corrado).
     expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call"]);
@@ -71,7 +71,7 @@ describe("prossimaAzione: una riga per fase", () => {
 
   it("40 Offerta fissata: Offerta con Marco, dopo l'ora com'è andata, poi la call di analisi", () => {
     const p = prossimaAzione(lead(FASE.offerta, { nextActionAt: ADESSO - ORA }), ADESSO);
-    expect(p.azione).toBe("Offerta con Marco");
+    expect(p.azione).toBe("Call con Marco Rossi");
     expect(p.pulsante).toEqual({ testo: "Segna com'è andata l'offerta", codice: "segna_offerta" });
     expect(p.poi).toBe("Fissare la call di analisi");
     expect(p.responsabile).toBe("presentazione");
@@ -83,7 +83,7 @@ describe("prossimaAzione: una riga per fase", () => {
 
   it("45 Analisi fissata: Fai l'analisi con Marco, poi il progetto entro 3 giorni lavorativi", () => {
     const prima = prossimaAzione(lead(FASE.analisi), ADESSO);
-    expect(prima.azione).toBe("Fai l'analisi con Marco");
+    expect(prima.azione).toBe("Call con Marco Rossi");
     expect(prima.poi).toMatch(/^Preparare il progetto entro /);
     expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call"]);
     expect(prima.responsabile).toBe("presentazione");
@@ -106,7 +106,7 @@ describe("prossimaAzione: una riga per fase", () => {
 
   it("55 Progetto fissato: Presenta il progetto e chiudi, poi la decisione", () => {
     const p = prossimaAzione(lead(FASE.progetto, { nextActionAt: ADESSO - ORA }), ADESSO);
-    expect(p.azione).toBe("Presenta il progetto e chiudi");
+    expect(p.azione).toBe("Call con Marco Rossi, per chiudere");
     expect(p.pulsante).toEqual({ testo: "Segna com'è andata la call del progetto", codice: "segna_progetto" });
     expect(p.poi).toBe("Sentire Marco per la decisione");
     expect(p.responsabile).toBe("presentazione");
@@ -129,7 +129,7 @@ describe("prossimaAzione: una riga per fase", () => {
 
   it("60 In attesa decisione: Sentire Marco, Chiama, secondarie Segna la decisione e Rimanda", () => {
     const p = prossimaAzione(lead(FASE.decisione), ADESSO);
-    expect(p.azione).toBe("Sentire Marco per la decisione");
+    expect(p.azione).toBe("Senti Marco per la risposta");
     expect(p.pulsante?.testo).toBe("Chiama Marco");
     expect(p.secondarie.map((s) => s.testo)).toEqual(["Segna la decisione", "Rimanda"]);
   });

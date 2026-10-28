@@ -150,10 +150,14 @@ const numeroGiorno = (p: { anno: number; mese: number; giorno: number }) => Math
 // Scadenza corta per la colonna da 11% e la riga del telefono: "scaduta da 2 g", "ieri 18:00", "oggi 15:00",
 // "domani 10:00", "gio 30 ott". "Scaduta" solo per lo stato scaduto (oltre un giorno di ritardo, la riga rossa):
 // una scadenza di stamattina è ancora "oggi 08:30", così la parola non contraddice il segmento Scaduti.
+// Giorni di calendario (a Roma) tra la scadenza e oggi: -1 ieri, 0 oggi, 1 domani.
+export const giorniDaOggi = (ms: number, ora: number) => numeroGiorno(partiRoma(ms)) - numeroGiorno(partiRoma(ora));
+
 export function scadenzaBreve(ms: number, ora: number, stato?: ProssimaAzione["stato"]): string {
   if (stato === "scaduto" && ms < ora) {
     const d = ora - ms;
-    const n = d < 86_400_000 ? `${Math.max(1, Math.floor(d / 3_600_000))} h` : `${Math.floor(d / 86_400_000)} g`;
+    const ore = Math.max(1, Math.floor(d / 3_600_000)), giorni = Math.floor(d / 86_400_000);
+    const n = d < 86_400_000 ? (ore === 1 ? "1 ora" : `${ore} ore`) : giorni === 1 ? "1 giorno" : `${giorni} giorni`;
     return `scaduta da ${n}`;
   }
   const p = partiRoma(ms);

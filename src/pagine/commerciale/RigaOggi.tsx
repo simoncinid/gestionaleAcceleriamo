@@ -57,7 +57,7 @@ export function RigaDaFare({ l, ora, primaria, onApri }: {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-baseline gap-3">
           <span className="min-w-0 flex-1 text-[15px] font-semibold leading-5">{p.azione}</span>
-          {p.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(p.stato))}>{scadenzaBreve(p.scadenza, ora, p.stato)}</span>}
+          {p.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(p.stato, p.scadenza, ora))}>{scadenzaBreve(p.scadenza, ora, p.stato)}</span>}
         </span>
         <Link to={scheda} className="truncate text-[13px] text-grigio after:absolute after:inset-0 hover:text-ink hover:underline">{persona}</Link>
       </div>

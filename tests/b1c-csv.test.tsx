@@ -32,6 +32,6 @@ describe("modifica 21: Esporta CSV e telefono", () => {
     const html = render(<Lead ora={ORA} />, { percorso: "/commerciale/lead", dati: [[["leads", "tabella"], [riga("a")]], [["stages"], FASI], [["users"], UTENTI]] });
     expect(html).toContain('aria-label="Altre azioni dei lead"');
     const lista = html.slice(html.indexOf('aria-label="Lead"'));
-    for (const t of ["Officina a", "domani 10:00", "Da richiamare", "Richiamare: tentativo 2 di 5"]) expect(lista).toContain(t);
+    for (const t of ["Officina a", "domani 10:00", "Da richiamare", "Richiama Marco, tentativo 2 di 5"]) expect(lista).toContain(t);
   });
 });

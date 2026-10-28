@@ -21,7 +21,7 @@ export const FASI: Stage[] = [
 ];
 
 export function riga(id: string, extra: Partial<RigaLead> & { stato?: "scaduto" | "oggi" | "futuro" | null; scadenza?: number | null; azione?: string | null } = {}): RigaLead {
-  const { stato = "futuro", scadenza = ORA + GIORNO, azione = "Richiamare: tentativo 2 di 5", ...resto } = extra;
+  const { stato = "futuro", scadenza = ORA + GIORNO, azione = "Richiama Marco, tentativo 2 di 5", ...resto } = extra;
   const chiuso = ["chiuso", "non-chiuso", "fake"].includes(resto.stageId ?? "");
   return {
     id, company: `Officina ${id}`, contactName: "Luca Prova", email: `${id}@esempio.it`, phone: "+39 333 1234567", source: "meta",

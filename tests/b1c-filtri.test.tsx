@@ -76,7 +76,7 @@ describe("modifica 19: filtri, ricerca e ordinamento", () => {
   });
 
   it("la parola scaduta solo sulle righe rosse; stamattina resta oggi", () => {
-    expect(scadenzaBreve(ORA - 3 * GIORNO, ORA, "scaduto")).toBe("scaduta da 3 g");
+    expect(scadenzaBreve(ORA - 3 * GIORNO, ORA, "scaduto")).toBe("scaduta da 3 giorni");
     expect(scadenzaBreve(ORA - 2 * ORE, ORA, "oggi")).toMatch(/^oggi \d\d:\d\d$/);
     expect(scadenzaBreve(ORA + GIORNO, ORA, "futuro")).toMatch(/^domani /);
   });

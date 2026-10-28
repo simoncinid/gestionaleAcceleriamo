@@ -22,12 +22,12 @@ import {
 // Larghezze (Ruling della corsia C): quelle del contratto (22, 14, 18, 11, 10, 11, 9, 5) a 1440 con la barra laterale
 // lasciano 1120 px e tagliano fasi e azioni; Azioni al 5% non contiene tre bersagli da 32 px. Stesso ordine, pesi rivisti.
 // Con le colonne a richiesta la tabella passa a larghezze fisse in px e scorre di lato dentro il suo contenitore.
-type IdColonna = "azienda" | "fase" | "dafare" | "scadenza" | "responsabile" | "fonte" | "contatto" | "azioni";
+type IdColonna = "azienda" | "fase" | "dafare" | "responsabile" | "fonte" | "contatto" | "azioni";
 export const COLONNE: { id: IdColonna; titolo: string; largo: string; px: number; ordine?: Ordine }[] = [
   { id: "azienda", titolo: "Azienda", largo: "17%", px: 210, ordine: "azienda" },
   { id: "fase", titolo: "Fase", largo: "17%", px: 200, ordine: "fase" },
-  { id: "dafare", titolo: "Da fare", largo: "19%", px: 220 },
-  { id: "scadenza", titolo: "Scadenza", largo: "10%", px: 130, ordine: "scadenza" },
+  // Blocco 1 bis: "Da fare" e "Scadenza" sono una colonna sola, azione sopra e scadenza sotto; si ordina per scadenza.
+  { id: "dafare", titolo: "Da fare", largo: "29%", px: 300, ordine: "scadenza" },
   { id: "responsabile", titolo: "Responsabile", largo: "8%", px: 110 },
   { id: "fonte", titolo: "Fonte", largo: "10%", px: 130 },
   { id: "contatto", titolo: "Ultimo contatto", largo: "9%", px: 130, ordine: "contatto" },
@@ -123,7 +123,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                 <colgroup>
                   {COLONNE.filter((c) => c.id !== "azioni").map((c) => <col key={c.id} style={{ width: largo ? c.px : c.largo }} />)}
                   {extra.map((c) => <col key={c} style={{ width: PX_EXTRA[c] }} />)}
-                  <col style={{ width: largo ? COLONNE[7].px : COLONNE[7].largo }} />
+                  <col style={{ width: largo ? COLONNE.at(-1)!.px : COLONNE.at(-1)!.largo }} />
                 </colgroup>
                 <thead className={cx("bg-avorio", !largo && "sticky top-(--sopra-pagina) z-[1] shadow-[0_1px_0_#E5DED4]")}>
                   <tr>
@@ -155,9 +155,11 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                         <CellaFase lead={l} fasi={fasi.data ?? []}
                           onScegli={(f) => scegliFase(l, f, setFoglio, (stageId) => sposta.mutate({ lead: l, stageId, prima: l.stageId }))} />
                       </td>
-                      <td className={cella}><span title={l.prossima?.azione ?? undefined} className={cx("block truncate", !l.prossima?.azione && "text-grigio")}>{l.prossima?.azione ?? "Nessuna azione"}</span></td>
-                      <td className={cx(cella, "tabular-nums")}>
-                        <span className={cx("block truncate", classeScadenza(l.prossima?.stato))}>{l.prossima?.scadenza != null ? scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato) : ""}</span>
+                      <td className={cella}>
+                        <span title={l.prossima?.azione ?? undefined} className={cx("block truncate", !l.prossima?.azione && "text-grigio")}>{l.prossima?.azione ?? "Nessuna azione"}</span>
+                        {l.prossima?.scadenza != null && (
+                          <span className={cx("block truncate text-[13px] leading-4 tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>
+                        )}
                       </td>
                       <td className={cella}><span title={l.ownerId ? nome.get(l.ownerId) : undefined} className="block truncate">{l.ownerId ? (nome.get(l.ownerId) ?? "").split(" ")[0] : <span className="text-grigio">Nessuno</span>}</span></td>
                       <td className={cella}>
@@ -183,7 +185,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                 <Link to={`/commerciale/lead/${l.id}`} data-lead={l.id} className="flex min-h-[60px] flex-col justify-center gap-1 px-4 py-2.5 active:bg-crema">
                   <span className="flex items-baseline gap-3">
                     <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.company}</span>
-                    {l.prossima?.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(l.prossima.stato))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>}
+                    {l.prossima?.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>}
                   </span>
                   <span className="flex min-w-0 items-center gap-2 text-[13px] text-grigio">
                     <span className={cx("size-2 shrink-0 rounded-full", classePallino(l.stageId))} aria-hidden />
