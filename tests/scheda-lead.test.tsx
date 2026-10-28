@@ -142,7 +142,7 @@ describe("scheda lead, correzioni della revisione", () => {
     const html = render(<LeadForm lead={conDati.lead} users={[]} ora={ORA} onSave={() => undefined} pending={false} />);
     expect(html).toContain(">Valore stimato</dt>");
     expect(html).toContain(">Link Meet</dt>");
-    expect(html).toContain(">Consulenza</dt>");
+    expect(html).toContain(">Call fissata</dt>"); // modifica 25: quattro tipi di call, etichetta unica
     expect(html).not.toContain(">Link preventivo</dt>");
     for (const etichetta of ["Link Meet", "Link preventivo", "Appuntamento", "Valore stimato (euro)"]) expect(html).not.toContain(`>${etichetta}</label>`);
     const senza = render(<LeadForm lead={DETTAGLIO.lead} users={[]} ora={ORA} onSave={() => undefined} pending={false} />);
