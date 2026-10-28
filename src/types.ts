@@ -37,7 +37,7 @@ export type { CodiceAzione, Comando, ProssimaAzione, Ruolo, StatoScadenza } from
 export type { Collegamenti, RigaContatto } from "../worker/leads/collegamenti-tipi";
 export type { CodiceMotivo } from "../worker/processo/motivi";
 import type { ProssimaAzione } from "../worker/processo/processo";
-export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";
+export type { CallOggi, Oggi, RigaOggi } from "../worker/today/tipi";
 export type { Funnel, Stats1A, Tappa, TempoFase } from "../worker/numeri/funnel";
 export type { Campagne, LivelloCosto, RigaCampagna, RigaInserzione } from "../worker/numeri/campagne";
 export type { LeadAperto, Previsione, PropostaAperta, RigaFase } from "../worker/numeri/previsione";

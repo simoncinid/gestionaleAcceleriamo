@@ -18,19 +18,6 @@ async function insertLead(id: string, extra: Record<string, unknown> = {}) {
   await env.DB.prepare(`INSERT INTO leads (${keys.join(",")}) VALUES (${keys.map(() => "?").join(",")})`).bind(...Object.values(row)).run();
 }
 
-// Tutte le righe che Oggi mostra, con la sezione in cui stanno.
-function righe(o: Oggi): [string, string][] {
-  const r: [string, string][] = [];
-  if (o.adesso) r.push(["adesso", o.adesso.tipo === "call" ? o.adesso.leadId : o.adesso.id]);
-  for (const l of o.nuovi) r.push(["nuovi", l.id]);
-  for (const k of o.call) r.push(["call", k.leadId]);
-  for (const l of o.daFare) r.push(["daFare", l.id]);
-  for (const p of o.proposte) r.push(["proposte", p.leadId]);
-  for (const l of o.finePausa) r.push(["finePausa", l.id]);
-  for (const l of o.fermi) r.push(["fermi", l.id]);
-  return r;
-}
-
 describe("scadenza della prima chiamata (una sola funzione)", () => {
   it("lead arrivato venerdì alle 23:20: scade sabato alle 09:00, uguale in Oggi, Scaletta, Elenco e scheda", async () => {
     expect(scadenzaPrimaChiamata(VENERDI_SERA, { minuti: 30, orario: ORARIO_DEFAULT })).toBe(SCADENZA);
@@ -39,10 +26,9 @@ describe("scadenza della prima chiamata (una sola funzione)", () => {
     await insertLead("notturno", { stage_id: "da-chiamare-prima-volta", next_action: "Prima chiamata", next_action_at: VENERDI_SERA, created_at: VENERDI_SERA, stage_changed_at: VENERDI_SERA });
     await insertLead("altro-nuovo", { stage_id: "da-chiamare-prima-volta", next_action: "Prima chiamata", next_action_at: VENERDI_SERA - 60_000, created_at: VENERDI_SERA - 60_000 });
 
-    const o = (await (await call(`/api/today?chi=tutte&now=${VENERDI_SERA + 60_000}`, {}, cookie)).json()) as Oggi;
-    const daOggi = [...(o.adesso?.tipo === "lead" ? [o.adesso] : []), ...o.nuovi].find((l) => l.id === "notturno")!;
-    expect(daOggi.slaScadenza).toBe(SCADENZA);
-    expect(daOggi.nextActionAt).toBe(SCADENZA);
+    // Sabato alle 08:00 il lead è nella lista di Oggi con la stessa scadenza della tabella e della scheda.
+    const o = (await (await call(`/api/today?chi=tutte&now=${SCADENZA - 3_600_000}`, {}, cookie)).json()) as Oggi;
+    expect(o.righe.find((l) => l.id === "notturno")?.prossima.scadenza).toBe(SCADENZA);
 
     const elenco = (await (await call("/api/leads", {}, cookie)).json()) as { leads: { id: string; nextActionAt: number }[] };
     expect(elenco.leads.find((l) => l.id === "notturno")!.nextActionAt).toBe(SCADENZA);
@@ -72,34 +58,21 @@ describe("scadenza della prima chiamata (una sola funzione)", () => {
 });
 
 describe("Oggi: ogni lead una volta sola, un solo conteggio", () => {
-  it("Adesso non si ripete in Da fare, la call compare una volta, fermi senza doppioni; titolo e badge uguali", async () => {
+  it("un lead con call oggi e azione scaduta compare una riga sola; titolo e badge uguali", async () => {
     const cookie = await authed();
-    const ora = Date.UTC(2026, 9, 13, 10, 0); // martedì 13 ottobre, 12:00 a Roma
-    // Scaduto da tempo e fermo da 9 giorni: Adesso, non anche nei fermi.
-    await insertLead("scaduto", { next_action_at: ora - 2 * 3_600_000, stage_changed_at: ora - 9 * GIORNO, created_at: ora - 10 * GIORNO });
-    // Call fra 20 minuti: la prossima azione è la call stessa.
+    const ora = Date.now();
+    await insertLead("scaduto", { next_action_at: ora - 2 * GIORNO, stage_changed_at: ora - 9 * GIORNO, created_at: ora - 10 * GIORNO });
+    await insertLead("altro", { next_action_at: ora - 60_000, stage_changed_at: ora - GIORNO, created_at: ora - 2 * GIORNO });
     await insertLead("con-call", { stage_id: "appuntamento-confermato", next_action: "Call di conoscenza", next_action_at: ora + 20 * 60_000, stage_changed_at: ora - GIORNO, created_at: ora - 2 * GIORNO });
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k1', 'con-call', 'conoscenza', ?, ?, ?)").bind(ora + 20 * 60_000, ora, ora).run();
-    await insertLead("altro", { next_action_at: ora - 60_000, stage_changed_at: ora - 9 * GIORNO, created_at: ora - 10 * GIORNO });
 
-    const o = (await (await call(`/api/today?chi=mie&now=${ora}`, {}, cookie)).json()) as Oggi;
-    const tutte = righe(o);
-    const ids = tutte.map(([, id]) => id);
+    const o = (await (await call("/api/today?chi=mie", {}, cookie)).json()) as Oggi;
+    const ids = o.righe.map((l) => l.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(o.adesso).toMatchObject({ tipo: "lead", id: "scaduto" });
-    expect(o.daFare.map((l) => l.id)).toEqual(["altro"]);
-    expect(o.call.map((k) => k.id)).toEqual(["k1"]);
-    expect(o.fermi).toEqual([]);
-
-    // Il titolo conta le righe mostrate (fermi esclusi, a scomparsa).
-    const mostrate = tutte.filter(([sezione]) => sezione !== "fermi").length;
-    expect(o.totale).toBe(mostrate);
-    // Il badge è lo stesso numero di Oggi con "Mie", calcolato adesso.
-    await insertLead("scaduto-adesso", { next_action_at: Date.now() - 1000, stage_changed_at: Date.now(), created_at: Date.now() - GIORNO });
-    await insertLead("dopo-adesso", { next_action_at: Date.now() - 500, stage_changed_at: Date.now(), created_at: Date.now() - GIORNO });
-    const adesso = (await (await call("/api/today?chi=mie", {}, cookie)).json()) as Oggi;
+    expect(ids[0]).toBe("scaduto");
+    expect(o.totale).toBe(o.righe.length);
     const badge = (await (await call("/api/badge", {}, cookie)).json()) as { commerciale: number };
-    expect(badge.commerciale).toBe(adesso.totale);
+    expect(badge.commerciale).toBe(o.totale);
     expect(badge.commerciale).toBeGreaterThanOrEqual(2);
   });
 });

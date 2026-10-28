@@ -47,15 +47,12 @@ describe("Lunedì e Diario", () => {
     expect((html.match(/aria-expanded="false"/g) ?? []).length).toBe(3);
     expect(contaPrimari(html)).toBe(0);
   });
-  const oggi = { adesso: null, nuovi: [], daFare: [], call: [], proposte: [], fermi: [], finePausa: [], numeri: { leadNuovi: 0, primaRispostaMinuti: null, callSettimana: 0, proposteAperte: 0 }, totale: 0 };
+  const oggi = { righe: [], call: [], totale: 0 };
   const conRevisione = (ora: number, r: Record<string, unknown> = revisione) => render(<Oggi ora={ora} />, { percorso: "/commerciale/oggi", dati: [[["today", "mie"], oggi], [["lunedi", "corrente"], r]] });
-  it("Oggi: segmenti e banner del lunedì solo fino alle 12 di Roma e solo con la revisione aperta", () => {
+  it("Oggi (contratto blocco 1, sezione 5): niente linguette Lunedì e Diario né banner, anche il lunedì mattina", () => {
     const mattina = conRevisione(daRoma(2026, 10, 12, 11, 30));
-    expect(mattina).toContain("La revisione della settimana è pronta");
-    expect(mattina).toContain("Diario");
-    expect(conRevisione(daRoma(2026, 10, 12, 12, 0))).not.toContain("La revisione della settimana è pronta");
-    expect(conRevisione(daRoma(2026, 10, 13, 9, 0))).not.toContain("La revisione della settimana è pronta");
-    expect(conRevisione(daRoma(2026, 10, 12, 9, 0), { ...revisione, chiusaAt: 1, chiusaDa: "diego" })).not.toContain("La revisione della settimana è pronta");
+    expect(mattina).not.toContain("La revisione della settimana è pronta");
+    expect(mattina).not.toContain("Diario");
   });
 });
 

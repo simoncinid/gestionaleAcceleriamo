@@ -6,10 +6,10 @@ const ORA_VERA = /\b\d{1,2}:\d{2}\b/;
 type Schermata = { nome: string; percorso: string; prima?: (p: Page) => Promise<void> };
 const SCHERMATE: Schermata[] = [
   { nome: "oggi", percorso: "/commerciale/oggi" },
-  { nome: "foglio-esito", percorso: "/commerciale/oggi", prima: async (p) => { await p.getByRole("region", { name: "Adesso" }).getByRole("button", { name: "Esito" }).click(); await expect(p.getByRole("dialog")).toBeVisible(); } },
+  { nome: "foglio-esito", percorso: "/commerciale/oggi", prima: async (p) => { await p.getByRole("list", { name: "Da fare oggi" }).getByRole("listitem").filter({ has: p.getByRole("link", { name: /^Chiama/ }) }).first().getByRole("button", { name: /^Altre azioni per/ }).click(); await p.getByRole("menuitem", { name: "Segna l'esito" }).click(); await expect(p.getByRole("dialog")).toBeVisible(); } },
   { nome: "lunedi", percorso: "/commerciale/oggi/lunedi" },
   { nome: "diario", percorso: "/commerciale/oggi/diario" },
-  { nome: "scaletta", percorso: "/commerciale/scaletta" },
+  { nome: "lead", percorso: "/commerciale/lead" },
   { nome: "scheda-lead", percorso: "/commerciale/lead/demo-lead-30" },
   { nome: "call", percorso: "/commerciale/call" },
   { nome: "proposte", percorso: "/commerciale/proposte" },
@@ -77,7 +77,7 @@ test("niente animazioni con prefers-reduced-motion", async ({ browser }, info) =
   const page = await ctx.newPage();
   await entra(page);
   await fermo(page);
-  await page.getByRole("region", { name: "Adesso" }).getByRole("button", { name: "Esito" }).click();
+  await page.getByRole("list", { name: "Da fare oggi" }).getByRole("listitem").filter({ has: page.getByRole("link", { name: /^Chiama/ }) }).first().getByRole("button", { name: /^Altre azioni per/ }).click(); await page.getByRole("menuitem", { name: "Segna l'esito" }).click();
   // Con l'orologio fermo di entra() la linea del tempo non avanza: un'animazione da 0,01 ms resta "running".
   // Conta quindi le animazioni che durano davvero (lo spinner è l'unico moto ammesso, e qui non c'è).
   const attive = await page.evaluate(() => document.getAnimations().filter((a) => Number(a.effect?.getTiming().duration ?? 0) > 1).length);

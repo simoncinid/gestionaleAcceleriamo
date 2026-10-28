@@ -54,18 +54,18 @@ describe("TestoMarkdown", () => {
 describe("Oggi: riga della call di conoscenza", () => {
   const ORA = Date.UTC(2026, 9, 13, 8, 0);
   const dati: DatiOggi = {
-    adesso: null, nuovi: [], daFare: [], proposte: [], fermi: [], finePausa: [],
+    righe: [],
     call: [
       { id: "k1", leadId: "a", company: "Officina a", contactName: null, phone: null, kind: "conoscenza", scheduledAt: ORA + 7_200_000, meetLink: null, scheda: "pronta" },
       { id: "k2", leadId: "b", company: "Officina b", contactName: null, phone: null, kind: "conoscenza", scheduledAt: ORA + 9_000_000, meetLink: null, scheda: "in_preparazione" },
       { id: "k3", leadId: "c", company: "Officina c", contactName: null, phone: null, kind: "presentazione", scheduledAt: ORA + 10_000_000, meetLink: null, scheda: "pronta" },
     ],
-    numeri: { leadNuovi: 0, primaRispostaMinuti: null, callSettimana: 3, proposteAperte: 0 }, totale: 3,
+    totale: 0,
   };
   it("pronta o in preparazione, solo per la conoscenza", () => {
     const html = render(<Oggi ora={ORA} />, { percorso: "/commerciale/oggi", dati: [[["today", "mie"], dati]] });
-    expect(html.match(/Scheda azienda pronta/g)?.length).toBe(1);
-    expect(html).toContain("Scheda in preparazione");
+    expect(html.match(/scheda azienda pronta/gi)?.length).toBe(1);
+    expect(html).toMatch(/scheda in preparazione/i);
   });
 });
 

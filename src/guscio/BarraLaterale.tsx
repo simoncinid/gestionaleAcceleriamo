@@ -4,6 +4,7 @@ import { Link, NavLink, useLocation } from "react-router";
 import { Avatar, Badge, Punto, cx } from "../ds";
 import { AREE, SOTTOMENU, areaDi, creazioneDellaBarra, type Creazione } from "./aree";
 import type { BadgeDati } from "./BarraBasso";
+import { BadgeIntero } from "./BadgeIntero";
 import { Icona3D } from "./Icona3D";
 
 // Computer: logo, pulsante di creazione, aree a gruppi, profilo.
@@ -38,7 +39,7 @@ export function BarraLaterale({ nome, badge, onCrea, onEsci, onCerca }: { nome: 
                 className={cx("flex h-11 w-full items-center gap-3 rounded-controllo px-3 transition-colors duration-(--durata-veloce) hover:bg-chrome-2", corrente === a.id ? "bg-chrome-2 text-chrome-testo" : "text-chrome-testo-2")}>
                 <Icona3D area={a.id} attiva={corrente === a.id} misura={24} />
                 <span className="flex-1 text-left font-semibold">{a.etichetta}</span>
-                <Badge n={n} />
+                {a.id === "commerciale" ? <BadgeIntero n={n} etichetta="da fare oggi" /> : <Badge n={n} />}
                 <CaretDown size={16} weight="bold" aria-hidden className={cx("transition-transform duration-(--durata-base) ease-(--ease-uscita)", aperta && "rotate-180")} />
               </button>
               {aperta && SOTTOMENU[a.id].map((s) => (
