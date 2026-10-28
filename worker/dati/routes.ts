@@ -237,7 +237,7 @@ datiRoutes.get("/audit", async (c) => {
 
 datiRoutes.get("/dati/riepilogo", async (c) => {
   const [cestino, ultima] = await Promise.all([
-    c.env.DB.prepare("SELECT COUNT(*) AS n FROM leads WHERE deleted_at IS NOT NULL").first<{ n: number }>(),
+    c.env.DB.prepare("SELECT COUNT(*) AS n FROM leads l WHERE l.deleted_at IS NOT NULL AND EXISTS (SELECT 1 FROM activities a WHERE a.lead_id = l.id AND a.type = 'cestino')").first<{ n: number }>(),
     c.env.DB.prepare("SELECT MAX(created_at) AS at FROM audit_log").first<{ at: number | null }>(),
   ]);
   const out: RiepilogoDati = { cestino: cestino?.n ?? 0, ultimaModifica: ultima?.at ?? null, demoUrl: c.env.DEMO_URL || null };

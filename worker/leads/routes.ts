@@ -17,7 +17,7 @@ import { proposteDelLead } from "../proposte/service";
 import { conScadenzaSla, leggiSla } from "../regole/sla";
 import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
 import { conProssima } from "../processo/leggi";
-import { leggiCestino } from "./cestino";
+import { eliminaPerSempre, leggiCestino } from "./cestino";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 
 export const leadRoutes = new Hono<AppEnv>();
@@ -161,6 +161,12 @@ leadRoutes.get("/:id/proposta", async (c) => {
 
 leadRoutes.delete("/:id", async (c) => {
   await softDeleteLead(getDb(c.env.DB), c.req.param("id"), c.get("user").id);
+  return c.json({ ok: true });
+});
+
+// Blocco 1, modifica 9: elimina per sempre un lead che è già nel cestino.
+leadRoutes.delete("/:id/per-sempre", async (c) => {
+  await eliminaPerSempre(getDb(c.env.DB), c.req.param("id"), c.get("user").id);
   return c.json({ ok: true });
 });
 
