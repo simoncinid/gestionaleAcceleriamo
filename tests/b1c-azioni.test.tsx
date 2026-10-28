@@ -32,15 +32,17 @@ describe("modifica 20: azioni dalla tabella", () => {
     expect(prova("da-richiamare", "da-richiamare")).toEqual({ foglio: undefined, sposta: undefined });
   });
 
-  it("riga: cella Fase che si apre, Chiama, WhatsApp e menu; senza telefono le icone sono spente", () => {
+  it("riga: cella Fase che si apre e menu; niente icone di telefono e WhatsApp (seconda passata, stanno nella scheda)", () => {
     const html = render(<Lead ora={ORA} />, {
       percorso: "/commerciale/lead",
       dati: [[["leads", "tabella"], [riga("a"), riga("b", { phone: null })]], [["stages"], FASI], [["users"], [{ id: "tommaso", name: "Tommaso" }]], [["modelli"], []]],
     });
     expect(html).toContain('aria-label="Fase di Officina a: Da richiamare. Cambia"');
-    expect(html).toContain('href="tel:+39 333 1234567"');
-    expect(html).toContain("https://wa.me/");
     expect(html).toContain('aria-label="Altre azioni per Officina a"');
-    expect(html).toContain('aria-label="Chiama Luca: manca il telefono"');
+    expect(html).not.toContain("https://wa.me/");
+    expect(html).not.toContain('aria-label="Chiama ');
+    expect(html).not.toContain('aria-label="WhatsApp a ');
+    // La cella Azioni tiene solo il menu: colonna da 44 px.
+    expect(html).toContain('<col style="width:44px"/>');
   });
 });

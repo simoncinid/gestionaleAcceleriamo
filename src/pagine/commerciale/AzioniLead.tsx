@@ -1,24 +1,19 @@
-import { Phone, WhatsappLogo } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { Foglio, Pulsante, Selettore, cx } from "../../ds";
-import { linkTel, linkWhatsApp } from "../../format";
-import { useModelli } from "../../hooks";
 import type { Stage } from "../../types";
 import { callPerFase } from "../../../worker/regole/fasi-call";
-import { avviaContatto } from "./chiamata";
 import { EtichettaFase, faseDi } from "./EtichettaFase";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFissaCall } from "./FoglioFissaCall";
 import { callDellAssenza, useNonPresentato } from "./nonPresentato";
-import { compila, modelloPer } from "./modelli";
 import { MenuPunti, Tendina, VoceTendina } from "./Tendina";
 import { aperto, type RigaLead } from "./tabellaLead";
 
-// Azioni dalla tabella dei lead (contratto blocco 1, sezione 4, modifica 20): fase dalla cella, Chiama e WhatsApp,
+// Azioni dalla tabella dei lead (contratto blocco 1, sezione 4, modifica 20): fase dalla cella e
 // menu "..." della riga. Le regole sono quelle della scheda: le fasi con una call chiedono giorno e ora,
 // Cliente chiede i dati, le fasi di chiusura chiedono il motivo; le altre cambiano subito con "Annulla" nel toast.
 
@@ -86,31 +81,12 @@ export function CellaFase({ lead, fasi, onScegli }: { lead: RigaLead; fasi: Stag
   );
 }
 
-// Icona di contatto da 32 px (la riga è alta 44): con il telefono è un link, senza resta spenta e dice perché.
-function IconaContatto({ href, etichetta, esterno, onAvvio, children }: { href: string | null; etichetta: string; esterno?: boolean; onAvvio: () => void; children: ReactNode }) {
-  const base = "inline-flex size-8 shrink-0 items-center justify-center rounded-[8px]";
-  if (!href) return <span role="img" aria-label={`${etichetta}: manca il telefono`} title="Manca il telefono" className={cx(base, "text-sabbia-2")}>{children}</span>;
-  return (
-    <a href={href} aria-label={etichetta} title={etichetta} onClick={onAvvio} target={esterno ? "_blank" : undefined} rel={esterno ? "noreferrer" : undefined}
-      className={cx(base, "text-ink transition-colors duration-(--durata-veloce) hover:bg-crema active:bg-sabbia")}>
-      {children}
-    </a>
-  );
-}
-
 export function AzioniRiga({ lead, onApri, onCestina }: { lead: RigaLead; onApri: (f: FoglioRiga) => void; onCestina: () => void }) {
   const nonPresentato = useNonPresentato();
   const assenza = callDellAssenza(lead.stageId);
-  const wa = modelloPer(useModelli().data, "whatsapp", lead.stageId, "non_ti_ho_trovato");
-  const nome = lead.contactName?.trim().split(/\s+/)[0] ?? lead.company;
+  // Seconda passata: niente icone di telefono e WhatsApp nella riga (Chiama e WhatsApp stanno nella scheda del lead).
   return (
-    <span className="flex items-center justify-end gap-0.5">
-      <IconaContatto href={lead.phone ? linkTel(lead.phone) : null} etichetta={`Chiama ${nome}`} onAvvio={() => avviaContatto(lead.id, "chiamata")}>
-        <Phone size={18} weight="bold" aria-hidden />
-      </IconaContatto>
-      <IconaContatto href={lead.phone ? linkWhatsApp(lead.phone, compila(wa?.body, lead)) : null} etichetta={`WhatsApp a ${nome}`} esterno onAvvio={() => avviaContatto(lead.id, "whatsapp", wa?.id)}>
-        <WhatsappLogo size={18} weight="bold" aria-hidden />
-      </IconaContatto>
+    <span className="flex items-center justify-end">
       <MenuPunti piccolo etichetta={`Altre azioni per ${lead.company}`} voci={[
         { testo: "Segna l'esito", onClick: () => onApri({ tipo: "esito", lead }) },
         { testo: "Fissa una call", onClick: () => onApri({ tipo: "fissa", lead }) },

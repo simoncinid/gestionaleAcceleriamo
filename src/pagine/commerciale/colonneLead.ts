@@ -12,7 +12,7 @@ export type IdColonna =
 
 export type DefColonna = { id: IdColonna; titolo: string; px: number; fissa?: boolean; ordine?: "azienda" | "fase" | "scadenza" | "contatto" };
 
-// Ordine di lettura nella tabella. Larghezze in px: le sei di partenza più Azioni fanno 1001 px e stanno nei
+// Ordine di lettura nella tabella. Larghezze in px: le sei di partenza più Azioni fanno 941 px e stanno nei
 // 1118 px che restano a 1440 accanto alla barra laterale (Fase larga quanto "Nuovo, da chiamare" con la freccia);
 // con più colonne la tabella scorre di lato dentro il suo contenitore.
 export const COLONNE: DefColonna[] = [
@@ -29,7 +29,7 @@ export const COLONNE: DefColonna[] = [
   { id: "offerta", titolo: "Offerta", px: 170 },
   { id: "fonte", titolo: "Fonte", px: 130 },
 ];
-export const PX_AZIONI = 104;
+export const PX_AZIONI = 44; // solo il menu "⋯" da 32 px più 2 × 4 px di margine
 
 export const VISIBILI_BASE: IdColonna[] = ["azienda", "telefono", "fase", "dafare", "contatto", "arrivato"];
 
