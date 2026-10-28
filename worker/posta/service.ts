@@ -158,12 +158,21 @@ export async function confermaInvito(db: Db, leadId: string, activityId: string,
   if (proposta.outcome !== "da_confermare") throw new HTTPException(409, { message: "Questa proposta è già confermata" });
   const call = proposta.callId ? await db.select().from(calls).where(and(eq(calls.id, proposta.callId), isNull(calls.deletedAt))).get() : undefined;
   if (!call || call.outcome) throw new HTTPException(422, { message: "La call di questo invito non è più in programma" });
-  const lead = await db.select({ kind: stages.kind }).from(leads).innerJoin(stages, eq(stages.id, leads.stageId)).where(eq(leads.id, leadId)).get();
-  if (lead?.kind !== "open") throw new HTTPException(422, { message: "Il lead è chiuso: riaprilo prima di confermare la call" });
+  const lead = await db.select({ kind: stages.kind }).from(leads).innerJoin(stages, eq(stages.id, leads.stageId)).where(and(eq(leads.id, leadId), isNull(leads.deletedAt))).get();
+  if (!lead) throw new HTTPException(404, { message: "Lead non trovato" });
+  if (lead.kind !== "open") throw new HTTPException(422, { message: "Il lead è chiuso: riaprilo prima di confermare la call" });
   const p = propostaEvento({ tipo: "call_fissata", kind: call.kind, scheduledAt: call.scheduledAt }, await contestoRegole(db, now));
   const passi = await passiProposta(db, leadId, p, actorId, now);
-  passi.push(db.update(activities).set({ outcome: "confermata" }).where(eq(activities.id, activityId)));
-  await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+  // Doppio clic: la proposta si prende con un aggiornamento condizionato prima di applicare; il secondo trova già "confermata".
+  const presa = await db.update(activities).set({ outcome: "confermata" })
+    .where(and(eq(activities.id, activityId), eq(activities.outcome, "da_confermare"))).returning({ id: activities.id });
+  if (presa.length === 0) throw new HTTPException(409, { message: "Questa proposta è già confermata" });
+  try {
+    await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+  } catch (err) {
+    await db.update(activities).set({ outcome: "da_confermare" }).where(eq(activities.id, activityId));
+    throw err;
+  }
 }
 
 // --- Richieste dal modulo del sito ---

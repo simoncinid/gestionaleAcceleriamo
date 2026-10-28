@@ -64,4 +64,26 @@ describe("inviti del calendario come proposta", () => {
     expect((await conferma("i4", p.id, cookie)).status).toBe(404);
     expect((await conferma("i3", "inesistente", cookie)).status).toBe(404);
   });
+
+  it("doppio clic: la conferma si applica una volta sola, la seconda risponde 409", async () => {
+    const cookie = await authed();
+    await insertLead("i5");
+    await posta(ICS_GOOGLE());
+    const [p] = await proposte("i5");
+    const stati = (await Promise.all([conferma("i5", p.id, cookie), conferma("i5", p.id, cookie)])).map((r) => r.status).sort();
+    expect(stati).toEqual([200, 409]);
+    const cambi = await env.DB.prepare("SELECT id FROM activities WHERE lead_id = 'i5' AND type = 'cambio_fase'").all();
+    expect(cambi.results.length).toBeLessThanOrEqual(1);
+    expect(await lead("i5")).toMatchObject({ stage_id: "appuntamento-confermato" });
+  });
+
+  it("lead nel cestino: la proposta non si conferma", async () => {
+    const cookie = await authed();
+    await insertLead("i6");
+    await posta(ICS_GOOGLE());
+    const [p] = await proposte("i6");
+    await env.DB.prepare("UPDATE leads SET deleted_at = ? WHERE id = 'i6'").bind(NOW).run();
+    expect((await conferma("i6", p.id, cookie)).status).toBe(404);
+    expect(await lead("i6")).toMatchObject({ stage_id: "da-chiamare-prima-volta" });
+  });
 });
