@@ -1,5 +1,17 @@
+import type { CallKind } from "../../../worker/db/schema";
+
+type VoceNota = { chiave: string; etichetta: string };
 // Spec 6.7: lo schema delle note dipende dal tipo di call. Si salvano come JSON in calls.notes.
-export const NOTE_CALL: Record<"conoscenza" | "presentazione", { chiave: string; etichetta: string }[]> = {
+// Modifica 25: analisi e progetto usano le stesse voci dell'offerta.
+const NOTE_OFFERTA: VoceNota[] = [
+  { chiave: "reazione", etichetta: "Reazione alla proposta" },
+  { chiave: "obiezioni", etichetta: "Obiezioni" },
+  { chiave: "opzione", etichetta: "Opzione che interessa (standard o proprietà del codice)" },
+  { chiave: "decide", etichetta: "Chi decide e quando" },
+  { chiave: "prossimo", etichetta: "Prossimo passo" },
+  { chiave: "libero", etichetta: "Altro" },
+];
+export const NOTE_CALL: Record<CallKind, VoceNota[]> = {
   conoscenza: [
     { chiave: "giornata", etichetta: "Cosa fa durante il giorno" },
     { chiave: "problema", etichetta: "Problema principale, con le sue parole" },
@@ -9,14 +21,9 @@ export const NOTE_CALL: Record<"conoscenza" | "presentazione", { chiave: string;
     { chiave: "budget", etichetta: "Budget o reazione al prezzo indicativo" },
     { chiave: "libero", etichetta: "Altro" },
   ],
-  presentazione: [
-    { chiave: "reazione", etichetta: "Reazione alla proposta" },
-    { chiave: "obiezioni", etichetta: "Obiezioni" },
-    { chiave: "opzione", etichetta: "Opzione che interessa (standard o proprietà del codice)" },
-    { chiave: "decide", etichetta: "Chi decide e quando" },
-    { chiave: "prossimo", etichetta: "Prossimo passo" },
-    { chiave: "libero", etichetta: "Altro" },
-  ],
+  offerta: NOTE_OFFERTA,
+  analisi: NOTE_OFFERTA,
+  progetto: NOTE_OFFERTA,
 };
 
 // Note vecchie o scritte a mano (testo semplice) finiscono in "Altro".

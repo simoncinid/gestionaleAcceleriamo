@@ -12,7 +12,7 @@ import type { propostaManualeSchema, propostaPatchSchema } from "./schema";
 
 export type PropostaRiga = {
   id: string; number: string; leadId: string | null; company: string; status: (typeof PROPOSAL_STATUSES)[number]; option: "standard" | "proprieta";
-  setupCents: number | null; feeCents: number | null; hoursEstimate: number | null; alternativeCents: number | null; validUntil: number | null;
+  setupCents: number | null; feeCents: number | null; hoursEstimate: number | null; alternativeCents: number | null; validUntil: number | null; forbiceDaCents: number | null; forbiceACents: number | null;
   sentAt: number | null; presentedAt: number | null; pdfUrl: string | null; sourcePath: string | null; objections: string | null;
   nextActionAt: number | null; version: number;
 };
@@ -20,7 +20,7 @@ export type PropostaRiga = {
 const COLONNE = {
   id: proposals.id, number: proposals.number, leadId: proposals.leadId, company: sql<string>`coalesce(${leads.company}, ${proposals.company}, '')`,
   status: proposals.status, option: proposals.option, setupCents: proposals.setupCents, feeCents: proposals.feeCents, hoursEstimate: proposals.hoursEstimate,
-  alternativeCents: proposals.alternativeCents, validUntil: proposals.validUntil, sentAt: proposals.sentAt, presentedAt: proposals.presentedAt,
+  alternativeCents: proposals.alternativeCents, validUntil: proposals.validUntil, forbiceDaCents: proposals.forbiceDaCents, forbiceACents: proposals.forbiceACents, sentAt: proposals.sentAt, presentedAt: proposals.presentedAt,
   pdfUrl: proposals.pdfUrl, sourcePath: proposals.sourcePath, objections: proposals.objections, nextActionAt: leads.nextActionAt, version: proposals.version,
 };
 
@@ -38,13 +38,13 @@ export async function unaProposta(db: Db, id: string): Promise<PropostaRiga> {
 
 export const ricontattiDi = (base: number, ctx: Contesto) => ctx.ricontatti.map((g) => alleOre(base, g, 10, 0, ctx.orario));
 
-// Una proposta diventa "registrata": data di invio, prezzo sul lead, regola "Fissare la call di presentazione".
+// Una proposta diventa "registrata": data di invio, prezzo sul lead, regola "Fissare la call dell'offerta".
 export async function passiRegistrata(db: Db, leadId: string, p: { setupCents: number | null; feeCents: number | null }, actorId: string | null, now: number): Promise<BatchItem<"sqlite">[]> {
-  const pres = await db.select({ id: calls.id }).from(calls).where(and(eq(calls.leadId, leadId), eq(calls.kind, "presentazione"), isNull(calls.deletedAt))).get();
+  const pres = await db.select({ id: calls.id }).from(calls).where(and(eq(calls.leadId, leadId), eq(calls.kind, "offerta"), isNull(calls.deletedAt))).get();
   const ctx = await contestoRegole(db, now);
   return [
     db.update(leads).set({ setupCents: p.setupCents, feeCents: p.feeCents }).where(eq(leads.id, leadId)),
-    ...(await passiProposta(db, leadId, propostaEvento({ tipo: "proposta_registrata", haCallPresentazione: Boolean(pres) }, ctx), actorId, now)),
+    ...(await passiProposta(db, leadId, propostaEvento({ tipo: "proposta_registrata", haCallOfferta: Boolean(pres) }, ctx), actorId, now)),
   ];
 }
 
@@ -54,7 +54,7 @@ export async function creaAMano(db: Db, input: z.infer<typeof propostaManualeSch
   const id = crypto.randomUUID();
   const registrata = input.status === "registrata";
   await db.batch([
-    db.insert(proposals).values({ id, leadId: input.leadId, number: input.number, option: input.option, setupCents: input.setupCents ?? null, feeCents: input.feeCents ?? null, hoursEstimate: input.hoursEstimate ?? null, alternativeCents: input.alternativeCents ?? null, validUntil: input.validUntil ?? null, pdfUrl: input.pdfUrl ?? null, status: input.status, sentAt: registrata ? now : null, registeredVia: "manuale", createdAt: now, updatedAt: now }),
+    db.insert(proposals).values({ id, leadId: input.leadId, number: input.number, option: input.option, setupCents: input.setupCents ?? null, feeCents: input.feeCents ?? null, hoursEstimate: input.hoursEstimate ?? null, alternativeCents: input.alternativeCents ?? null, validUntil: input.validUntil ?? null, pdfUrl: input.pdfUrl ?? null, status: input.status, forbiceDaCents: input.forbiceDaCents ?? null, forbiceACents: input.forbiceACents ?? null, sentAt: registrata ? now : null, registeredVia: "manuale", createdAt: now, updatedAt: now }),
     db.insert(activities).values({ id: crypto.randomUUID(), leadId: input.leadId, type: "proposta", body: `Preventivo ${input.number} inserito a mano`, authorId: actorId, createdAt: now }),
     ...(registrata ? await passiRegistrata(db, input.leadId, { setupCents: input.setupCents ?? null, feeCents: input.feeCents ?? null }, actorId, now) : []),
   ]);
@@ -64,7 +64,7 @@ export async function creaAMano(db: Db, input: z.infer<typeof propostaManualeSch
 export async function aggiornaProposta(db: Db, id: string, input: z.infer<typeof propostaPatchSchema>, actorId: string, now: number) {
   const prima = await unaProposta(db, id);
   const set: Partial<typeof proposals.$inferInsert> = { updatedAt: now };
-  for (const k of ["option", "setupCents", "feeCents", "alternativeCents", "validUntil", "pdfUrl", "objections"] as const) if (input[k] !== undefined) (set as Record<string, unknown>)[k] = input[k];
+  for (const k of ["option", "setupCents", "feeCents", "alternativeCents", "validUntil", "pdfUrl", "objections", "forbiceDaCents", "forbiceACents"] as const) if (input[k] !== undefined) (set as Record<string, unknown>)[k] = input[k];
   const passi: BatchItem<"sqlite">[] = [];
   const cambio = input.status && input.status !== prima.status ? input.status : null;
   if (cambio) {

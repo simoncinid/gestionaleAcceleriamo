@@ -51,6 +51,7 @@ async function salva(db: Db, b: z.infer<typeof hookSchema>, now: number) {
   const campi = {
     option: b.opzione, setupCents: b.setup ?? null, feeCents: b.canone ?? null, hoursEstimate: b.ore ?? null,
     alternativeCents: b.alternativa_proprieta ?? null, validUntil, pdfUrl: b.link_pdf ?? null, sourcePath: b.sourcePath, updatedAt: now,
+    forbiceDaCents: b.forbice_da ?? null, forbiceACents: b.forbice_a ?? null,
   };
   const esistente = await db.select().from(proposals).where(eq(proposals.number, b.numero)).get();
   const leadTrovato = await trovaLead(db, b.lead, b.azienda);

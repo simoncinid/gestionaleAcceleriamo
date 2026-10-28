@@ -1,4 +1,5 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
+import { AZIONE_CALL, callAttesa } from "../regole/fasi-call";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -40,8 +41,6 @@ const quando = (ms: number) => {
   return `${GIORNI[p.settimana]} ${p.giorno}/${p.mese} alle ${String(p.ore).padStart(2, "0")}:${String(p.minuti).padStart(2, "0")}`;
 };
 
-// Fasi in cui la prossima call è la presentazione del preventivo.
-const FASI_PRESENTAZIONE = ["in-attesa-preventivo", "presentazione-confermata", "in-attesa-decisione"];
 
 export async function smistaMail(env: Env, m: Mail, now: number): Promise<Esito & { nuova: boolean }> {
   const db = getDb(env.DB);
@@ -131,17 +130,17 @@ async function invito(db: Db, m: Mail, now: number): Promise<Esito> {
     const spostata = call.scheduledAt !== inv.inizio;
     passi.push(db.update(calls).set({ scheduledAt: inv.inizio, durationMin: inv.durataMin, meetLink: link ?? call.meetLink, icsUid: inv.uid, icsSequence: inv.versione, outcome: null, outcomeAt: null, updatedAt: now }).where(eq(calls.id, call.id)));
     if (spostata) {
-      passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `Call di ${call.kind} spostata dall'invito di Google: ${quando(inv.inizio)}`, authorId: null, createdAt: now, callId: call.id }));
+      passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `${AZIONE_CALL[call.kind]} spostata dall'invito di Google: ${quando(inv.inizio)}`, authorId: null, createdAt: now, callId: call.id }));
       if (aperta) passi.push(propostaInvito(db, leadId, call.id, `Il cliente ha chiesto di spostare la call a ${quando(inv.inizio)}: conferma`, now));
     }
     await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
     return { tipo: "invito", esito: spostata ? "call spostata" : "call aggiornata", leadId };
   }
-  const conoscenzaFatta = await db.select({ id: calls.id }).from(calls).where(and(eq(calls.leadId, leadId), eq(calls.kind, "conoscenza"), eq(calls.outcome, "fatta"), isNull(calls.deletedAt))).get();
-  const kind = conoscenzaFatta || FASI_PRESENTAZIONE.includes(lead?.stageId ?? "") ? "presentazione" : "conoscenza";
+  const fatte = await db.select({ kind: calls.kind }).from(calls).where(and(eq(calls.leadId, leadId), eq(calls.outcome, "fatta"), isNull(calls.deletedAt)));
+  const kind = callAttesa(lead?.stageId ?? "", fatte.map((f) => f.kind));
   const id = crypto.randomUUID();
   passi.push(db.insert(calls).values({ id, leadId, kind, scheduledAt: inv.inizio, durationMin: inv.durataMin, meetLink: link, icsUid: inv.uid, icsSequence: inv.versione, createdBy: null, createdAt: now, updatedAt: now }));
-  passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `Call di ${kind} fissata dall'invito di Google: ${quando(inv.inizio)}`, authorId: null, createdAt: now, callId: id }));
+  passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `${AZIONE_CALL[kind]} fissata dall'invito di Google: ${quando(inv.inizio)}`, authorId: null, createdAt: now, callId: id }));
   if (aperta) passi.push(propostaInvito(db, leadId, id, `Il cliente ha accettato la call di ${quando(inv.inizio)}: conferma`, now));
   await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
   return { tipo: "invito", esito: "call creata", leadId };

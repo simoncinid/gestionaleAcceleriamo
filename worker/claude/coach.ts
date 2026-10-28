@@ -4,7 +4,8 @@ import { getDb } from "../db/client";
 import type { Env } from "../env";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { daRoma, partiRoma } from "../lib/roma";
-import { callPerFase } from "../regole/fasi-call";
+import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
+import type { CallKind } from "../db/schema";
 import type { DefTipo } from "./coda";
 import { chiamaClaude, ErroreClaude } from "./client";
 import { usoVuoto } from "./costo";
@@ -72,11 +73,11 @@ messaggio WhatsApp o email nel tono di Acceleriamo, firmato dal commerciale, sen
 sistemare (per esempio una call che manca), al massimo sei. Al massimo sei risposte alle obiezioni.`;
 
 export const SISTEMA_CONOSCENZA = `${COMUNE}
-È una call di conoscenza: controlla che sia fissata la call di presentazione e, se manca, mettilo nei controlli; proponi cosa
-mettere nel preventivo usando le regole di prezzo; prepara la risposta a "voglio una roba mia" con l'opzione proprietà del codice.`;
+È una call di conoscenza: controlla che sia fissata la call dell'offerta e, se manca, mettilo nei controlli; proponi cosa
+mettere nell'offerta (con la forbice di prezzo) usando le regole di prezzo; prepara la risposta a "voglio una roba mia" con l'opzione proprietà del codice.`;
 
 export const SISTEMA_PRESENTAZIONE = `${COMUNE}
-È una call di presentazione: leggi le obiezioni e l'opzione scelta (standard o proprietà del codice); proponi quando
+È una call dell'offerta, di analisi o del progetto: leggi le obiezioni e l'opzione scelta (standard o proprietà del codice); proponi quando
 ricontattare e con quale testo; per ogni obiezione scrivi la risposta.`;
 
 const MAX_TOKENS = 3_000;
@@ -100,7 +101,7 @@ const dataRoma = (ms: number) => {
   return `${String(p.giorno).padStart(2, "0")}/${String(p.mese).padStart(2, "0")}/${p.anno}`;
 };
 
-type Contesto = { kind: "conoscenza" | "presentazione"; notes: string | null; company: string; stageId: string; scheda: string | null };
+type Contesto = { kind: CallKind; notes: string | null; company: string; stageId: string; scheda: string | null };
 
 export const TIPO_COACH: DefTipo = {
   stima: (imp) => ({ modello: imp.modelli.coach, ingresso: 12_000, maxTokens: MAX_TOKENS, ricerche: 0 }),
@@ -141,7 +142,7 @@ export const TIPO_COACH: DefTipo = {
     );
     const faseAttuale = tutte.results.find((f) => f.id === x.stageId)?.label ?? x.stageId;
     const testoRichiesta = [
-      bloccoDatiLead({ "Azienda": x.company, "Fase attuale": faseAttuale, "Tipo di call": x.kind, ...campiNote }),
+      bloccoDatiLead({ "Azienda": x.company, "Fase attuale": faseAttuale, "Tipo di call": AZIONE_CALL[x.kind], ...campiNote }),
       x.scheda ? blocco("scheda_azienda", x.scheda, 6000) : "",
       storico.results.length ? blocco("storico", storico.results.map((s) => `${dataRoma(s.at)} ${s.type}: ${s.body}`).join("\n"), 4000) : "",
       `Fasi possibili (id: etichetta):\n${fasi.results.map((f) => `${f.id}: ${f.label}`).join("\n")}`,
@@ -150,7 +151,8 @@ opzione proprietà del codice: solo setup, ${prezzi.moltiplicatore} volte il set
     ].filter(Boolean).join("\n\n");
     const r = await chiamaClaude(env, {
       modello: imp.modelli.coach,
-      sistema: x.kind === "presentazione" ? SISTEMA_PRESENTAZIONE : SISTEMA_CONOSCENZA,
+      // Offerta, analisi e progetto usano lo stesso sistema (modifica 25).
+      sistema: x.kind === "conoscenza" ? SISTEMA_CONOSCENZA : SISTEMA_PRESENTAZIONE,
       testo: testoRichiesta,
       maxTokens: MAX_TOKENS,
       schema: schemaCoach(fasi.results.map((f) => f.id)),

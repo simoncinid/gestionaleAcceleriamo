@@ -27,7 +27,7 @@ beforeEach(async () => {
 const risultato = (fase: string, extra: Record<string, unknown> = {}) => JSON.stringify({
   riassunto: "Preventivi fatti a mano.",
   faseSuggerita: fase,
-  prossimaAzione: { testo: "Fissare la call di presentazione", entroGiorni: 2 },
+  prossimaAzione: { testo: "Fissare la call dell'offerta", entroGiorni: 2 },
   bozzaFollowUp: "Ciao Marco, ti scrivo per fissare la presentazione.",
   risposteObiezioni: [{ obiezione: "Voglio una roba mia", risposta: "C'è l'opzione con la proprietà del codice." }],
   controlli: ["La call di presentazione non è ancora fissata"],
@@ -54,7 +54,7 @@ describe("coach", () => {
     // Le fasi che esistono solo con una call fissata non si propongono (salvo quella attuale del lead).
     expect(schema.properties.faseSuggerita.enum).not.toContain("presentazione-confermata");
     expect(schema.properties.faseSuggerita.enum).toContain("appuntamento-confermato");
-    expect(String(corpo.system)).toContain("call di presentazione");
+    expect(String(corpo.system)).toContain("call dell'offerta");
     expect(corpo.model).toBe("claude-sonnet-5-5");
     expect(corpo).not.toHaveProperty("thinking");
     expect(corpo).not.toHaveProperty("tool_choice");
@@ -100,7 +100,7 @@ describe("coach", () => {
   });
 
   it("taglio a fine parola con i puntini; i testi corti restano come sono", () => {
-    expect(taglia("Fissare la call di presentazione", 20)).toBe("Fissare la call...");
+    expect(taglia("Fissare la call dell'offerta", 20)).toBe("Fissare la call...");
     expect(taglia("Fissare la call", 20)).toBe("Fissare la call");
     expect(taglia("a".repeat(30), 20)).toBe(`${"a".repeat(17)}...`);
     expect(taglia("parola ".repeat(400), 2000).length).toBeLessThanOrEqual(2000);
@@ -129,7 +129,7 @@ describe("coach", () => {
     const b = await (await call("/api/calls/C1/coach", { method: "POST" }, cookie)).json<Coach>();
     expect(b.id).toBe(a.id);
     expect((await env.DB.prepare("SELECT count(*) n FROM ai_jobs WHERE tipo = 'coach'").first<{ n: number }>())?.n).toBe(1);
-    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('C2', 'L1', 'presentazione', 0, 0, 0)").run();
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('C2', 'L1', 'offerta', 0, 0, 0)").run();
     const r = await call("/api/calls/C2/coach", { method: "POST" }, cookie);
     expect(r.status).toBe(409);
     expect((await r.json<{ error: string }>()).error).toBe("Il coach legge solo le call fatte");
@@ -142,7 +142,7 @@ describe("coach", () => {
     setClaudeFetch(async () => rispostaClaude({ testo: risultato("in-attesa-preventivo") }));
     await lavoraCoda(env, ora, 3);
     const a = await (await call(`/api/call-analyses/${id}/applica`, { method: "POST" }, cookie)).json<{ precompilato: { stageId: string; nextAction: string; nextActionAt: number; note: string } }>();
-    expect(a.precompilato).toMatchObject({ stageId: "in-attesa-preventivo", nextAction: "Fissare la call di presentazione", nextActionAt: daRoma(2026, 10, 22, 9, 0) });
+    expect(a.precompilato).toMatchObject({ stageId: "in-attesa-preventivo", nextAction: "Fissare la call dell'offerta", nextActionAt: daRoma(2026, 10, 22, 9, 0) });
     expect(a.precompilato.note).toContain("Preventivi fatti a mano.");
     const l = await env.DB.prepare("SELECT stage_id FROM leads WHERE id = 'L1'").first<{ stage_id: string }>();
     expect(l?.stage_id).toBe("appuntamento-confermato");

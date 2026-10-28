@@ -130,25 +130,30 @@ describe("API delle call", () => {
     await insertLead("l4", { stage_id: "appuntamento-confermato" });
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k4', 'l4', 'conoscenza', ?, ?, ?)").bind(NOW - 3_600_000, NOW, NOW).run();
     const note = JSON.stringify({ problema: "Perde le mail dei clienti" });
-    const r = await call("/api/calls/k4", { method: "PATCH", json: { outcome: "fatta", notes: note, presentazione: { scheduledAt: DOMANI, meetLink: null } } }, cookie);
+    const r = await call("/api/calls/k4", { method: "PATCH", json: { outcome: "fatta", notes: note, prossima: { scheduledAt: DOMANI, meetLink: null } } }, cookie);
     expect(r.status).toBe(200);
-    expect(await lead("l4")).toMatchObject({ stage_id: "presentazione-confermata", next_action: "Call di presentazione", next_action_at: DOMANI });
+    expect(await lead("l4")).toMatchObject({ stage_id: "presentazione-confermata", next_action: "Call dell'offerta", next_action_at: DOMANI });
     const { results } = await env.DB.prepare("SELECT kind, outcome FROM calls WHERE lead_id = 'l4' ORDER BY scheduled_at").all();
-    expect(results).toEqual([{ kind: "conoscenza", outcome: "fatta" }, { kind: "presentazione", outcome: null }]);
+    expect(results).toEqual([{ kind: "conoscenza", outcome: "fatta" }, { kind: "offerta", outcome: null }]);
   });
 
-  it("presentazione fatta: proposta presentata e fase In attesa decisione", async () => {
+  it("call del progetto fatta: fase In attesa decisione; call dell'offerta fatta: proposta presentata", async () => {
     const cookie = await authed();
     // Con le sequenze accese il motore avanza al passo 1 (spente, il passo non si muove).
     await env.DB.prepare("INSERT INTO settings (key, value, updated_at) VALUES ('sequenze', '{\"attive\":true}', ?)").bind(NOW).run();
     await insertLead("l5", { stage_id: "presentazione-confermata" });
-    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k5', 'l5', 'presentazione', ?, ?, ?)").bind(NOW - 3_600_000, NOW, NOW).run();
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k5', 'l5', 'offerta', ?, ?, ?)").bind(NOW - 3_600_000, NOW, NOW).run();
     await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('p5', 'l5', 'ACC-2026-005', 'registrata', 'aggancio', ?, ?)").bind(NOW, NOW).run();
     await call("/api/calls/k5", { method: "PATCH", json: { outcome: "fatta" } }, cookie);
-    expect(await lead("l5")).toMatchObject({ stage_id: "in-attesa-decisione", next_action: "Follow-up preventivo", sequence_step: 1 });
+    // Senza call di analisi la fase resta (40) e si fissa la call di analisi.
+    expect(await lead("l5")).toMatchObject({ stage_id: "presentazione-confermata", next_action: "Fissare la call di analisi" });
     expect(await env.DB.prepare("SELECT status, presented_at IS NOT NULL p FROM proposals WHERE id = 'p5'").first()).toEqual({ status: "presentata", p: 1 });
+    await env.DB.prepare("UPDATE leads SET stage_id = 'progetto-fissato' WHERE id = 'l5'").run();
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k5b', 'l5', 'progetto', ?, ?, ?)").bind(NOW - 3_600_000, NOW, NOW).run();
+    await call("/api/calls/k5b", { method: "PATCH", json: { outcome: "fatta" } }, cookie);
+    expect(await lead("l5")).toMatchObject({ stage_id: "in-attesa-decisione", next_action: "Follow-up preventivo", sequence_step: 1 });
     const fase = await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'l5' AND type = 'cambio_fase'").first<{ body: string }>();
-    expect(fase?.body).toBe('Da "Presentazione fissata" a "In attesa decisione"');
+    expect(fase?.body).toBe('Da "Progetto fissato" a "In attesa decisione"');
   });
 
   it("call saltata: regola del no-show, la fase resta e si rifissa (blocco 1)", async () => {

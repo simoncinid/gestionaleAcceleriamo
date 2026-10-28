@@ -327,12 +327,16 @@ export const sheetSyncState = sqliteTable("sheet_sync_state", {
   tokenCache: text("token_cache"),
 });
 
+// Le quattro call del percorso di vendita (blocco 1, modifica 25). La qualifica al telefono resta un tentativo.
+export const CALL_KINDS = ["conoscenza", "offerta", "analisi", "progetto"] as const;
+export type CallKind = (typeof CALL_KINDS)[number];
+
 export const calls = sqliteTable(
   "calls",
   {
     id: text("id").primaryKey(),
     leadId: text("lead_id").notNull(),
-    kind: text("kind", { enum: ["conoscenza", "presentazione"] }).notNull(),
+    kind: text("kind", { enum: CALL_KINDS }).notNull(),
     scheduledAt: integer("scheduled_at").notNull(),
     meetLink: text("meet_link"),
     notes: text("notes"),
@@ -372,6 +376,9 @@ export const proposals = sqliteTable(
     feeCents: integer("fee_cents"),
     hoursEstimate: integer("hours_estimate"),
     alternativeCents: integer("alternative_cents"),
+    // Forbice di prezzo della proposta dell'offerta (modifica 25): due numeri, nessun calcolo.
+    forbiceDaCents: integer("forbice_da_cents"),
+    forbiceACents: integer("forbice_a_cents"),
     validUntil: integer("valid_until"),
     status: text("status", { enum: PROPOSAL_STATUSES }).notNull(),
     sentAt: integer("sent_at"),

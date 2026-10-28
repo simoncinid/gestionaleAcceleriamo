@@ -3,10 +3,11 @@ import { AZIONE_PAUSA, transizione, type Evento as EventoTransizione, type LeadT
 
 // Le regole propongono, le persone salvano (spec 6.3). Qui solo funzioni pure.
 
-// "appuntamento" è solo la prima call (la consulenza); la seconda è la presentazione del preventivo.
+// Percorso a cinque chiamate (modifica 25): qualifica al telefono, poi conoscenza, offerta, analisi e progetto.
 export const ESITI = [
-  "risposto", "non_risponde", "occupato", "richiamare", "appuntamento", "non_interessato", "fuori_target",
-  "consulenza_fatta", "presentazione_fissata", "presentazione_fatta",
+  "risposto", "non_risponde", "occupato", "richiamare", "non_interessato", "fuori_target",
+  "conoscenza_fissata", "conoscenza_fatta", "offerta_pronta", "offerta_fissata", "offerta_presentata",
+  "analisi_fissata", "analisi_fatta", "progetto_pronto", "progetto_fissato", "progetto_presentato",
 ] as const;
 export type Esito = (typeof ESITI)[number];
 

@@ -28,7 +28,7 @@ describe("aggancio dal wiki", () => {
     expect(r.status).toBe(201);
     expect(await r.json()).toMatchObject({ numero: "ACC-2026-014", versione: 1, stato: "abbinata" });
     expect(await proposta("ACC-2026-014")).toMatchObject({ lead_id: "bertini", status: "registrata", setup_cents: 200_000, fee_cents: 15_000, hours_estimate: 40, registered_via: "aggancio" });
-    expect(await lead("bertini")).toMatchObject({ next_action: "Fissare la call di presentazione", setup_cents: 200_000, fee_cents: 15_000 });
+    expect(await lead("bertini")).toMatchObject({ next_action: "Fissare la call dell'offerta", setup_cents: 200_000, fee_cents: 15_000 });
     const storico = await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'bertini' AND type = 'proposta'").first<{ body: string }>();
     expect(storico?.body).toBe("Preventivo ACC-2026-014 registrato dal wiki");
   });
@@ -60,21 +60,21 @@ describe("aggancio dal wiki", () => {
   });
 
   it("bozza: si registra ma non fa partire regole; alla stampa in sent passa a registrata", async () => {
-    await insertLead("bozza", "Officina Meccanica Bertini", { next_action: "Preparare il preventivo", next_action_at: NOW + 1000 });
+    await insertLead("bozza", "Officina Meccanica Bertini", { next_action: "Preparare l'offerta", next_action_at: NOW + 1000 });
     await aggancio({ ...base, stato: "draft" });
     expect(await proposta("ACC-2026-014")).toMatchObject({ status: "bozza", sent_at: null });
-    expect(await lead("bozza")).toMatchObject({ next_action: "Preparare il preventivo" });
+    expect(await lead("bozza")).toMatchObject({ next_action: "Preparare l'offerta" });
     await aggancio(base);
     expect(await proposta("ACC-2026-014")).toMatchObject({ status: "registrata", version: 2 });
     expect((await proposta("ACC-2026-014"))?.sent_at).not.toBeNull();
-    expect(await lead("bozza")).toMatchObject({ next_action: "Fissare la call di presentazione" });
+    expect(await lead("bozza")).toMatchObject({ next_action: "Fissare la call dell'offerta" });
   });
 
   it("una presentazione già fissata: nessuna nuova azione", async () => {
-    await insertLead("con-call", "Officina Meccanica Bertini", { stage_id: "presentazione-confermata", next_action: "Call di presentazione", next_action_at: NOW + 86_400_000 });
-    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k', 'con-call', 'presentazione', ?, ?, ?)").bind(NOW + 86_400_000, NOW, NOW).run();
+    await insertLead("con-call", "Officina Meccanica Bertini", { stage_id: "presentazione-confermata", next_action: "Call dell'offerta", next_action_at: NOW + 86_400_000 });
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k', 'con-call', 'offerta', ?, ?, ?)").bind(NOW + 86_400_000, NOW, NOW).run();
     await aggancio(base);
-    expect(await lead("con-call")).toMatchObject({ next_action: "Call di presentazione" });
+    expect(await lead("con-call")).toMatchObject({ next_action: "Call dell'offerta" });
   });
 
   it("corpo non valido 400, corpo oltre 16 KB 413, oltre 30 chiamate l'ora 429", async () => {
@@ -118,7 +118,7 @@ describe("aggancio dal wiki", () => {
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ stato: "abbinata", versione: 2 });
     expect(await proposta("ACC-2026-014")).toMatchObject({ lead_id: "dopo", status: "registrata" });
-    expect(await lead("dopo")).toMatchObject({ setup_cents: 200_000, fee_cents: 15_000, next_action: "Fissare la call di presentazione" });
+    expect(await lead("dopo")).toMatchObject({ setup_cents: 200_000, fee_cents: 15_000, next_action: "Fissare la call dell'offerta" });
   });
 
   it("link al PDF che non inizia con https:// rifiutato", async () => {

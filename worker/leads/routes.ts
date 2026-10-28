@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, isNull } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import { Hono } from "hono";
 import { getDb } from "../db/client";
-import { activities, calls, documents, jobs, leads, users } from "../db/schema";
+import { activities, CALL_KINDS, calls, documents, jobs, leads, users } from "../db/schema";
 import type { AppEnv } from "../env";
 import { VISTE, addActivity, azioniMultiple, cercaDoppioni, clienteDelLead, getLead, ingressoLead, riscontro, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead, type Vista } from "./service";
 import { activitySchema, bulkSchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
@@ -139,9 +139,9 @@ leadRoutes.patch("/:id/esito", async (c) => {
   return c.json(r);
 });
 
-// "Non si è presentato" (fasi 30 e 50): regola del no-show, la fase resta (contratto blocco 1, sezione 2).
+// "Non si è presentato" (fasi 30, 40, 45, 55): regola del no-show, la fase resta (contratto blocco 1, sezione 2).
 leadRoutes.post("/:id/no-show", async (c) => {
-  const { kind } = z.object({ kind: z.enum(["conoscenza", "presentazione"]) }).strict().parse(await c.req.json());
+  const { kind } = z.object({ kind: z.enum(CALL_KINDS) }).strict().parse(await c.req.json());
   const db = getDb(c.env.DB);
   const id = c.req.param("id");
   await segnaNoShow(db, id, kind, c.get("user").id, Date.now());

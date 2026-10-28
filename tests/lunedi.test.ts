@@ -41,7 +41,7 @@ describe("settimana", () => {
       VALUES ('P1', 'VECCHIO', 'P-1', 'Azienda VECCHIO', 200000, 'presentata', ?1, 'manuale', ?1, ?1)`).bind(LUN - 15 * GIORNO).run();
     await env.DB.prepare("INSERT INTO campaign_spend (id, campagna, mese, amount_cents, updated_at) VALUES ('S1', 'Campagna A', '2026-10', 6000, 0)").run();
     const n = await calcolaSettimana(env.DB, LUN);
-    expect(n).toMatchObject({ da: SETT, a: daRoma(2026, 10, 12, 0, 0), arrivati: 2, conoscenza: 1, presentazione: 0, proposte: 0, vinti: 0, spesaAdsMeseCents: 6000, costoPerLeadCents: 2000 });
+    expect(n).toMatchObject({ da: SETT, a: daRoma(2026, 10, 12, 0, 0), arrivati: 2, conoscenza: 1, offerta: 0, analisi: 0, progetto: 0, proposte: 0, vinti: 0, spesaAdsMeseCents: 6000, costoPerLeadCents: 2000 });
     expect(n.perFonte).toEqual(expect.arrayContaining([{ source: "meta", n: 1 }, { source: "foglio_andrea", n: 1 }]));
     expect(n.fermi.map((f) => f.id)).toEqual(["VECCHIO"]);
     expect(n.proposteFerme).toEqual([{ id: "P1", leadId: "VECCHIO", company: "Azienda VECCHIO", giorni: 15 }]);

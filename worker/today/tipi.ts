@@ -1,3 +1,4 @@
+import type { CallKind } from "../db/schema";
 import type { ProssimaAzione } from "../processo/processo";
 
 // Riga di "Da fare oggi" (contratto blocco 1, sezione 5): il lead con la sua prossima azione, calcolata dalla stessa
@@ -8,7 +9,7 @@ export type RigaOggi = {
   prossima: ProssimaAzione; meetLink: string | null;
 };
 
-export type CallOggi = { id: string; leadId: string; company: string; contactName: string | null; phone: string | null; kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null;
+export type CallOggi = { id: string; leadId: string; company: string; contactName: string | null; phone: string | null; kind: CallKind; scheduledAt: number; meetLink: string | null;
   // Spec 6.4: stato della scheda azienda di Claude (ultima versione), mostrato sotto la call di conoscenza.
   scheda: "pronta" | "in_preparazione" | null };
 

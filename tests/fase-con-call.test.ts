@@ -38,7 +38,7 @@ describe("Q14: fase che richiede una call", () => {
     const quando = Date.now() + 3 * 86_400_000;
     const res = await call(`/api/leads/${id}`, { method: "PATCH", json: { stageId: "presentazione-confermata", callAt: quando } }, cookie);
     const { lead } = (await res.json()) as LeadBody;
-    expect(lead).toMatchObject({ stageId: "presentazione-confermata", nextAction: "Call di presentazione", nextActionAt: quando });
+    expect(lead).toMatchObject({ stageId: "presentazione-confermata", nextAction: "Call dell'offerta", nextActionAt: quando });
   });
 
   it("se la call c'è già (Annulla dopo uno spostamento) la data non serve", async () => {
@@ -62,10 +62,12 @@ describe("Q14: fase che richiede una call", () => {
 });
 
 describe("Q14: quali fasi chiedono la call", () => {
-  it("appuntamento e presentazione sì, le altre no", async () => {
+  it("le quattro fasi con call sì, le altre no", async () => {
     const { callPerFase } = await import("../worker/regole/fasi-call");
     expect(callPerFase("appuntamento-confermato")).toBe("conoscenza");
-    expect(callPerFase("presentazione-confermata")).toBe("presentazione");
+    expect(callPerFase("presentazione-confermata")).toBe("offerta");
+    expect(callPerFase("analisi-fissata")).toBe("analisi");
+    expect(callPerFase("progetto-fissato")).toBe("progetto");
     expect(callPerFase("da-richiamare")).toBeNull();
     expect(callPerFase(undefined)).toBeNull();
   });

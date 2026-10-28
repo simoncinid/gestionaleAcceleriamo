@@ -66,7 +66,7 @@ const leggi = (id: string) => env.DB.prepare("SELECT * FROM leads WHERE id = ?")
 type Risposta = { lead: { stageId: string; noShow: number; prossima: { azione: string; stato: string } } };
 
 describe("POST /api/leads/:id/no-show", () => {
-  it("prima volta: fase che resta, Rifissare la consulenza entro oggi, call chiusa come saltata, storico", async () => {
+  it("prima volta: fase che resta, Rifissare la conoscenza entro oggi, call chiusa come saltata, storico", async () => {
     const cookie = await authed();
     await insertLead("ns1");
     await insertCall("kns1", "ns1");
@@ -74,17 +74,17 @@ describe("POST /api/leads/:id/no-show", () => {
     expect(r.status).toBe(200);
     const { lead } = (await r.json()) as Risposta;
     expect(lead).toMatchObject({ stageId: "appuntamento-confermato", noShow: 1 });
-    expect(lead.prossima.azione).toBe("Rifissare la consulenza");
+    expect(lead.prossima.azione).toBe("Rifissare la conoscenza");
     expect(await leggi("ns1")).toMatchObject({ attempt_count: 2, next_action: AZIONE_RIFISSARE });
     expect(await env.DB.prepare("SELECT outcome FROM calls WHERE id = 'kns1'").first()).toEqual({ outcome: "saltata" });
     const storia = await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'ns1' AND type = 'call'").first<{ body: string }>();
-    expect(storia?.body).toBe("Non si è presentato alla consulenza (prima volta)");
+    expect(storia?.body).toBe("Non si è presentato alla conoscenza (prima volta)");
   });
 
   it("seconda volta: Riprovare il <data fra 2 mesi>", async () => {
     const cookie = await authed();
     await insertLead("ns2", { stage_id: "presentazione-confermata", no_show: 1 });
-    const r = await call("/api/leads/ns2/no-show", { method: "POST", json: { kind: "presentazione" } }, cookie);
+    const r = await call("/api/leads/ns2/no-show", { method: "POST", json: { kind: "offerta" } }, cookie);
     const { lead } = (await r.json()) as Risposta;
     expect(lead.noShow).toBe(2);
     expect(lead.prossima.azione).toMatch(/^Riprovare il /);

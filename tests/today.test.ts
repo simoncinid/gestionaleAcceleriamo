@@ -98,7 +98,7 @@ describe("numeri", () => {
     expect(s.bySource).toContainEqual({ source: "meta", total: 3, won: 1, lost: 1 });
     expect(s.byCampaign).toContainEqual({ campaign: "Campagna A", total: 2, won: 1, lost: 0 });
     expect(s.byStage.find((x) => x.stageId === "chiuso")?.count).toBe(1);
-    expect(s.byStage).toHaveLength(9);
+    expect(s.byStage).toHaveLength(12);
     expect(s.firstResponse).toEqual({ avgMs: 5_400_000, count: 2 });
   });
 });

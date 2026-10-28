@@ -5,7 +5,7 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Db } from "../db/client";
-import { activities, auditLog, calls, leads, messageTemplates, type Lead } from "../db/schema";
+import { activities, auditLog, CALL_KINDS, calls, leads, messageTemplates, type CallKind, type Lead } from "../db/schema";
 import { callPerFase } from "../regole/fasi-call";
 import { ESITI, type Esito } from "../regole/motore";
 import { assertChiusura, getLead, getStage } from "./service";
@@ -31,7 +31,7 @@ export const esitoSchema = z
     recontactAt: z.number().int().nullish(),
     note: z.string().trim().max(4000).optional(),
     call: z
-      .object({ kind: z.enum(["conoscenza", "presentazione"]), scheduledAt: z.number().int(), meetLink: linkHttp("Link Meet non valido").nullable() })
+      .object({ kind: z.enum(CALL_KINDS), scheduledAt: z.number().int(), meetLink: linkHttp("Link Meet non valido").nullable() })
       .strict()
       .optional(),
   })
@@ -43,15 +43,23 @@ const ETICHETTE: Record<Esito, string> = {
   non_risponde: "Non risponde",
   occupato: "Occupato",
   richiamare: "Richiamare",
-  appuntamento: "Consulenza fissata",
   non_interessato: "Non interessato",
   fuori_target: "Non profilato",
-  consulenza_fatta: "Consulenza fatta",
-  presentazione_fissata: "Presentazione fissata",
-  presentazione_fatta: "Presentazione fatta",
+  conoscenza_fissata: "Conoscenza fissata",
+  conoscenza_fatta: "Conoscenza fatta",
+  offerta_pronta: "Offerta pronta",
+  offerta_fissata: "Offerta fissata",
+  offerta_presentata: "Offerta presentata",
+  analisi_fissata: "Analisi fissata",
+  analisi_fatta: "Analisi fatta",
+  progetto_pronto: "Progetto pronto",
+  progetto_fissato: "Progetto fissato",
+  progetto_presentato: "Progetto presentato",
 };
 // Gli esiti che chiudono la call in programma di quel tipo (resta una sola strada per dire "fatta").
-const CALL_FATTA: Partial<Record<Esito, "conoscenza" | "presentazione">> = { consulenza_fatta: "conoscenza", presentazione_fatta: "presentazione" };
+const CALL_FATTA: Partial<Record<Esito, CallKind>> = {
+  conoscenza_fatta: "conoscenza", offerta_presentata: "offerta", analisi_fatta: "analisi", progetto_presentato: "progetto",
+};
 const TENTATIVI: Esito[] = ["non_risponde", "occupato"];
 
 export async function primoTentativoAt(db: Db, leadId: string): Promise<number | null> {
@@ -66,17 +74,21 @@ export async function primoTentativoAt(db: Db, leadId: string): Promise<number |
 
 const giaFatto = (db: Db, requestId: string) => db.select({ id: activities.id }).from(activities).where(eq(activities.requestId, requestId)).get();
 
-// Esiti validi per fase (contratto blocco 1, sezione 2): in 10 e 20 solo le telefonate, poi consulenza,
-// preventivo e presentazione. "Non interessato" e "Non profilato" valgono in tutte le fasi aperte; 70, 80, 90 nessuno.
+// Esiti validi per fase (modifica 25): in 10 e 20 solo le telefonate, poi una riga per ogni passo del percorso.
+// "Non interessato" e "Non profilato" valgono in tutte le fasi aperte; 70, 80, 90 nessuno. Copia unica: l'interfaccia la importa da qui.
 const CHIUSURE: Esito[] = ["non_interessato", "fuori_target"];
-const TELEFONATE: Esito[] = ["non_risponde", "occupato", "richiamare", "risposto", "appuntamento"];
+const TELEFONATE: Esito[] = ["non_risponde", "occupato", "richiamare", "risposto", "conoscenza_fissata"];
+const DOPO_CALL: Esito[] = ["richiamare", "non_risponde", "occupato"];
 export const ESITI_PER_FASE: Record<string, Esito[]> = {
   [FASE.nuovo]: [...TELEFONATE, ...CHIUSURE],
   [FASE.richiamare]: [...TELEFONATE, ...CHIUSURE],
-  [FASE.consulenza]: ["consulenza_fatta", "presentazione_fissata", "richiamare", "non_risponde", "occupato", ...CHIUSURE],
-  [FASE.preventivo]: ["presentazione_fissata", "richiamare", "non_risponde", "occupato", "risposto", ...CHIUSURE],
-  [FASE.presentazione]: ["presentazione_fatta", "richiamare", "non_risponde", "occupato", ...CHIUSURE],
-  [FASE.decisione]: ["risposto", "richiamare", "non_risponde", "occupato", "presentazione_fissata", ...CHIUSURE],
+  [FASE.conoscenza]: ["conoscenza_fatta", "offerta_fissata", ...DOPO_CALL, ...CHIUSURE],
+  [FASE.attesaOfferta]: ["offerta_pronta", "offerta_fissata", ...DOPO_CALL, "risposto", ...CHIUSURE],
+  [FASE.offerta]: ["offerta_presentata", "analisi_fissata", ...DOPO_CALL, ...CHIUSURE],
+  [FASE.analisi]: ["analisi_fatta", "progetto_fissato", ...DOPO_CALL, ...CHIUSURE],
+  [FASE.attesaProgetto]: ["progetto_pronto", "progetto_fissato", ...DOPO_CALL, "risposto", ...CHIUSURE],
+  [FASE.progetto]: ["progetto_presentato", ...DOPO_CALL, ...CHIUSURE],
+  [FASE.decisione]: ["risposto", "richiamare", "non_risponde", "occupato", "progetto_fissato", ...CHIUSURE],
 };
 
 // Un solo PATCH, una sola transazione D1 (db.batch): attività, fase, prossima azione, call.
@@ -89,7 +101,7 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
   if (input.call) assertCallFutura(input.call.scheduledAt, now);
   const ctx = await contestoRegole(db, now);
   const p = transizione(
-    { stageId: lead.stageId, attemptCount: lead.attemptCount, primoTentativoAt: await primoTentativoAt(db, leadId), noShow: lead.noShow, pausedUntil: lead.pausedUntil },
+    { stageId: lead.stageId, attemptCount: lead.attemptCount, primoTentativoAt: await primoTentativoAt(db, leadId), noShow: lead.noShow, pausedUntil: lead.pausedUntil, stageChangedAt: lead.stageChangedAt },
     { tipo: "esito", esito: input.esito, call: input.call ? { scheduledAt: input.call.scheduledAt } : undefined },
     ctx,
   );

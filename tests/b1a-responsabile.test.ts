@@ -29,7 +29,7 @@ describe("responsabile per fase", () => {
     expect((await call("/api/leads/r1", { method: "PATCH", json: { ownerId: "diego" } }, cookie)).status).toBe(200);
     expect(await leggi("r1")).toMatchObject({ owner_id: "diego", owner_manual: 1 });
 
-    const r = await call("/api/leads/r1/calls", { method: "POST", json: { kind: "presentazione", scheduledAt: DOMANI, meetLink: null, invito: false } }, cookie);
+    const r = await call("/api/leads/r1/calls", { method: "POST", json: { kind: "offerta", scheduledAt: DOMANI, meetLink: null, invito: false } }, cookie);
     expect(r.status).toBe(201);
     expect(await leggi("r1")).toMatchObject({ stage_id: "presentazione-confermata", owner_id: "diego", owner_manual: 1 });
   });

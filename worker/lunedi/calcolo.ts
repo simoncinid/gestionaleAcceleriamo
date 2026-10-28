@@ -18,8 +18,11 @@ export type NumeriSettimana = {
   arrivati: number;
   perFonte: { source: string; n: number }[];
   costoPerLeadCents: number | null;
+  // Call fatte nella settimana, una voce per tipo (modifica 25).
   conoscenza: number;
-  presentazione: number;
+  offerta: number;
+  analisi: number;
+  progetto: number;
   proposte: number;
   vinti: number;
   fermi: { id: string; company: string; giorni: number }[];
@@ -66,7 +69,9 @@ export async function calcolaSettimana(db: D1Database, now: number): Promise<Num
     perFonte: fonti.results,
     costoPerLeadCents: spesaCents === 0 || !leadMese?.n ? null : Math.round(spesaCents / leadMese.n),
     conoscenza: call.results.find((c) => c.kind === "conoscenza")?.n ?? 0,
-    presentazione: call.results.find((c) => c.kind === "presentazione")?.n ?? 0,
+    offerta: call.results.find((c) => c.kind === "offerta")?.n ?? 0,
+    analisi: call.results.find((c) => c.kind === "analisi")?.n ?? 0,
+    progetto: call.results.find((c) => c.kind === "progetto")?.n ?? 0,
     proposte: proposte?.n ?? 0,
     vinti: vinti?.n ?? 0,
     fermi: fermi.results.map((f) => ({ id: f.id, company: f.company, giorni: giorni(f.da) })),

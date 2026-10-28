@@ -5,12 +5,16 @@ import { ORARIO_DEFAULT, scadenzaLavorativa, type Orario } from "../regole/orari
 // azione, scadenza, pulsante, responsabile e passo successivo. Scheda, tabella, Oggi, promemoria e Numeri
 // la leggono; nessuno di loro calcola niente da sé. Funzione pura: niente database, niente orologio.
 
+// Percorso a cinque chiamate (modifica 25): gli id vecchi restano, cambiano etichetta e ordine.
 export const FASE = {
   nuovo: "da-chiamare-prima-volta",
   richiamare: "da-richiamare",
-  consulenza: "appuntamento-confermato",
-  preventivo: "in-attesa-preventivo",
-  presentazione: "presentazione-confermata",
+  conoscenza: "appuntamento-confermato",
+  attesaOfferta: "in-attesa-preventivo",
+  offerta: "presentazione-confermata",
+  analisi: "analisi-fissata",
+  attesaProgetto: "in-attesa-progetto",
+  progetto: "progetto-fissato",
   decisione: "in-attesa-decisione",
   cliente: "chiuso",
   perso: "non-chiuso",
@@ -18,12 +22,16 @@ export const FASE = {
 } as const;
 
 // Fasi da 10 a 60: hanno sempre una e una sola azione con scadenza.
-export const FASI_APERTE: string[] = [FASE.nuovo, FASE.richiamare, FASE.consulenza, FASE.preventivo, FASE.presentazione, FASE.decisione];
+export const FASI_APERTE: string[] = [
+  FASE.nuovo, FASE.richiamare, FASE.conoscenza, FASE.attesaOfferta, FASE.offerta, FASE.analisi, FASE.attesaProgetto, FASE.progetto, FASE.decisione,
+];
 
 // Codici delle azioni: l'interfaccia li traduce in fogli e link, il testo lo decide la funzione.
 export type CodiceAzione =
-  | "chiama" | "apri_videochiamata" | "segna_consulenza" | "segna_presentazione" | "segna_preventivo" | "segna_esito"
-  | "fissa_consulenza" | "fissa_presentazione" | "sposta_call" | "non_presentato" | "segna_decisione" | "rimanda" | "apri_cliente" | "riapri";
+  | "chiama" | "apri_videochiamata" | "segna_esito" | "segna_decisione" | "sposta_call" | "non_presentato" | "rimanda" | "apri_cliente" | "riapri"
+  | "fissa_conoscenza" | "fissa_offerta" | "fissa_analisi" | "fissa_progetto"
+  | "segna_conoscenza" | "segna_offerta" | "segna_analisi" | "segna_progetto"
+  | "segna_offerta_pronta" | "segna_progetto_pronto";
 export type Comando = { testo: string; codice: CodiceAzione };
 export type Ruolo = "primaChiamata" | "presentazione";
 export type StatoScadenza = "scaduto" | "oggi" | "futuro";
@@ -33,8 +41,8 @@ export type LeadPerProcesso = {
   createdAt: number; stageChangedAt: number;
   nextAction: string | null; nextActionAt: number | null;
   attemptCount: number; pausedUntil: number | null; noShow?: number | null;
-  // Facoltativi, dati da chi chiama quando li ha: link della call in programma, proposta collegata, data della presentazione.
-  meetLink?: string | null; haProposta?: boolean; presentazioneAt?: number | null;
+  // Facoltativi, dati da chi chiama quando li ha: link della call in programma, proposta collegata, data della call dell'offerta.
+  meetLink?: string | null; haProposta?: boolean; offertaAt?: number | null;
 };
 
 export type RegoleProcesso = { orario: Orario; minutiPrimaChiamata: number; massimoTentativi: number };
@@ -93,14 +101,44 @@ export function giornoLavorativoPrima(a: number, orario: Orario): number {
   return daRoma(p.anno, p.mese, p.giorno - 1, hc, mc);
 }
 
+// 10 e 20 a chi fa la prima chiamata (Diego); dalla 30 alla 70 a chi presenta (Tommaso). Modifica 25.
 export const ruoloDellaFase = (stageId: string): Ruolo | null =>
-  [FASE.nuovo, FASE.richiamare, FASE.consulenza].includes(stageId as never) ? "primaChiamata"
-  : [FASE.preventivo, FASE.presentazione, FASE.decisione, FASE.cliente].includes(stageId as never) ? "presentazione"
+  [FASE.nuovo, FASE.richiamare].includes(stageId as never) ? "primaChiamata"
+  : [...FASI_APERTE.slice(2), FASE.cliente].includes(stageId) ? "presentazione"
   : null;
 
 // Azioni salvate dalla transizione dopo un "Non si è presentato" (prima e seconda assenza).
 export const AZIONE_RIFISSARE = "Rifissare la call";
 export const AZIONE_RIPROVARE = "Riprovare dopo la pausa";
+// Azioni salvate dalla transizione quando il materiale è pronto ma la call non c'è ancora.
+export const AZIONE_FISSA_OFFERTA = "Fissare la call dell'offerta";
+export const AZIONE_FISSA_ANALISI = "Fissare la call di analisi";
+export const AZIONE_FISSA_PROGETTO = "Fissare la call del progetto";
+
+// Le quattro fasi con una call (30, 40, 45, 55): parole e codici di ognuna.
+type FaseCall = { titolo: (nome: string) => string; cosa: string; fissa: Comando; segna: Comando; poi: (salvata: number, nome: string, o: Orario) => string };
+const FASI_CALL: Record<string, FaseCall> = {
+  [FASE.conoscenza]: {
+    titolo: (n) => `Conoscenza con ${n}`, cosa: "la conoscenza",
+    fissa: { testo: "Fissa la call di conoscenza", codice: "fissa_conoscenza" }, segna: { testo: "Segna com'è andata la conoscenza", codice: "segna_conoscenza" },
+    poi: (t, _n, o) => `Preparare l'offerta entro ${dataTesto(giorniLavorativiDopo(t, 3, o))}`,
+  },
+  [FASE.offerta]: {
+    titolo: (n) => `Offerta con ${n}`, cosa: "l'offerta",
+    fissa: { testo: "Fissa la call dell'offerta", codice: "fissa_offerta" }, segna: { testo: "Segna com'è andata l'offerta", codice: "segna_offerta" },
+    poi: () => AZIONE_FISSA_ANALISI,
+  },
+  [FASE.analisi]: {
+    titolo: (n) => `Fai l'analisi con ${n}`, cosa: "l'analisi",
+    fissa: { testo: "Fissa la call di analisi", codice: "fissa_analisi" }, segna: { testo: "Segna com'è andata l'analisi", codice: "segna_analisi" },
+    poi: (t, _n, o) => `Preparare il progetto entro ${dataTesto(giorniLavorativiDopo(t, 3, o))}`,
+  },
+  [FASE.progetto]: {
+    titolo: () => "Presenta il progetto e chiudi", cosa: "la call del progetto",
+    fissa: { testo: "Fissa la call del progetto", codice: "fissa_progetto" }, segna: { testo: "Segna com'è andata la call del progetto", codice: "segna_progetto" },
+    poi: (_t, n) => `Sentire ${n} per la decisione`,
+  },
+};
 
 const comando = (testo: string, codice: CodiceAzione): Comando => ({ testo, codice });
 
@@ -123,7 +161,7 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
         : scadenzaLavorativa(lead.createdAt, regole.minutiPrimaChiamata, regole.orario);
       return fine("Prima chiamata", scadenza, {
         pulsante: chiama, tentativo: lead.attemptCount + 1,
-        secondarie: [comando("Segna l'esito", "segna_esito"), comando("Fissa una consulenza", "fissa_consulenza")],
+        secondarie: [comando("Segna l'esito", "segna_esito"), FASI_CALL[FASE.conoscenza].fissa],
       });
     }
     case FASE.richiamare: {
@@ -133,48 +171,52 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
         : lead.attemptCount >= massimo ? "Ultima chiamata dopo la pausa" : `Richiamare: tentativo ${n} di ${massimo}`;
       return fine(azione, salvata, {
         pulsante: chiama, tentativo: n,
-        secondarie: [comando("Segna l'esito", "segna_esito"), comando("Fissa una consulenza", "fissa_consulenza")],
+        secondarie: [comando("Segna l'esito", "segna_esito"), FASI_CALL[FASE.conoscenza].fissa],
       });
     }
-    case FASE.consulenza:
-    case FASE.presentazione: {
-      const consulenza = lead.stageId === FASE.consulenza;
-      const cosa = consulenza ? "la consulenza" : "la presentazione";
+    case FASE.conoscenza:
+    case FASE.offerta:
+    case FASE.analisi:
+    case FASE.progetto: {
+      const f = FASI_CALL[lead.stageId];
       // No-show: la data è tolta, si rifissa (o si riprova dopo la pausa della seconda assenza).
       if ((lead.noShow ?? 0) > 0 && lead.nextAction === AZIONE_RIPROVARE && !inPausa) {
         // Pausa finita dopo la seconda assenza: un'ultima chiamata, a vuoto il lead va in 80.
-        return fine("Ultima chiamata dopo la pausa", salvata, {
-          pulsante: chiama, secondarie: [comando("Segna l'esito", "segna_esito"), comando(consulenza ? "Fissa la consulenza" : "Fissa la presentazione", consulenza ? "fissa_consulenza" : "fissa_presentazione")],
-        });
+        return fine("Ultima chiamata dopo la pausa", salvata, { pulsante: chiama, secondarie: [comando("Segna l'esito", "segna_esito"), f.fissa] });
       }
       if ((lead.noShow ?? 0) > 0 && (lead.nextAction === AZIONE_RIFISSARE || lead.nextAction === AZIONE_RIPROVARE)) {
-        const azione = inPausa ? `Riprovare il ${dataTesto(lead.pausedUntil!)}` : `Rifissare ${cosa}`;
+        const azione = inPausa ? `Riprovare il ${dataTesto(lead.pausedUntil!)}` : `Rifissare ${f.cosa}`;
         return fine(azione, salvata, {
-          pulsante: inPausa ? chiama : comando(consulenza ? "Fissa la consulenza" : "Fissa la presentazione", consulenza ? "fissa_consulenza" : "fissa_presentazione"),
+          pulsante: inPausa ? chiama : f.fissa,
           secondarie: inPausa ? [comando("Segna l'esito", "segna_esito")] : [comando(`Chiama ${nome}`, "chiama")],
         });
       }
-      const azione = `${consulenza ? "Consulenza" : "Presentazione"} con ${nome}`;
-      const iniziata = adesso >= salvata;
-      const pulsante = iniziata
-        ? comando(`Segna com'è andata ${cosa}`, consulenza ? "segna_consulenza" : "segna_presentazione")
-        : lead.meetLink ? comando("Apri la videochiamata", "apri_videochiamata") : chiama;
-      const poi = consulenza
-        ? `Preparare il preventivo entro ${dataTesto(giorniLavorativiDopo(salvata, 2, regole.orario))}`
-        : `Sentire ${nome} per la decisione`;
-      return fine(azione, salvata, { pulsante, poi, secondarie: [comando("Sposta la call", "sposta_call"), comando("Non si è presentato", "non_presentato")] });
-    }
-    case FASE.preventivo: {
-      // Preventivo pronto ma senza data della presentazione: tocca a chi fissa la call.
-      if (lead.haProposta && lead.presentazioneAt == null) {
-        return fine("Fissare la presentazione", salvata, {
-          responsabile: "primaChiamata", pulsante: comando("Fissa la presentazione", "fissa_presentazione"), secondarie: [chiama],
-        });
+      // Offerta fatta senza la call di analisi: si fissa la call (2 giorni lavorativi, salvati dalla transizione).
+      if (lead.stageId === FASE.offerta && lead.nextAction === AZIONE_FISSA_ANALISI) {
+        return fine("Fissa la call di analisi", salvata, { pulsante: FASI_CALL[FASE.analisi].fissa, secondarie: [chiama] });
       }
-      const scadenza = lead.presentazioneAt != null ? giornoLavorativoPrima(lead.presentazioneAt, regole.orario) : salvata;
-      return fine("Preparare il preventivo", scadenza, {
-        pulsante: comando("Segna il preventivo pronto", "segna_preventivo"),
-        poi: lead.presentazioneAt != null ? `Presentazione ${dataTesto(lead.presentazioneAt)}` : "Fissare la presentazione",
+      const iniziata = adesso >= salvata;
+      const pulsante = iniziata ? f.segna : lead.meetLink ? comando("Apri la videochiamata", "apri_videochiamata") : chiama;
+      return fine(f.titolo(nome), salvata, {
+        pulsante, poi: f.poi(salvata, nome, regole.orario),
+        secondarie: [comando("Sposta la call", "sposta_call"), comando("Non si è presentato", "non_presentato")],
+      });
+    }
+    case FASE.attesaOfferta:
+    case FASE.attesaProgetto: {
+      // Prepara entro 3 giorni lavorativi dall'ingresso in fase; la call va fissata entro 4 (decisione di Tommaso, 28/10).
+      const offerta = lead.stageId === FASE.attesaOfferta;
+      const daFissare = offerta ? AZIONE_FISSA_OFFERTA : AZIONE_FISSA_PROGETTO;
+      const pronto = lead.nextAction === daFissare || (offerta && !!lead.haProposta);
+      const callAt = offerta ? lead.offertaAt ?? null : null;
+      if (pronto && callAt == null) {
+        const fissa = FASI_CALL[offerta ? FASE.offerta : FASE.progetto].fissa;
+        return fine(fissa.testo, giorniLavorativiDopo(lead.stageChangedAt, 4, regole.orario), { pulsante: fissa, secondarie: [chiama] });
+      }
+      const scadenza = callAt != null ? giornoLavorativoPrima(callAt, regole.orario) : giorniLavorativiDopo(lead.stageChangedAt, 3, regole.orario);
+      return fine(offerta ? "Prepara l'offerta con la forbice" : "Prepara il progetto", scadenza, {
+        pulsante: offerta ? comando("Segna l'offerta pronta", "segna_offerta_pronta") : comando("Segna il progetto pronto", "segna_progetto_pronto"),
+        poi: callAt != null ? `Offerta ${dataTesto(callAt)}` : daFissare,
       });
     }
     case FASE.decisione: {

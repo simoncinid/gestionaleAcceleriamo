@@ -56,7 +56,7 @@ describe("fogli della call", () => {
     expect(html).not.toContain("Fissa call e manda");
   });
   it("Foglio della call: un solo primario e le note dello schema per tipo", () => {
-    const html = render(<FoglioCall k={k("x", ORA, { kind: "presentazione" })} onChiudi={() => {}} />);
+    const html = render(<FoglioCall k={k("x", ORA, { kind: "offerta" })} onChiudi={() => {}} />);
     expect(contaPrimari(html)).toBe(1);
     expect(html).toContain("Reazione alla proposta");
     expect(html).not.toContain("Cosa fa durante il giorno");

@@ -1,3 +1,5 @@
+import { CALL_KINDS, type CallKind } from "../db/schema";
+import { AZIONE_CALL } from "../regole/fasi-call";
 import { getDb } from "../db/client";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { etichettaMotivo } from "../processo/motivi";
@@ -65,13 +67,14 @@ export function tempiPerFase(eventi: { leadId: string; at: number; body: string 
   });
 }
 
-export type Tappa = { chiave: "arrivati" | "sla" | "conoscenza" | "presentazione" | "proposte" | "chiusi"; nome: string; numero: number; percentuale: number | null };
+export type Tappa = { chiave: "arrivati" | "sla" | CallKind | "proposte" | "chiusi"; nome: string; numero: number; percentuale: number | null };
 export type Funnel = Stats1A & {
   tappe: Tappa[];
   sla: { percentuale: number | null; dentro: number; totale: number };
   tempi: TempoFase[];
   motivi: { id: string; etichetta: string; numero: number }[];
-  call: { conoscenza: number; presentazione: number; rapporto: number | null };
+  // Una voce per tipo di call (modifica 25); rapporto = dalla conoscenza all'offerta.
+  call: Record<CallKind, number> & { rapporto: number | null };
   // Prima risposta sulla coorte (senza doppioni, solo lead da Meta e dal foglio): a differenza di firstResponse della 1A.
   primaRisposta: { mediaMs: number | null; numero: number };
 };
@@ -84,10 +87,9 @@ export async function calcolaFunnel(db: D1Database, from: number, until: number)
     leggiImpostazioni(getDb(db)),
     db.prepare(`SELECT l.id, l.source, l.created_at AS createdAt, s.kind,
         (SELECT MIN(a.created_at) FROM activities a WHERE a.lead_id = l.id AND a.type IN ${TIPI_UMANI}) AS primaRisposta,
-        EXISTS (SELECT 1 FROM calls c WHERE c.lead_id = l.id AND c.kind = 'conoscenza' AND c.outcome = 'fatta' AND c.deleted_at IS NULL) AS conoscenza,
-        EXISTS (SELECT 1 FROM calls c WHERE c.lead_id = l.id AND c.kind = 'presentazione' AND c.outcome = 'fatta' AND c.deleted_at IS NULL) AS presentazione,
+        ${CALL_KINDS.map((k) => `EXISTS (SELECT 1 FROM calls c WHERE c.lead_id = l.id AND c.kind = '${k}' AND c.outcome = 'fatta' AND c.deleted_at IS NULL) AS ${k},`).join("\n        ")}
         EXISTS (SELECT 1 FROM proposals p WHERE p.lead_id = l.id AND p.presented_at IS NOT NULL AND p.deleted_at IS NULL) AS proposta
-      ${FROM} WHERE ${coorte}`).bind(from, until).all<{ id: string; source: string; createdAt: number; kind: string; primaRisposta: number | null; conoscenza: number; presentazione: number; proposta: number }>(),
+      ${FROM} WHERE ${coorte}`).bind(from, until).all<{ id: string; source: string; createdAt: number; kind: string; primaRisposta: number | null; proposta: number } & Record<CallKind, number>>(),
     // Cambi di fase dei lead della coorte: passa dall'indice dei lead per data e da quello delle attività per lead,
     // senza scorrere tutto il registro delle attività.
     db.prepare(`SELECT a.lead_id AS leadId, a.created_at AS at, a.body FROM leads l JOIN activities a ON a.lead_id = l.id
@@ -102,8 +104,7 @@ export async function calcolaFunnel(db: D1Database, from: number, until: number)
   const conta = (f: (x: (typeof r)[number]) => boolean) => r.filter(f).length;
   const arrivati = r.length;
   const tappa = (chiave: Tappa["chiave"], nome: string, numero: number, su = arrivati): Tappa => ({ chiave, nome, numero, percentuale: percentualeOnesta(numero, su) });
-  const conoscenza = conta((x) => !!x.conoscenza);
-  const presentazione = conta((x) => !!x.presentazione);
+  const call = Object.fromEntries(CALL_KINDS.map((k) => [k, conta((x) => !!x[k])])) as Record<CallKind, number>;
   const risposte = conSla.filter((x) => x.primaRisposta != null).map((x) => x.primaRisposta! - x.createdAt);
   const mediaMs = risposte.length === 0 ? null : Math.round(risposte.reduce((a, b) => a + b, 0) / risposte.length);
   return {
@@ -111,15 +112,14 @@ export async function calcolaFunnel(db: D1Database, from: number, until: number)
     tappe: [
       tappa("arrivati", "Lead arrivati", arrivati),
       tappa("sla", "Chiamati entro lo SLA", dentro, conSla.length),
-      tappa("conoscenza", "Call di conoscenza fatte", conoscenza),
-      tappa("presentazione", "Call di presentazione fatte", presentazione),
+      ...CALL_KINDS.map((k) => tappa(k, `${AZIONE_CALL[k]} fatte`, call[k])),
       tappa("proposte", "Proposte presentate", conta((x) => !!x.proposta)),
       tappa("chiusi", "Clienti chiusi", conta((x) => x.kind === "won")),
     ],
     sla: { percentuale: percentualeOnesta(dentro, conSla.length), dentro, totale: conSla.length },
     tempi: tempiPerFase(eventi.results, fasi.results),
     motivi: motivi.results.map((m) => ({ id: m.id, etichetta: etichettaMotivo(m.id, imp.motivi), numero: m.numero })),
-    call: { conoscenza, presentazione, rapporto: percentualeOnesta(presentazione, conoscenza) },
+    call: { ...call, rapporto: percentualeOnesta(call.offerta, call.conoscenza) },
     primaRisposta: { mediaMs, numero: risposte.length },
   };
 }

@@ -1,6 +1,7 @@
 import { and, asc, inArray, isNull } from "drizzle-orm";
 import type { Db } from "../db/client";
-import { calls, proposals } from "../db/schema";
+import { calls, proposals, type CallKind } from "../db/schema";
+import { callPerFase } from "../regole/fasi-call";
 import { contestoRegole } from "../impostazioni/service";
 import { leggiSla } from "../regole/sla";
 import { prossimaAzione, type LeadPerProcesso, type ProssimaAzione, type RegoleProcesso } from "./processo";
@@ -19,7 +20,7 @@ export async function conProssima<T extends LeadPerProcesso & { id: string }>(db
   if (elenco.length === 0) return [];
   const r = regole ?? (await leggiRegoleProcesso(db, adesso));
   const ids = elenco.map((l) => l.id);
-  const aperte: { leadId: string; kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null }[] = [];
+  const aperte: { leadId: string; kind: CallKind; scheduledAt: number; meetLink: string | null }[] = [];
   const conProposta = new Set<string>();
   // D1 accetta al massimo 100 parametri per query: si legge a pezzi.
   for (let i = 0; i < ids.length; i += 90) {
@@ -34,11 +35,11 @@ export async function conProssima<T extends LeadPerProcesso & { id: string }>(db
   }
   return elenco.map((l) => {
     const mie = aperte.filter((k) => k.leadId === l.id);
-    const consulenza = mie.find((k) => k.kind === "conoscenza");
-    const presentazione = mie.find((k) => k.kind === "presentazione");
-    const inCorso = l.stageId === "presentazione-confermata" ? presentazione : consulenza;
+    // La call della fase (30, 40, 45, 55) dà il link; quella dell'offerta serve alla scadenza in 35.
+    const inCorso = mie.find((k) => k.kind === (callPerFase(l.stageId) ?? "conoscenza"));
+    const offerta = mie.find((k) => k.kind === "offerta");
     const prossima = prossimaAzione({
-      ...l, meetLink: inCorso?.meetLink ?? null, haProposta: conProposta.has(l.id), presentazioneAt: presentazione?.scheduledAt ?? null,
+      ...l, meetLink: inCorso?.meetLink ?? null, haProposta: conProposta.has(l.id), offertaAt: offerta?.scheduledAt ?? null,
     }, adesso, r);
     return { ...l, prossima };
   });

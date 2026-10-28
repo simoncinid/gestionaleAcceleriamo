@@ -75,17 +75,17 @@ describe("GET /api/numeri/funnel", () => {
     await lead("D1", { duplicate_of_id: "L1" });
     for (const id of ["L1", "L2", "L3", "L4"]) await attivita(id, "chiamata", T0 + 30 * 60_000);
     await attivita("L5", "chiamata", T0 + 5 * ORA);
-    await callFatta("L1", "conoscenza"); await callFatta("L2", "conoscenza"); await callFatta("L1", "presentazione");
+    await callFatta("L1", "conoscenza"); await callFatta("L2", "conoscenza"); await callFatta("L1", "offerta");
     await proposta("L1", "P-1", { setup: 200_000, fee: 30_000, status: "presentata", at: T0 + 48 * ORA });
     await env.DB.prepare("UPDATE leads SET stage_id = 'non-chiuso', lost_reason = 'budget' WHERE id = 'L3'").run();
     const f = await (await call(`/api/numeri/funnel?from=${T0 - ORA}&until=${T0 + ORA}`, {}, cookie)).json<{
       tappe: { chiave: string; numero: number }[]; sla: { percentuale: number }; motivi: { id: string; etichetta: string; numero: number }[];
-      call: { conoscenza: number; presentazione: number; rapporto: number | null }; bySource: unknown[];
+      call: Record<string, number | null>; bySource: unknown[];
     }>();
-    expect(f.tappe.map((t) => [t.chiave, t.numero])).toEqual([["arrivati", 5], ["sla", 4], ["conoscenza", 2], ["presentazione", 1], ["proposte", 1], ["chiusi", 0]]);
+    expect(f.tappe.map((t) => [t.chiave, t.numero])).toEqual([["arrivati", 5], ["sla", 4], ["conoscenza", 2], ["offerta", 1], ["analisi", 0], ["progetto", 0], ["proposte", 1], ["chiusi", 0]]);
     expect(f.sla.percentuale).toBe(80);
     expect(f.motivi).toEqual([{ id: "budget", etichetta: "Budget", numero: 1 }]);
-    expect(f.call).toEqual({ conoscenza: 2, presentazione: 1, rapporto: null });
+    expect(f.call).toEqual({ conoscenza: 2, offerta: 1, analisi: 0, progetto: 0, rapporto: null });
     expect(Array.isArray(f.bySource)).toBe(true);
   });
 

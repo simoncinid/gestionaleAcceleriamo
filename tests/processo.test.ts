@@ -18,50 +18,112 @@ describe("prossimaAzione: una riga per fase", () => {
     expect(p.pulsante).toEqual({ testo: "Chiama Marco", codice: "chiama" });
     expect(p.tentativo).toBe(1);
     expect(p.responsabile).toBe("primaChiamata");
-    expect(p.secondarie.map((s) => s.testo)).toEqual(["Segna l'esito", "Fissa una consulenza"]);
+    expect(p.secondarie).toEqual([{ testo: "Segna l'esito", codice: "segna_esito" }, { testo: "Fissa la call di conoscenza", codice: "fissa_conoscenza" }]);
     expect(p.scadenza).toBeTypeOf("number");
   });
 
-  it("20 Da richiamare: tentativo n di 5 con la data salvata", () => {
+  it("20 Da richiamare: tentativo n di 5 con la data salvata, responsabile chi chiama", () => {
     const p = prossimaAzione(lead(FASE.richiamare, { attemptCount: 1 }), ADESSO);
     expect(p.azione).toBe("Richiamare: tentativo 2 di 5");
     expect(p.tentativo).toBe(2);
     expect(p.scadenza).toBe(ADESSO + 2 * GIORNO);
     expect(p.pulsante?.codice).toBe("chiama");
+    expect(p.responsabile).toBe("primaChiamata");
   });
 
-  it("30 Consulenza fissata: prima dell'ora apre la videochiamata, dopo chiede com'è andata", () => {
-    const prima = prossimaAzione(lead(FASE.consulenza, { meetLink: "https://meet.example/x" }), ADESSO);
-    expect(prima.azione).toBe("Consulenza con Marco");
+  it("30 Conoscenza fissata: prima dell'ora apre la videochiamata, dopo chiede com'è andata, poi l'offerta; Tommaso", () => {
+    const prima = prossimaAzione(lead(FASE.conoscenza, { meetLink: "https://meet.example/x" }), ADESSO);
+    expect(prima.azione).toBe("Conoscenza con Marco");
     expect(prima.pulsante).toEqual({ testo: "Apri la videochiamata", codice: "apri_videochiamata" });
     expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call", "Non si è presentato"]);
-    expect(prima.poi).toMatch(/^Preparare il preventivo entro /);
+    expect(prima.poi).toMatch(/^Preparare l'offerta entro /);
     expect(prima.tentativo).toBeNull();
-    const telefonica = prossimaAzione(lead(FASE.consulenza), ADESSO);
+    expect(prima.responsabile).toBe("presentazione");
+    const telefonica = prossimaAzione(lead(FASE.conoscenza), ADESSO);
     expect(telefonica.pulsante?.testo).toBe("Chiama Marco");
-    const dopo = prossimaAzione(lead(FASE.consulenza, { nextActionAt: ADESSO - ORA }), ADESSO);
-    expect(dopo.pulsante).toEqual({ testo: "Segna com'è andata la consulenza", codice: "segna_consulenza" });
+    const dopo = prossimaAzione(lead(FASE.conoscenza, { nextActionAt: ADESSO - ORA }), ADESSO);
+    expect(dopo.pulsante).toEqual({ testo: "Segna com'è andata la conoscenza", codice: "segna_conoscenza" });
   });
 
-  it("40 In attesa preventivo: Segna il preventivo pronto, Tommaso; con proposta e senza data: Fissare la presentazione, Diego", () => {
-    const p = prossimaAzione(lead(FASE.preventivo), ADESSO);
-    expect(p.azione).toBe("Preparare il preventivo");
-    expect(p.pulsante?.testo).toBe("Segna il preventivo pronto");
+  it("35 In attesa offerta: Prepara l'offerta con la forbice entro 3 giorni lavorativi dalla conoscenza", () => {
+    const p = prossimaAzione(lead(FASE.attesaOfferta), ADESSO);
+    expect(p.azione).toBe("Prepara l'offerta con la forbice");
+    expect(p.pulsante).toEqual({ testo: "Segna l'offerta pronta", codice: "segna_offerta_pronta" });
+    expect(p.scadenza).toBe(daRoma(2026, 10, 31, 19, 30)); // conoscenza mercoledì 28: giovedì, venerdì, sabato
+    expect(p.poi).toBe("Fissare la call dell'offerta");
     expect(p.responsabile).toBe("presentazione");
-    const pronto = prossimaAzione(lead(FASE.preventivo, { haProposta: true, presentazioneAt: null }), ADESSO);
-    expect(pronto.azione).toBe("Fissare la presentazione");
-    expect(pronto.responsabile).toBe("primaChiamata");
-    // Con la presentazione già fissata la scadenza è il giorno lavorativo prima.
-    const fissata = prossimaAzione(lead(FASE.preventivo, { presentazioneAt: daRoma(2026, 11, 2, 15, 0) }), ADESSO);
-    expect(fissata.scadenza).toBe(daRoma(2026, 10, 31, 19, 30)); // sabato è lavorativo nell'orario di base
   });
 
-  it("50 Presentazione fissata: come la 30, poi la decisione", () => {
-    const p = prossimaAzione(lead(FASE.presentazione, { nextActionAt: ADESSO - ORA }), ADESSO);
-    expect(p.azione).toBe("Presentazione con Marco");
-    expect(p.pulsante?.testo).toBe("Segna com'è andata la presentazione");
+  it("35 con proposta (o offerta pronta) e senza call: Fissa la call dell'offerta entro 4 giorni lavorativi", () => {
+    for (const extra of [{ haProposta: true }, { nextAction: "Fissare la call dell'offerta" }]) {
+      const p = prossimaAzione(lead(FASE.attesaOfferta, { ...extra, offertaAt: null }), ADESSO);
+      expect(p.azione).toBe("Fissa la call dell'offerta");
+      expect(p.pulsante).toEqual({ testo: "Fissa la call dell'offerta", codice: "fissa_offerta" });
+      expect(p.scadenza).toBe(daRoma(2026, 11, 2, 19, 30)); // lunedì: la domenica è chiusa
+      expect(p.responsabile).toBe("presentazione");
+    }
+    // Con la call dell'offerta già fissata la scadenza è il giorno lavorativo prima.
+    const fissata = prossimaAzione(lead(FASE.attesaOfferta, { offertaAt: daRoma(2026, 11, 2, 15, 0) }), ADESSO);
+    expect(fissata.scadenza).toBe(daRoma(2026, 10, 31, 19, 30));
+    expect(fissata.poi).toMatch(/^Offerta /);
+  });
+
+  it("40 Offerta fissata: Offerta con Marco, dopo l'ora com'è andata, poi la call di analisi", () => {
+    const p = prossimaAzione(lead(FASE.offerta, { nextActionAt: ADESSO - ORA }), ADESSO);
+    expect(p.azione).toBe("Offerta con Marco");
+    expect(p.pulsante).toEqual({ testo: "Segna com'è andata l'offerta", codice: "segna_offerta" });
+    expect(p.poi).toBe("Fissare la call di analisi");
+    expect(p.responsabile).toBe("presentazione");
+    const daFissare = prossimaAzione(lead(FASE.offerta, { nextAction: "Fissare la call di analisi" }), ADESSO);
+    expect(daFissare.azione).toBe("Fissa la call di analisi");
+    expect(daFissare.pulsante).toEqual({ testo: "Fissa la call di analisi", codice: "fissa_analisi" });
+    expect(daFissare.scadenza).toBe(ADESSO + 2 * GIORNO);
+  });
+
+  it("45 Analisi fissata: Fai l'analisi con Marco, poi il progetto entro 3 giorni lavorativi", () => {
+    const prima = prossimaAzione(lead(FASE.analisi), ADESSO);
+    expect(prima.azione).toBe("Fai l'analisi con Marco");
+    expect(prima.poi).toMatch(/^Preparare il progetto entro /);
+    expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call", "Non si è presentato"]);
+    expect(prima.responsabile).toBe("presentazione");
+    const dopo = prossimaAzione(lead(FASE.analisi, { nextActionAt: ADESSO - ORA }), ADESSO);
+    expect(dopo.pulsante).toEqual({ testo: "Segna com'è andata l'analisi", codice: "segna_analisi" });
+  });
+
+  it("50 In attesa progetto: Prepara il progetto entro 3 giorni lavorativi; a progetto pronto Fissa la call del progetto entro 4", () => {
+    const p = prossimaAzione(lead(FASE.attesaProgetto), ADESSO);
+    expect(p.azione).toBe("Prepara il progetto");
+    expect(p.pulsante).toEqual({ testo: "Segna il progetto pronto", codice: "segna_progetto_pronto" });
+    expect(p.scadenza).toBe(daRoma(2026, 10, 31, 19, 30));
+    expect(p.poi).toBe("Fissare la call del progetto");
+    expect(p.responsabile).toBe("presentazione");
+    const pronto = prossimaAzione(lead(FASE.attesaProgetto, { nextAction: "Fissare la call del progetto" }), ADESSO);
+    expect(pronto.azione).toBe("Fissa la call del progetto");
+    expect(pronto.pulsante).toEqual({ testo: "Fissa la call del progetto", codice: "fissa_progetto" });
+    expect(pronto.scadenza).toBe(daRoma(2026, 11, 2, 19, 30));
+  });
+
+  it("55 Progetto fissato: Presenta il progetto e chiudi, poi la decisione", () => {
+    const p = prossimaAzione(lead(FASE.progetto, { nextActionAt: ADESSO - ORA }), ADESSO);
+    expect(p.azione).toBe("Presenta il progetto e chiudi");
+    expect(p.pulsante).toEqual({ testo: "Segna com'è andata la call del progetto", codice: "segna_progetto" });
     expect(p.poi).toBe("Sentire Marco per la decisione");
     expect(p.responsabile).toBe("presentazione");
+    expect(p.secondarie.map((s) => s.testo)).toEqual(["Sposta la call", "Non si è presentato"]);
+  });
+
+  it("no-show uguale nelle quattro fasi con call: prima assenza Rifissare la call di quel tipo", () => {
+    const attese: [string, string, string][] = [
+      [FASE.conoscenza, "Rifissare la conoscenza", "fissa_conoscenza"],
+      [FASE.offerta, "Rifissare l'offerta", "fissa_offerta"],
+      [FASE.analisi, "Rifissare l'analisi", "fissa_analisi"],
+      [FASE.progetto, "Rifissare la call del progetto", "fissa_progetto"],
+    ];
+    for (const [fase, azione, codice] of attese) {
+      const p = prossimaAzione(lead(fase, { noShow: 1, nextAction: "Rifissare la call" }), ADESSO);
+      expect(p.azione, fase).toBe(azione);
+      expect(p.pulsante?.codice, fase).toBe(codice);
+    }
   });
 
   it("60 In attesa decisione: Sentire Marco, Chiama, secondarie Segna la decisione e Rimanda", () => {

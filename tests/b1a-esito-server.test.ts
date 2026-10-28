@@ -36,7 +36,7 @@ describe("esito calcolato dal server", () => {
   it("esito che non vale nella fase: 422 e niente scritto", async () => {
     const cookie = await authed();
     await insertLead("e3");
-    const r = await esito("e3", { esito: "presentazione_fatta" }, cookie);
+    const r = await esito("e3", { esito: "offerta_presentata" }, cookie);
     expect(r.status).toBe(422);
     expect(((await r.json()) as { error: string }).error).toBe("Questo esito non vale in questa fase");
     await insertLead("e3b", { stage_id: "chiuso", next_action: null, next_action_at: null });
@@ -49,9 +49,9 @@ describe("esito calcolato dal server", () => {
     const cookie = await authed();
     await insertLead("e4", { stage_id: "appuntamento-confermato", next_action: "Call di conoscenza", owner_id: null });
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k4', 'e4', 'conoscenza', ?, ?, ?)").bind(NOW - 600_000, NOW, NOW).run();
-    expect((await esito("e4", { esito: "consulenza_fatta" }, cookie)).status).toBe(200);
+    expect((await esito("e4", { esito: "conoscenza_fatta" }, cookie)).status).toBe(200);
     const l = await leggi("e4");
-    expect(l).toMatchObject({ stage_id: "in-attesa-preventivo", next_action: "Preparare il preventivo", owner_id: "tommaso" });
+    expect(l).toMatchObject({ stage_id: "in-attesa-preventivo", next_action: "Preparare l'offerta", owner_id: "tommaso" });
     expect(l!.next_action_at as number).toBeGreaterThan(NOW);
     const c = await env.DB.prepare("SELECT outcome FROM calls WHERE id = 'k4'").first<{ outcome: string }>();
     expect(c!.outcome).toBe("fatta");

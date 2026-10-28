@@ -3,7 +3,7 @@ import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { getDb, type Db } from "../db/client";
-import { activities, calls, leads, proposals, type Lead } from "../db/schema";
+import { activities, CALL_KINDS, calls, leads, proposals, type CallKind, type Lead } from "../db/schema";
 import type { Env } from "../env";
 import { CHIAVE_MANCANTE, base64Utf8, indirizzoDi, inviaEmail } from "../email/resend";
 import { contestoRegole, leggiImpostazioni } from "../impostazioni/service";
@@ -12,23 +12,25 @@ import { partiRoma } from "../lib/roma";
 import { passiProposta } from "../regole/applica";
 import { propostaEvento, type Contesto } from "../regole/motore";
 import { dataTesto } from "../processo/processo";
+import { AZIONE_CALL, CALL_DELL_FASE } from "../regole/fasi-call";
 import { transizione } from "../processo/transizione";
 import { creaIcs } from "./ics";
 import { linkHttp } from "../leads/validation";
 
 const link = linkHttp("Link Meet non valido").pipe(z.string().max(500)).nullable();
-export const callNuovaSchema = z.object({ kind: z.enum(["conoscenza", "presentazione"]), scheduledAt: z.number().int(), meetLink: link, invito: z.boolean().default(false) }).strict();
+export const callNuovaSchema = z.object({ kind: z.enum(CALL_KINDS), scheduledAt: z.number().int(), meetLink: link, invito: z.boolean().default(false) }).strict();
 export const callPatchSchema = z.object({
   scheduledAt: z.number().int().optional(),
   meetLink: link.optional(),
   notes: z.string().max(20000).nullable().optional(),
   outcome: z.enum(["fatta", "saltata", "rimandata"]).nullable().optional(),
-  presentazione: z.object({ scheduledAt: z.number().int(), meetLink: link }).strict().optional(),
+  // Call successiva fissata nello stesso foglio: l'offerta dopo la conoscenza, l'analisi dopo l'offerta.
+  prossima: z.object({ scheduledAt: z.number().int(), meetLink: link }).strict().optional(),
 }).strict();
 
 export type CallAgenda = {
   id: string; leadId: string; company: string; contactName: string | null; phone: string | null; email: string | null;
-  kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null; notes: string | null;
+  kind: CallKind; scheduledAt: number; meetLink: string | null; notes: string | null;
   outcome: "fatta" | "saltata" | "rimandata" | null; inviteSentAt: number | null;
   // Dall'invito di Google letto nella casella (worker/posta); null per le call fissate a mano.
   durationMin: number | null;
@@ -55,6 +57,9 @@ export async function unaCall(db: Db, id: string): Promise<CallAgenda> {
 
 const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
 // Orari mostrati sempre sul fuso di Roma.
+// Call che si può fissare nello stesso foglio quando quella prima è fatta.
+export const CALL_SEGUENTE: Partial<Record<CallKind, CallKind>> = { conoscenza: "offerta", offerta: "analisi" };
+
 const quandoTesto = (ms: number) => {
   const p = partiRoma(ms);
   return `${GIORNI[p.settimana]} ${p.giorno}/${p.mese} alle ${String(p.ore).padStart(2, "0")}:${String(p.minuti).padStart(2, "0")}`;
@@ -66,7 +71,7 @@ export async function icsDellaCall(db: Db, k: CallAgenda, letto?: Awaited<Return
   const [riga] = await db.select({ createdAt: calls.createdAt }).from(calls).where(eq(calls.id, k.id));
   const imp = letto ?? (await leggiImpostazioni(db));
   return creaIcs({
-    uid: k.id, inizio: k.scheduledAt, titolo: `Call di ${k.kind} con Acceleriamo`, descrizione: k.meetLink ? `Link: ${k.meetLink}` : undefined, luogo: k.meetLink,
+    uid: k.id, inizio: k.scheduledAt, titolo: `${AZIONE_CALL[k.kind]} con Acceleriamo`, descrizione: k.meetLink ? `Link: ${k.meetLink}` : undefined, luogo: k.meetLink,
     ora: riga?.createdAt, organizer: indirizzoDi(imp.conferma.mittente), attendee: k.email,
   });
 }
@@ -139,7 +144,7 @@ export async function fissaCall(env: Env, db: Db, leadId: string, input: z.infer
   const passi = await passiProposta(db, leadId, propostaEvento({ tipo: "call_fissata", kind: input.kind, scheduledAt: input.scheduledAt }, ctx), actorId, now);
   await db.batch([
     db.insert(calls).values({ id, leadId, kind: input.kind, scheduledAt: input.scheduledAt, meetLink: input.meetLink, createdBy: actorId, createdAt: now, updatedAt: now }),
-    db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `Call di ${input.kind} fissata per ${quandoTesto(input.scheduledAt)}`, authorId: actorId, createdAt: now, callId: id }),
+    db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `${AZIONE_CALL[input.kind]} fissata per ${quandoTesto(input.scheduledAt)}`, authorId: actorId, createdAt: now, callId: id }),
     ...passi,
   ]);
   let invito: "mandato" | "in_coda" | "non_mandato" | "non_richiesto" = "non_richiesto";
@@ -155,7 +160,9 @@ export async function fissaCall(env: Env, db: Db, leadId: string, input: z.infer
 export async function aggiornaCall(db: Db, id: string, input: z.infer<typeof callPatchSchema>, actorId: string, now: number) {
   const k = await unaCall(db, id);
   if (input.scheduledAt !== undefined && input.scheduledAt !== k.scheduledAt) assertCallFutura(input.scheduledAt, now);
-  if (input.presentazione) assertCallFutura(input.presentazione.scheduledAt, now);
+  const seguente = CALL_SEGUENTE[k.kind];
+  if (input.prossima && !seguente) throw new HTTPException(422, { message: "Dopo questa call non se ne fissa un'altra da qui" });
+  if (input.prossima) assertCallFutura(input.prossima.scheduledAt, now);
   const ctx = await contestoRegole(db, now);
   const passi: BatchItem<"sqlite">[] = [];
   const set: Partial<typeof calls.$inferInsert> = { updatedAt: now };
@@ -165,26 +172,26 @@ export async function aggiornaCall(db: Db, id: string, input: z.infer<typeof cal
   if (input.outcome !== undefined && input.outcome !== k.outcome) {
     set.outcome = input.outcome;
     set.outcomeAt = input.outcome ? now : null;
-    if (input.outcome === "fatta" && k.kind === "conoscenza") {
-      const pres = input.presentazione;
-      if (pres) {
+    if (input.outcome === "fatta") {
+      const pros = input.prossima;
+      if (pros && seguente) {
         const nuova = crypto.randomUUID();
-        passi.push(db.insert(calls).values({ id: nuova, leadId: k.leadId, kind: "presentazione", scheduledAt: pres.scheduledAt, meetLink: pres.meetLink, createdBy: actorId, createdAt: now, updatedAt: now }));
-        passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId: k.leadId, type: "call", body: `Call di presentazione fissata per ${quandoTesto(pres.scheduledAt)}`, authorId: actorId, createdAt: now, callId: nuova }));
+        passi.push(db.insert(calls).values({ id: nuova, leadId: k.leadId, kind: seguente, scheduledAt: pros.scheduledAt, meetLink: pros.meetLink, createdBy: actorId, createdAt: now, updatedAt: now }));
+        passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId: k.leadId, type: "call", body: `${AZIONE_CALL[seguente]} fissata per ${quandoTesto(pros.scheduledAt)}`, authorId: actorId, createdAt: now, callId: nuova }));
       }
-      const p = propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: pres?.scheduledAt ?? null }, ctx);
-      passi.push(...(await passiProposta(db, k.leadId, pres ? { ...p, nextAction: "Call di presentazione", nextActionAt: pres.scheduledAt } : p, actorId, now)));
-    } else if (input.outcome === "fatta") {
-      passi.push(...(await passiProposta(db, k.leadId, propostaEvento({ tipo: "call_fatta", kind: "presentazione" }, ctx), actorId, now)));
-      passi.push(db.update(proposals).set({ status: "presentata", presentedAt: now, updatedAt: now })
-        .where(and(eq(proposals.leadId, k.leadId), eq(proposals.status, "registrata"), isNull(proposals.deletedAt))));
+      passi.push(...(await passiProposta(db, k.leadId, propostaEvento({ tipo: "call_fatta", kind: k.kind, prossimaAt: pros?.scheduledAt ?? null }, ctx), actorId, now)));
+      // La proposta dell'offerta diventa presentata con la call dell'offerta.
+      if (k.kind === "offerta") {
+        passi.push(db.update(proposals).set({ status: "presentata", presentedAt: now, updatedAt: now })
+          .where(and(eq(proposals.leadId, k.leadId), eq(proposals.status, "registrata"), isNull(proposals.deletedAt))));
+      }
     } else if (input.outcome === "saltata") {
       // Stessa regola di "Non si è presentato", solo se il lead è ancora nella fase di quella call.
       const lead = await db.select().from(leads).where(eq(leads.id, k.leadId)).get();
-      if (lead && lead.stageId === FASE_DELLA_CALL[k.kind]) passi.push(...(await passiNoShow(db, lead, ctx, actorId, now)).passi);
+      if (lead && lead.stageId === CALL_DELL_FASE[k.kind]) passi.push(...(await passiNoShow(db, lead, ctx, actorId, now)).passi);
     }
     const testo = { fatta: "fatta", saltata: "saltata", rimandata: "rimandata" }[input.outcome ?? "rimandata"];
-    passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId: k.leadId, type: "call", body: `Call di ${k.kind} ${testo}`, authorId: actorId, createdAt: now, callId: id }));
+    passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId: k.leadId, type: "call", body: `${AZIONE_CALL[k.kind]} ${testo}`, authorId: actorId, createdAt: now, callId: id }));
   }
   // Rimandata con la nuova data: la call torna in programma e la prossima azione segue la data nuova.
   if (input.outcome === "rimandata" && input.scheduledAt !== undefined) {
@@ -196,8 +203,6 @@ export async function aggiornaCall(db: Db, id: string, input: z.infer<typeof cal
   return unaCall(db, id);
 }
 
-const FASE_DELLA_CALL = { conoscenza: "appuntamento-confermato", presentazione: "presentazione-confermata" } as const;
-
 // Regola unica del no-show (contratto blocco 1, sezione 2): la usano "Non si è presentato" e la call segnata saltata.
 async function passiNoShow(db: Db, lead: Lead, ctx: Contesto, actorId: string | null, now: number) {
   const p = transizione({ stageId: lead.stageId, attemptCount: lead.attemptCount, primoTentativoAt: null, noShow: lead.noShow, pausedUntil: lead.pausedUntil }, { tipo: "no_show" }, ctx);
@@ -206,14 +211,17 @@ async function passiNoShow(db: Db, lead: Lead, ctx: Contesto, actorId: string | 
 
 // "Non si è presentato": chiude come saltata la call aperta di quel tipo, scrive lo storico e applica la regola, tutto in un batch.
 // Il WhatsApp "ci siamo persi?" non parte da qui: nessun invio senza il sì di una persona.
-export async function segnaNoShow(db: Db, leadId: string, kind: "conoscenza" | "presentazione", actorId: string, now: number) {
+// Parole dello storico per ogni tipo di call.
+const ALLA_CALL: Record<CallKind, string> = { conoscenza: "alla conoscenza", offerta: "all'offerta", analisi: "all'analisi", progetto: "alla call del progetto" };
+
+export async function segnaNoShow(db: Db, leadId: string, kind: CallKind, actorId: string, now: number) {
   const lead = await db.select().from(leads).where(and(eq(leads.id, leadId), isNull(leads.deletedAt))).get();
   if (!lead) throw new HTTPException(404, { message: "Lead non trovato" });
-  if (lead.stageId !== FASE_DELLA_CALL[kind]) throw new HTTPException(422, { message: `Non si è presentato vale solo con la ${kind === "conoscenza" ? "consulenza" : "presentazione"} fissata` });
+  if (lead.stageId !== CALL_DELL_FASE[kind]) throw new HTTPException(422, { message: `Non si è presentato vale solo con la ${AZIONE_CALL[kind].toLowerCase()} fissata` });
   const aperta = await db.select({ id: calls.id }).from(calls)
     .where(and(eq(calls.leadId, leadId), eq(calls.kind, kind), isNull(calls.deletedAt), isNull(calls.outcome))).orderBy(asc(calls.scheduledAt)).get();
   const { p, passi } = await passiNoShow(db, lead, await contestoRegole(db, now), actorId, now);
-  const cosa = kind === "conoscenza" ? "alla consulenza" : "alla presentazione";
+  const cosa = ALLA_CALL[kind];
   const body = p.pausedUntil ? `Non si è presentato ${cosa} (seconda volta): si riprova ${dataTesto(p.pausedUntil)}` : `Non si è presentato ${cosa} (prima volta)`;
   await db.batch([
     db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body, authorId: actorId, createdAt: now, callId: aperta?.id ?? null }),

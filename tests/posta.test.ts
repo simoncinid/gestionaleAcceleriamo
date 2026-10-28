@@ -90,16 +90,16 @@ describe("inviti Meet sulla call del lead", () => {
 
   it("call già fissata a mano: l'invito la completa invece di crearne un'altra", async () => {
     await insertLead("rossi", "Officina Rossi Finta", { email_norm: "mario@officina-rossi-finta.it", stage_id: "in-attesa-preventivo" });
-    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k1', 'rossi', 'presentazione', ?, ?, ?)").bind(ALLE_10, NOW, NOW).run();
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k1', 'rossi', 'offerta', ?, ?, ?)").bind(ALLE_10, NOW, NOW).run();
     expect(await (await posta(mail({ calendario: ICS_GOOGLE() }))).json()).toMatchObject({ esito: "call aggiornata" });
     expect(await env.DB.prepare("SELECT * FROM calls WHERE id = 'k1'").first()).toMatchObject({ duration_min: 45, meet_link: "https://meet.google.com/abc-defg-hij", ics_uid: "abc123finto@google.com" });
     expect(await tutte("SELECT * FROM calls")).toHaveLength(1);
   });
 
-  it("dopo la consulenza fatta l'invito nuovo è la presentazione", async () => {
+  it("in attesa offerta l'invito nuovo è la call dell'offerta", async () => {
     await insertLead("rossi", "Officina Rossi Finta", { email_norm: "mario@officina-rossi-finta.it", stage_id: "in-attesa-preventivo" });
     await posta(mail({ calendario: ICS_GOOGLE() }));
-    expect(await env.DB.prepare("SELECT kind FROM calls WHERE lead_id = 'rossi'").first("kind")).toBe("presentazione");
+    expect(await env.DB.prepare("SELECT kind FROM calls WHERE lead_id = 'rossi'").first("kind")).toBe("offerta");
     expect(await env.DB.prepare("SELECT stage_id FROM leads WHERE id = 'rossi'").first("stage_id")).toBe("in-attesa-preventivo");
     expect(await tutte("SELECT outcome FROM activities WHERE lead_id = 'rossi' AND type = 'invito_proposta'")).toEqual([{ outcome: "da_confermare" }]);
   });

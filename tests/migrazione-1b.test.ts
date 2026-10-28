@@ -13,11 +13,11 @@ async function insertLead(id: string, extra: Record<string, unknown> = {}) {
 describe("migrazioni del Piano A", () => {
   it("le fasi hanno probabilità, azione proposta e motivo obbligatorio solo per le perse", async () => {
     const { results } = await env.DB.prepare("SELECT id, probability, suggested_next_action, requires_reason FROM stages ORDER BY sort_order").all<{ id: string; probability: number; suggested_next_action: string | null; requires_reason: number }>();
-    // Stato finale, dopo la 0016 che ha tolto tre fasi.
-    expect(results).toHaveLength(9);
+    // Stato finale, dopo la 0020 che ha aggiunto le tre fasi di analisi e progetto.
+    expect(results).toHaveLength(12);
     expect(results.find((s) => s.id === "da-chiamare-prima-volta")).toMatchObject({ probability: 10, suggested_next_action: "Prima chiamata", requires_reason: 0 });
     expect(results.filter((s) => s.requires_reason === 1).map((s) => s.id)).toEqual(["non-chiuso", "fake"]);
-    const aperte = results.slice(0, 6).map((s) => s.probability);
+    const aperte = results.slice(0, 9).map((s) => s.probability);
     expect(Math.min(...aperte)).toBe(10);
     expect(Math.max(...aperte)).toBe(80);
   });
@@ -96,8 +96,11 @@ describe("migrazioni del Piano A", () => {
       "da-chiamare-prima-volta": [10, "Prima chiamata", 0],
       "da-richiamare": [15, "Richiamare", 24],
       "appuntamento-confermato": [30, "Call di conoscenza", null],
-      "presentazione-confermata": [55, "Call di presentazione", null],
-      "in-attesa-preventivo": [45, "Preparare il preventivo", 24],
+      "presentazione-confermata": [55, "Call dell'offerta", null],
+      "in-attesa-preventivo": [45, "Preparare l'offerta", null],
+      "analisi-fissata": [60, "Call di analisi", null],
+      "in-attesa-progetto": [65, "Preparare il progetto", null],
+      "progetto-fissato": [70, "Call del progetto", null],
       "in-attesa-decisione": [80, "Follow-up preventivo", 72],
       chiuso: [100, null, null],
     };
@@ -121,7 +124,7 @@ describe("migrazioni del Piano A", () => {
     const att = await db.prepare("SELECT type, body, created_at, request_id, outcome FROM activities WHERE id = 'att1'").first();
     expect(att).toEqual({ type: "nota", body: "testo 1A", created_at: 8, request_id: null, outcome: null });
     const stages = await db.prepare("SELECT COUNT(*) AS n, SUM(requires_reason) AS motivo FROM stages").first<{ n: number; motivo: number }>();
-    expect(stages).toEqual({ n: 9, motivo: 2 });
+    expect(stages).toEqual({ n: 12, motivo: 2 });
   });
 });
 

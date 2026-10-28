@@ -19,21 +19,21 @@ describe("esito della consulenza e della presentazione", () => {
     const cookie = await authed();
     await insertLead("c1", { stage_id: "appuntamento-confermato" });
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_by, created_at, updated_at) VALUES ('k1', 'c1', 'conoscenza', ?, 'x', 1, 1)").bind(NOW - 3_600_000).run();
-    const res = await esito("c1", { requestId: crypto.randomUUID(), esito: "consulenza_fatta", stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: NOW + 86_400_000 }, cookie);
+    const res = await esito("c1", { requestId: crypto.randomUUID(), esito: "conoscenza_fatta", stageId: "in-attesa-preventivo", nextAction: "Preparare l'offerta", nextActionAt: NOW + 86_400_000 }, cookie);
     expect(res.status).toBe(200);
-    expect(await leadRow("c1")).toMatchObject({ stage_id: "in-attesa-preventivo", next_action: "Preparare il preventivo" });
+    expect(await leadRow("c1")).toMatchObject({ stage_id: "in-attesa-preventivo", next_action: "Preparare l'offerta" });
     expect(await env.DB.prepare("SELECT outcome FROM calls WHERE id = 'k1'").first()).toEqual({ outcome: "fatta" });
     const a = await env.DB.prepare("SELECT body FROM activities WHERE lead_id = 'c1' AND type = 'esito'").first();
-    expect(a).toEqual({ body: "Consulenza fatta" });
+    expect(a).toEqual({ body: "Conoscenza fatta" });
   });
 
   it("presentazione fissata: crea la call di presentazione e sposta in Presentazione fissata", async () => {
     const cookie = await authed();
     await insertLead("c2", { stage_id: "in-attesa-preventivo" });
     const quando = NOW + 2 * 86_400_000;
-    const res = await esito("c2", { requestId: crypto.randomUUID(), esito: "presentazione_fissata", stageId: "presentazione-confermata", nextAction: "Call di presentazione", nextActionAt: quando, call: { kind: "presentazione", scheduledAt: quando, meetLink: "meet.google.com/abc-defg-hij" } }, cookie);
+    const res = await esito("c2", { requestId: crypto.randomUUID(), esito: "offerta_fissata", stageId: "presentazione-confermata", nextAction: "Call dell'offerta", nextActionAt: quando, call: { kind: "offerta", scheduledAt: quando, meetLink: "meet.google.com/abc-defg-hij" } }, cookie);
     expect(res.status).toBe(200);
-    expect(await env.DB.prepare("SELECT kind, meet_link FROM calls WHERE lead_id = 'c2'").first()).toEqual({ kind: "presentazione", meet_link: "https://meet.google.com/abc-defg-hij" });
+    expect(await env.DB.prepare("SELECT kind, meet_link FROM calls WHERE lead_id = 'c2'").first()).toEqual({ kind: "offerta", meet_link: "https://meet.google.com/abc-defg-hij" });
     expect((await leadRow("c2"))?.stage_id).toBe("presentazione-confermata");
   });
 });
@@ -58,7 +58,7 @@ describe("PATCH /leads/:id/esito", () => {
     const cookie = await authed();
     await insertLead("l2");
     const quando = NOW + 2 * 86_400_000;
-    const res = await esito("l2", { requestId: crypto.randomUUID(), esito: "appuntamento", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: quando, call: { kind: "conoscenza", scheduledAt: quando, meetLink: "https://meet.google.com/abc-defg-hij" } }, cookie);
+    const res = await esito("l2", { requestId: crypto.randomUUID(), esito: "conoscenza_fissata", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: quando, call: { kind: "conoscenza", scheduledAt: quando, meetLink: "https://meet.google.com/abc-defg-hij" } }, cookie);
     const body = (await res.json()) as { callId: string };
     expect(body.callId).toBeTruthy();
     expect(await conta("SELECT count(*) n FROM calls WHERE lead_id = 'l2' AND kind = 'conoscenza' AND scheduled_at = ?", quando)).toBe(1);
@@ -72,14 +72,14 @@ describe("PATCH /leads/:id/esito", () => {
     const cookie = await authed();
     await insertLead("lc");
     const quando = NOW + 2 * 86_400_000;
-    const res = await esito("lc", { requestId: crypto.randomUUID(), esito: "appuntamento" }, cookie);
+    const res = await esito("lc", { requestId: crypto.randomUUID(), esito: "conoscenza_fissata" }, cookie);
     expect(res.status).toBe(422);
     expect((await res.json<{ error: string }>()).error).toBe("Per questa fase serve la call: scegli giorno e ora");
     expect(await conta("SELECT count(*) n FROM activities WHERE lead_id = 'lc'")).toBe(0);
     expect((await leadRow("lc"))!.stage_id).toBe("da-richiamare");
     // Con una call di conoscenza già in programma l'esito passa.
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('kc', 'lc', 'conoscenza', ?1, 0, 0)").bind(quando).run();
-    const ok = await esito("lc", { requestId: crypto.randomUUID(), esito: "appuntamento" }, cookie);
+    const ok = await esito("lc", { requestId: crypto.randomUUID(), esito: "conoscenza_fissata" }, cookie);
     expect(ok.status).toBe(200);
     expect(await leadRow("lc")).toMatchObject({ stage_id: "appuntamento-confermato", next_action_at: quando });
   });
@@ -88,7 +88,7 @@ describe("PATCH /leads/:id/esito", () => {
     const cookie = await authed();
     await insertLead("lp");
     const ieri = NOW - 86_400_000;
-    const res = await esito("lp", { requestId: crypto.randomUUID(), esito: "appuntamento", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: NOW + 3_600_000, call: { kind: "conoscenza", scheduledAt: ieri, meetLink: null } }, cookie);
+    const res = await esito("lp", { requestId: crypto.randomUUID(), esito: "conoscenza_fissata", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: NOW + 3_600_000, call: { kind: "conoscenza", scheduledAt: ieri, meetLink: null } }, cookie);
     expect(res.status).toBe(422);
     expect((await res.json<{ error: string }>()).error).toBe("La call è nel passato: scegli giorno e ora da adesso in poi");
     expect(await conta("SELECT count(*) n FROM calls WHERE lead_id = 'lp'")).toBe(0);
@@ -112,7 +112,7 @@ describe("PATCH /leads/:id/esito", () => {
     const cookie = await authed();
     await insertLead("l4");
     await env.DB.prepare("CREATE TRIGGER blocca_call BEFORE INSERT ON calls BEGIN SELECT RAISE(ABORT, 'prova'); END").run();
-    const res = await esito("l4", { requestId: crypto.randomUUID(), esito: "appuntamento", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: NOW + 1000, call: { kind: "conoscenza", scheduledAt: NOW + 1000, meetLink: null } }, cookie);
+    const res = await esito("l4", { requestId: crypto.randomUUID(), esito: "conoscenza_fissata", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: NOW + 1000, call: { kind: "conoscenza", scheduledAt: NOW + 1000, meetLink: null } }, cookie);
     expect(res.status).toBe(500);
     expect(await conta("SELECT count(*) n FROM activities WHERE lead_id = 'l4'")).toBe(0);
     expect((await leadRow("l4"))?.stage_id).toBe("da-richiamare");
@@ -121,7 +121,7 @@ describe("PATCH /leads/:id/esito", () => {
   it("stessa richiesta due volte (doppio tocco o rete lenta): un solo esito, un solo tentativo, una sola call", async () => {
     const cookie = await authed();
     await insertLead("l5");
-    const corpo = { requestId: crypto.randomUUID(), esito: "appuntamento", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: NOW + 5000, call: { kind: "conoscenza", scheduledAt: NOW + 5000, meetLink: null } };
+    const corpo = { requestId: crypto.randomUUID(), esito: "conoscenza_fissata", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: NOW + 5000, call: { kind: "conoscenza", scheduledAt: NOW + 5000, meetLink: null } };
     const [a, b] = await Promise.all([esito("l5", corpo, cookie), esito("l5", corpo, cookie)]);
     expect([a.status, b.status]).toEqual([200, 200]);
     const c = await esito("l5", corpo, cookie);
