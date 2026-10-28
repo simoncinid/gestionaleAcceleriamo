@@ -3,7 +3,7 @@ import type { Env } from "../env";
 import { rispCampagne, type RispCampagna, type RispEvento } from "../db/schema";
 import { MOTIVO_FB_NON_COLLEGATO, MOTIVO_NON_COLLEGATO, motivoErrore, registraFallimento } from "./errori";
 import { graphPost, leggiCanale, type Canale, type EsitoGraph, type Piattaforma } from "./graph";
-import { MOTIVO_NON_DEL_POST, postDellaCampagna, scegliCampagna } from "./parola";
+import { MOTIVO_NON_DEL_POST, campagnaDelPost, candidateCampagne } from "./parola";
 
 // piattaforma assente: Instagram. Su Facebook mediaId è l'id del post e parentId c'è solo per le risposte in thread.
 export type Commento = { id: string; testo: string; autoreId: string | null; autoreNome: string | null; mediaId: string; parentId: string | null; piattaforma?: Piattaforma };
@@ -46,9 +46,21 @@ export async function trattaCommento(env: Env, c: Commento, now: number): Promis
 async function lavora(env: Env, c: Commento, piattaforma: Piattaforma, canale: Canale | null, now: number): Promise<RispEvento["stato"]> {
   // 3. Campagna.
   const campagne = await drizzle(env.DB).select().from(rispCampagne).all();
-  const campagna = scegliCampagna(campagne, c.mediaId, c.testo);
-  if (!campagna) {
+  const candidate = candidateCampagne(campagne, c.mediaId, c.testo);
+  if (!candidate.length) {
     await chiudi(env, c.id, "ignorato", now, { motivo: "nessuna parola chiave" });
+    return "ignorato";
+  }
+  if (!canale) {
+    const motivo = piattaforma === "fb" ? MOTIVO_FB_NON_COLLEGATO : MOTIVO_NON_COLLEGATO;
+    await chiudi(env, c.id, "errore", now, { campagnaId: candidate[0].id, motivo, errore: true });
+    return "errore";
+  }
+
+  // 3 bis. La parola deve essere quella chiesta in questo post (vedi postDellaCampagna e campagnaDelPost).
+  const campagna = await campagnaDelPost(env, canale, candidate, c.mediaId);
+  if (!campagna) {
+    await chiudi(env, c.id, "ignorato", now, { campagnaId: candidate[0].id, motivo: MOTIVO_NON_DEL_POST });
     return "ignorato";
   }
 
@@ -63,17 +75,6 @@ async function lavora(env: Env, c: Commento, piattaforma: Piattaforma, canale: C
     return "ignorato";
   }
 
-  if (!canale) {
-    const motivo = piattaforma === "fb" ? MOTIVO_FB_NON_COLLEGATO : MOTIVO_NON_COLLEGATO;
-    await chiudi(env, c.id, "errore", now, { campagnaId: campagna.id, motivo, errore: true });
-    return "errore";
-  }
-
-  // 4 bis. La parola deve essere quella chiesta in questo post (vedi postDellaCampagna).
-  if (!(await postDellaCampagna(env, canale, campagna, c.mediaId))) {
-    await chiudi(env, c.id, "ignorato", now, { campagnaId: campagna.id, motivo: MOTIVO_NON_DEL_POST });
-    return "ignorato";
-  }
 
   // 5. Risposta pubblica: se fallisce si va avanti col privato.
   let varianti: unknown = null;

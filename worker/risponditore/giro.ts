@@ -3,7 +3,7 @@ import type { Env } from "../env";
 import { rispCampagne } from "../db/schema";
 import { inviaPrivato } from "./commenti";
 import { MOTIVI_NON_RITENTABILI, motivoErrore, registraFallimento, TENTATIVI_MAX } from "./errori";
-import { MOTIVO_NON_DEL_POST, postDellaCampagna, scegliCampagna } from "./parola";
+import { MOTIVO_NON_DEL_POST, campagnaDelPost, candidateCampagne } from "./parola";
 import { recuperaCommenti } from "./recupero";
 import { leggiCanale, type Canale, type Piattaforma } from "./graph";
 
@@ -55,9 +55,26 @@ async function ritenta(env: Env, now: number, limite: number, canali: Partial<Re
   const campagne = await drizzle(env.DB).select().from(rispCampagne).all();
   let ritentati = 0;
   for (const r of results) {
-    const campagna = (r.campagna_id ? campagne.find((c) => c.id === r.campagna_id) : null) ?? scegliCampagna(campagne, r.media_id, r.testo);
-    if (!campagna) {
+    // Campagna già fissata (passata dal controllo del post): resta quella; se no si riparte dalle candidate.
+    const fissata = r.campagna_id ? campagne.find((c) => c.id === r.campagna_id) : undefined;
+    const candidate = fissata ? [fissata] : candidateCampagne(campagne, r.media_id, r.testo);
+    if (!candidate.length) {
       await env.DB.prepare(`UPDATE risp_eventi SET stato = 'ignorato', motivo = 'nessuna parola chiave', aggiornato_il = ? WHERE commento_id = ?`).bind(now, r.commento_id).run();
+      continue;
+    }
+    const canale = canali[r.piattaforma]!;
+    // Anche nei ritentativi la parola vale solo sotto il suo post. Didascalia non leggibile: si riprova più tardi,
+    // senza fissare la campagna.
+    let campagna: (typeof candidate)[number] | null;
+    try {
+      campagna = await campagnaDelPost(env, canale, candidate, r.media_id);
+    } catch (err) {
+      ritentati++;
+      await registraFallimento(env, r.commento_id, (err instanceof Error ? err.message : String(err)).slice(0, 200), now);
+      continue;
+    }
+    if (!campagna) {
+      await env.DB.prepare(`UPDATE risp_eventi SET stato = 'ignorato', campagna_id = ?, motivo = ?, aggiornato_il = ? WHERE commento_id = ?`).bind(candidate[0].id, MOTIVO_NON_DEL_POST, now, r.commento_id).run();
       continue;
     }
     // Stessa persona, campagna e post già serviti da un altro commento: niente secondo messaggio privato.
@@ -75,16 +92,10 @@ async function ritenta(env: Env, now: number, limite: number, canali: Partial<Re
       await env.DB.prepare(`UPDATE risp_eventi SET tentativi = tentativi + 1, campagna_id = ?, aggiornato_il = ? WHERE commento_id = ?`).bind(campagna.id, now, r.commento_id).run();
     }
     ritentati++;
-    const canale = canali[r.piattaforma]!;
     try {
-      // Anche nei ritentativi la parola vale solo sotto il suo post.
-      if (!(await postDellaCampagna(env, canale, campagna, r.media_id))) {
-        await env.DB.prepare(`UPDATE risp_eventi SET stato = 'ignorato', campagna_id = ?, motivo = ?, aggiornato_il = ? WHERE commento_id = ?`).bind(campagna.id, MOTIVO_NON_DEL_POST, now, r.commento_id).run();
-        continue;
-      }
       const priv = await inviaPrivato(env, canale, campagna, r.commento_id);
       if (priv.ok) {
-        await env.DB.prepare(`UPDATE risp_eventi SET stato = 'inviato', aggiornato_il = ? WHERE commento_id = ?`).bind(now, r.commento_id).run();
+        await env.DB.prepare(`UPDATE risp_eventi SET stato = 'inviato', campagna_id = ?, aggiornato_il = ? WHERE commento_id = ?`).bind(campagna.id, now, r.commento_id).run();
       } else {
         await registraFallimento(env, r.commento_id, motivoErrore(priv.codice, priv.messaggio, r.piattaforma).motivo, now, { campagnaId: campagna.id });
       }

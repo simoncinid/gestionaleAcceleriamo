@@ -232,6 +232,21 @@ describe("campagna senza post legato: risponde solo dove la didascalia chiede la
     expect((await evento("c1"))?.stato).toBe("inviato");
   });
 
+  it("commento con due parole (CARICO e ORE): risponde la campagna chiesta dal post, anche se l'altra è più recente", async () => {
+    await campagna({ id: "camp-carico", media_id: null, parola: "carico", creata_il: NOW - 1000 });
+    await campagna({ id: "camp-ore", media_id: null, parola: "ore", creata_il: NOW });
+    conDidascalia("Traslochi: la lista di carico. Commenta CARICO e te la mandiamo.");
+    expect(await trattaCommento(env, commento({ testo: "CARICO, ci perdo ore ogni volta" }), NOW)).toBe("inviato");
+    expect((await evento("c1"))?.campagna_id).toBe("camp-carico");
+    expect(urlsFinali().filter((u) => u.includes("fields=caption")).length).toBeLessThanOrEqual(2);
+  });
+
+  it("parola scritta tra virgolette nella didascalia (Commenta \"CARICO\"): vale", async () => {
+    await campagna({ media_id: null, parola: "carico" });
+    conDidascalia("Commenta \"CARICO\" e te la mandiamo.");
+    expect(await trattaCommento(env, commento({ testo: "carico" }), NOW)).toBe("inviato");
+  });
+
   it("campagna legata al post: nessuna lettura della didascalia", async () => {
     await campagna();
     conDidascalia(null);
