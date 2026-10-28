@@ -1,15 +1,16 @@
 // Gira in Node puro (vitest.nodo.config.ts): il runtime del Worker non vede i file del computer.
-// Solo lettura del file delle 17 risorse; se il file non c'è (altro computer) il test si salta.
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+// In `npm test` legge la copia delle risorse salvata nel repo (tests-nodo/fixture), uguale su ogni computer.
+// Per confrontare il gestionale con il file vivo delle risorse: RISORSE_FILE=<file.json> npm run controlla:risorse
+import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GRAFICHE } from "../worker/risponditore/grafiche-risorse";
 import { firmaPassi, passiSchema } from "../src/pagine/pubbliche/corpoRisorsa";
 
-const FILE_RISORSE = "/Users/tommasorovini/agente/companies/acceleriamo/crescita/video-hyperframes/risorse-risponditore.json";
 const RADICE = resolve(import.meta.dirname, "..");
+const FILE_RISORSE = process.env.RISORSE_FILE ?? join(import.meta.dirname, "fixture/risorse-risponditore.json");
 
-describe.skipIf(!existsSync(FILE_RISORSE))("grafiche e dati veri delle risorse", () => {
+describe("grafiche e dati veri delle risorse", () => {
   it("ogni risorsa con uno schema ha le sue grafiche e il numero dei passi coincide", () => {
     const { risorse } = JSON.parse(readFileSync(FILE_RISORSE, "utf8")) as { risorse: { slug: string; corpo: string }[] };
     expect(risorse.length).toBeGreaterThan(0);
