@@ -23,9 +23,10 @@ const RILETTURA = 2000;       // righe lette quando il foglio ha cambiato forma
 // D1 online lega al massimo 100 parametri per query: candidati() ne usa fino a 5 per riga, quindi blocchi da 16.
 const RIGHE_PER_RICERCA = 16;
 // Costo in query D1 di ogni passo del ciclo. Il budget del giro è massimoCreati * creato + 2: con il tetto del cron
-// (2 lead) fa 36, e il resto del giro ne usa circa 6, sotto le 50 di una invocazione. Prima di ogni riga si tiene
-// posto per il caso peggiore, un lead nuovo con la sua catena: così anche gli agganci (2 query l'uno) hanno un tetto.
-const SPESA = { ricerca: 1, aggancio: 2, creato: 17 } as const;
+// (2 lead) fa 38, e il resto del giro ne usa circa 6, sotto le 50 di una invocazione. Prima di ogni riga si tiene
+// posto per il caso peggiore, un lead nuovo con la sua catena: così anche gli agganci (fino a 3 query l'uno) hanno un tetto.
+// Blocco 1, modifica 8: creato da 17 a 18 (createLead cerca i doppioni anche nel cestino e può scrivere l'avviso).
+const SPESA = { ricerca: 1, aggancio: 2, completa: 1, creato: 18 } as const;
 
 type ImpFoglio = Impostazioni["foglio"];
 // Intervalli di righe del foglio (numerate da 1, estremi inclusi) → righe di ciascun intervallo.
@@ -99,8 +100,25 @@ async function candidati(db: Db, righe: Mappata[], impronte: (string | null)[]) 
   if (chiavi.length) dove.push(inArray(leads.sheetRowKey, chiavi));
   if (cond.length) dove.push(and(isNull(leads.deletedAt), or(...cond))!);
   if (!dove.length) return [];
-  return db.select({ id: leads.id, phoneNorm: leads.phoneNorm, emailNorm: leads.emailNorm, metaLeadId: leads.metaLeadId, sheetRowKey: leads.sheetRowKey, deletedAt: leads.deletedAt })
-    .from(leads).where(or(...dove));
+  return db.select({
+    id: leads.id, phoneNorm: leads.phoneNorm, emailNorm: leads.emailNorm, metaLeadId: leads.metaLeadId, sheetRowKey: leads.sheetRowKey, deletedAt: leads.deletedAt,
+    contactName: leads.contactName, phone: leads.phone, email: leads.email, metaCampaign: leads.metaCampaign, metaAd: leads.metaAd,
+  }).from(leads).where(or(...dove));
+}
+
+type Candidato = Awaited<ReturnType<typeof candidati>>[number];
+
+// Blocco 1, modifica 8: un lead che c'è già prende dalla riga solo i campi che ha vuoti. Mai la fase, mai l'azienda.
+function campiVuoti(l: Candidato, r: Mappata) {
+  const set: Partial<typeof leads.$inferInsert> = {};
+  const tel = normalizePhone(r.telefono);
+  const mail = normalizeEmail(r.email);
+  if (!l.contactName && r.referente) set.contactName = l.contactName = r.referente;
+  if (!l.phone && tel) { set.phone = l.phone = aE164(r.telefono) ?? r.telefono; set.phoneNorm = l.phoneNorm = tel; }
+  if (!l.email && mail) { set.email = l.email = r.email; set.emailNorm = l.emailNorm = mail; }
+  if (!l.metaCampaign && r.campagna) set.metaCampaign = l.metaCampaign = r.campagna;
+  if (!l.metaAd && r.inserzione) set.metaAd = l.metaAd = r.inserzione;
+  return set;
 }
 
 // Spec 6.1, Foglio Andrea: senso unico, solo righe nuove, rilettura una volta se il foglio cambia forma.
@@ -162,17 +180,32 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
       esito.lette++;
       if (r.vuota || r.prova) { esito.scartate++; continue; }
       const chiave = impronte[i];
-      if (chiave && esistenti.some((l) => l.sheetRowKey === chiave)) { esito.agganciate++; continue; }
+      const legato = chiave ? esistenti.find((l) => l.sheetRowKey === chiave) : undefined;
+      if (legato) {
+        esito.agganciate++;
+        // In rilettura la riga può avere campi che al primo giro mancavano: si completano sul lead (non cestinato).
+        const set = legato.deletedAt == null ? campiVuoti(legato, r) : {};
+        if (Object.keys(set).length) {
+          await db.update(leads).set({ ...set, updatedAt: now }).where(eq(leads.id, legato.id));
+          spesa += SPESA.completa;
+        }
+        continue;
+      }
       const tel = normalizePhone(r.telefono);
       const mail = normalizeEmail(r.email);
       const trovato = esistenti.find((l) => l.deletedAt == null && ((r.metaId && l.metaLeadId === r.metaId) || (tel && l.phoneNorm === tel) || (mail && l.emailNorm === mail)));
       if (trovato) {
         esito.agganciate++;
-        if (trovato.sheetRowKey == null) {
-          await db.update(leads).set({ sheetRowKey: ultimaImpronta, updatedAt: now }).where(eq(leads.id, trovato.id));
+        const set = campiVuoti(trovato, r);
+        const nuovoLegame = trovato.sheetRowKey == null;
+        if (nuovoLegame) { set.sheetRowKey = ultimaImpronta; trovato.sheetRowKey = ultimaImpronta; }
+        if (Object.keys(set).length) {
+          await db.update(leads).set({ ...set, updatedAt: now }).where(eq(leads.id, trovato.id));
+          spesa += SPESA.completa;
+        }
+        if (nuovoLegame) {
           await addActivity(db, trovato.id, "foglio", "Visto anche nel Foglio Andrea", null, now);
-          trovato.sheetRowKey = ultimaImpronta;
-          spesa += SPESA.aggancio;
+          spesa += SPESA.aggancio - SPESA.completa;
         }
         continue;
       }
@@ -192,7 +225,10 @@ export async function giroFoglio(env: Env, now: number, massimoCreati = MASSIMO_
         const primo = await db.select({ id: leads.id }).from(leads).where(eq(leads.metaLeadId, r.metaId)).get();
         await db.update(leads).set({ ...campi, duplicateOfId: primo?.id ?? null }).where(eq(leads.id, creato.id));
       }
-      esistenti.push({ id: creato.id, phoneNorm: tel, emailNorm: mail, metaLeadId: r.metaId || null, sheetRowKey: ultimaImpronta, deletedAt: null });
+      esistenti.push({
+        id: creato.id, phoneNorm: tel, emailNorm: mail, metaLeadId: r.metaId || null, sheetRowKey: ultimaImpronta, deletedAt: null,
+        contactName: creato.contactName, phone: creato.phone, email: creato.email, metaCampaign: campi.metaCampaign, metaAd: campi.metaAd,
+      });
       // Come in meta/ingest.ts: se la catena fallisce su un lead, il lead resta e il giro continua con gli altri.
       try {
         await catenaLeadNuovo(env, creato.id, "foglio", now);

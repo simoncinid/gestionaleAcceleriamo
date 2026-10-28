@@ -8,6 +8,8 @@ import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { callPerFase } from "../regole/fasi-call";
+import { scadenzaLavorativa } from "../regole/orario";
+import { FASE, FASI_APERTE } from "../processo/processo";
 
 export const DEFAULT_NEXT_ACTION = "Prima chiamata";
 
@@ -87,13 +89,16 @@ export async function getLead(db: Db, id: string, opts: { includeDeleted?: boole
   return lead;
 }
 
-export async function createLead(db: Db, input: LeadInput, actorId: string | null, now = Date.now()): Promise<Lead> {
+// `trovati`: i lead con la stessa chiave, se chi chiama li ha già cercati (una query in meno).
+export async function createLead(db: Db, input: LeadInput, actorId: string | null, now = Date.now(), trovati?: Doppione[]): Promise<Lead> {
   const stage = input.stageId ? await getStage(db, input.stageId) : await firstOpenStage(db);
   await assertOwner(db, input.ownerId);
   const emailNorm = normalizeEmail(input.email);
   const phoneNorm = normalizePhone(input.phone);
   const isOpen = stage.kind === "open";
   const id = crypto.randomUUID();
+  // Un lead in 90 o nel cestino con la stessa chiave non ferma il nuovo: resta l'avviso "Possibile doppione".
+  const possibile = riscontro(trovati ?? (await cercaDoppioni(db, emailNorm, phoneNorm)))?.lead ?? null;
   await db.insert(leads).values({
     id,
     company: input.company,
@@ -115,14 +120,78 @@ export async function createLead(db: Db, input: LeadInput, actorId: string | nul
     meetLink: input.meetLink ?? null,
     proposalUrl: input.proposalUrl ?? null,
     notes: input.notes ?? null,
-    duplicateOfId: await findDuplicate(db, emailNorm, phoneNorm),
+    duplicateOfId: possibile?.id ?? null,
     createdBy: actorId,
     createdAt: now,
     updatedAt: now,
   });
   await addActivity(db, id, "creazione", `Lead creato (${input.source ?? "manuale"})`, actorId, now);
+  if (possibile) await addActivity(db, id, "nota", `Possibile doppione di ${possibile.company}${possibile.deletedAt ? " (nel cestino)" : ""}`, null, now);
   await audit(db, actorId, "lead", id, "create", undefined, now);
   return getLead(db, id);
+}
+
+// --- Doppioni all'ingresso (contratto blocco 1, sezione 7; modifica 8) ---
+// Chiave: telefono normalizzato (normalizePhone) oppure email minuscola. Stessa regola per Meta, modulo del sito, a mano e CSV:
+// lead aperto (o cliente): niente lead nuovo, storico "Arrivato di nuovo da <fonte>" e punteggio alzato;
+// lead in 80: si riapre in 10 con la nota; lead in 90 o nel cestino: nasce il nuovo con l'avviso "Possibile doppione".
+export type Doppione = { id: string; company: string; stageId: string; score: Lead["score"]; deletedAt: number | null };
+export type Riscontro = { tipo: "aperto" | "perso" | "possibile"; lead: Doppione };
+const FASI_CHE_TENGONO: string[] = [...FASI_APERTE, FASE.cliente];
+
+// Tutti i lead con la stessa chiave, anche nel cestino, dal più vecchio. Una query.
+export async function cercaDoppioni(db: Db, emailNorm: string | null, phoneNorm: string | null, excludeId?: string): Promise<Doppione[]> {
+  const matches: SQL[] = [];
+  if (emailNorm) matches.push(eq(leads.emailNorm, emailNorm));
+  if (phoneNorm) matches.push(eq(leads.phoneNorm, phoneNorm));
+  if (!matches.length) return [];
+  return db
+    .select({ id: leads.id, company: leads.company, stageId: leads.stageId, score: leads.score, deletedAt: leads.deletedAt })
+    .from(leads)
+    .where(and(or(...matches), excludeId ? ne(leads.id, excludeId) : undefined))
+    .orderBy(asc(leads.createdAt))
+    .limit(20);
+}
+
+export function riscontro(trovati: Doppione[]): Riscontro | null {
+  const vivi = trovati.filter((d) => d.deletedAt == null);
+  const aperto = vivi.find((d) => FASI_CHE_TENGONO.includes(d.stageId));
+  if (aperto) return { tipo: "aperto", lead: aperto };
+  const perso = vivi.find((d) => d.stageId === FASE.perso);
+  if (perso) return { tipo: "perso", lead: perso };
+  const altro = vivi[0] ?? trovati[0];
+  return altro ? { tipo: "possibile", lead: altro } : null;
+}
+
+const PIU_ALTO = { grigio: "giallo", giallo: "verde", verde: "verde" } as const;
+export const punteggioAlzato = (s: Lead["score"]): NonNullable<Lead["score"]> => (s ? PIU_ALTO[s] : "giallo");
+
+// Il contatto è tornato: storico e punteggio sul lead che c'è già; se era in 80 si riapre in 10 (tentativi azzerati).
+export async function arrivatoDiNuovo(db: Db, r: Riscontro, fonte: string, actorId: string | null, now: number): Promise<"arrivato_di_nuovo" | "riaperto"> {
+  const score = punteggioAlzato(r.lead.score);
+  if (r.tipo === "perso") {
+    const { orario } = await leggiImpostazioni(db);
+    await db.update(leads).set({
+      stageId: FASE.nuovo, stageChangedAt: now, nextAction: DEFAULT_NEXT_ACTION, nextActionAt: scadenzaLavorativa(now, 30, orario),
+      attemptCount: 0, noShow: 0, lostReason: null, pausedUntil: null, sequenceStep: 0, score, updatedAt: now,
+    }).where(eq(leads.id, r.lead.id));
+    await addActivity(db, r.lead.id, "cambio_fase", `Riaperto: arrivato di nuovo da ${fonte}. Era tra i non interessati.`, actorId, now);
+    await audit(db, actorId, "lead", r.lead.id, "update", { stageId: { from: r.lead.stageId, to: FASE.nuovo } }, now);
+    return "riaperto";
+  }
+  await db.update(leads).set({ score, updatedAt: now }).where(eq(leads.id, r.lead.id));
+  await addActivity(db, r.lead.id, "contatto", `Arrivato di nuovo da ${fonte}`, actorId, now);
+  return "arrivato_di_nuovo";
+}
+
+export type Ingresso = { esito: "creato" | "arrivato_di_nuovo" | "riaperto"; lead: Lead };
+
+// Ingresso di un contatto con la regola dei doppioni. `fonte` è il testo dello storico ("Meta", "modulo del sito", "A mano", il file).
+export async function ingressoLead(db: Db, input: LeadInput, fonte: string, actorId: string | null, now = Date.now(), trovati?: Doppione[]): Promise<Ingresso> {
+  const tutti = trovati ?? (await cercaDoppioni(db, normalizeEmail(input.email), normalizePhone(input.phone)));
+  const r = riscontro(tutti);
+  if (r && r.tipo !== "possibile") return { esito: await arrivatoDiNuovo(db, r, fonte, actorId, now), lead: await getLead(db, r.lead.id) };
+  return { esito: "creato", lead: await createLead(db, input, actorId, now, tutti) };
 }
 
 export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: string | null, now = Date.now()): Promise<Lead> {

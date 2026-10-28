@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, type ChangeEvent } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { api } from "../../api";
+import { api, ApiError } from "../../api";
 import { Campo, Foglio, Pulsante, Selettore } from "../../ds";
 import { linkTel } from "../../format";
 import type { Lead } from "../../types";
@@ -23,11 +23,14 @@ export function FoglioNuovoLead({ onChiudi }: { onChiudi: () => void }) {
   const vai = useNavigate();
   const [v, setV] = useState({ company: "", contactName: "", phone: "" });
   const [fonte, setFonte] = useState<Fonte>("manuale");
+  // Blocco 1, modifica 8: stesso telefono o email di un lead aperto o cliente. Il server non lo crea e qui si apre quello.
+  const [esistente, setEsistente] = useState<{ id: string; company: string } | null>(null);
   const crea = useMutation({
     mutationFn: (poi: "chiama" | "apri") =>
-      api<{ lead: Lead }>("/leads", { method: "POST", json: { ...v, source: fonte } }).then((r) => ({ lead: r.lead, poi })),
-    onSuccess: ({ lead, poi }) => {
-      toast.success("Lead salvato");
+      api<{ lead: Lead; riaperto?: boolean }>("/leads", { method: "POST", json: { ...v, source: fonte } }).then((r) => ({ lead: r.lead, riaperto: !!r.riaperto, poi })),
+    onMutate: () => setEsistente(null),
+    onSuccess: ({ lead, riaperto, poi }) => {
+      toast.success(riaperto ? `${lead.company} era tra i non interessati: riaperto in Da chiamare prima volta` : "Lead salvato");
       void qc.invalidateQueries({ queryKey: ["today"] });
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["badge"] });
@@ -39,7 +42,11 @@ export function FoglioNuovoLead({ onChiudi }: { onChiudi: () => void }) {
         vai(`/commerciale/lead/${lead.id}`);
       }
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      const trovato = e instanceof ApiError && e.status === 409 ? (e.body as { esistente?: { id: string; company: string } }).esistente : undefined;
+      if (trovato) setEsistente(trovato);
+      else toast.error(e.message);
+    },
   });
   const manca = !v.company.trim() ? "Serve il nome dell'azienda" : undefined;
   const campo = (k: keyof typeof v) => ({ value: v[k], onChange: (e: ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value })) });
@@ -59,7 +66,13 @@ export function FoglioNuovoLead({ onChiudi }: { onChiudi: () => void }) {
         <Campo etichetta="Referente" placeholder="Nome e cognome" autoComplete="off" {...campo("contactName")} />
         <Campo etichetta="Telefono" type="tel" inputMode="tel" placeholder="+39" {...campo("phone")} />
         <Selettore etichetta="Provenienza" opzioni={[...FONTI_A_MANO]} valore={fonte} onCambia={setFonte} />
-        <p className="text-secondaria text-grigio">Parte in Da chiamare prima volta, con la prima chiamata entro 2 ore.</p>
+        {esistente ? (
+          <p role="alert" className="text-secondaria">
+            Esiste già: <Link to={`/commerciale/lead/${esistente.id}`} onClick={onChiudi} className="font-medium underline underline-offset-2">apri {esistente.company}</Link>
+          </p>
+        ) : (
+          <p className="text-secondaria text-grigio">Parte in Da chiamare prima volta, con la prima chiamata entro 30 minuti in orario di lavoro.</p>
+        )}
       </div>
     </Foglio>
   );

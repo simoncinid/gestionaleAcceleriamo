@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { getDb } from "../db/client";
 import { activities, calls, documents, jobs, leads, users } from "../db/schema";
 import type { AppEnv } from "../env";
-import { VISTE, addActivity, azioniMultiple, clienteDelLead, createLead, getLead, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead, type Vista } from "./service";
+import { VISTE, addActivity, azioniMultiple, cercaDoppioni, clienteDelLead, getLead, ingressoLead, riscontro, listLeads, mergeLeads, restoreLead, softDeleteLead, updateLead, type Vista } from "./service";
 import { activitySchema, bulkSchema, documentSchema, leadCreateSchema, leadPatchSchema, mergeSchema } from "./validation";
 import { audit } from "../lib/audit";
 import { catenaLeadNuovo } from "../regole/catena";
@@ -17,6 +17,8 @@ import { proposteDelLead } from "../proposte/service";
 import { conScadenzaSla, leggiSla } from "../regole/sla";
 import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
 import { conProssima } from "../processo/leggi";
+import { leggiCestino } from "./cestino";
+import { normalizeEmail, normalizePhone } from "../lib/normalize";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -39,13 +41,23 @@ leadRoutes.post("/bulk", async (c) => {
   return c.json(await azioniMultiple(getDb(c.env.DB), input, c.get("user").id));
 });
 
-leadRoutes.get("/trash", async (c) => c.json({ leads: await listLeads(getDb(c.env.DB), { deleted: true }) }));
+leadRoutes.get("/trash", async (c) => c.json({ leads: await leggiCestino(getDb(c.env.DB), Date.now()) }));
 
 leadRoutes.post("/", async (c) => {
   const input = leadCreateSchema.parse(await c.req.json());
   const db = getDb(c.env.DB);
   const now = Date.now();
-  const creato = await createLead(db, input, c.get("user").id, now);
+  // Doppioni (modifica 8): con un lead aperto o cliente non nasce niente, il foglio mostra "Esiste già: apri <azienda>";
+  // con un lead in 80 quello si riapre in 10; con uno in 90 o nel cestino nasce il nuovo con l'avviso.
+  const trovati = await cercaDoppioni(db, normalizeEmail(input.email), normalizePhone(input.phone));
+  const r = riscontro(trovati);
+  if (r?.tipo === "aperto") return c.json({ error: `Esiste già: ${r.lead.company}`, esistente: { id: r.lead.id, company: r.lead.company } }, 409);
+  const ing = await ingressoLead(db, input, "A mano", c.get("user").id, now, trovati);
+  if (ing.esito !== "creato") {
+    const [riaperto] = await conProssima(db, [conScadenzaSla(ing.lead, await leggiSla(db))], Date.now());
+    return c.json({ lead: riaperto, riaperto: true }, 200);
+  }
+  const creato = ing.lead;
   // Un errore della catena (regole, avvisi) non deve far fallire la creazione del lead.
   try {
     await catenaLeadNuovo(c.env, creato.id, "manuale", now);

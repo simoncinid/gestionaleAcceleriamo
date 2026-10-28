@@ -27,18 +27,19 @@ describe("csv", () => {
 
 describe("import", () => {
   const csv = "Azienda;Referente;Email;Telefono\nNuova Srl;Anna;anna@nuova.it;3331112222\nGià Qui;Mario;MARIO@gia.it;\n;Senza azienda;x@y.it;\nNuova Srl bis;Anna;anna@nuova.it;\n";
-  it("anteprima: nuovo, doppione col database, errore, doppione nel file", async () => {
-    const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { esito: string; motivo: string | null }[]; nuovi: number; doppioni: number; errori: number }>();
-    expect(a.righe.map((r) => r.esito)).toEqual(["nuovo", "doppione", "errore", "doppione"]);
-    expect(a).toMatchObject({ nuovi: 1, doppioni: 2, errori: 1 });
+  it("anteprima: nuovo, già presente nel database, errore, già presente nel file", async () => {
+    const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { esito: string; motivo: string | null }[]; nuovi: number; giaPresenti: number; errori: number }>();
+    expect(a.righe.map((r) => r.esito)).toEqual(["nuovo", "gia_presente", "errore", "gia_presente"]);
+    expect(a).toMatchObject({ nuovi: 1, giaPresenti: 2, errori: 1 });
     expect(a.righe[2].motivo).toBe("Manca l'azienda");
   });
-  it("import: crea i nuovi senza catena e senza email, salta i doppioni", async () => {
+  it("import: crea i nuovi senza catena e senza email, i già presenti non diventano lead nuovi", async () => {
     const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { esito: string }[] }>();
     const r = await (await call("/api/import/leads", { method: "POST", json: { righe: a.righe } }, cookie)).json<{ creati: number; saltati: number }>();
-    expect(r).toEqual({ creati: 1, saltati: 3 });
+    // "Già Qui" ha un lead dietro (storico e punteggio); la riga ripetuta nel file e quella senza azienda si saltano.
+    expect(r).toEqual({ creati: 1, giaPresenti: 1, saltati: 2 });
     const l = await env.DB.prepare("SELECT source, confirmation_sent_at AS c FROM leads WHERE company = 'Nuova Srl'").first<{ source: string; c: number | null }>();
-    expect(l).toEqual({ source: "manuale", c: null });
+    expect(l).toEqual({ source: "migrazione", c: null });
     const job = await env.DB.prepare("SELECT COUNT(*) AS n FROM ai_jobs").first<{ n: number }>();
     expect(job?.n).toBe(0);
   });
@@ -99,7 +100,7 @@ describe("import: limiti e casi in più", () => {
   it("20 righe nuove: sotto le 50 query della richiesta", async () => {
     const righe = Array.from({ length: 20 }, (_, i) => ({ riga: i + 2, company: `Azienda ${i}`, contactName: null, email: `a${i}@x.it`, phone: `33300000${String(i).padStart(2, "0")}`, website: null, notes: null, esito: "nuovo", motivo: null }));
     const { r, query } = await conQuery("/api/import/leads", { method: "POST", json: { righe } });
-    expect(await r.json()).toEqual({ creati: 20, saltati: 0 });
+    expect(await r.json()).toEqual({ creati: 20, giaPresenti: 0, saltati: 0 });
     expect(query).toBeLessThanOrEqual(30);
     const att = await env.DB.prepare("SELECT COUNT(*) AS n FROM activities WHERE type = 'migrazione'").first<{ n: number }>();
     expect(att?.n).toBe(20);
@@ -107,7 +108,7 @@ describe("import: limiti e casi in più", () => {
   it("20 righe miste (email e sola azienda), tutte da controllare: al massimo 30 query", async () => {
     const righe = Array.from({ length: 20 }, (_, i) => ({ riga: i + 2, company: `Mista ${i}`, contactName: null, email: i % 2 ? `m${i}@x.it` : null, phone: null, website: null, notes: null, esito: "nuovo", motivo: null }));
     const { r, query } = await conQuery("/api/import/leads", { method: "POST", json: { righe } });
-    expect(await r.json()).toEqual({ creati: 20, saltati: 0 });
+    expect(await r.json()).toEqual({ creati: 20, giaPresenti: 0, saltati: 0 });
     expect(query).toBeLessThanOrEqual(30);
     const att = await env.DB.prepare("SELECT COUNT(*) AS n FROM activities WHERE type = 'migrazione' AND body LIKE 'Importato da CSV (riga %)'").first<{ n: number }>();
     expect(att?.n).toBe(20);
@@ -116,7 +117,7 @@ describe("import: limiti e casi in più", () => {
     await env.DB.prepare("INSERT INTO leads (id, company, source, stage_id, stage_changed_at, created_at, updated_at) VALUES ('ACC', 'ÈDILE  ÒMBRA', 'manuale', 'da-richiamare', 0, 0, 0)").run();
     const csv = "Azienda\nèdile ombra\nèdile òmbra\n";
     const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { esito: string }[] }>();
-    expect(a.righe.map((r) => r.esito)).toEqual(["nuovo", "doppione"]);
+    expect(a.righe.map((r) => r.esito)).toEqual(["senza_contatti", "gia_presente"]);
   });
   it("anteprima di 500 righe: sotto le 50 query", async () => {
     const csv = ["Azienda;Email;Telefono", ...Array.from({ length: 500 }, (_, i) => `A${i};a${i}@x.it;3331${String(i).padStart(6, "0")}`)].join("\n");
@@ -133,13 +134,13 @@ describe("import: limiti e casi in più", () => {
   });
   it("l'esito mandato dalla pagina non fa testo: un doppione travestito da nuovo resta fuori", async () => {
     const righe = [{ riga: 2, company: "Finto Nuovo", contactName: null, email: "mario@gia.it", phone: null, website: null, notes: null, esito: "nuovo", motivo: null }];
-    expect(await (await call("/api/import/leads", { method: "POST", json: { righe } }, cookie)).json()).toEqual({ creati: 0, saltati: 1 });
+    expect(await (await call("/api/import/leads", { method: "POST", json: { righe } }, cookie)).json()).toEqual({ creati: 0, giaPresenti: 1, saltati: 0 });
   });
   it("l'import finisce nel registro", async () => {
     const righe = [{ riga: 2, company: "Gamma", contactName: null, email: null, phone: null, website: null, notes: null, esito: "nuovo", motivo: null }];
     await call("/api/import/leads", { method: "POST", json: { righe } }, cookie);
     const g = await (await call("/api/audit", {}, cookie)).json<{ voci: { entita: string; azione: string }[] }>();
-    expect(g.voci[0]).toMatchObject({ entita: "import", azione: "importa 1 lead" });
+    expect(g.voci[0]).toMatchObject({ entita: "import", azione: "importa 1 lead, 0 già presenti (CSV)" });
   });
 });
 
@@ -195,24 +196,24 @@ describe("import: stessi limiti in anteprima e import (revisione Task 12)", () =
     expect((await r.json<{ error: string }>()).error).toBe("Riga 3: Telefono troppo lungo: al massimo 50 caratteri");
     const note = await call("/api/import/leads", { method: "POST", json: { righe: [riga(4, { notes: "n".repeat(2001) })] } }, cookie);
     expect((await note.json<{ error: string }>()).error).toBe("Riga 4: Note troppo lunghe: al massimo 2000 caratteri");
-    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: [riga(2), riga(5)] } }, cookie)).json()).toEqual({ creati: 2, saltati: 0 });
+    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: [riga(2), riga(5)] } }, cookie)).json()).toEqual({ creati: 2, giaPresenti: 0, saltati: 0 });
   });
   it("più di 20 righe: messaggio diverso da quello della riga non valida", async () => {
     const r = await call("/api/import/leads", { method: "POST", json: { righe: Array.from({ length: 21 }, (_, i) => riga(i + 2)) } }, cookie);
     expect(r.status).toBe(400);
     expect((await r.json<{ error: string }>()).error).toBe("Al massimo 20 righe per volta");
   });
-  it("riga con la sola azienda importata due volte: la seconda è un doppione", async () => {
+  it("riga con la sola azienda importata due volte: la prima va tra i non profilati, la seconda è già presente", async () => {
     const csv = "Azienda\nSolo  Nome Srl\n";
     const prima = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv } }, cookie)).json<{ righe: { esito: string }[] }>();
-    expect(prima.righe[0].esito).toBe("nuovo");
-    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: prima.righe } }, cookie)).json()).toEqual({ creati: 1, saltati: 0 });
+    expect(prima.righe[0].esito).toBe("senza_contatti");
+    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: prima.righe } }, cookie)).json()).toEqual({ creati: 1, giaPresenti: 0, saltati: 0 });
     const seconda = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv: "Azienda\nsolo nome SRL\n" } }, cookie)).json<{ righe: { esito: string; motivo: string | null }[] }>();
-    expect(seconda.righe[0]).toEqual(expect.objectContaining({ esito: "doppione", motivo: "C'è già un lead con la stessa azienda" }));
-    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: [riga(2, { company: "SOLO NOME srl" })] } }, cookie)).json()).toEqual({ creati: 0, saltati: 1 });
+    expect(seconda.righe[0]).toEqual(expect.objectContaining({ esito: "gia_presente", motivo: "C'è già un lead con la stessa azienda" }));
+    expect(await (await call("/api/import/leads", { method: "POST", json: { righe: [riga(2, { company: "SOLO NOME srl" })] } }, cookie)).json()).toEqual({ creati: 0, giaPresenti: 0, saltati: 1 });
   });
-  it("sola azienda ripetuta nel file: la seconda è un doppione", async () => {
+  it("sola azienda ripetuta nel file: la seconda è già presente", async () => {
     const a = await (await call("/api/import/leads?anteprima=1", { method: "POST", json: { csv: "Azienda\nDelta\ndelta\n" } }, cookie)).json<{ righe: { esito: string }[] }>();
-    expect(a.righe.map((r) => r.esito)).toEqual(["nuovo", "doppione"]);
+    expect(a.righe.map((r) => r.esito)).toEqual(["senza_contatti", "gia_presente"]);
   });
 });

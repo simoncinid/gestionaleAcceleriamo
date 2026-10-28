@@ -5,7 +5,7 @@ import type { Env } from "../env";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
 import { catenaLeadNuovo } from "../regole/catena";
-import { DEFAULT_NEXT_ACTION, addActivity, findDuplicate, firstOpenStage } from "../leads/service";
+import { DEFAULT_NEXT_ACTION, addActivity, arrivatoDiNuovo, cercaDoppioni, firstOpenStage, riscontro } from "../leads/service";
 import { metaFetch } from "./fetcher";
 import { eDemo, NIENTE_IN_DEMO } from "../lib/demo";
 
@@ -91,6 +91,10 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
     const m = mapMetaFields(data.fields);
     const emailNorm = normalizeEmail(m.email);
     const phoneNorm = normalizePhone(m.phone);
+    // Doppioni (modifica 8): con un lead aperto, cliente o in 80 il lead in arrivo non resta (esce dagli elenchi, non va nel cestino)
+    // e sull'altro compare "Arrivato di nuovo da Meta"; con uno in 90 o nel cestino resta, con l'avviso "Possibile doppione".
+    const r = riscontro(await cercaDoppioni(db, emailNorm, phoneNorm, leadId));
+    const assorbito = r != null && r.tipo !== "possibile";
     await db
       .update(leads)
       .set({
@@ -107,10 +111,16 @@ export async function fillMetaLead(env: Env, leadId: string, now = Date.now()) {
         metaAd: data.ad,
         metaFormId: data.formId ?? lead.metaFormId,
         metaStatus: "ok",
-        duplicateOfId: await findDuplicate(db, emailNorm, phoneNorm, leadId),
+        duplicateOfId: r?.lead.id ?? null,
+        ...(assorbito ? { deletedAt: now } : {}),
         updatedAt: now,
       })
       .where(eq(leads.id, leadId));
+    if (assorbito) {
+      await arrivatoDiNuovo(db, r, "Meta", null, now);
+      return true;
+    }
+    if (r) await addActivity(db, leadId, "nota", `Possibile doppione di ${r.lead.company}${r.lead.deletedAt ? " (nel cestino)" : ""}`, null, now);
   } catch (err) {
     console.error("meta_fill_failed", leadId, err);
     await db
