@@ -1,0 +1,24 @@
+// Blocco 1 bis, punto 5: dalla scheda di un lead in attesa decisione, Rimanda, "Si farà vivo lui".
+import { chromium } from "playwright";
+const porta = process.argv[2] ?? "5288";
+const base = `http://localhost:${porta}`;
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto(base + "/");
+await page.getByLabel("Utente").fill("demo");
+await page.getByLabel("Password").fill("password-demo-locale-e2e");
+await page.getByRole("button", { name: "Entra" }).click();
+await page.waitForURL(/\/commerciale\/oggi/);
+await page.goto(base + "/commerciale/lead?q=Mattonelli");
+await page.waitForSelector("tr[data-lead]");
+const id = await page.locator("tr[data-lead]").first().getAttribute("data-lead");
+await page.goto(base + "/commerciale/lead/" + id);
+await page.getByRole("button", { name: "Rimanda" }).first().click();
+await page.getByRole("checkbox", { name: /Si farà vivo lui/ }).click();
+await page.screenshot({ path: "qa/blocco-1/bis-rimanda-1440.png" });
+await page.getByRole("dialog").getByRole("button", { name: "Rimanda", exact: true }).click();
+await page.waitForTimeout(1200);
+const daFare = await page.locator("main").innerText();
+console.log(/Se non si è fatto vivo, richiama Paolo/.test(daFare) ? "Da fare aggiornato" : "Da fare NON aggiornato");
+console.log(/Aspettiamo che richiami lui/.test(daFare) ? "voce di storico presente" : "voce di storico NON visibile");
+await browser.close();

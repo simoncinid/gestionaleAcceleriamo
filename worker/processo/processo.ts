@@ -116,6 +116,8 @@ export const AZIONE_RIPROVARE = "Riprovare dopo la pausa";
 export const AZIONE_FISSA_OFFERTA = "Fissare la call dell'offerta";
 export const AZIONE_FISSA_ANALISI = "Fissare la call di analisi";
 export const AZIONE_FISSA_PROGETTO = "Fissare la call del progetto";
+// Blocco 1 bis: "Si farà vivo lui" dal foglio Rimanda. Si aspetta 7 giorni, poi si richiama.
+export const AZIONE_SI_FARA_VIVO = "Aspettiamo che richiami lui";
 
 // Le quattro fasi con una call (30, 40, 45, 55): parole e codici di ognuna.
 type FaseCall = { titolo: (nome: string) => string; cosa: string; fissa: Comando; segna: Comando; poi: (salvata: number, nome: string, o: Orario) => string };
@@ -225,7 +227,8 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
       });
     }
     case FASE.decisione: {
-      const azione = inPausa ? `Riprovare il ${dataTesto(lead.pausedUntil!)}` : `Senti ${nome} per la risposta`;
+      const azione = inPausa ? `Riprovare il ${dataTesto(lead.pausedUntil!)}`
+        : lead.nextAction === AZIONE_SI_FARA_VIVO ? `Se non si è fatto vivo, richiama ${nome}` : `Senti ${nome} per la risposta`;
       return fine(azione, salvata, { pulsante: chiama, secondarie: [comando("Segna la decisione", "segna_decisione"), comando("Rimanda", "rimanda")] });
     }
     case FASE.cliente:

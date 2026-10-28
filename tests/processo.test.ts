@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { daRoma } from "../worker/lib/roma";
-import { FASE, FASI_APERTE, prossimaAzione, statoScadenza, type LeadPerProcesso } from "../worker/processo/processo";
+import { AZIONE_SI_FARA_VIVO, FASE, FASI_APERTE, prossimaAzione, statoScadenza, type LeadPerProcesso } from "../worker/processo/processo";
 
 // Contratto blocco 1, sezione 2: una prova per ogni riga della tabella delle fasi.
 const ADESSO = daRoma(2026, 10, 28, 11, 0); // mercoledì
@@ -132,6 +132,13 @@ describe("prossimaAzione: una riga per fase", () => {
     expect(p.azione).toBe("Senti Marco per la risposta");
     expect(p.pulsante?.testo).toBe("Chiama Marco");
     expect(p.secondarie.map((s) => s.testo)).toEqual(["Segna la decisione", "Rimanda"]);
+  });
+
+  it("60 con \"Si farà vivo lui\" (blocco 1 bis): fra 7 giorni, se non si è fatto vivo, si richiama", () => {
+    const p = prossimaAzione(lead(FASE.decisione, { nextAction: AZIONE_SI_FARA_VIVO, nextActionAt: ADESSO + 7 * GIORNO }), ADESSO);
+    expect(p.azione).toBe("Se non si è fatto vivo, richiama Marco");
+    expect(p.scadenza).toBe(ADESSO + 7 * GIORNO);
+    expect(p.pulsante?.testo).toBe("Chiama Marco");
   });
 
   it("70 Cliente: nessuna scadenza, Apri il cliente", () => {
