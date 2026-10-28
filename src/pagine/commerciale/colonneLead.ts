@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { partiRoma } from "../../../worker/lib/roma";
-import type { RigaLead } from "./tabellaLead";
+import type { Ordine, RigaLead } from "./tabellaLead";
 
 // Blocco 1 bis, punto 4: le colonne del foglio "CRM LEAD" di Diego nella tabella dei lead, scelte da chi la usa.
 // Dodici colonne in tutto (Azioni a parte, sempre in fondo); Azienda, Fase e Da fare non si tolgono.
@@ -10,7 +10,7 @@ export type IdColonna =
   | "azienda" | "telefono" | "fase" | "dafare" | "contatto" | "arrivato"
   | "email" | "inserzione" | "settore" | "attivita" | "offerta" | "fonte";
 
-export type DefColonna = { id: IdColonna; titolo: string; px: number; fissa?: boolean; ordine?: "azienda" | "fase" | "scadenza" | "contatto" };
+export type DefColonna = { id: IdColonna; titolo: string; px: number; fissa?: boolean; ordine?: Ordine };
 
 // Ordine di lettura nella tabella. Larghezze in px: le sei di partenza più Azioni fanno 941 px e stanno nei
 // 1118 px che restano a 1440 accanto alla barra laterale (Fase larga quanto "Nuovo, da chiamare" con la freccia);
@@ -21,7 +21,7 @@ export const COLONNE: DefColonna[] = [
   { id: "fase", titolo: "Fase", px: 186, fissa: true, ordine: "fase" },
   { id: "dafare", titolo: "Da fare", px: 195, fissa: true, ordine: "scadenza" },
   { id: "contatto", titolo: "Ultimo contatto", px: 115, ordine: "contatto" },
-  { id: "arrivato", titolo: "Arrivato il", px: 86 },
+  { id: "arrivato", titolo: "Arrivato il", px: 100, ordine: "arrivo" },
   { id: "email", titolo: "Email", px: 220 },
   { id: "inserzione", titolo: "Inserzione", px: 220 },
   { id: "settore", titolo: "Settore", px: 160 },

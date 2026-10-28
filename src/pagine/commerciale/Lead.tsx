@@ -15,7 +15,7 @@ import { MenuPunti } from "./Tendina";
 import { toast } from "sonner";
 import { FiltriComputer, FiltriTelefono } from "./FiltriLead";
 import {
-  FILTRI_BASE, campagne as campagneDi, conteggi, filtra, leggiFiltri, ordina, scadenzaBreve, scriviFiltri, titoloLead,
+  FILTRI_BASE, campagne as campagneDi, conteggi, filtra, leggiFiltri, ordina, scadenzaBreve, scriviFiltri, titoloLead, versoAlClic,
   type Filtri, type Ordine, type RigaLead,
 } from "./tabellaLead";
 
@@ -102,7 +102,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
       </>;
     }
   };
-  const ordinaPer = (o: Ordine) => setFiltri({ ...filtri, ord: o, dir: filtri.ord === o && filtri.dir === "asc" ? "desc" : "asc" });
+  const ordinaPer = (o: Ordine) => setFiltri({ ...filtri, ord: o, dir: versoAlClic(filtri, o) });
   const colonne = COLONNE.filter((c) => visibili.includes(c.id));
   const totale = colonne.reduce((t, c) => t + c.px, 0) + PX_AZIONI;
   // Prima della misura (e nelle prove senza browser) si assume che ci stia.
@@ -156,7 +156,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                         className={cx(cella, "h-10 whitespace-nowrap border-b border-[#E5DED4] text-[13px] font-medium text-grigio")}>
                         {c.ordine ? (
                           <button type="button" onClick={() => ordinaPer(c.ordine!)}
-                            className={cx("-mx-1.5 inline-flex h-8 items-center gap-1 rounded-[6px] px-1.5 hover:bg-crema hover:text-ink", filtri.ord === c.ordine && "text-ink")}>
+                            className={cx("-mx-1.5 inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] px-1.5 hover:bg-crema hover:text-ink", filtri.ord === c.ordine && "text-ink")}>
                             {c.titolo}
                             {filtri.ord === c.ordine && (filtri.dir === "asc" ? <ArrowUp size={12} weight="bold" aria-hidden /> : <ArrowDown size={12} weight="bold" aria-hidden />)}
                           </button>

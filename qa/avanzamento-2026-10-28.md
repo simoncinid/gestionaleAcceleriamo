@@ -172,3 +172,15 @@ Richiesta di Tommaso (via Dante): filtrare la tabella Lead per quando sono arriv
 - `Tendina.tsx`: opzione `alta` (fino a 560 px prima di scorrere), usata solo con il periodo aperto, larghezza 340.
 - Prove: `tests/b1bis-arrivati.test.tsx` (9 prove: oggi, ieri, 7 e 30 giorni a cavallo del 25/10, mese, mese scorso a gennaio, periodo, lead delle 00:30 e delle 23:59, segmenti, conteggi, indirizzo, pagina). vitest 1368/1368 (più 1/1 nodo), typecheck pulito, build ok. Nel browser sulla demo: Ultimi 7 giorni e Oggi danno 0 (la demo non ha lead recenti), periodo 08/10-28/10 dà 25 aperti, indirizzo aggiornato.
 - Foto: `qa/blocco-1/bis3-lead-filtro-arrivati-1440.png` (tendina aperta su Periodo) e `-390.png` (foglio Filtri), con `qa/blocco-1/bis3-foto.mjs`. Nella foto i campi data sono in formato americano perché il browser di prova è in inglese; su un browser italiano si vedono gg/mm/aaaa.
+
+## Blocco 1 bis, ordinamento per Arrivato il, Azienda e Fase
+
+Richiesta di Tommaso dalla produzione: "non posso ordinare per Arrivato il". Fatto da Silvio (sviluppatore), nessuna migrazione.
+
+- **Arrivato il** ordinabile (`ord=arrivo`): ordina per `createdAt` completo (data e ora). Primo clic dal più recente (desc), secondo dal più vecchio. Colonna allargata da 86 a 100 px per far stare la freccia.
+- **Azienda** (già ordinabile): a parità di azienda ora ordina per referente, senza referente in fondo. Primo clic A-Z.
+- **Fase** (già ordinabile): sort_order dalla più bassa, a parità per scadenza (invariato).
+- Verso al clic in una funzione sola, `versoAlClic` in `tabellaLead.ts`: sulla colonna attiva si inverte, su una nuova "Arrivato il" parte da desc, le altre da asc (Ultimo contatto e Da fare come prima).
+- Intestazioni ordinabili: aggiunto `cursor-pointer` (prima il cursore era quello normale), stesso sfondo al passaggio e colonna attiva in nero con freccia, come "Ultimo contatto". Ordine di default invariato (Da fare crescente, indirizzo pulito). Il CSV esporta le righe nell'ordine mostrato (invariato).
+- Prove: `tests/b1bis-ordina-arrivo.test.tsx` (6 prove: arrivo nei due versi con ore diverse nello stesso giorno, parità di ora, azienda con referente e maiuscole, fase con parità per scadenza, verso al primo e secondo clic, indirizzo). vitest 1374/1374 (più 1/1 nodo), typecheck pulito, build ok.
+- Nel browser (anteprima 5210, `qa/blocco-1/bis4-foto.mjs`): primo clic `ord=arrivo&dir=desc` con freccia giù, secondo `dir=asc`, resta dopo ricaricamento e passando a Chiusi; cursore a mano su tutte le intestazioni ordinabili. Foto `qa/blocco-1/bis4-lead-ordina-arrivo-1440.png`.

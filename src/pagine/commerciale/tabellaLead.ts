@@ -9,7 +9,7 @@ import type { LeadListItem, ProssimaAzione, Stage } from "../../types";
 export type RigaLead = LeadListItem & { prossima?: ProssimaAzione; ultimoContatto?: number | null };
 
 export type Segmento = "aperti" | "scaduti" | "chiusi";
-export type Ordine = "azienda" | "fase" | "scadenza" | "contatto";
+export type Ordine = "azienda" | "fase" | "scadenza" | "contatto" | "arrivo";
 export type Filtri = {
   seg: Segmento; fasi: string[]; resp: string; camp: string; q: string;
   // "oggi": solo le scadenze entro oggi (scadute comprese), lo stesso insieme della lista di Oggi.
@@ -80,7 +80,12 @@ export const NESSUNO = "nessuno";
 
 export const FILTRI_BASE: Filtri = { seg: "aperti", fasi: [], resp: "", camp: "", q: "", scad: "", arr: "", dal: "", al: "", ord: "scadenza", dir: "asc" };
 
-const ORDINI: Ordine[] = ["azienda", "fase", "scadenza", "contatto"];
+const ORDINI: Ordine[] = ["azienda", "fase", "scadenza", "contatto", "arrivo"];
+
+// Verso dopo un clic sull'intestazione: sulla colonna già attiva si inverte; su una colonna nuova "Arrivato il"
+// parte dal più recente (desc), le altre dal crescente (A-Z, fase più bassa, scadenza più vicina).
+export const versoAlClic = (f: Pick<Filtri, "ord" | "dir">, o: Ordine): Filtri["dir"] =>
+  f.ord === o ? (f.dir === "asc" ? "desc" : "asc") : o === "arrivo" ? "desc" : "asc";
 const lista = (v: string | null) => (v ? v.split(",").filter(Boolean) : []);
 
 export function leggiFiltri(p: URLSearchParams): Filtri {
@@ -165,18 +170,23 @@ export const titoloLead = (n: { aperti: number; scaduti: number }) =>
   `${n.aperti} ${n.aperti === 1 ? "lead aperto" : "lead aperti"}, ${n.scaduti} ${n.scaduti === 1 ? "scaduto" : "scaduti"}`;
 
 // Ordine di default: scadenza crescente (prima i più scaduti), poi fase. Senza scadenza (chiusi) in fondo,
-// dal cambio di fase più recente. Il clic sull'intestazione ordina per Azienda, Fase, Scadenza, Ultimo contatto.
+// dal cambio di fase più recente. Il clic sull'intestazione ordina per Azienda (poi referente), Fase (poi scadenza),
+// Scadenza, Ultimo contatto e Arrivato il (createdAt completo, data e ora).
 export function ordina(righe: RigaLead[], f: Pick<Filtri, "ord" | "dir">, fasi: Stage[]): RigaLead[] {
   const posto = new Map(fasi.map((s) => [s.id, s.sortOrder]));
   const fase = (a: RigaLead, b: RigaLead) => (posto.get(a.stageId) ?? 999) - (posto.get(b.stageId) ?? 999);
   const verso = f.dir === "desc" ? -1 : 1;
   const conValore = (va: number | null | undefined, vb: number | null | undefined) =>
     va == null && vb == null ? 0 : va == null ? 1 : vb == null ? -1 : verso * (va - vb);
+  // Referente a parità di azienda: nello stesso verso, senza nome in fondo.
+  const referente = (a: RigaLead, b: RigaLead) =>
+    !a.contactName && !b.contactName ? 0 : !a.contactName ? 1 : !b.contactName ? -1 : verso * a.contactName.localeCompare(b.contactName, "it", { sensitivity: "base" });
   const confronto = (a: RigaLead, b: RigaLead): number => {
     switch (f.ord) {
-      case "azienda": return verso * a.company.localeCompare(b.company, "it", { sensitivity: "base" });
+      case "azienda": return verso * a.company.localeCompare(b.company, "it", { sensitivity: "base" }) || referente(a, b);
       case "fase": return verso * fase(a, b) || conValore(a.prossima?.scadenza, b.prossima?.scadenza);
       case "contatto": return conValore(a.ultimoContatto, b.ultimoContatto);
+      case "arrivo": return conValore(a.createdAt, b.createdAt);
       default: return conValore(a.prossima?.scadenza, b.prossima?.scadenza) || fase(a, b) || b.stageChangedAt - a.stageChangedAt;
     }
   };
