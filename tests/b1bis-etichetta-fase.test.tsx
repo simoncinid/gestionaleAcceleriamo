@@ -1,29 +1,51 @@
 import { describe, expect, it } from "vitest";
-import { EtichettaFase, faseDi, tintaFase } from "../src/pagine/commerciale/EtichettaFase";
-import { classeScadenza } from "../src/pagine/commerciale/coloriLead";
+import { EtichettaFase, faseDi } from "../src/pagine/commerciale/EtichettaFase";
+import { classeScadenza, coloreFase } from "../src/pagine/commerciale/coloriLead";
 import { scadenzaBreve } from "../src/pagine/commerciale/tabellaLead";
 import { FASI } from "./b1c-fixture";
 import { render } from "./render";
 
-// Blocco 1 bis: la fase è un'etichetta colorata dal tono della tabella stages, alta 24 px, senza pallino.
+const FASI_DODICI = ["da-chiamare-prima-volta", "da-richiamare", "appuntamento-confermato", "in-attesa-preventivo", "presentazione-confermata",
+  "analisi-fissata", "in-attesa-progetto", "progetto-fissato", "in-attesa-decisione", "chiuso", "non-chiuso", "fake"];
+
+// Blocco 1 bis: la fase è un'etichetta colorata, alta 24 px, senza pallino.
+// Seconda passata: un colore per ogni fase (dodici), scelto dall'id della fase; sfondo tinta al 18%, bordo pieno.
+const contrasto = (a: string, b: string) => {
+  const l = (h: string) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [x, y] = [l(a), l(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+
 describe("blocco 1 bis: etichetta della fase", () => {
-  it("un colore per famiglia di fase, testo scuro, bordo, niente pallino", () => {
-    expect(tintaFase("orange")).toContain("bg-[#FCE4DA]");
-    expect(tintaFase("blue")).not.toBe(tintaFase("orange"));
-    expect(tintaFase("sconosciuto")).toBe(tintaFase("neutral"));
-    const html = render(<EtichettaFase label="Da richiamare" tone="orange" freccia />);
+  it("dodici fasi, dodici colori pieni diversi, testo leggibile (almeno 4,5:1) su ogni sfondo", () => {
+    const ids = FASI_DODICI;
+    const colori = ids.map((id) => coloreFase(id));
+    expect(new Set(colori.map((c) => c.pieno)).size).toBe(12);
+    expect(new Set(colori.map((c) => c.sfondo)).size).toBe(12);
+    expect(coloreFase("da-chiamare-prima-volta").pieno).toBe("#EC5E2D");
+    expect(coloreFase("chiuso").pieno).toBe("#16A34A");
+    for (const c of colori) expect(contrasto(c.testo, c.sfondo)).toBeGreaterThanOrEqual(4.5);
+    expect(coloreFase("boh")).toEqual(coloreFase("non-chiuso"));
+  });
+
+  it("etichetta: sfondo, bordo pieno da 1 px e testo dal colore della fase, alta 24 px, niente pallino", () => {
+    const c = coloreFase("presentazione-confermata");
+    const html = render(<EtichettaFase id="presentazione-confermata" label="Offerta fissata" freccia />);
     expect(html).toContain("h-6");
-    expect(html).toContain("text-ink");
-    expect(html).toContain("border");
-    expect(html).toContain("Da richiamare");
+    expect(html).toContain(`background-color:${c.sfondo}`);
+    expect(html).toContain(`border-color:${c.pieno}`);
+    expect(html).toContain(`color:${c.testo}`);
+    expect(html).toContain("Offerta fissata");
     expect(html).toContain("<svg"); // la freccia per cambiare fase
     expect(html).not.toContain("rounded-full");
   });
 
-  it("nome e tono dall'elenco delle fasi; fase sconosciuta in grigio con l'id", () => {
-    const fasi = FASI.map((f) => (f.id === "da-richiamare" ? { ...f, tone: "orange" } : f));
-    expect(faseDi(fasi, "da-richiamare")).toEqual({ label: "Da richiamare", tone: "orange" });
-    expect(faseDi(fasi, "boh")).toEqual({ label: "boh", tone: "neutral" });
+  it("nome dall'elenco delle fasi; fase sconosciuta in grigio con l'id", () => {
+    expect(faseDi(FASI, "da-richiamare")).toMatchObject({ id: "da-richiamare", label: "Da richiamare" });
+    expect(faseDi(FASI, "boh")).toEqual({ id: "boh", label: "boh" });
   });
 
   it("scadenza sotto l'azione: scaduta da 2 giorni e ieri in rosso, oggi in arancio scuro, domani normale", () => {

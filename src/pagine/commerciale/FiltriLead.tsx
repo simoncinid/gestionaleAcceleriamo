@@ -54,7 +54,7 @@ export function FiltriComputer({ filtri, onCambia, fasi, utenti, campagne, senza
     <div className="hidden flex-wrap items-center gap-2 md:flex">
       <Segmenti valore={filtri.seg} onCambia={(seg) => cambia({ seg, fasi: [] })} />
       <Filtro etichetta="Fase" multipla valori={filtri.fasi} onCambia={(fasi) => cambia({ fasi })} larghezza={280}
-        opzioni={fasiDelSegmento(fasi, filtri.seg).map((f) => ({ valore: f.id, etichetta: f.label, voce: <EtichettaFase label={f.label} tone={f.tone} /> }))} />
+        opzioni={fasiDelSegmento(fasi, filtri.seg).map((f) => ({ valore: f.id, etichetta: f.label, voce: <EtichettaFase id={f.id} label={f.label} /> }))} />
       <Filtro etichetta="Responsabile" tutte="Tutti" valori={filtri.resp ? [filtri.resp] : []} onCambia={([r]) => cambia({ resp: r ?? "" })}
         opzioni={opzioniResponsabile(utenti, senzaResponsabile)} />
       {campagne.length > 0 && (

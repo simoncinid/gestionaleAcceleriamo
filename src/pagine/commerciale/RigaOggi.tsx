@@ -31,7 +31,7 @@ export function aperturaDi(codice: Comando["codice"]): Apertura | "chiama" | "me
 }
 
 export function RigaDaFare({ l, ora, fase, primaria, onApri }: {
-  l: RigaOggi; ora: number; fase?: { label: string; tone: string }; primaria: boolean; onApri: (a: Apertura, c: Comando) => void;
+  l: RigaOggi; ora: number; fase?: { id: string; label: string }; primaria: boolean; onApri: (a: Apertura, c: Comando) => void;
 }) {
   const vai = useNavigate();
   const nonPresentato = useNonPresentato();

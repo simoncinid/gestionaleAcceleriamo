@@ -26,4 +26,4 @@ export const OCRA = "#B7791F";
 
 export const COLORE_STATO: Record<StatoScadenza, string> = { scaduto: ROSSO, oggi: ARANCIONE_TESTO, futuro: GRIGIO };
 
-// I colori delle fasi stanno in EtichettaFase.tsx (blocco 1 bis): un aspetto solo in tutto il gestionale.
+// I colori delle fasi stanno in coloriLead.ts e li usa EtichettaFase.tsx: un aspetto solo in tutto il gestionale.

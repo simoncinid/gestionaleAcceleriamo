@@ -60,19 +60,19 @@ export function CellaFase({ lead, fasi, onScegli }: { lead: RigaLead; fasi: Stag
   const [aperta, setAperta] = useState(false);
   const ancora = useRef<HTMLButtonElement>(null);
   const ordinate = [...fasi].sort((a, b) => a.sortOrder - b.sortOrder);
-  const { label: nome, tone } = faseDi(fasi, lead.stageId);
+  const { label: nome } = faseDi(fasi, lead.stageId);
   return (
     <>
       <button ref={ancora} type="button" aria-haspopup="menu" aria-expanded={aperta} aria-label={`Fase di ${lead.company}: ${nome}. Cambia`}
         onClick={() => setAperta((a) => !a)}
         className={cx("-mx-1 flex h-8 max-w-[calc(100%+8px)] min-w-0 items-center rounded-[8px] px-1 text-left hover:[&>span]:brightness-95", aperta && "ring-1 ring-ink")}>
-        <EtichettaFase label={nome} tone={tone} freccia />
+        <EtichettaFase id={lead.stageId} label={nome} freccia />
       </button>
       <Tendina ancora={ancora} aperta={aperta} onChiudi={() => setAperta(false)} etichetta={`Fase di ${lead.company}`} larghezza={260}>
         <div role="menu" aria-label={`Fase di ${lead.company}`}>
           {ordinate.map((f) => (
             <VoceTendina key={f.id} scelta={f.id === lead.stageId} onClick={() => { setAperta(false); onScegli(f); }}>
-              <EtichettaFase label={f.label} tone={f.tone} />
+              <EtichettaFase id={f.id} label={f.label} />
             </VoceTendina>
           ))}
         </div>

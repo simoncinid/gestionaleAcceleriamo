@@ -1,29 +1,23 @@
 import { CaretDown } from "@phosphor-icons/react";
 import { cx } from "../../ds";
 import type { Stage } from "../../types";
+import { coloreFase } from "./coloriLead";
 
 // Blocco 1 bis: la fase ha un aspetto solo in tutto il gestionale (tabella, scheda, Oggi, filtro, fogli).
-// Etichetta piena e chiara con testo scuro, un colore per famiglia di fase preso dal tono della tabella stages:
-// arancione = tocca a noi, blu = c'è una call in calendario, giallo = aspettiamo il cliente, verde = cliente,
-// grigio = chiusa. Tinte solide (non trasparenti), così sulla riga a zebra il colore non cambia.
-const TINTE: Record<string, string> = {
-  orange: "bg-[#FCE4DA] border-[#EFA88E]", // arancione del brand #EC5E2D al 15% su bianco, bordo più scuro
-  blue: "bg-[#E1E9F7] border-[#A7BDE3]",
-  yellow: "bg-[#FAF0CF] border-[#DFC46F]",
-  green: "bg-[#DCF0E3] border-[#98CBA9]",
-  neutral: "bg-[#EEEAE4] border-[#D2CABF]",
-};
-export const tintaFase = (tono: string | null | undefined) => TINTE[tono ?? ""] ?? TINTE.neutral;
+// Seconda passata: un colore per ogni fase, dall'id (mappa in coloriLead.ts): sfondo tinta solida, bordo da 1 px
+// nel colore pieno, testo nel colore pieno scurito. Alta 24 px, niente pallino.
 
-// Nome e tono di una fase dall'elenco; se la fase non c'è (dati vecchi) resta l'id in grigio.
-export function faseDi(fasi: Stage[] | undefined, id: string): { label: string; tone: string } {
+// Id e nome di una fase dall'elenco; se la fase non c'è (dati vecchi) resta l'id, in grigio.
+export function faseDi(fasi: Stage[] | undefined, id: string): { id: string; label: string } {
   const f = fasi?.find((x) => x.id === id);
-  return { label: f?.label ?? id, tone: f?.tone ?? "neutral" };
+  return { id, label: f?.label ?? id };
 }
 
-export function EtichettaFase({ label, tone, freccia = false, className }: { label: string; tone: string; freccia?: boolean; className?: string }) {
+export function EtichettaFase({ id, label, freccia = false, className }: { id: string; label: string; freccia?: boolean; className?: string }) {
+  const c = coloreFase(id);
   return (
-    <span title={label} className={cx("inline-flex h-6 max-w-full min-w-0 items-center gap-1 rounded-[6px] border px-2 text-[13px] font-medium leading-4 text-ink", tintaFase(tone), className)}>
+    <span title={label} style={{ backgroundColor: c.sfondo, borderColor: c.pieno, color: c.testo }}
+      className={cx("inline-flex h-6 max-w-full min-w-0 items-center gap-1 rounded-[6px] border px-2 text-[13px] font-medium leading-4", className)}>
       <span className="min-w-0 truncate">{label}</span>
       {freccia && <CaretDown size={11} weight="bold" aria-hidden className="shrink-0 opacity-70" />}
     </span>
