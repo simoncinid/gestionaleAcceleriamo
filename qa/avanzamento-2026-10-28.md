@@ -79,9 +79,40 @@ Dopo le modifiche 1 e 2, contratto delle interfacce fissato e committato (tipi `
 
 | Corsia | Agente | Ramo | Porta | Modifiche | Stato |
 |---|---|---|---|---|---|
-| A regole nel worker | Silvio | blocco1-corsia-a | 5211 | 3, 4, 6, 7 (worker), 12 (worker) | lanciata |
-| B scheda del lead | Damiano | blocco1-corsia-b | 5212 | 7 (foglio), 10, 11, 12 (fogli), 13, 14, 15, 16, 17 | lanciata |
-| C tabella e Oggi | Damiano | blocco1-corsia-c | 5213 | 18, 19, 20, 21, 22 | lanciata |
-| D gestione CRM | Silvio | blocco1-corsia-d | 5214 | 5, 8, 9 | lanciata |
+| A regole nel worker | Silvio | blocco1-corsia-a | 5211 | 3, 4, 6, 7 (worker), 12 (worker) | in corso (agente partito 28/10) |
+| B scheda del lead | Damiano | blocco1-corsia-b | 5212 | 7 (foglio), 10, 11, 12 (fogli), 13, 14, 15, 16, 17 | in corso (agente partito 28/10) |
+| C tabella e Oggi | Damiano | blocco1-corsia-c | 5213 | 18, 19, 20, 21, 22 | in corso (agente partito 28/10) |
+| D gestione CRM | Silvio | blocco1-corsia-d | 5214 | 5, 8, 9 | in corso (agente partito 28/10) |
 
 Dopo l'unione: 23 (passata UI, Damiano) sul ramo unito, poi test, typecheck, build, e2e e foto sull'anteprima 5210. 24: Dante.
+
+## Ramo di Diego avanzato (nota del 28/10)
+
+- `diego/acceleriamo-os` è a `33ca9e8` (5 commit del 28/10 mattina dal worktree `acceleriamo-os-restyling`: risponditore, pagina risorsa, SEO e robots.txt delle risorse, prove delle risorse; 217 file). La nostra unione `da8734b` arrivava a `774a5d2`.
+- File in comune col nostro ramo: solo `worker/db/schema.ts` (colonna `risorse.seo`, nessun conflitto di righe atteso), `drizzle/meta/_journal.json`, `drizzle/meta/0018_snapshot.json`.
+- Conflitto vero: due migrazioni 0018 (`0018_risorse_seo.sql` di Diego, `0018_blocco1.sql` nostra). Ruling: all'unione la nostra diventa `0019_blocco1.sql` con snapshot e journal rigenerati dopo la 0018 di Diego, perché il suo ramo è quello pubblicato e la nostra non è mai uscita dal Mac. Costo se sbagliato: rinominare una migrazione locale. I D1 locali (demo) che hanno già la nostra 0018 vanno ricreati da zero prima delle prove.
+- Ordine all'unione: prima `git merge diego/acceleriamo-os` nel ramo `acceleriamo-os`, poi le quattro corsie, poi test, typecheck, build, e2e. Niente push.
+
+## Modifica 25: percorso di vendita a cinque chiamate (ordine di Tommaso via Dante, 28/10)
+
+- Dove: nella fase di unione, dopo il merge di Diego e delle quattro corsie, prima delle prove finali. La fa Silvio (sviluppatore); i testi di scheda e tabella li ricontrolla Damiano (designer) nella 23.
+- Ruling: non la passo alla corsia A, che è ancora aperta (modifiche 3, 4, 6 chiuse), perché un agente già partito non riceve messaggi e perché tutte e quattro le corsie lavorano sugli id di fase e sui tipi di call di oggi: cambiarli a metà romperebbe tre rami in parallelo. Costo se sbagliato: un giro in più di prove dopo l'unione.
+- Migrazione: `0020_percorso_cinque_call.sql` (0018 è di Diego, 0019 sarà la nostra `blocco1`). Gli id restano stringhe; cambiano etichetta e ordine, più tre fasi nuove.
+- Mappa vecchio → nuovo:
+
+| Fase | id | Prima | Dopo |
+|---|---|---|---|
+| 10 | da-chiamare-prima-volta | Nuovo, da chiamare | invariata |
+| 20 | da-richiamare | Da richiamare | invariata |
+| 30 | appuntamento-confermato | Consulenza fissata | Conoscenza fissata |
+| 35 | in-attesa-preventivo | In attesa preventivo (40) | In attesa offerta: "Prepara l'offerta con la forbice" entro 2 giorni lavorativi |
+| 40 | presentazione-confermata | Presentazione fissata (50) | Offerta fissata: call dell'offerta, poi "Fissa la call di analisi" |
+| 45 | analisi-fissata (nuova) | | "Fai l'analisi" alla data della call, no-show come le altre |
+| 50 | in-attesa-progetto (nuova) | | "Prepara il progetto" entro 3 giorni lavorativi |
+| 55 | progetto-fissato (nuova) | | "Presenta il progetto e chiudi" alla data della call |
+| 60 | in-attesa-decisione | In attesa decisione | invariata, ci si arriva dopo "Progetto presentato" |
+| 70, 80, 90 | chiuso, non-chiuso, fake | | invariate |
+
+- Tipi di call: `conoscenza`, `offerta` (ex `presentazione`, i dati vecchi aggiornati dalla migrazione), `analisi`, `progetto`. La chiamata di qualifica resta un tentativo, non una call.
+- Da toccare: `prossimaAzione` e `transizione` (tabella delle fasi, esiti per fase, ruoli: 10-30 primaChiamata, 35-60 presentazione salvo diversa indicazione), enum `calls.kind`, `esitiPerFase`, fogli della call (4 tipi), pallini e filtri della tabella, seed demo a 12 lead (uno per fase), prove.
+- Il contratto `collaudo-fable-lead.md` lo aggiorna Dante (direttore).
