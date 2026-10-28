@@ -9,7 +9,6 @@ import { CorpoEsporta } from "../src/pagine/impostazioni/Dati";
 import { Fasi } from "../src/pagine/impostazioni/Fasi";
 import { IntegrazioneDettaglio } from "../src/pagine/impostazioni/IntegrazioneDettaglio";
 import { Utenti } from "../src/pagine/impostazioni/Utenti";
-import { RiordinaFasi, spostaFase } from "../src/pagine/impostazioni/RiordinaFasi";
 import { FoglioAbbina } from "../src/pagine/commerciale/FoglioProposta";
 import { Voci } from "../src/pagine/commerciale/MenuRapido";
 import type { LeadListItem, Stage } from "../src/types";
@@ -20,21 +19,6 @@ const f = (id: string, kind: Stage["kind"], sortOrder: number): Stage => ({ id, 
 const FASI = [f("a", "open", 10), f("b", "open", 20), f("c", "open", 30), f("vinto", "won", 40), f("perso", "lost", 50)];
 
 describe("Riordina", () => {
-  it("sposta dentro lo stesso gruppo", () => {
-    expect(spostaFase(FASI, "b", -1)).toEqual(["b", "a", "c", "vinto", "perso"]);
-    expect(spostaFase(FASI, "b", 1)).toEqual(["a", "c", "b", "vinto", "perso"]);
-  });
-  it("non esce dal gruppo né dall'elenco", () => {
-    expect(spostaFase(FASI, "c", 1)).toBeNull();
-    expect(spostaFase(FASI, "a", -1)).toBeNull();
-    expect(spostaFase(FASI, "vinto", 1)).toBeNull();
-  });
-  it("foglio: un solo primario, frecce con l'etichetta della fase", () => {
-    const html = render(<RiordinaFasi fasi={FASI} onChiudi={() => {}} />, { percorso: "/impostazioni/fasi" });
-    expect(html).toContain("Salva l&#x27;ordine");
-    expect(html).toContain('aria-label="Sposta B più su"');
-    expect(contaPrimari(html)).toBe(1);
-  });
   it("pagina Fasi: niente Riordina, le fasi sono fisse (blocco 1, modifica 4)", () => {
     const html = render(<Fasi />, { percorso: "/impostazioni/fasi", dati: [[["stages"], FASI], [["stage-rules"], []], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], []]] });
     expect(html).not.toContain(">Riordina<");
