@@ -16,6 +16,7 @@ import { esitoSchema, primoTentativoAt, registraContatto, salvaEsito } from "./e
 import { proposteDelLead } from "../proposte/service";
 import { conScadenzaSla, leggiSla } from "../regole/sla";
 import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
+import { conProssima } from "../processo/leggi";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -29,7 +30,7 @@ leadRoutes.get("/", async (c) => {
     listLeads(db, { q: q.q, stageId: q.stageId, source: q.source, campaign: q.campaign, ownerId: q.ownerId, score, vista, da: num(q.da), a: num(q.a) }),
     leggiSla(db),
   ]);
-  return c.json({ leads: rows.map((l) => conScadenzaSla(l, sla)) });
+  return c.json({ leads: await conProssima(db, rows.map((l) => conScadenzaSla(l, sla)), Date.now()) });
 });
 
 // Prima delle rotte con /:id.
@@ -51,12 +52,13 @@ leadRoutes.post("/", async (c) => {
   } catch (e) {
     console.error("catena_lead_nuovo", e);
   }
-  return c.json({ lead: conScadenzaSla(await getLead(db, creato.id), await leggiSla(db)) }, 201);
+  const [nuovo] = await conProssima(db, [conScadenzaSla(await getLead(db, creato.id), await leggiSla(db))], Date.now());
+  return c.json({ lead: nuovo }, 201);
 });
 
 leadRoutes.get("/:id", async (c) => {
   const db = getDb(c.env.DB);
-  const lead = conScadenzaSla(await getLead(db, c.req.param("id")), await leggiSla(db));
+  const [lead] = await conProssima(db, [conScadenzaSla(await getLead(db, c.req.param("id")), await leggiSla(db))], Date.now());
   const history = await db
     .select({ id: activities.id, type: activities.type, body: activities.body, createdAt: activities.createdAt, authorId: activities.authorId, authorName: users.name })
     .from(activities)

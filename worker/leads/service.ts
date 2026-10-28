@@ -313,6 +313,8 @@ export async function listLeads(db: Db, f: LeadFilters) {
       setupCents: leads.setupCents,
       feeCents: leads.feeCents,
       sequenceStep: leads.sequenceStep,
+      pausedUntil: leads.pausedUntil,
+      lostReason: leads.lostReason,
     })
     .from(leads)
     .where(and(...conds))

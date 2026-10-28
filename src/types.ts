@@ -10,6 +10,9 @@ export type LeadListItem = {
   estimatedValue: number | null; ownerId: string | null; nextAction: string | null; nextActionAt: number | null;
   appointmentAt: number | null; duplicateOfId: string | null; createdAt: number; updatedAt: number; deletedAt: number | null;
   attemptCount: number; score: "verde" | "giallo" | "grigio" | null; setupCents: number | null; feeCents: number | null; sequenceStep: number;
+  pausedUntil?: number | null; lostReason?: string | null;
+  // Riga "Da fare" della funzione unica (worker/processo/processo.ts): la mostrano scheda, tabella e Oggi.
+  prossima?: ProssimaAzione;
 };
 
 export type Lead = LeadListItem & {
@@ -28,6 +31,8 @@ export type Stats = {
   byStage: { stageId: string; label: string; count: number }[];
   firstResponse: { avgMs: number | null; count: number };
 };
+export type { CodiceAzione, Comando, ProssimaAzione, StatoScadenza } from "../worker/processo/processo";
+import type { ProssimaAzione } from "../worker/processo/processo";
 export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";
 export type { Funnel, Stats1A, Tappa, TempoFase } from "../worker/numeri/funnel";
 export type { Campagne, LivelloCosto, RigaCampagna, RigaInserzione } from "../worker/numeri/campagne";

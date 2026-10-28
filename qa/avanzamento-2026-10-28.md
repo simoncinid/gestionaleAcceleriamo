@@ -61,3 +61,13 @@ Chi: Silvio (sviluppatore). Ramo `acceleriamo-os`, commit locali, niente push.
 
 - 20 risorse nuove nel file del wiki senza grafiche nel gestionale (`npm run risorse:grafiche`): lavoro di contenuto, da decidere.
 - Avviso della build sul pacchetto sopra 500 kB: non urgente.
+
+# Blocco 1 (contratto: wiki `companies/acceleriamo/miglioramenti/2026-10-26-audit-gestionale/collaudo-fable-lead.md`, sezione 10)
+
+Avvio 28/10/2026, Silvio (sviluppatore). Base: `da8734b` (merge dei 4 commit del risponditore arrivati su `diego/acceleriamo-os`: autore Tommaso, non Diego, file solo `worker/risponditore`, `worker/cron.ts` e prove; nessun conflitto, quindi niente stop).
+Anteprima: `CLOUDFLARE_ENV=demo npx vite --port 5210`, log in `qa/anteprima.log`. Screenshot in `qa/blocco-1/`.
+Regola: un commit per modifica, "blocco 1, modifica N: ...". Niente push. La 24 (collaudo finale) la lancia Dante.
+
+| N | Modifica | Commit | Esito | Resta |
+|---|---|---|---|---|
+| 1 | Funzione unica: `worker/processo/processo.ts` (`prossimaAzione`), `transizione.ts` (`transizione`), `leggi.ts` (aggiunge `prossima` a elenco e scheda); `motore.ts` ora involucro | vedi git log | OK: `tests/processo.test.ts` 10/10 (una per fase + invariante + colori), motore/esito/call 68 verdi, typecheck pulito; nel browser 32 lead aperti, 0 senza azione | Ruling: la scadenza resta salvata in `nextActionAt` (la scrive la transizione); `prossimaAzione` la legge e decide testo, pulsante, colore. Costo se sbagliato: un campo derivato in più da tenere allineato. La scheda vecchia legge già `prossima`; tabella e Oggi la useranno con le modifiche 18 e 22 |

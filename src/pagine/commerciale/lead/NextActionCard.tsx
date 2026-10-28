@@ -23,7 +23,10 @@ export function NextActionCard({ lead, kind, ora, seNonRisponde, onSave, pending
       </section>
     );
   }
-  const scaduta = lead.nextActionAt != null && lead.nextActionAt < ora;
+  // Azione e scadenza dalla funzione unica del server; il dato salvato resta solo come riserva.
+  const azioneDaFare = lead.prossima?.azione ?? lead.nextAction;
+  const scadenza = lead.prossima?.scadenza ?? lead.nextActionAt;
+  const scaduta = scadenza != null && scadenza < ora;
   const apri = () => { setAzione(lead.nextAction ?? ""); setMomento(lead.nextActionAt); setCambia(true); };
   return (
     <section aria-label="Prossima azione" className={cx("rounded-blocco border border-sabbia p-4", scaduta ? "bg-tinta-2" : "bg-avorio")}>
@@ -45,9 +48,9 @@ export function NextActionCard({ lead, kind, ora, seNonRisponde, onSave, pending
         <div className="flex flex-col gap-1 pt-2">
           <p className="flex items-center gap-2 text-corpo">
             <Clock size={18} weight="bold" aria-hidden className={cx("shrink-0", scaduta ? "text-errore" : "text-grigio")} />
-            <span className="min-w-0 truncate">{lead.nextAction ?? "Nessuna azione"}</span>
+            <span className="min-w-0 truncate">{azioneDaFare ?? "Nessuna azione"}</span>
           </p>
-          {lead.nextActionAt != null && <p className={cx("text-secondaria tabular-nums", scaduta ? "font-semibold text-errore" : "text-grigio")}>{quando(lead.nextActionAt, ora)}</p>}
+          {scadenza != null && <p className={cx("text-secondaria tabular-nums", scaduta ? "font-semibold text-errore" : "text-grigio")}>{quando(scadenza, ora)}</p>}
           <p className="text-secondaria text-grigio tabular-nums">{testoTentativo(lead.attemptCount)}</p>
           {seNonRisponde && <p className="text-secondaria text-grigio">Se non risponde: {seNonRisponde}</p>}
         </div>
