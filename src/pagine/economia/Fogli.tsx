@@ -7,6 +7,7 @@ import { Campo, CampoGiorno, Foglio, Interruttore, Pulsante, Selettore, type Opz
 import { daIsoGiorno, euro, ilGiorno, isoGiorno, presetPassato } from "../../format";
 import { daRoma } from "../../../worker/lib/roma";
 import type { CanoneRiga, FatturaRiga } from "../../types";
+import { ContattoDalCliente } from "../commerciale/lead/ContattoDa";
 import { centesimi } from "../commerciale/scheda";
 import { opzioniClienti, useAutomazioni, useClienti, useRicarica } from "../dati-gestione";
 
@@ -169,6 +170,7 @@ export function FoglioCanone({ c, ora = Date.now(), onChiudi }: { c: CanoneRiga;
   }
   return (
     <Foglio aperto titolo={`Canone di ${c.cliente}`} onChiudi={onChiudi}>
+      <ContattoDalCliente clienteId={c.clientId} azienda={c.cliente} />
       <p className="font-display text-titolo-card tabular-nums">{`${euro(c.amountCents)} al mese`}</p>
       <p className="text-corpo">{`Fatturazione il giorno ${c.billingDay}`}</p>
       <p className="text-corpo">{`Stato: ${ETICHETTE_CANONE[c.status]}`}</p>

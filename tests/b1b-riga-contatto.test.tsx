@@ -34,3 +34,13 @@ describe("dal canone all'automazione", async () => {
     expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>).)*href="\/automazioni\/A1"/s);
   });
 });
+
+describe("foglio del canone", async () => {
+  const { FoglioCanone } = await import("../src/pagine/economia/Fogli");
+  it("ha la riga del contatto con lead e cliente", () => {
+    const c = { id: "F1", clientId: "C1", automationId: null, amountCents: 30000, billingDay: 1, status: "attivo", cliente: "Officina Prova", startAt: null, pausedAt: null, endAt: null } as never;
+    const html = render(<FoglioCanone c={c} ora={0} onChiudi={() => {}} />, { dati: [[["clienti", "C1"], { lead: { id: "L1", company: "Officina Prova" } }]] });
+    expect(html).toContain('href="/commerciale/clienti/C1"');
+    expect(html).toContain('href="/commerciale/lead/L1"');
+  });
+});
