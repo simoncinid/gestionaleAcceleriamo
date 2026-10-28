@@ -111,7 +111,7 @@ export async function paginaRisorsa(c: Context<AppEnv>) {
 
 // robots.txt: si indicizzano solo le pagine risorsa (e quello che serve a disegnarle); il gestionale resta fuori.
 export function robots(c: Context<AppEnv>) {
-  const testo = ["User-agent: *", "Allow: /r/", "Allow: /api/pubblico/", "Allow: /assets/", "Allow: /risorse/", "Allow: /brand/", "Allow: /fonts/", "Allow: /icone/", "Allow: /icone-3d/", "Disallow: /", "", `Sitemap: ${base(c)}/sitemap.xml`, ""].join("\n");
+  const testo = ["User-agent: *", "Allow: /r/", "Allow: /api/pubblico/", "Allow: /assets/", "Allow: /risorse/", "Allow: /brand/", "Allow: /fonts/", "Allow: /icone/", "Allow: /icone-3d/", "Allow: /sitemap.xml", "Allow: /app/favicon.svg", "Disallow: /", "", `Sitemap: ${base(c)}/sitemap.xml`, ""].join("\n");
   return c.text(testo, 200, { "cache-control": "public, max-age=3600" });
 }
 
