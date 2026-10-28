@@ -18,7 +18,7 @@ function graphFinto(risposta: (url: string) => Response = () => Response.json({ 
 }
 
 async function campagna(extra: Partial<Record<string, unknown>> = {}) {
-  const c = { id: "camp-1", nome: "Guida", parola: "casa", media_id: null, rispostepubbliche: JSON.stringify(["Ti scrivo in privato!"]), testo_privato: "Ecco la guida", etichetta_pulsante: "Mandami il link", risorsa_slug: "guida", testo_link: "Eccolo", attiva: 1, creata_il: NOW, ...extra };
+  const c = { id: "camp-1", nome: "Guida", parola: "casa", media_id: "m1" as string | null, rispostepubbliche: JSON.stringify(["Ti scrivo in privato!"]), testo_privato: "Ecco la guida", etichetta_pulsante: "Mandami il link", risorsa_slug: "guida", testo_link: "Eccolo", attiva: 1, creata_il: NOW, ...extra };
   await env.DB.prepare(
     "INSERT INTO risp_campagne (id, nome, parola, media_id, rispostepubbliche, testo_privato, etichetta_pulsante, risorsa_slug, testo_link, attiva, creata_il) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
   ).bind(c.id, c.nome, c.parola, c.media_id, c.rispostepubbliche, c.testo_privato, c.etichetta_pulsante, c.risorsa_slug, c.testo_link, c.attiva, c.creata_il).run();
@@ -184,5 +184,81 @@ describe("trattaCommento", () => {
     expect(await trattaCommento({ ...env, DB: db as D1Database }, commento(), NOW)).toBe("errore");
     expect(await evento("c1")).toMatchObject({ stato: "errore", tentativi: 1, motivo: "D1 non risponde" });
     expect(chiamate).toHaveLength(0);
+  });
+});
+
+describe("campagna senza post legato: risponde solo dove la didascalia chiede la parola", () => {
+  const conDidascalia = (caption: string | null) =>
+    graphFinto((url) => (url.includes("?fields=caption") ? (caption === null ? Response.json({ error: { code: 1, message: "giù" } }, { status: 500 }) : Response.json({ id: "m1", caption })) : Response.json({ id: "ok-1" })));
+
+  it("didascalia con \"Commenta CASA\": parte tutto; il secondo commento rilegge la didascalia (si ricordano solo i no)", async () => {
+    await campagna({ media_id: null });
+    conDidascalia("Le richieste dei portali all'agente giusto. Commenta CASA e ti mandiamo lo schema.");
+    expect(await trattaCommento(env, commento(), NOW)).toBe("inviato");
+    expect(urlsFinali()).toEqual(["/m1?fields=caption", "/c1/replies", "/me/messages"]);
+    chiamate = [];
+    expect(await trattaCommento(env, commento({ id: "c2", autoreId: "persona-2" }), NOW + 1)).toBe("inviato");
+    expect(urlsFinali()).toEqual(["/m1?fields=caption", "/c2/replies", "/me/messages"]);
+  });
+
+  it("\"tra due ore\" sotto un post che non chiede ORE: nessuna risposta, nessun messaggio, motivo scritto", async () => {
+    await campagna({ media_id: null, parola: "ore" });
+    conDidascalia("Il nostro nuovo ufficio. Commenta TEMPO e ti mandiamo lo schema.");
+    expect(await trattaCommento(env, commento({ testo: "ci sentiamo tra due ore" }), NOW)).toBe("ignorato");
+    expect(urlsFinali()).toEqual(["/m1?fields=caption"]);
+    expect(await evento("c1")).toMatchObject({ stato: "ignorato", campagna_id: "camp-1", motivo: "parola non chiesta nella didascalia di questo post" });
+    chiamate = [];
+    expect(await trattaCommento(env, commento({ id: "c2", autoreId: "persona-2", testo: "ORE" }), NOW + 1)).toBe("ignorato");
+    expect(chiamate).toHaveLength(0); // la risposta di prima vale per tutto il post
+  });
+
+  it("parola solo nominata nella didascalia (senza \"Commenta\"): non basta", async () => {
+    await campagna({ media_id: null, parola: "ore" });
+    conDidascalia("Abbiamo risparmiato tre ore a settimana. Commenta TEMPO.");
+    expect(await trattaCommento(env, commento({ testo: "ore" }), NOW)).toBe("ignorato");
+  });
+
+  it("didascalia non leggibile: errore senza invii; il giro riprova e, se la didascalia conferma, manda", async () => {
+    await campagna({ media_id: null });
+    conDidascalia(null);
+    expect(await trattaCommento(env, commento(), NOW)).toBe("errore");
+    expect(urlsFinali()).toEqual(["/m1?fields=caption"]);
+    expect((await evento("c1"))?.motivo).toContain("Didascalia del post non leggibile");
+    conDidascalia("Commenta CASA e ti mandiamo lo schema");
+    chiamate = [];
+    const { giroRisponditore } = await import("../worker/risponditore/giro");
+    expect(await giroRisponditore(env, NOW + 11 * 60_000, 3)).toMatchObject({ ritentati: 1 });
+    expect(urlsFinali().filter((u) => !u.startsWith("/me/media"))).toEqual(["/m1?fields=caption", "/me/messages"]);
+    expect((await evento("c1"))?.stato).toBe("inviato");
+  });
+
+  it("commento con due parole (CARICO e ORE): risponde la campagna chiesta dal post, anche se l'altra è più recente", async () => {
+    await campagna({ id: "camp-carico", media_id: null, parola: "carico", creata_il: NOW - 1000 });
+    await campagna({ id: "camp-ore", media_id: null, parola: "ore", creata_il: NOW });
+    conDidascalia("Traslochi: la lista di carico. Commenta CARICO e te la mandiamo.");
+    expect(await trattaCommento(env, commento({ testo: "CARICO, ci perdo ore ogni volta" }), NOW)).toBe("inviato");
+    expect((await evento("c1"))?.campagna_id).toBe("camp-carico");
+    expect(urlsFinali().filter((u) => u.includes("fields=caption")).length).toBeLessThanOrEqual(2);
+  });
+
+  it("parola scritta tra virgolette nella didascalia (Commenta \"CARICO\"): vale", async () => {
+    await campagna({ media_id: null, parola: "carico" });
+    conDidascalia("Commenta \"CARICO\" e te la mandiamo.");
+    expect(await trattaCommento(env, commento({ testo: "carico" }), NOW)).toBe("inviato");
+  });
+
+  it("un invio fatto prima del controllo non vale come sì: sotto un post che non chiede ORE non riparte", async () => {
+    await campagna({ media_id: null, parola: "ore" });
+    await env.DB.prepare("INSERT INTO risp_eventi (commento_id, media_id, autore_id, testo, campagna_id, stato, tentativi, creato_il, aggiornato_il) VALUES ('vecchio','m1','persona-9','ore','camp-1','inviato',0,?,?)").bind(NOW - 1000, NOW - 1000).run();
+    conDidascalia("Il nostro nuovo ufficio. Commenta TEMPO e ti mandiamo lo schema.");
+    expect(await trattaCommento(env, commento({ testo: "tra due ore" }), NOW)).toBe("ignorato");
+    expect(urlsFinali()).toEqual(["/m1?fields=caption"]);
+  });
+
+  it("campagna legata al post: nessuna lettura della didascalia", async () => {
+    await campagna();
+    conDidascalia(null);
+    expect(await trattaCommento(env, commento(), NOW)).toBe("inviato");
+    expect(urlsFinali()).toEqual(["/c1/replies", "/me/messages"]);
   });
 });

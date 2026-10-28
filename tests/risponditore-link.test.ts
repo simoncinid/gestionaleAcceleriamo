@@ -27,7 +27,7 @@ beforeEach(async () => {
   });
   await salvaToken(env, { igUserId: "1784", username: "acceleriamo", token: "IGAA-segreto", scadeIl: NOW + 30 * GIORNO }, NOW - GIORNO);
   await env.DB.prepare(
-    "INSERT INTO risp_campagne (id, nome, parola, media_id, rispostepubbliche, testo_privato, etichetta_pulsante, risorsa_slug, testo_link, attiva, creata_il) VALUES ('camp-1','Guida','casa',NULL,?, 'Ecco','Mandami il link','guida','Eccolo, e seguici!',1,?)",
+    "INSERT INTO risp_campagne (id, nome, parola, media_id, rispostepubbliche, testo_privato, etichetta_pulsante, risorsa_slug, testo_link, attiva, creata_il) VALUES ('camp-1','Guida','casa','m1',?, 'Ecco','Mandami il link','guida','Eccolo, e seguici!',1,?)",
   ).bind(JSON.stringify(["Ti scrivo!"]), NOW).run();
 });
 afterEach(() => {

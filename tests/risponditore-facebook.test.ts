@@ -29,6 +29,8 @@ beforeEach(async () => {
   risposta = () => Response.json({ id: "ok-1", message_id: "m" });
   setMetaFetch(async (url, init) => {
     const metodo = init?.method ?? "GET";
+    // Il testo del post (campagna senza post legato): dice "Commenta CASA", non conta tra le chiamate.
+    if (url.endsWith("?fields=message")) return Response.json({ message: "Commenta CASA e ti mandiamo la guida" });
     chiamate.push({ url, metodo, corpo: init?.body ? JSON.parse(String(init.body)) : null, auth: new Headers(init?.headers).get("authorization") });
     return risposta(url, metodo);
   });

@@ -15,6 +15,8 @@ let nPrivati = 0;
 function graphFinto() {
   setMetaFetch(async (url) => {
     const percorso = url.split("/v25.0")[1];
+    // La didascalia del post (campagna senza post legato): dice "Commenta CASA", non conta tra le chiamate.
+    if (percorso.endsWith("?fields=caption")) return Response.json({ caption: "Commenta CASA e ti mandiamo la guida" });
     chiamate.push(percorso);
     if (percorso === "/me/messages") return privato(++nPrivati);
     return Response.json({ id: "ok-1" });
