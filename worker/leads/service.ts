@@ -8,6 +8,7 @@ import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { callPerFase } from "../regole/fasi-call";
+import { responsabileDellaFase } from "../regole/applica";
 
 export const DEFAULT_NEXT_ACTION = "Prima chiamata";
 
@@ -147,6 +148,12 @@ export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: 
   const next: Partial<Lead> = { ...patch, updatedAt: now };
   // La pausa vale solo nella fase in cui è nata: cambiando fase si toglie.
   if (stageChanged) { next.stageChangedAt = now; next.pausedUntil = null; }
+  // Un responsabile scelto a mano resta tale ai cambi di fase; altrimenti la fase porta il suo default.
+  if ("ownerId" in patch) next.ownerManual = true;
+  else if (stageChanged) {
+    const owner = await responsabileDellaFase(db, current, stage.id);
+    if (owner !== undefined) next.ownerId = owner;
+  }
 
   if (stage.kind === "open") {
     const at = patch.nextActionAt !== undefined ? patch.nextActionAt : current.nextActionAt;
@@ -352,7 +359,7 @@ export async function azioniMultiple(db: Db, input: AzioneMultipla, actorId: str
   } else if (input.azione === "responsabile") {
     const ownerId = input.valore ?? null;
     for (const l of trovati) {
-      passi.push(db.update(leads).set({ ownerId, updatedAt: now }).where(eq(leads.id, l.id)));
+      passi.push(db.update(leads).set({ ownerId, ownerManual: true, updatedAt: now }).where(eq(leads.id, l.id)));
       passi.push(voce(l.id, "update", l.ownerId === ownerId ? {} : { ownerId: { from: l.ownerId, to: ownerId } }));
     }
   } else {
@@ -364,7 +371,8 @@ export async function azioniMultiple(db: Db, input: AzioneMultipla, actorId: str
       const aperta = nuova.kind === "open";
       const nextAction = aperta ? (l.nextAction ?? nuova.suggestedNextAction ?? DEFAULT_NEXT_ACTION) : null;
       const nextActionAt = aperta ? (l.nextActionAt ?? now + (nuova.suggestedDelayHours ?? 0) * 3_600_000) : null;
-      passi.push(db.update(leads).set({ stageId: nuova.id, stageChangedAt: now, pausedUntil: null, nextAction, nextActionAt, updatedAt: now }).where(eq(leads.id, l.id)));
+      const owner = await responsabileDellaFase(db, l, nuova.id);
+      passi.push(db.update(leads).set({ stageId: nuova.id, stageChangedAt: now, pausedUntil: null, nextAction, nextActionAt, updatedAt: now, ...(owner !== undefined ? { ownerId: owner } : {}) }).where(eq(leads.id, l.id)));
       passi.push(attivita(l.id, "cambio_fase", `Da "${etichette.get(l.stageId) ?? l.stageId}" a "${nuova.label}"`));
       const changes: Record<string, { from: unknown; to: unknown }> = { stageId: { from: l.stageId, to: nuova.id } };
       if (nextAction !== l.nextAction) changes.nextAction = { from: l.nextAction, to: nextAction };

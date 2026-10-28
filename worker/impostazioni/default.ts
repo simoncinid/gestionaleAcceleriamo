@@ -66,7 +66,7 @@ export const IMPOSTAZIONI_DEFAULT: Impostazioni = {
     { id: "gia_servito", etichetta: "Già servito" },
     { id: "altro", etichetta: "Altro" },
   ],
-  assegnazione: { primaChiamata: "diego", presentazione: "diego", proposta: "diego", via: { utente: null, fino: null } },
+  assegnazione: { primaChiamata: "diego", presentazione: "tommaso", proposta: "diego", via: { utente: null, fino: null } },
   conferma: {
     attiva: true,
     mittente: "Tommaso di Acceleriamo <tommaso@mail.acceleriamo.it>",
