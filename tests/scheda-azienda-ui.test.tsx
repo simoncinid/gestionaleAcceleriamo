@@ -17,16 +17,16 @@ describe("SezioneSchedaAzienda", () => {
     expect(html).toContain("Prepara comunque");
     expect(contaPrimari(html)).toBe(0);
   });
-  it("lead a mano senza scheda: Prepara la scheda", async () => {
-    expect(await r("nessuna", {}, true)).toContain("Prepara la scheda");
+  it("lead a mano senza scheda: Genera la ricerca", async () => {
+    expect(await r("nessuna", {}, true)).toContain("Genera la ricerca");
   });
   it("in coda: nessun pulsante", async () => {
     const html = await r("in_coda");
     expect(html).toContain("In coda");
     expect(html).not.toContain("<button");
   });
-  it("errore con lavoro: Riprova la scheda", async () => {
-    expect(await r("errore", { errore: "Risposta troncata", jobId: "j1" })).toContain("Riprova la scheda");
+  it("errore con lavoro: Riprova la ricerca", async () => {
+    expect(await r("errore", { errore: "Risposta troncata", jobId: "j1" })).toContain("Riprova la ricerca");
   });
   it("pronta: contenuto come testo, Rigenera e versione da stampare", async () => {
     const html = await r("pronta", { contenuto: "## Chi è\n<script>x</script>\n[x](javascript:alert(1))", aggiornata: 0, fonti: [{ url: "javascript:alert(2)", titolo: "cattiva" }, { url: "https://a.it", titolo: "Fonte A" }] });
@@ -35,7 +35,7 @@ describe("SezioneSchedaAzienda", () => {
     expect(html).not.toContain("javascript:");
     expect(html).toContain("Fonte A");
     expect(html).not.toContain("cattiva");
-    expect(html).toContain("Rigenera la scheda");
+    expect(html).toContain("Rigenera la ricerca");
     expect(html).toContain("/api/leads/L1/scheda-azienda/stampa");
     expect(contaPrimari(html)).toBe(0);
   });
@@ -86,12 +86,12 @@ describe("SezioneSchedaAzienda: errori e versione precedente", () => {
     expect(html).toContain("Nuova versione in preparazione");
     expect(html).toContain("vecchia");
     expect(html).toContain("/api/leads/L1/scheda-azienda/stampa");
-    expect(html).not.toContain("Rigenera la scheda");
+    expect(html).not.toContain("Rigenera la ricerca");
   });
   it("nuova versione non riuscita: Riprova e la precedente resta", async () => {
     const html = await r("errore", { contenuto: "## Chi è\nvecchia", versione: 1, aggiornata: 0, errore: "Risposta troncata", jobId: "j2" });
     expect(html).toContain("Nuova versione non riuscita");
-    expect(html).toContain("Riprova la scheda");
+    expect(html).toContain("Riprova la ricerca");
     expect(html).toContain("vecchia");
     expect(contaPrimari(html)).toBe(0);
   });
