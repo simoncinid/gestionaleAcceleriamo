@@ -5,6 +5,7 @@ import { COSTO_AVVISI, controllaAvvisi, controllaMeta48 } from "./avvisi/control
 import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
 import { generaRicorrenti } from "./lavori/service";
+import { togliScaduti } from "./leads/cestino";
 import { mandaInvitiInCoda } from "./calls/service";
 import { lavoraCoda, orologioCoda } from "./claude/coda";
 import "./claude/tipi";
@@ -23,7 +24,7 @@ import { giroTelegram } from "./telegram/bot";
 import { COSTO_STATO, controllaStato, potaStorico, scriviEsiti, type EsitoGiro } from "./stato/service";
 import { idVoceGiro, VOCE_GIRO, VOCI_GIRO } from "./stato/voci";
 
-export type Lavoro = "avvisi" | "risponditore" | "ig_token" | "consegna" | "foglio" | "meta_recupero" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "lunedi" | "stato";
+export type Lavoro = "avvisi" | "risponditore" | "ig_token" | "consegna" | "foglio" | "meta_recupero" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "cestino" | "lunedi" | "stato";
 
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
@@ -141,6 +142,9 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
     fisse: 2, perUnita: 1, sottoPerUnita: 0, max: 12,
     esegui: (e, n, l) => generaRicorrenti(getDb(e.DB), n, l),
   },
+  // Cestino (blocco 1, modifica 9): alle 6:30 di Roma toglie per sempre i lead nel cestino da oltre 30 giorni, 3 per giro.
+  // A lead: 3 letture (lead, cestino, cliente) e una batch da 10 scritture; fisse 1 per la lista.
+  cestino: { quando: (p) => p.ore === 6 && p.minuti >= 30 && p.minuti < 35, fisse: 1, perUnita: 13, sottoPerUnita: 0, max: 3, esegui: (e, n) => togliScaduti(getDb(e.DB), n) },
   // Lunedì (spec 6.4): il lunedì dalle 7:00 alle 7:55 (ora di Roma) il giro congela i numeri della settimana chiusa
   // in weekly_reviews. Dopo il lead e i suoi avvisi, prima di Claude: se il budget non basta riprova al giro dopo.
   // La revisione nasce una volta sola per settimana (settimana unica, ON CONFLICT): nei giri dopo il primo costa
