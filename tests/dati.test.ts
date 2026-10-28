@@ -48,13 +48,20 @@ describe("import", () => {
   });
 });
 
+// Response.text() toglie il BOM (standard Fetch): si leggono i byte veri del file, come li riceve Excel.
+async function testoConBom(r: Response) {
+  const byte = new Uint8Array(await r.arrayBuffer());
+  expect([...byte.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(byte);
+}
+
 describe("export, registro, riepilogo", () => {
   it("export dei lead in CSV con BOM e punto e virgola", async () => {
     await env.DB.prepare("UPDATE leads SET company = '=HYPERLINK(1)' WHERE id = 'L1'").run();
     const r = await call("/api/export/leads", {}, cookie);
     expect(r.headers.get("content-type")).toContain("text/csv");
     expect(r.headers.get("content-disposition")).toContain("lead-");
-    const t = await r.text();
+    const t = await testoConBom(r);
     expect(t.charCodeAt(0)).toBe(0xfeff);
     expect(t).toContain("'=HYPERLINK(1)");
     expect(t.split("\n")[0]).toContain(";");
@@ -139,7 +146,7 @@ describe("import: limiti e casi in più", () => {
 describe("export e registro: casi in più", () => {
   it("proposte e fatture: date in AAAA-MM-GG, intestazione italiana", async () => {
     await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, company, status, registered_via, sent_at, created_at, updated_at) VALUES ('P1', 'L1', 'ACC-1', 'Già Qui', 'mandata', 'manuale', ?1, 0, 0)").bind(Date.UTC(2026, 9, 3)).run();
-    const t = await (await call("/api/export/proposte", {}, cookie)).text();
+    const t = await testoConBom(await call("/api/export/proposte", {}, cookie));
     expect(t.split("\n")[0]).toBe("﻿numero;azienda;opzione;setup (centesimi);canone (centesimi);stato;mandata il;presentata il;decisa il");
     expect(t).toContain("ACC-1;Già Qui;standard;;;mandata;2026-10-03;;");
     await env.DB.prepare("INSERT INTO clients (id, name, created_at) VALUES ('C1', 'Cliente Uno', 0)").run();

@@ -1,7 +1,11 @@
-import type { Env } from "../worker/env";
+import type { Env as EnvWorker } from "../worker/env";
 
-declare module "cloudflare:test" {
-  interface ProvidedEnv extends Env {
-    TEST_MIGRATIONS: D1Migration[];
+// Il plugin Cloudflare per vitest 4 tipizza `env` di "cloudflare:test" come Cloudflare.Env.
+declare global {
+  namespace Cloudflare {
+    interface Env extends EnvWorker {
+      DB_PRE: D1Database; // database vuoto della prova sulle migrazioni (vitest.config.ts)
+      TEST_MIGRATIONS: import("@cloudflare/vitest-plugin").D1Migration[];
+    }
   }
 }
