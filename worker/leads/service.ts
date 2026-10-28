@@ -11,7 +11,7 @@ import { propostaEvento } from "../regole/motore";
 import { callPerFase } from "../regole/fasi-call";
 import { responsabileDellaFase } from "../regole/applica";
 import { MOTIVI_CON_DATA, MOTIVI_CON_TESTO, eMotivoPerso, etichettaMotivo } from "../processo/motivi";
-import { scadenzaLavorativa } from "../regole/orario";
+import { leggiSla, scadenzaPrimaChiamata } from "../regole/sla";
 import { dataTesto, FASE, FASI_APERTE } from "../processo/processo";
 
 export const DEFAULT_NEXT_ACTION = "Prima chiamata";
@@ -185,9 +185,9 @@ export const punteggioAlzato = (s: Lead["score"]): NonNullable<Lead["score"]> =>
 export async function arrivatoDiNuovo(db: Db, r: Riscontro, fonte: string, actorId: string | null, now: number): Promise<"arrivato_di_nuovo" | "riaperto"> {
   const score = punteggioAlzato(r.lead.score);
   if (r.tipo === "perso") {
-    const { orario } = await leggiImpostazioni(db);
+    const scadenza = scadenzaPrimaChiamata(now, await leggiSla(db));
     await db.update(leads).set({
-      stageId: FASE.nuovo, stageChangedAt: now, nextAction: DEFAULT_NEXT_ACTION, nextActionAt: scadenzaLavorativa(now, 30, orario),
+      stageId: FASE.nuovo, stageChangedAt: now, nextAction: DEFAULT_NEXT_ACTION, nextActionAt: scadenza,
       attemptCount: 0, noShow: 0, lostReason: null, pausedUntil: null, sequenceStep: 0, score, updatedAt: now,
     }).where(eq(leads.id, r.lead.id));
     await addActivity(db, r.lead.id, "cambio_fase", `Riaperto: arrivato di nuovo da ${fonte}. Era tra i non interessati.`, actorId, now);

@@ -5,9 +5,8 @@ import type { AppEnv } from "../env";
 import { AZIENDA_SQL, aziendaNorm } from "../lib/azienda";
 import { FINE, dopoCursore, leggiCursore, scriviCursore } from "../lib/cursore";
 import { DEFAULT_NEXT_ACTION, firstOpenStage } from "../leads/service";
-import { leggiImpostazioni } from "../impostazioni/service";
 import { FASE } from "../processo/processo";
-import { scadenzaLavorativa } from "../regole/orario";
+import { leggiSla, scadenzaPrimaChiamata } from "../regole/sla";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { cellaCsv, colonneImport, leggiCsv } from "./csv";
 
@@ -156,7 +155,7 @@ datiRoutes.post("/import/leads", async (c) => {
   const chi = c.get("user").id;
   const db = getDb(c.env.DB);
   const fase = await firstOpenStage(db);
-  const orario = tornati.some((r) => r.esistente.stageId === FASE.perso) ? (await leggiImpostazioni(db)).orario : null;
+  const riapertura = tornati.some((r) => r.esistente.stageId === FASE.perso) ? scadenzaPrimaChiamata(now, await leggiSla(db)) : null;
   const ids = nuove.map(() => crypto.randomUUID());
   const istruzioni = nuove.map((r, i) => {
     const senza = r.esito === "senza_contatti";
@@ -170,7 +169,7 @@ datiRoutes.post("/import/leads", async (c) => {
     const score = r.esistente.score ? PIU_ALTO[r.esistente.score] : "giallo";
     istruzioni.push(r.esistente.stageId === FASE.perso
       ? c.env.DB.prepare(`UPDATE leads SET stage_id = ?2, stage_changed_at = ?3, next_action = ?4, next_action_at = ?5, attempt_count = 0, no_show = 0, lost_reason = NULL, paused_until = NULL, sequence_step = 0, score = ?6, updated_at = ?3 WHERE id = ?1`)
-        .bind(r.esistente.id, FASE.nuovo, now, DEFAULT_NEXT_ACTION, scadenzaLavorativa(now, 30, orario!), score)
+        .bind(r.esistente.id, FASE.nuovo, now, DEFAULT_NEXT_ACTION, riapertura!, score)
       : c.env.DB.prepare("UPDATE leads SET score = ?2, updated_at = ?3 WHERE id = ?1").bind(r.esistente.id, score, now));
   }
   // Le voci di storico in un'istruzione sola (4 parametri a riga più 2, al massimo 82 dei 100 di D1):

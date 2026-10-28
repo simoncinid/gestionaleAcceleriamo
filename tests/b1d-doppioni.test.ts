@@ -4,6 +4,7 @@ import { computeMetaSignature } from "../worker/meta/signature";
 import { setMetaFetch } from "../worker/meta/fetcher";
 import { getDb } from "../worker/db/client";
 import { ingressoLead } from "../worker/leads/service";
+import { leggiSla, scadenzaPrimaChiamata } from "../worker/regole/sla";
 import { authed, call } from "./helpers";
 
 // Blocco 1, modifica 8: doppioni all'ingresso (contratto, sezione 7). Chiave: telefono normalizzato oppure email minuscola.
@@ -80,6 +81,15 @@ describe("ingresso automatico (stessa regola per Meta, modulo del sito e CSV)", 
     expect(r.lead.score).toBe("giallo");
     expect(await storico("aperto")).toContain("Arrivato di nuovo da modulo del sito");
     expect(await contaLead()).toBe(1);
+  });
+  it("lead in 80 riaperto: la prima chiamata scade con lo SLA delle Impostazioni, non con 30 minuti fissi", async () => {
+    await env.DB.prepare(`UPDATE stage_rules SET params = '{"minuti":120,"avvisoMinuti":90}' WHERE id = 'sla-prima'`).run();
+    await inserisci("perso", "non-chiuso", { phone: "333 111 2222", lostReason: "prezzo" });
+    const db = getDb(env.DB);
+    const r = await ingressoLead(db, { company: "X", phone: "+39 333 1112222", source: "sito" }, "modulo del sito", null, NOW);
+    expect(r.esito).toBe("riaperto");
+    expect(r.lead.nextActionAt).toBe(scadenzaPrimaChiamata(NOW, await leggiSla(db)));
+    expect(r.lead.nextActionAt).toBe(NOW + 120 * 60_000);
   });
 });
 
