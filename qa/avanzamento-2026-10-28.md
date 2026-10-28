@@ -72,3 +72,16 @@ Regola: un commit per modifica, "blocco 1, modifica N: ...". Niente push. La 24 
 |---|---|---|---|---|
 | 1 | Funzione unica: `worker/processo/processo.ts` (`prossimaAzione`), `transizione.ts` (`transizione`), `leggi.ts` (aggiunge `prossima` a elenco e scheda); `motore.ts` ora involucro | vedi git log | OK: `tests/processo.test.ts` 10/10 (una per fase + invariante + colori), motore/esito/call 68 verdi, typecheck pulito; nel browser 32 lead aperti, 0 senza azione | Ruling: la scadenza resta salvata in `nextActionAt` (la scrive la transizione); `prossimaAzione` la legge e decide testo, pulsante, colore. Costo se sbagliato: un campo derivato in più da tenere allineato. La scheda vecchia legge già `prossima`; tabella e Oggi la useranno con le modifiche 18 e 22 |
 | 2 | Scadenze: prima chiamata 30 minuti in orario (migrazione `0018_blocco1.sql`, anche colonne `no_show` e `owner_manual` per le modifiche 3 e 6), preventivo entro 2 giorni lavorativi a fine orario, pausa di 2 mesi dopo il quinto tentativo e poi 80 "mai_risposto", evento `cambio_fase` con azione di base per fase | vedi git log | OK: processo 13/13, motore 32/32; aggiornate 5 prove che fissavano lo SLA a 120 (avvisi, cron con SLA 120 nello scenario, migrazione, oggi-unico, today); browser: lead creato alle 09:08 scade alle 09:38 | Ruling: `oreProposta` (regola 24/48 ore) non vale più per il preventivo, vince l'ipotesi 9. Ruling: il WhatsApp all'inizio della pausa non parte (nessun invio senza sì): resta da fare con il blocco 7, funzione 5 |
+
+## Riorganizzazione in corsie (ordine di Tommaso via Dante, 28/10 mattina)
+
+Dopo le modifiche 1 e 2, contratto delle interfacce fissato e committato (tipi `ProssimaAzione`, `Collegamenti`, `RigaContatto`, `MOTIVI_PERSI`, campi `noShow`/`ownerManual` nelle risposte, rotte `/commerciale/lead` e `/commerciale/call/:id` già registrate con segnaposto). Divisione e proprietà dei file in `qa/blocco-1/corsie.md`.
+
+| Corsia | Agente | Ramo | Porta | Modifiche | Stato |
+|---|---|---|---|---|---|
+| A regole nel worker | Silvio | blocco1-corsia-a | 5211 | 3, 4, 6, 7 (worker), 12 (worker) | lanciata |
+| B scheda del lead | Damiano | blocco1-corsia-b | 5212 | 7 (foglio), 10, 11, 12 (fogli), 13, 14, 15, 16, 17 | lanciata |
+| C tabella e Oggi | Damiano | blocco1-corsia-c | 5213 | 18, 19, 20, 21, 22 | lanciata |
+| D gestione CRM | Silvio | blocco1-corsia-d | 5214 | 5, 8, 9 | lanciata |
+
+Dopo l'unione: 23 (passata UI, Damiano) sul ramo unito, poi test, typecheck, build, e2e e foto sull'anteprima 5210. 24: Dante.

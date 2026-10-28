@@ -12,6 +12,8 @@ import { Oggi } from "./pagine/commerciale/Oggi";
 import { Lunedi } from "./pagine/commerciale/Lunedi";
 import { Diario } from "./pagine/commerciale/Diario";
 import { Call } from "./pagine/commerciale/Call";
+import { DettaglioCall } from "./pagine/commerciale/DettaglioCall";
+import { Lead } from "./pagine/commerciale/Lead";
 import { DettaglioProposta } from "./pagine/commerciale/DettaglioProposta";
 import { Proposte } from "./pagine/commerciale/Proposte";
 import { FogliCreazione } from "./pagine/FogliCreazione";
@@ -100,7 +102,9 @@ function AppPrivata() {
         <Route path="/commerciale/oggi/lunedi" element={<Lunedi />} />
         <Route path="/commerciale/oggi/diario" element={<Diario />} />
         <Route path="/commerciale/scaletta" element={<Scaletta />} />
+        <Route path="/commerciale/lead" element={<Lead />} />
         <Route path="/commerciale/call" element={<Call />} />
+        <Route path="/commerciale/call/:id" element={<DettaglioCall />} />
         <Route path="/commerciale/proposte" element={<Proposte />} />
         <Route path="/commerciale/proposte/:id" element={<DettaglioProposta />} />
         <Route path="/commerciale/lead/:id" element={<SchedaLeadRotta />} />

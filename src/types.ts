@@ -11,6 +11,8 @@ export type LeadListItem = {
   appointmentAt: number | null; duplicateOfId: string | null; createdAt: number; updatedAt: number; deletedAt: number | null;
   attemptCount: number; score: "verde" | "giallo" | "grigio" | null; setupCents: number | null; feeCents: number | null; sequenceStep: number;
   pausedUntil?: number | null; lostReason?: string | null;
+  // Blocco 1: assenze alle call (fasi 30 e 50) e responsabile scelto a mano.
+  noShow?: number; ownerManual?: boolean;
   // Riga "Da fare" della funzione unica (worker/processo/processo.ts): la mostrano scheda, tabella e Oggi.
   prossima?: ProssimaAzione;
 };
@@ -31,7 +33,9 @@ export type Stats = {
   byStage: { stageId: string; label: string; count: number }[];
   firstResponse: { avgMs: number | null; count: number };
 };
-export type { CodiceAzione, Comando, ProssimaAzione, StatoScadenza } from "../worker/processo/processo";
+export type { CodiceAzione, Comando, ProssimaAzione, Ruolo, StatoScadenza } from "../worker/processo/processo";
+export type { Collegamenti, RigaContatto } from "../worker/leads/collegamenti-tipi";
+export type { CodiceMotivo } from "../worker/processo/motivi";
 import type { ProssimaAzione } from "../worker/processo/processo";
 export type { CallOggi, Oggi, PropostaOggi, RigaOggi, VoceAdesso } from "../worker/today/tipi";
 export type { Funnel, Stats1A, Tappa, TempoFase } from "../worker/numeri/funnel";
