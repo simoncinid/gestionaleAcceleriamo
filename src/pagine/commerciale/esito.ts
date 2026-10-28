@@ -22,16 +22,30 @@ export type SceltaEsito = Esito | "firmato" | "rimanda";
 export const SCELTE_SPECIALI = ["firmato", "rimanda"] as const;
 export const eSpeciale = (e: SceltaEsito | null): e is "firmato" | "rimanda" => e === "firmato" || e === "rimanda";
 
-const TELEFONATE: SceltaEsito[] = ["appuntamento", "non_risponde", "occupato", "richiamare", "non_interessato", "fuori_target"];
-const PER_FASE: Record<string, SceltaEsito[]> = {
-  "da-chiamare-prima-volta": TELEFONATE,
-  "da-richiamare": TELEFONATE,
-  "appuntamento-confermato": ["consulenza_fatta", "non_interessato", "fuori_target"],
-  "in-attesa-preventivo": ["presentazione_fissata", "non_interessato"],
-  "presentazione-confermata": ["presentazione_fatta", "firmato", "non_interessato"],
+// Copia di ESITI_PER_FASE del worker (worker/leads/esito.ts della corsia A, che rifiuta con 422 gli altri):
+// dopo l'unione si importa da lì. Qui sopra si aggiungono solo le due voci della scheda ("firmato", "rimanda")
+// e l'ordine mette prima il passo della tabella del contratto.
+const CHIUSURE: Esito[] = ["non_interessato", "fuori_target"];
+const TELEFONATE: Esito[] = ["non_risponde", "occupato", "richiamare", "risposto", "appuntamento"];
+export const ESITI_PER_FASE: Record<string, Esito[]> = {
+  "da-chiamare-prima-volta": [...TELEFONATE, ...CHIUSURE],
+  "da-richiamare": [...TELEFONATE, ...CHIUSURE],
+  "appuntamento-confermato": ["consulenza_fatta", "presentazione_fissata", "richiamare", "non_risponde", "occupato", ...CHIUSURE],
+  "in-attesa-preventivo": ["presentazione_fissata", "richiamare", "non_risponde", "occupato", "risposto", ...CHIUSURE],
+  "presentazione-confermata": ["presentazione_fatta", "richiamare", "non_risponde", "occupato", ...CHIUSURE],
+  "in-attesa-decisione": ["risposto", "richiamare", "non_risponde", "occupato", "presentazione_fissata", ...CHIUSURE],
+};
+// Il passo della tabella in cima: in 10 e 20 la consulenza fissata, in 60 la decisione.
+const IN_CIMA: Record<string, SceltaEsito[]> = {
+  "da-chiamare-prima-volta": ["appuntamento"],
+  "da-richiamare": ["appuntamento"],
+  "presentazione-confermata": ["presentazione_fatta", "firmato"],
   "in-attesa-decisione": ["firmato", "non_interessato", "rimanda"],
 };
-export const esitiPerFase = (stageId: string): SceltaEsito[] => PER_FASE[stageId] ?? TELEFONATE;
+export const esitiPerFase = (stageId: string): SceltaEsito[] => {
+  const cima = IN_CIMA[stageId] ?? [];
+  return [...cima, ...(ESITI_PER_FASE[stageId] ?? []).filter((e) => !cima.includes(e))];
+};
 
 // La stessa scelta si dice in modo diverso secondo la fase: in 60 "Sì, firma" e "No, non firma".
 export function etichettaScelta(e: SceltaEsito, stageId: string): string {
@@ -53,11 +67,13 @@ export const opzioniAzione = (proposta: string) =>
 export type StatoEsito = {
   requestId: string; esito: Esito | null; stageId: string; nextAction: string; nextActionAt: number | null;
   lostReason: string | null; lostNote: string; recontactAt: number | null; note: string; callAt: number | null; meetLink: string;
+  // Giorno detto dal cliente per "richiamare": vince sulla scadenza di default.
+  data: number | null;
 };
 
+// Fase, azione e scadenza le calcola il server (corsia A, modifica 12): il foglio dice solo cosa è successo.
 export type EsitoBody = {
-  requestId: string; esito: Esito; stageId: string; nextAction: string | null; nextActionAt: number | null; lostReason: string | null;
-  lostNote?: string; recontactAt?: number;
+  requestId: string; esito: Esito; lostReason?: string; lostNote?: string; recontactAt?: number; data?: number;
   note?: string; call?: { kind: "conoscenza" | "presentazione"; scheduledAt: number; meetLink: string | null };
 };
 
@@ -72,7 +88,7 @@ export const statoIniziale = (
   iniziale?: Partial<Pick<StatoEsito, "stageId" | "nextAction" | "nextActionAt" | "note">>,
 ): StatoEsito => ({
   requestId, esito: null, stageId: iniziale?.stageId || lead.stageId, nextAction: iniziale?.nextAction ?? "", nextActionAt: iniziale?.nextActionAt ?? null,
-  lostReason: null, lostNote: "", recontactAt: null, note: iniziale?.note ?? "", callAt: null, meetLink: "",
+  lostReason: null, lostNote: "", recontactAt: null, note: iniziale?.note ?? "", callAt: null, meetLink: "", data: null,
 });
 
 // Gli esiti che decidono da soli fase e prossima azione: una call fissata o un lead perso. Con questi vincono le regole
@@ -116,12 +132,11 @@ export function validaEsito(s: StatoEsito, motivoObbligatorio: boolean, ora = Da
 }
 
 export function corpoEsito(s: StatoEsito): EsitoBody {
-  const corpo: EsitoBody = {
-    requestId: s.requestId, esito: s.esito!, stageId: s.stageId,
-    nextAction: s.nextAction.trim() || null, nextActionAt: s.nextActionAt, lostReason: s.lostReason,
-  };
+  const corpo: EsitoBody = { requestId: s.requestId, esito: s.esito! };
+  if (s.lostReason) corpo.lostReason = s.lostReason;
   if (s.lostReason && s.lostNote.trim()) corpo.lostNote = s.lostNote.trim();
   if (s.lostReason && s.recontactAt != null && MOTIVI_CON_DATA.includes(s.lostReason as CodiceMotivo)) corpo.recontactAt = s.recontactAt;
+  if (s.esito === "richiamare" && s.data != null) corpo.data = s.data;
   if (s.note.trim()) corpo.note = s.note.trim();
   const kind = CALL_DELL_ESITO[s.esito!];
   if (kind && s.callAt != null) corpo.call = { kind, scheduledAt: s.callAt, meetLink: s.meetLink.trim() || null };
