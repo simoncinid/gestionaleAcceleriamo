@@ -6,7 +6,7 @@ import { Pulsante, Skeleton, TestoMarkdown, classiPulsante } from "../../ds";
 import { momento } from "../../format";
 
 const RIGA_STATO: Record<SchedaApi["stato"], string> = {
-  nessuna: "Nessuna scheda",
+  nessuna: "Nessuna ricerca",
   in_coda: "In coda: Claude la prepara entro qualche minuto",
   in_corso: "Claude la sta preparando",
   pronta: "Pronta",
@@ -41,9 +41,11 @@ export function azioniScheda(qc: QueryClient, leadId: string) {
   };
 }
 
-// Spec 6.6, sezione 8. Nessun pulsante pieno qui: il primario della scheda lead resta "Chiama".
+// Spec 6.6, sezione 8; contratto blocco 1, sezioni 3 e 9: "Ricerca sull'azienda" nel riquadro Assistente.
+// Nessun pulsante pieno qui: il primario della scheda lead sta in Da fare.
 // Il testo di Claude passa da TestoMarkdown: resta testo, mai HTML interpretato.
-export function SezioneSchedaAzienda({ leadId, manuale }: { leadId: string; manuale: boolean }) {
+// incorporata: dentro il riquadro Assistente della scheda il titolo lo dà la riga che si apre.
+export function SezioneSchedaAzienda({ leadId, manuale, incorporata = false }: { leadId: string; manuale: boolean; incorporata?: boolean }) {
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["scheda-azienda", leadId],
@@ -59,13 +61,13 @@ export function SezioneSchedaAzienda({ leadId, manuale }: { leadId: string; manu
   const fonti = s.fonti.filter((f) => http(f.url));
   return (
     <section aria-labelledby="titolo-scheda-azienda" className="flex flex-col gap-2">
-      <h2 id="titolo-scheda-azienda" className="font-display text-titolo-card">Scheda azienda di Claude</h2>
+      <h2 id="titolo-scheda-azienda" className={incorporata ? "sr-only" : "font-sans text-[17px] font-semibold"}>Ricerca sull'azienda</h2>
       <p className="text-secondaria text-grigio">{(s.contenuto && RIGA_NUOVA[s.stato]) || RIGA_STATO[s.stato]}</p>
       {s.stato === "nessuna" && manuale && <p className="text-secondaria text-grigio">Per i lead scritti a mano si prepara su richiesta.</p>}
       {s.motivo && <p className="text-secondaria text-grigio">{s.motivo}</p>}
       {s.errore && <p className="text-secondaria text-grigio">{s.errore}</p>}
       {s.stato === "nessuna" && (
-        <div><Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(false)}>Prepara la scheda</Pulsante></div>
+        <div><Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(false)}>Genera la ricerca</Pulsante></div>
       )}
       {s.stato === "privato" && (
         <div><Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(true)}>Prepara comunque</Pulsante></div>
@@ -73,9 +75,9 @@ export function SezioneSchedaAzienda({ leadId, manuale }: { leadId: string; manu
       {s.stato === "errore" && (
         <div>
           {s.jobId ? (
-            <Pulsante variante="secondario" inCorso={riprova.isPending} onClick={() => riprova.mutate(s.jobId!)}>Riprova la scheda</Pulsante>
+            <Pulsante variante="secondario" inCorso={riprova.isPending} onClick={() => riprova.mutate(s.jobId!)}>Riprova la ricerca</Pulsante>
           ) : (
-            <Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(false)}>Prepara la scheda</Pulsante>
+            <Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(false)}>Genera la ricerca</Pulsante>
           )}
         </div>
       )}
@@ -94,7 +96,7 @@ export function SezioneSchedaAzienda({ leadId, manuale }: { leadId: string; manu
           )}
           <div className="mt-2 flex flex-col gap-2 sm:flex-row">
             {s.stato === "pronta" && (
-              <Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(true)}>Rigenera la scheda</Pulsante>
+              <Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(true)}>Rigenera la ricerca</Pulsante>
             )}
             <a className={classiPulsante("fantasma", "md")} href={`/api/leads/${leadId}/scheda-azienda/stampa`} target="_blank" rel="noopener">Apri la versione da stampare</a>
           </div>

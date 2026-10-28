@@ -11,6 +11,7 @@ import type { AutomationStep } from "../../types";
 import { usePassi } from "../lavori/dati";
 import { useAutomazione, useRicarica } from "../dati-gestione";
 import { Sezione } from "../impostazioni/parti";
+import { ContattoDalCliente } from "../commerciale/lead/ContattoDa";
 import { useAnonimo } from "./anonimo";
 import { Flusso, FoglioPasso, ordinaFlusso } from "./Flusso";
 import { FoglioPassaggi } from "./FoglioPassaggi";
@@ -65,9 +66,10 @@ export function SchedaAutomazione({ id }: { id: string }) {
     <div key={a.updatedAt} className="grid gap-6 p-4 pb-28 md:px-0">
       <Intestazione titolo={a.name} eyebrow="Automazione">
         {anonimo ? <p className="text-corpo">{nomeCliente(a, true)}</p> : (
-          <Link to={`/commerciale/clienti/${a.clientId}`} className="flex min-h-11 w-fit items-center gap-2 text-corpo hover:underline">
-            <LogoCliente logo={a.logo} nome={a.cliente} misura={32} />{a.cliente}
-          </Link>
+          <div className="flex items-center gap-2">
+            <LogoCliente logo={a.logo} nome={a.cliente} misura={32} />
+            <ContattoDalCliente clienteId={a.clientId} azienda={a.cliente} />
+          </div>
         )}
         {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
         <p className="flex items-center gap-2 text-secondaria"><Punto colore={a.status === "attiva" ? "verde" : a.status === "in_costruzione" ? "giallo" : "grigio"} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>

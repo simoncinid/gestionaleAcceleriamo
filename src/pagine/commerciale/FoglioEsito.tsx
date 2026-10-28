@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
@@ -8,16 +8,22 @@ import { useStages } from "../../hooks";
 import type { Esito, Proposta } from "../../../worker/regole/motore";
 import type { Precompilato } from "../../../worker/calls/coach-routes";
 import { CasellaInvito, useResendCollegato } from "./CasellaInvito";
-import { CALL_DELL_ESITO, ETICHETTE_ESITO, esitiPerFase, applicaProposta, corpoEsito, opzioniAzione, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
+import { FoglioChiusura } from "./FoglioChiusura";
+import { FoglioRimanda } from "./FoglioRimanda";
+import { CampiMotivo } from "./lead/CampiMotivo";
+import { CALL_DELL_ESITO, eSpeciale, etichettaScelta, esitiPerFase, type SceltaEsito, corpoEsito, statoIniziale, testoTentativo, validaEsito, type LeadEsito, type StatoEsito } from "./esito";
+import { dataEOra } from "./lead/daFare";
 
-// Foglio "Com'è andata?": l'esito propone fase e prossima azione (le regole propongono, la persona salva).
-// "iniziale": i suggerimenti del coach. Il lead cambia solo con "Salva esito".
+// Foglio "Com'è andata?": la persona dice solo cosa è successo; fase, prossima azione e scadenza le calcola il server
+// (corsia A, modifica 12). Il foglio le mostra in sola lettura ("Va in", "Poi") prima di salvare.
+// Esiti filtrati per fase come il worker; "Ha firmato" e "Sì, firma" passano al foglio della chiusura, "Rimanda" al rinvio.
+// "Non interessato" chiede il motivo: il pulsante resta spento finché manca (contratto blocco 1, sezioni 2 e 7).
+// "iniziale": dal coach arriva solo la nota; fase e azione restano del server.
 export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onChiudi: () => void; iniziale?: Precompilato }) {
+  const [passa, setPassa] = useState<null | "firmato" | "rimanda">(null);
   const qc = useQueryClient();
   const fasi = useStages();
-  const motivi = useQuery({ queryKey: ["settings"], queryFn: () => api<{ motivi: { id: string; etichetta: string }[] }>("/settings") });
-  const coach = iniziale ? { ...iniziale, stageId: iniziale.stageId ?? undefined } : undefined;
-  const [s, setS] = useState<StatoEsito>(() => statoIniziale(crypto.randomUUID(), lead, coach));
+  const [s, setS] = useState<StatoEsito>(() => statoIniziale(crypto.randomUUID(), lead, iniziale ? { note: iniziale.note ?? undefined } : undefined));
   // Solo l'ultima proposta chiesta vale: un esito cambiato in fretta non viene sovrascritto da una risposta vecchia.
   const ultimaRichiesta = useRef(0);
   const senzaEmail = lead.email === null;
@@ -26,24 +32,22 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
   const mandaInvito = !!kindCall && invito && !senzaEmail;
   // Senza Resend l'invito va in coda: il pulsante non promette un invio che non parte adesso.
   const resend = useResendCollegato();
-  const fase = fasi.data?.find((f) => f.id === s.stageId);
-  const cambiaFase = s.stageId !== lead.stageId;
-  // PV2: il motivo serve solo se la fase cambia davvero verso una fase che lo chiede.
-  const motivoObbligatorio = cambiaFase && Boolean(fase?.requiresReason);
-  const aperta = !fase || fase.kind === "open";
+  const verso = fasi.data?.find((f) => f.id === s.stageId);
+  // Il motivo lo sceglie la persona solo quando dice "non interessato"; quelli automatici li mette il server.
+  const motivoObbligatorio = s.esito === "non_interessato";
 
+  const scegliVoce = (e: SceltaEsito) => (eSpeciale(e) ? setPassa(e) : void scegli(e));
   const scegli = async (esito: Esito, callAt = s.callAt) => {
-    setS((p) => ({ ...p, esito }));
+    setS((p) => ({ ...p, esito, stageId: lead.stageId, nextAction: "", nextActionAt: null }));
     const n = ++ultimaRichiesta.current;
     const q = new URLSearchParams({ esito });
     if (callAt != null) q.set("callAt", String(callAt));
     try {
       const p = await api<Proposta>(`/leads/${lead.id}/proposta?${q}`);
       if (n !== ultimaRichiesta.current) return;
-      // Con i suggerimenti del coach vincono loro, salvo appuntamento, non interessato e fuori target (vedi applicaProposta).
-      setS((prima) => applicaProposta(prima, p, coach));
+      setS((prima) => ({ ...prima, stageId: p.stageId ?? prima.stageId, nextAction: p.nextAction ?? "", nextActionAt: p.nextActionAt }));
     } catch {
-      if (n === ultimaRichiesta.current) toast("Nessuna proposta dalle regole: scegli fase e prossima azione a mano");
+      // Senza anteprima si salva lo stesso: decide il server.
     }
   };
 
@@ -63,19 +67,18 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
     },
     onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
-  const errore =
-    validaEsito(s, motivoObbligatorio) ??
-    (aperta && (!s.nextAction.trim() || s.nextActionAt == null) ? "Scegli la prossima azione e quando" : null);
+  const errore = validaEsito(s, motivoObbligatorio);
 
-  // Chiuso si segna dalla scheda lead (servono setup, canone e inizio): qui non si offre, salvo che il lead ci sia già.
-  const opzioniFase = [...(fasi.data ?? [])]
-    .filter((f) => f.kind !== "won" || f.id === lead.stageId)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((f) => ({ valore: f.id, etichetta: f.label }));
+  const chiuso = fasi.data?.find((f) => f.kind === "won");
+  if (passa === "rimanda") return <FoglioRimanda leadId={lead.id} onChiudi={onChiudi} />;
+  if (passa === "firmato" && chiuso) {
+    return <FoglioChiusura lead={{ id: lead.id, stageId: lead.stageId, company: lead.company, setupCents: lead.setupCents ?? null, feeCents: lead.feeCents ?? null }} fase={chiuso} onChiudi={onChiudi} />;
+  }
 
   return (
     <Foglio
       aperto
+      lato
       titolo="Com'è andata?"
       onChiudi={onChiudi}
       principale={
@@ -90,11 +93,7 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
           {/* I tentativi contano solo prima della consulenza. */}
           {["da-chiamare-prima-volta", "da-richiamare"].includes(lead.stageId) && <p className="tabular-nums">{testoTentativo(lead.attemptCount)}</p>}
         </div>
-        <Selettore etichetta="Esito" apertoAllInizio opzioni={esitiPerFase(lead.stageId).map((e) => ({ valore: e, etichetta: ETICHETTE_ESITO[e] }))} valore={s.esito} onCambia={(e) => void scegli(e)} />
-        {s.esito && (
-          <Selettore etichetta="Fase" valore={s.stageId || null} opzioni={opzioniFase}
-            onCambia={(id) => setS((p) => ({ ...p, stageId: id, lostReason: id === lead.stageId ? null : p.lostReason }))} />
-        )}
+        <Selettore etichetta="Esito" apertoAllInizio opzioni={esitiPerFase(lead.stageId).map((e) => ({ valore: e, etichetta: etichettaScelta(e, lead.stageId) }))} valore={s.esito as SceltaEsito | null} onCambia={scegliVoce} />
         {kindCall && s.esito && (
           <div className="flex flex-col gap-3 pt-1">
             <p className="text-secondaria font-medium">{kindCall === "conoscenza" ? "Consulenza (call di conoscenza)" : "Presentazione del preventivo"}</p>
@@ -105,14 +104,17 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
             <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} inCoda={!resend} />
           </div>
         )}
-        {s.esito && (motivoObbligatorio || s.lostReason) && (
-          <Selettore etichetta="Motivo" opzioni={(motivi.data?.motivi ?? []).map((m) => ({ valore: m.id, etichetta: m.etichetta }))} valore={s.lostReason} onCambia={(m) => setS((p) => ({ ...p, lostReason: m }))} />
+        {s.esito === "richiamare" && (
+          <CampoQuando etichetta="Quando richiamare, se l'ha detto" valore={s.data} onCambia={(ms) => setS((p) => ({ ...p, data: ms }))} />
         )}
-        {s.esito && aperta && (
-          <>
-            <Selettore etichetta="Prossima azione" valore={s.nextAction || null} opzioni={opzioniAzione(s.nextAction)} onCambia={(a) => setS((p) => ({ ...p, nextAction: a }))} />
-            <CampoQuando etichetta="Quando" valore={s.nextActionAt} onCambia={(ms) => setS((p) => ({ ...p, nextActionAt: ms }))} />
-          </>
+        {motivoObbligatorio && <CampiMotivo valore={s} onCambia={(m) => setS((p) => ({ ...p, ...m }))} />}
+        {s.esito && (verso || s.nextAction) && (
+          <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-[#E5DED4] pt-3 text-[15px]">
+            {verso && verso.id !== lead.stageId && <><dt className="text-[13px] text-[#6B645C]">Va in</dt><dd>{verso.label}</dd></>}
+            {s.nextAction && !(s.esito === "richiamare" && s.data != null) && (
+              <><dt className="text-[13px] text-[#6B645C]">Poi</dt><dd>{s.nextAction}{s.nextActionAt != null && <span className="tabular-nums">, {dataEOra(s.nextActionAt).toLowerCase()}</span>}</dd></>
+            )}
+          </dl>
         )}
         {s.esito && <AreaTesto etichetta="Note" rows={2} placeholder="Cosa ha detto, in una riga" value={s.note} onChange={(e) => setS((p) => ({ ...p, note: e.target.value }))} />}
       </div>

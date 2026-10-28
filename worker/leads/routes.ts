@@ -20,6 +20,7 @@ import { conProssima } from "../processo/leggi";
 import { confermaInvito } from "../posta/service";
 import { eliminaPerSempre, leggiCestino } from "./cestino";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
+import { collegamentiDelLead } from "./collegamenti";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -165,6 +166,7 @@ leadRoutes.post("/:id/contatti", async (c) => {
 
 leadRoutes.get("/:id/calls", async (c) => c.json({ calls: await callDelLead(getDb(c.env.DB), c.req.param("id")) }));
 leadRoutes.get("/:id/proposals", async (c) => c.json({ proposte: await proposteDelLead(getDb(c.env.DB), c.req.param("id")) }));
+leadRoutes.get("/:id/collegamenti", async (c) => c.json(await collegamentiDelLead(getDb(c.env.DB), c.req.param("id"))));
 
 leadRoutes.post("/:id/calls", async (c) => {
   const input = callNuovaSchema.parse(await c.req.json());

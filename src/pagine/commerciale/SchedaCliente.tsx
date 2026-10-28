@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ETICHETTE_AUTOMAZIONE, ETICHETTE_CANONE, ETICHETTE_CLIENTE } from "../../../worker/economia/calcoli";
@@ -11,6 +11,8 @@ import { RigaFattura } from "../economia/Fatture";
 import { FoglioAvvioLavoro } from "../lavori/FoglioAvvioLavoro";
 import { RigaTask } from "../lavori/RigaTask";
 import { Sezione } from "../impostazioni/parti";
+import type { LeadDetail } from "../../types";
+import { PassaggioLead } from "./lead/Passaggio";
 
 type Perimetro = "acceleriamo" | "fuori_perimetro";
 export const PERIMETRI: Opzione<Perimetro>[] = [
@@ -18,12 +20,16 @@ export const PERIMETRI: Opzione<Perimetro>[] = [
   { valore: "fuori_perimetro", etichetta: "Fuori perimetro", meta: "Non entra in Economia" },
 ];
 
-// Spec 6.10, scheda essenziale: dati, canoni, automazioni, ultime cinque fatture, lead di origine. Nessun primario.
+// Spec 6.10, scheda essenziale: dati, canoni, automazioni, ultime cinque fatture. Nessun primario.
+// Il lead di origine è una riga sotto il titolo (blocco 1, modifica 15): "Nato dal lead X il <data>: Apri il lead".
 export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number }) {
   const ora = useOra(60_000, oraFissa);
   const q = useCliente(id);
   const ricarica = useRicarica();
   const [avvio, setAvvio] = useState(false);
+  // Data del passaggio: quando il lead di origine è entrato in Cliente.
+  const origine = q.data?.lead?.id;
+  const leadOrigine = useQuery({ queryKey: ["lead", origine], queryFn: () => api<LeadDetail>(`/leads/${origine}`), enabled: !!origine });
   const patch = useMutation({
     mutationFn: (campi: Record<string, string | null>) => api(`/clients/${id}`, { method: "PATCH", json: campi }),
     onSuccess: () => { toast.success("Salvato"); ricarica(); },
@@ -45,6 +51,7 @@ export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number 
       <div className="@4xl:col-span-full">
       <Intestazione titolo={k.name} eyebrow="Cliente">
         <div className="flex items-center gap-2"><LogoCliente logo={k.logo} nome={k.name} misura={32} /><p className="text-secondaria text-grigio">{ETICHETTE_CLIENTE[k.stato]}</p></div>
+        {lead && <PassaggioLead leadId={lead.id} azienda={lead.company} il={leadOrigine.data?.lead.stageId === "chiuso" ? leadOrigine.data.lead.stageChangedAt : null} />}
       </Intestazione>
       </div>
       <Sezione titolo="Lavori">
@@ -79,11 +86,6 @@ export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number 
           {fatture.length === 0 ? <p className="text-secondaria text-grigio">Nessuna fattura</p> : (
             <ul className="grid grid-cols-1 gap-2">{fatture.map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} /></li>)}</ul>
           )}
-        </Sezione>
-      )}
-      {lead && (
-        <Sezione titolo="Lead di origine">
-          <Riga titolo={lead.company} href={`/commerciale/lead/${lead.id}`} />
         </Sezione>
       )}
       {avvio && <FoglioAvvioLavoro clientId={k.id} nomeCliente={k.name} canoneIniziale={k.canone?.cents ?? null} onChiudi={() => setAvvio(false)} />}

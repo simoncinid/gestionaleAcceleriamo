@@ -21,7 +21,8 @@ describe("Foglio Esito, logica", () => {
 
   it("il corpo porta sempre lo stesso requestId e la call solo con l'appuntamento", () => {
     const s = { ...statoIniziale(RID, { stageId: "da-richiamare" }), esito: "non_risponde" as const, nextAction: "Seconda chiamata", nextActionAt: 1_800_000_000_000 };
-    expect(corpoEsito(s)).toEqual({ requestId: RID, esito: "non_risponde", stageId: "da-richiamare", nextAction: "Seconda chiamata", nextActionAt: 1_800_000_000_000, lostReason: null });
+    // Fase e scadenza le calcola il server (blocco 1, modifica 12): il corpo non le porta.
+    expect(corpoEsito(s)).toEqual({ requestId: RID, esito: "non_risponde" });
     const a = { ...s, esito: "appuntamento" as const, callAt: 1_800_100_000_000, meetLink: " https://meet.google.com/abc-defg-hij " };
     expect(corpoEsito(a).call).toEqual({ kind: "conoscenza", scheduledAt: 1_800_100_000_000, meetLink: "https://meet.google.com/abc-defg-hij" });
     expect(corpoEsito(a).requestId).toBe(RID);

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { SchedaLead } from "../src/pagine/commerciale/SchedaLead";
 import { compila, modelliDelCanale, modelloPer } from "../src/pagine/commerciale/modelli";
-import { corpoDati, statoDati } from "../src/pagine/commerciale/lead/LeadForm";
+import { LeadForm, corpoDati, statoDati } from "../src/pagine/commerciale/lead/LeadForm";
 import { poiSeRiesce, type Salva } from "../src/pagine/commerciale/lead/salvataggi";
 import { centesimi, confermaNonPartita, idPerPreventivo, provenienza } from "../src/pagine/commerciale/scheda";
 import { MAX_TENTATIVI_CONFERMA } from "../worker/email/conferma";
 import type { MessageTemplate } from "../worker/db/schema";
 import type { LeadDetail, Stage } from "../src/types";
+import { prossimaAzione } from "../worker/processo/processo";
 import { contaPrimari, render } from "./render";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0);
@@ -26,6 +27,7 @@ const DETTAGLIO = {
   activities: [{ id: "a1", type: "esito", body: "Non risponde", createdAt: ORA - 1000, authorId: "tommaso", authorName: "Tommaso" }],
   documents: [], duplicateOf: null,
 } as unknown as LeadDetail;
+DETTAGLIO.lead.prossima = prossimaAzione(DETTAGLIO.lead as unknown as Parameters<typeof prossimaAzione>[0], ORA);
 
 const modello = (id: string, channel: "whatsapp" | "email", key: string | null, stageId: string | null): MessageTemplate =>
   ({ id, channel, key, title: id, subject: "Ciao {azienda}", body: "Ciao {referente} di {azienda}", stageId, sortOrder: 0 });
@@ -62,17 +64,32 @@ describe("scheda lead, logica", () => {
   });
 });
 
-describe("scheda lead, pagina", () => {
+describe("scheda lead, pagina (struttura B2, modifica 10)", () => {
   const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
   it("una sola azione primaria, Chiama col nome", () => {
     expect(contaPrimari(html)).toBe(1);
     expect(html).toContain("Chiama Luca");
-    expect(html).toContain("Dal Foglio Andrea, campagna Autunno");
-    expect(html).toContain("Tentativo 2 di 5");
-    expect(html).toContain("€ 2.000");
     expect(html).toMatch(/data-selettore="Fase"(?:(?!<\/button>).)*>Da richiamare</s);
-    expect(html).toContain('data-sezione="call"');
-    expect(html).toContain('data-sezione="proposta"');
+  });
+  it("cinque sezioni con titolo più Assistente, nessuna fisarmonica salvo la ricerca", () => {
+    for (const titolo of ["Da fare", "Contatti", "Dati del lead", "Storico", "Assistente"]) expect(html).toContain(`>${titolo}</h2>`);
+    expect((html.match(/<details/g) ?? []).length).toBe(1);
+    expect(html).toContain("Ricerca sull&#x27;azienda");
+    expect(html).toContain("Le altre funzioni arrivano con il blocco 7");
+    for (const via of ["Note e dati", "Risposte del modulo</span>", "Doppioni", "Scheda azienda di Claude"]) expect(html).not.toContain(via);
+  });
+  it("intestazione pulita: pillola della fase, niente provenienza né responsabile ripetuti", () => {
+    expect(html).toContain('aria-label="Fase: Da richiamare. Cambia fase"');
+    expect(html).not.toContain("Dal Foglio Andrea");
+    expect(html).not.toContain("Responsabile:");
+    // Fonte e campagna una volta sola, in Dati del lead.
+    expect(html.match(/>Autunno</g)?.length).toBe(1);
+  });
+  it("doppione come avviso in cima solo quando c'è", () => {
+    expect(html).not.toContain("Possibile doppione");
+    const doppio = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], { ...DETTAGLIO, duplicateOf: { id: "x1", company: "Officina Gemella" } }], [["stages"], FASI]] });
+    expect(doppio).toContain("Possibile doppione di Officina Gemella:");
+    expect(doppio).toContain('href="/commerciale/lead/x1"');
   });
   it("PV11: niente select del browser, WhatsApp con la sua etichetta", () => {
     expect(html).not.toContain("<select");
@@ -103,7 +120,8 @@ describe("scheda lead, correzioni della revisione", () => {
     const dopoAltroSalvataggio = { ...lead, updatedAt: lead.updatedAt + 60_000 };
     expect(dopoAltroSalvataggio.updatedAt).not.toBe(lead.updatedAt);
     expect(corpoDati(scritto).notes).toBe("Testo scritto a mano");
-    const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], { ...DETTAGLIO, lead: dopoAltroSalvataggio }], [["stages"], FASI]] });
+    // Il modulo ora vive nel foglio "Modifica dati" (menu "..."): si prova da solo.
+    const html = render(<LeadForm lead={dopoAltroSalvataggio} users={[]} ora={ORA} onSave={() => undefined} pending={false} />);
     expect(html).toContain("Salva i dati");
   });
   it("la prossima azione resta in modifica se il server rifiuta", () => {
@@ -121,13 +139,13 @@ describe("scheda lead, correzioni della revisione", () => {
     for (const k of ["estimatedValue", "appointmentAt", "meetLink", "proposalUrl"]) expect(corpo).not.toHaveProperty(k);
     expect(corpo).toMatchObject({ company: "Officina Prova", contactName: "Luca Prova", ownerId: "tommaso" });
     const conDati = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, estimatedValue: 2400, meetLink: "https://meet.google.com/abc", appointmentAt: ORA + 86_400_000, proposalUrl: null } };
-    const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], conDati], [["stages"], FASI]] });
+    const html = render(<LeadForm lead={conDati.lead} users={[]} ora={ORA} onSave={() => undefined} pending={false} />);
     expect(html).toContain(">Valore stimato</dt>");
     expect(html).toContain(">Link Meet</dt>");
     expect(html).toContain(">Consulenza</dt>");
     expect(html).not.toContain(">Link preventivo</dt>");
     for (const etichetta of ["Link Meet", "Link preventivo", "Appuntamento", "Valore stimato (euro)"]) expect(html).not.toContain(`>${etichetta}</label>`);
-    const senza = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
+    const senza = render(<LeadForm lead={DETTAGLIO.lead} users={[]} ora={ORA} onSave={() => undefined} pending={false} />);
     expect(senza).not.toContain("Dati di sola lettura");
   });
 });
@@ -141,7 +159,7 @@ describe("scheda lead, email di conferma", () => {
   it("tentativi finiti: avviso su due righe, nessun pulsante in più", () => {
     const fallita = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, confirmationAttempts: 4, confirmationError: "Indirizzo email rifiutato da Resend" } };
     const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], fallita], [["stages"], FASI]] });
-    expect(html).toContain("Email di conferma non partita</p>");
+    expect(html).toContain("Email di conferma non partita</span>");
     expect(html).toContain("Indirizzo email rifiutato da Resend");
     expect(contaPrimari(html)).toBe(1);
     const normale = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], DETTAGLIO], [["stages"], FASI]] });
@@ -154,7 +172,7 @@ describe("QA Task 15: telefono ed email nella scheda lead", () => {
     const conContatti = { ...DETTAGLIO, lead: { ...DETTAGLIO.lead, phone: "+39 000 1234567", email: "luca@esempio.invalid" } };
     const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], conContatti], [["stages"], FASI]] });
     for (const href of ["tel:", "mailto:"]) {
-      const a = html.match(new RegExp(`<a class="([^"]*)" href="${href}`));
+      const a = html.match(new RegExp(`<a class="([^"]*)" href="${href}`)) ?? html.match(new RegExp(`<a href="${href}[^"]*"[^>]*class="([^"]*)"`));
       expect(a?.[1]).toMatch(/\bmin-h-11\b/);
     }
   });

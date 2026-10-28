@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../../api";
 import { Contatto, Errore, Intestazione, Pulsante, Skeleton, Tag } from "../../ds";
@@ -8,6 +8,7 @@ import { euro, momento, quando } from "../../format";
 import { useModelli, useOra } from "../../hooks";
 import type { Activity, LeadDetail, PropostaRiga } from "../../types";
 import { avviaContatto } from "./chiamata";
+import { ContattoDalLead } from "./lead/ContattoDa";
 import { FoglioAccettazione, FoglioLinkPdf, aggiornaDopoProposta } from "./FoglioProposta";
 import { compila, modelloPer } from "./modelli";
 import { STATI, prezzo } from "./Proposte";
@@ -53,6 +54,7 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
     <div className="flex flex-col gap-5 p-4 md:p-0 md:pb-8">
       <Intestazione titolo={p.company || p.number} eyebrow={p.number}>
         <p><Tag>{STATI[p.status]}</Tag></p>
+        {p.leadId && <ContattoDalLead leadId={p.leadId} azienda={p.company || p.number} />}
       </Intestazione>
 
       {/* Schermo largo: a sinistra prezzo, documenti e azioni; a destra lo storico. */}
@@ -111,7 +113,6 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
             </div>
           </>
         )}
-        {p.leadId && <Link to={`/commerciale/lead/${p.leadId}`} className="self-start py-2 text-secondaria font-semibold underline underline-offset-4">Apri la scheda del lead</Link>}
       </div>
 
       </div>
