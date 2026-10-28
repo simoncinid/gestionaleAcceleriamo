@@ -116,3 +116,9 @@ Dopo l'unione: 23 (passata UI, Damiano) sul ramo unito, poi test, typecheck, bui
 - Tipi di call: `conoscenza`, `offerta` (ex `presentazione`, i dati vecchi aggiornati dalla migrazione), `analisi`, `progetto`. La chiamata di qualifica resta un tentativo, non una call.
 - Da toccare: `prossimaAzione` e `transizione` (tabella delle fasi, esiti per fase, ruoli: 10-30 primaChiamata, 35-60 presentazione salvo diversa indicazione), enum `calls.kind`, `esitiPerFase`, fogli della call (4 tipi), pallini e filtri della tabella, seed demo a 12 lead (uno per fase), prove.
 - Il contratto `collaudo-fable-lead.md` lo aggiorna Dante (direttore).
+
+## Fase di unione
+
+- Passo 1 chiuso: unione di `diego/acceleriamo-os` (`33ca9e8`) nel commit `ca31c52`. Conflitto solo sulle migrazioni: tenute `0018_risorse_seo` e meta di Diego, la nostra rigenerata con drizzle-kit come `0019_blocco1.sql` (stesse due colonne più l'UPDATE della regola sla-prima). Typecheck pulito, `npm test` 1231/1231 più 1/1.
+- I D1 locali che avevano la vecchia 0018_blocco1 vanno ricreati prima delle prove finali.
+- Le corsie le ha rimesse in moto Dante (direttore) dopo la caduta di rete; attendo che chiudano (script `qa/blocco-1/attendi-corsie.sh`).
