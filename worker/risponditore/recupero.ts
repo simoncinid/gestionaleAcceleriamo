@@ -7,9 +7,10 @@ import { graphGet, leggiCanale, type Canale } from "./graph";
 
 const SETTE_GIORNI = 7 * 86_400_000;
 const FINESTRA_ROTAZIONE = 15 * 60_000;
-// Commenti nuovi trattati per giro: ognuno costa fino a due chiamate (risposta pubblica e messaggio privato).
+// Commenti nuovi trattati per giro: ognuno costa fino a tre chiamate (lettura della didascalia, risposta pubblica e
+// messaggio privato).
 const NUOVI_PER_GIRO = 3;
-const CHIAMATE_PER_NUOVO = 2;
+const CHIAMATE_PER_NUOVO = 3;
 
 // Graph dà "2026-10-19T10:00:00+0000": senza i due punti nel fuso non tutti i motori lo leggono.
 function ora(ts: unknown): number | null {

@@ -24,9 +24,10 @@ export async function giroRisponditore(env: Env, now: number, limite: number): P
     if (canale) canali[p] = canale;
   }
   if (!canali.ig && !canali.fb) return { ritentati: 0, sottorichieste: 0 };
-  const ritentati = await ritenta(env, now, limite, canali);
-  // Il cron riserva sottoPerUnita (2) a unità; i ritentativi ne usano una ciascuno, il resto è del recupero.
-  const budget = limite * 2 - ritentati;
+  const { ritentati, letture } = await ritenta(env, now, limite, canali);
+  // Il cron riserva sottoPerUnita (2) a unità; i ritentativi ne usano una ciascuno più le letture delle didascalie,
+  // il resto è del recupero.
+  const budget = limite * 2 - ritentati - letture;
   let recupero = 0;
   if (budget >= 2) {
     try {
@@ -35,10 +36,10 @@ export async function giroRisponditore(env: Env, now: number, limite: number): P
       console.error("risponditore_recupero", err instanceof Error ? err.message : "errore");
     }
   }
-  return { ritentati, sottorichieste: ritentati + recupero };
+  return { ritentati, sottorichieste: ritentati + letture + recupero };
 }
 
-async function ritenta(env: Env, now: number, limite: number, canali: Partial<Record<Piattaforma, Canale>>): Promise<number> {
+async function ritenta(env: Env, now: number, limite: number, canali: Partial<Record<Piattaforma, Canale>>): Promise<{ ritentati: number; letture: number }> {
   const soglia = now - ATTESA;
   const nonRitentabili = MOTIVI_NON_RITENTABILI.map(() => "?").join(",");
   const piattaforme = Object.keys(canali);
@@ -50,13 +51,14 @@ async function ritenta(env: Env, now: number, limite: number, canali: Partial<Re
   )
     .bind(TENTATIVI_MAX, soglia, ...piattaforme, ...MOTIVI_NON_RITENTABILI, limite)
     .all<Riga>();
-  if (!results.length) return 0;
+  if (!results.length) return { ritentati: 0, letture: 0 };
 
   const campagne = await drizzle(env.DB).select().from(rispCampagne).all();
   let ritentati = 0;
+  let letture = 0;
   for (const r of results) {
     // Campagna già fissata (passata dal controllo del post): resta quella; se no si riparte dalle candidate.
-    const fissata = r.campagna_id ? campagne.find((c) => c.id === r.campagna_id) : undefined;
+    const fissata = r.campagna_id ? campagne.find((c) => c.id === r.campagna_id && c.attiva) : undefined;
     const candidate = fissata ? [fissata] : candidateCampagne(campagne, r.media_id, r.testo);
     if (!candidate.length) {
       await env.DB.prepare(`UPDATE risp_eventi SET stato = 'ignorato', motivo = 'nessuna parola chiave', aggiornato_il = ? WHERE commento_id = ?`).bind(now, r.commento_id).run();
@@ -67,9 +69,11 @@ async function ritenta(env: Env, now: number, limite: number, canali: Partial<Re
     // senza fissare la campagna.
     let campagna: (typeof candidate)[number] | null;
     try {
-      campagna = await campagnaDelPost(env, canale, candidate, r.media_id);
+      const esito = await campagnaDelPost(env, canale, candidate, r.media_id);
+      campagna = esito.campagna;
+      letture += esito.letture;
     } catch (err) {
-      ritentati++;
+      letture += 1;
       await registraFallimento(env, r.commento_id, (err instanceof Error ? err.message : String(err)).slice(0, 200), now);
       continue;
     }
@@ -103,5 +107,5 @@ async function ritenta(env: Env, now: number, limite: number, canali: Partial<Re
       await registraFallimento(env, r.commento_id, (err instanceof Error ? err.message : String(err)).slice(0, 200), now, { campagnaId: campagna.id });
     }
   }
-  return ritentati;
+  return { ritentati, letture };
 }

@@ -191,14 +191,14 @@ describe("campagna senza post legato: risponde solo dove la didascalia chiede la
   const conDidascalia = (caption: string | null) =>
     graphFinto((url) => (url.includes("?fields=caption") ? (caption === null ? Response.json({ error: { code: 1, message: "giù" } }, { status: 500 }) : Response.json({ id: "m1", caption })) : Response.json({ id: "ok-1" })));
 
-  it("didascalia con \"Commenta CASA\": parte tutto; il secondo commento sullo stesso post non rilegge la didascalia", async () => {
+  it("didascalia con \"Commenta CASA\": parte tutto; il secondo commento rilegge la didascalia (si ricordano solo i no)", async () => {
     await campagna({ media_id: null });
     conDidascalia("Le richieste dei portali all'agente giusto. Commenta CASA e ti mandiamo lo schema.");
     expect(await trattaCommento(env, commento(), NOW)).toBe("inviato");
     expect(urlsFinali()).toEqual(["/m1?fields=caption", "/c1/replies", "/me/messages"]);
     chiamate = [];
     expect(await trattaCommento(env, commento({ id: "c2", autoreId: "persona-2" }), NOW + 1)).toBe("inviato");
-    expect(urlsFinali()).toEqual(["/c2/replies", "/me/messages"]);
+    expect(urlsFinali()).toEqual(["/m1?fields=caption", "/c2/replies", "/me/messages"]);
   });
 
   it("\"tra due ore\" sotto un post che non chiede ORE: nessuna risposta, nessun messaggio, motivo scritto", async () => {
@@ -245,6 +245,14 @@ describe("campagna senza post legato: risponde solo dove la didascalia chiede la
     await campagna({ media_id: null, parola: "carico" });
     conDidascalia("Commenta \"CARICO\" e te la mandiamo.");
     expect(await trattaCommento(env, commento({ testo: "carico" }), NOW)).toBe("inviato");
+  });
+
+  it("un invio fatto prima del controllo non vale come sì: sotto un post che non chiede ORE non riparte", async () => {
+    await campagna({ media_id: null, parola: "ore" });
+    await env.DB.prepare("INSERT INTO risp_eventi (commento_id, media_id, autore_id, testo, campagna_id, stato, tentativi, creato_il, aggiornato_il) VALUES ('vecchio','m1','persona-9','ore','camp-1','inviato',0,?,?)").bind(NOW - 1000, NOW - 1000).run();
+    conDidascalia("Il nostro nuovo ufficio. Commenta TEMPO e ti mandiamo lo schema.");
+    expect(await trattaCommento(env, commento({ testo: "tra due ore" }), NOW)).toBe("ignorato");
+    expect(urlsFinali()).toEqual(["/m1?fields=caption"]);
   });
 
   it("campagna legata al post: nessuna lettura della didascalia", async () => {

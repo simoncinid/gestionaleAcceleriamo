@@ -36,20 +36,21 @@ export const MOTIVO_NON_DEL_POST = "parola non chiesta nella didascalia di quest
 /**
  * Una campagna legata a un post risponde solo lì (lo garantisce già scegliCampagna). Una campagna senza post risponde
  * solo sotto i post la cui didascalia dice "Commenta <PAROLA>": così "tra due ore" scritto sotto un altro post non fa
- * partire nulla. La risposta di Meta si ricorda negli eventi dello stesso post (un invio riuscito o un rifiuto per questo
- * motivo), per non rileggere la didascalia a ogni commento. Didascalia non leggibile: eccezione, l'evento va in errore
- * e il giro dei ritentativi riprova (nessun invio senza conferma).
+ * partire nulla. Si ricordano solo i "no" (un rifiuto per questo motivo sullo stesso post e la stessa parola): il "sì" si
+ * rilegge sempre dalla didascalia, perché gli invii scritti prima di questo controllo non provano niente.
+ * Didascalia non leggibile: eccezione, l'evento va in errore e il giro dei ritentativi riprova (nessun invio senza conferma).
+ * letture: chiamate a Graph fatte (0 o 1), per il conto delle sottorichieste.
  */
-export async function postDellaCampagna(env: Env, canale: Canale, campagna: RispCampagna, mediaId: string): Promise<boolean> {
-  if (campagna.mediaId) return campagna.mediaId === mediaId;
-  const visto = await env.DB.prepare(
-    `SELECT stato FROM risp_eventi WHERE media_id = ? AND campagna_id = ? AND (stato IN ('inviato','link_inviato') OR motivo = ?) ORDER BY aggiornato_il DESC LIMIT 1`,
-  ).bind(mediaId, campagna.id, MOTIVO_NON_DEL_POST).first<{ stato: string }>();
-  if (visto) return visto.stato !== "ignorato";
+export async function postDellaCampagna(env: Env, canale: Canale, campagna: RispCampagna, mediaId: string): Promise<{ ok: boolean; letture: number }> {
+  if (campagna.mediaId) return { ok: campagna.mediaId === mediaId, letture: 0 };
+  const no = await env.DB.prepare(
+    `SELECT 1 FROM risp_eventi e JOIN risp_campagne c ON c.id = e.campagna_id WHERE e.media_id = ? AND e.motivo = ? AND c.parola = ? LIMIT 1`,
+  ).bind(mediaId, MOTIVO_NON_DEL_POST, campagna.parola).first();
+  if (no) return { ok: false, letture: 0 };
   const campo = canale.piattaforma === "fb" ? "message" : "caption";
   const r = await graphGet(env, canale, `/${mediaId}?fields=${campo}`);
   if (!r.ok) throw new Error(`Didascalia del post non leggibile: ${r.messaggio}`.slice(0, 200));
-  return contieneParola(String(r.dati?.[campo] ?? ""), `commenta ${campagna.parola}`);
+  return { ok: contieneParola(String(r.dati?.[campo] ?? ""), `commenta ${campagna.parola}`), letture: 1 };
 }
 
 /**
@@ -57,7 +58,12 @@ export async function postDellaCampagna(env: Env, canale: Canale, campagna: Risp
  * "CARICO, ci perdo ore" sotto il reel che chiede CARICO deve far partire CARICO anche se ORE è più recente.
  * Didascalia non leggibile: eccezione, come postDellaCampagna.
  */
-export async function campagnaDelPost(env: Env, canale: Canale, candidate: RispCampagna[], mediaId: string): Promise<RispCampagna | null> {
-  for (const c of candidate) if (await postDellaCampagna(env, canale, c, mediaId)) return c;
-  return null;
+export async function campagnaDelPost(env: Env, canale: Canale, candidate: RispCampagna[], mediaId: string): Promise<{ campagna: RispCampagna | null; letture: number }> {
+  let letture = 0;
+  for (const c of candidate) {
+    const r = await postDellaCampagna(env, canale, c, mediaId);
+    letture += r.letture;
+    if (r.ok) return { campagna: c, letture };
+  }
+  return { campagna: null, letture };
 }

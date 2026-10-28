@@ -58,7 +58,7 @@ async function lavora(env: Env, c: Commento, piattaforma: Piattaforma, canale: C
   }
 
   // 3 bis. La parola deve essere quella chiesta in questo post (vedi postDellaCampagna e campagnaDelPost).
-  const campagna = await campagnaDelPost(env, canale, candidate, c.mediaId);
+  const { campagna } = await campagnaDelPost(env, canale, candidate, c.mediaId);
   if (!campagna) {
     await chiudi(env, c.id, "ignorato", now, { campagnaId: candidate[0].id, motivo: MOTIVO_NON_DEL_POST });
     return "ignorato";
