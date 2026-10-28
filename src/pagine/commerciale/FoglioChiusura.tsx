@@ -2,9 +2,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "../../api";
-import { Campo, CampoGiorno, Foglio, Pulsante, Selettore } from "../../ds";
+import { Campo, CampoGiorno, Foglio, Pulsante } from "../../ds";
 import type { PropostaRiga, Stage } from "../../types";
+import { mancaMotivo } from "./esito";
+import { CampiMotivo, type Motivo } from "./lead/CampiMotivo";
 import { centesimi, precompilaChiusura } from "./scheda";
+
+// Corpo del motivo: solo i campi che servono al codice scelto.
+const corpoMotivo = (m: Motivo) => ({
+  lostReason: m.lostReason,
+  ...(m.lostReason === "altro" ? { lostNote: m.lostNote.trim() } : {}),
+  ...(m.lostReason === "non_ora" && m.recontactAt != null ? { recontactAt: m.recontactAt } : {}),
+});
 
 // Foglio che si apre quando la fase cambia verso una persa (serve il motivo) o verso Chiuso (servono setup, canone e inizio).
 // PV2: i dati sono obbligatori solo se la fase cambia davvero; sulla fase attuale il foglio non chiede nulla.
@@ -16,8 +25,9 @@ export function FoglioChiusura({ lead, fase, onChiudi }: { lead: LeadChiusura; f
   const qc = useQueryClient();
   const vinto = fase.kind === "won";
   const cambia = fase.id !== lead.stageId;
-  const motivi = useQuery({ queryKey: ["settings"], queryFn: () => api<{ motivi: { id: string; etichetta: string }[] }>("/settings"), enabled: !vinto });
-  const [motivo, setMotivo] = useState<string | null>(null);
+  // In 80 il motivo è obbligatorio (con giorno o testo se serve); in 90 "Non profilato" è già il motivo.
+  const chiedeMotivo = !vinto && fase.id === "non-chiuso";
+  const [motivo, setMotivo] = useState<Motivo>({ lostReason: null, lostNote: "", recontactAt: null });
   const proposte = useQuery({ queryKey: ["lead", lead.id, "proposte"], queryFn: () => api<{ proposte: PropostaRiga[] }>(`/leads/${lead.id}/proposals`).then((r) => r.proposte), enabled: vinto });
   const iniziali = precompilaChiusura(lead, proposte.data);
   // null finché la persona non scrive: così i valori arrivati dopo dalla rete riempiono il campo.
@@ -30,12 +40,12 @@ export function FoglioChiusura({ lead, fase, onChiudi }: { lead: LeadChiusura; f
   const [inizio, setInizio] = useState<number | null>(null);
   const setupCents = centesimi(setup);
   const feeCents = centesimi(canone);
-  const corpo = vinto ? { stageId: fase.id, setupCents, feeCents, wonStartAt: inizio, ...(cambia && nome.trim() ? { clientName: nome.trim() } : {}) } : { stageId: fase.id, lostReason: motivo };
+  const corpo = vinto ? { stageId: fase.id, setupCents, feeCents, wonStartAt: inizio, ...(cambia && nome.trim() ? { clientName: nome.trim() } : {}) } : { stageId: fase.id, ...(chiedeMotivo ? corpoMotivo(motivo) : {}) };
   const manca = !cambia
     ? undefined
     : vinto
       ? !nome.trim() ? "Scrivi il nome del cliente" : setupCents == null ? "Scrivi il setup in euro" : feeCents == null ? "Scrivi il canone mensile in euro" : inizio == null ? "Scegli la data di inizio" : undefined
-      : !motivo ? "Scegli il motivo" : undefined;
+      : chiedeMotivo ? (mancaMotivo(motivo) ?? undefined) : undefined;
   const salva = useMutation({
     mutationFn: () => api(`/leads/${lead.id}`, { method: "PATCH", json: corpo }),
     onSuccess: () => {
@@ -46,7 +56,7 @@ export function FoglioChiusura({ lead, fase, onChiudi }: { lead: LeadChiusura; f
     onError: (e) => toast.error(e.message),
   });
   return (
-    <Foglio aperto titolo={vinto ? "Cliente: i dati del contratto" : `${fase.label}: perché`} onChiudi={onChiudi}
+    <Foglio aperto lato titolo={vinto ? "Cliente: i dati del contratto" : `${fase.label}: perché`} onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>{vinto && cambia ? "Chiudi e crea il cliente" : "Salva la chiusura"}</Pulsante>}>
       <div className="flex flex-col gap-3">
         {vinto ? (
@@ -57,7 +67,7 @@ export function FoglioChiusura({ lead, fase, onChiudi }: { lead: LeadChiusura; f
             <CampoGiorno etichetta="Data di inizio" valore={inizio} onCambia={setInizio} />
           </>
         ) : (
-          <Selettore etichetta="Motivo" apertoAllInizio opzioni={(motivi.data?.motivi ?? []).map((m) => ({ valore: m.id, etichetta: m.etichetta }))} valore={motivo} onCambia={setMotivo} />
+          chiedeMotivo ? <CampiMotivo apertoAllInizio valore={motivo} onCambia={setMotivo} /> : <p className="text-[15px]">Il lead esce dal giro delle chiamate: lo ritrovi nella tabella, filtro {fase.label}.</p>
         )}
       </div>
     </Foglio>

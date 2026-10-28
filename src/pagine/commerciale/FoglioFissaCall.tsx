@@ -34,7 +34,7 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase, ritorno }: {
     onError: (e) => (eCallNelPassato(e) ? setErroreData(e.message) : toast.error(e.message)),
   });
   return (
-    <Foglio aperto titolo={fase ? `${fase.label}: quando è la call` : "Fissa call"} onChiudi={onChiudi} ritorno={ritorno}
+    <Foglio aperto lato titolo={fase ? `${fase.label}: quando è la call` : "Fissa call"} onChiudi={onChiudi} ritorno={ritorno}
       principale={
         <Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={quando == null ? "Scegli giorno e ora" : undefined} onClick={() => salva.mutate()}>
           {invito && haEmail && resend ? "Fissa call e manda l'invito" : "Fissa call"}
