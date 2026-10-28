@@ -7,3 +7,5 @@ old-dashboard.json
 migration-old.sql
 test-results/
 playwright-report/
+.env*
+*.pem
