@@ -1,13 +1,14 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { entra, fermo } from "./controlli";
 
-// Spec 19.2: dal blocco Adesso a "Salva esito" in 4 tocchi al massimo.
-test("da Adesso a Salva esito in 4 tocchi", async ({ page }) => {
+// Spec 19.2: da Oggi a "Salva esito" in 4 tocchi al massimo (blocco 1: dal menu "..." della prima riga).
+test("da Oggi a Salva esito in 4 tocchi", async ({ page }) => {
   await entra(page);
   await fermo(page);
   let tocchi = 0;
   const tocca = async (l: Locator) => { await l.click(); tocchi++; };
-  await tocca(page.getByRole("region", { name: "Adesso" }).getByRole("button", { name: "Esito" }));
+  await tocca(page.getByRole("list", { name: "Da fare oggi" }).getByRole("listitem").filter({ has: page.getByRole("link", { name: /^Chiama/ }) }).first().getByRole("button", { name: /^Altre azioni per/ }));
+  await tocca(page.getByRole("menuitem", { name: "Segna l'esito" }));
   const foglio = page.getByRole("dialog");
   await expect(foglio).toBeVisible();
   // Il selettore dell'esito è già aperto (QA Piano A): si sceglie la prima voce, la prossima azione è proposta.
@@ -19,8 +20,10 @@ test("da Adesso a Salva esito in 4 tocchi", async ({ page }) => {
 
 // QA del Task 15, controlli 19 e 30: chiuso con Annulla, il foglio riporta il fuoco al pulsante che l'ha aperto.
 test("Annulla riporta il fuoco a chi ha aperto il foglio", async ({ page }) => {
+  // Il pulsante "Filtri" della tabella dei lead c'è sul telefono.
+  await page.setViewportSize({ width: 390, height: 844 });
   await entra(page);
-  await page.goto("/commerciale/scaletta");
+  await page.goto("/commerciale/lead");
   await fermo(page);
   const filtri = page.getByRole("button", { name: /^Filtri/ });
   await filtri.click();

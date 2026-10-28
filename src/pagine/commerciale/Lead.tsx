@@ -144,8 +144,8 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                   {righe.map((l) => (
                     <tr key={l.id} data-lead={l.id} onClick={(e) => clicRiga(e, l.id)}
                       className="cursor-pointer border-b border-[#EFE9E1] last:border-b-0 even:bg-[#FBF8F3] hover:bg-crema">
-                      <td className={cella}>
-                        <Link to={`/commerciale/lead/${l.id}`} title={l.company} className="block truncate font-semibold text-ink hover:underline">{l.company}</Link>
+                      <td className={cx(cella, "relative")}>
+                        <Link to={`/commerciale/lead/${l.id}`} title={l.company} className="block truncate font-semibold text-ink after:absolute after:inset-0 hover:underline">{l.company}</Link>
                         {l.contactName && <span className={secondaria}>{l.contactName}</span>}
                       </td>
                       <td className={cella}>

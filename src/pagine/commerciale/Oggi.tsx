@@ -66,10 +66,10 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
         <p className="text-[13px] text-grigio first-letter:uppercase">{DATA.format(ora)}</p>
         <h1 className="font-sans text-[24px] font-semibold leading-[1.15] tracking-[-0.01em] tabular-nums md:text-[28px]">{n == null ? "Oggi" : titoloOggi(n)}</h1>
       </div>
-      <div role="group" aria-label="Di chi" className="flex h-11 shrink-0 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio p-0.5">
+      <div role="group" aria-label="Di chi" className="flex shrink-0 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio p-0.5 md:h-11">
         {SEGMENTI.map((s) => (
           <button key={s.id} type="button" aria-pressed={chi === s.id} onClick={() => setChi(s.id)}
-            className={cx("flex-1 rounded-[9px] px-5 text-secondaria font-medium transition-colors duration-(--durata-veloce) md:flex-none",
+            className={cx("h-11 flex-1 rounded-[9px] px-5 md:h-auto text-secondaria font-medium transition-colors duration-(--durata-veloce) md:flex-none",
               chi === s.id ? "bg-ink text-avorio" : "text-ink hover:bg-crema")}>
             {s.etichetta}
           </button>

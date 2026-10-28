@@ -12,10 +12,10 @@ type Props = { filtri: Filtri; onCambia: (f: Filtri) => void; fasi: Stage[]; ute
 // Segmento a tre voci: un solo gruppo con bordo, la voce attiva piena. Sul telefono prende tutta la riga.
 export function Segmenti({ valore, onCambia }: { valore: Segmento; onCambia: (s: Segmento) => void }) {
   return (
-    <div role="group" aria-label="Quali lead" className="flex h-11 shrink-0 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio p-0.5">
+    <div role="group" aria-label="Quali lead" className="flex shrink-0 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio p-0.5 md:h-11">
       {SEGMENTI.map((s) => (
         <button key={s.id} type="button" aria-pressed={valore === s.id} onClick={() => onCambia(s.id)}
-          className={cx("min-w-0 flex-1 rounded-[9px] px-4 text-secondaria font-medium transition-colors duration-(--durata-veloce) md:flex-none",
+          className={cx("h-11 min-w-0 flex-1 rounded-[9px] px-4 md:h-auto text-secondaria font-medium transition-colors duration-(--durata-veloce) md:flex-none",
             valore === s.id ? "bg-ink text-avorio" : "text-ink hover:bg-crema")}>
           {s.etichetta}
         </button>

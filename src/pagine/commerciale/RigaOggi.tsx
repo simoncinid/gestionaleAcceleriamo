@@ -47,15 +47,15 @@ export function RigaDaFare({ l, ora, primaria, onApri }: {
       ? <a href={linkTel(l.phone)} data-variante={variante} onClick={() => avviaContatto(l.id, "chiamata")} title={pulsante.testo} className={cx(classiPulsante(variante, "md"), "w-full min-w-0 md:w-auto")}><span className="truncate">{pulsante.testo}</span></a>
       : <Pulsante variante={variante} title={pulsante.testo} className="w-full min-w-0 md:w-auto" onClick={() => esegui(pulsante)}><span className="truncate">{pulsante.testo}</span></Pulsante>;
   return (
-    <li data-lead={l.id} className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-4">
+    <li data-lead={l.id} className="relative flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-4">
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-baseline gap-3">
           <span className="min-w-0 flex-1 text-[15px] font-semibold leading-5">{p.azione}</span>
           {p.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(p.stato))}>{scadenzaBreve(p.scadenza, ora, p.stato)}</span>}
         </span>
-        <Link to={scheda} className="truncate text-[13px] text-grigio hover:text-ink hover:underline">{persona}</Link>
+        <Link to={scheda} className="truncate text-[13px] text-grigio after:absolute after:inset-0 hover:text-ink hover:underline">{persona}</Link>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="relative z-[1] flex items-center gap-2">
         <div className="min-w-0 flex-1 md:flex-none">{azione}</div>
         <MenuPunti etichetta={`Altre azioni per ${l.company}`} voci={[
           ...p.secondarie.filter((c) => c.codice !== pulsante?.codice).map((c) => ({ testo: c.testo, onClick: () => esegui(c) })),
