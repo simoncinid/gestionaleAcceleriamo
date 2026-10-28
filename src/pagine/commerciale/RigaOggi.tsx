@@ -4,6 +4,7 @@ import { linkTel } from "../../format";
 import type { Comando, RigaOggi } from "../../types";
 import { avviaContatto } from "./chiamata";
 import { classeScadenza } from "./coloriLead";
+import { EtichettaFase } from "./EtichettaFase";
 import { scadenzaBreve } from "./tabellaLead";
 import { MenuPunti } from "./Tendina";
 import { callDellAssenza, useNonPresentato } from "./nonPresentato";
@@ -29,8 +30,8 @@ export function aperturaDi(codice: Comando["codice"]): Apertura | "chiama" | "me
   }
 }
 
-export function RigaDaFare({ l, ora, primaria, onApri }: {
-  l: RigaOggi; ora: number; primaria: boolean; onApri: (a: Apertura, c: Comando) => void;
+export function RigaDaFare({ l, ora, fase, primaria, onApri }: {
+  l: RigaOggi; ora: number; fase?: { label: string; tone: string }; primaria: boolean; onApri: (a: Apertura, c: Comando) => void;
 }) {
   const vai = useNavigate();
   const nonPresentato = useNonPresentato();
@@ -59,7 +60,10 @@ export function RigaDaFare({ l, ora, primaria, onApri }: {
           <span className="min-w-0 flex-1 text-[15px] font-semibold leading-5">{p.azione}</span>
           {p.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(p.stato, p.scadenza, ora))}>{scadenzaBreve(p.scadenza, ora, p.stato)}</span>}
         </span>
-        <Link to={scheda} className="truncate text-[13px] text-grigio after:absolute after:inset-0 hover:text-ink hover:underline">{persona}</Link>
+        <span className="flex min-w-0 items-center gap-2">
+          {fase && <EtichettaFase {...fase} className="shrink-0" />}
+          <Link to={scheda} className="min-w-0 truncate text-[13px] text-grigio after:absolute after:inset-0 hover:text-ink hover:underline">{persona}</Link>
+        </span>
       </div>
       <div className="relative z-[1] flex items-center gap-2">
         <div className="min-w-0 flex-1 md:flex-none">{azione}</div>

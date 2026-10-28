@@ -7,7 +7,8 @@ import { Errore, Pulsante, Skeleton, StatoVuoto, cx } from "../../ds";
 import { SOURCE_LABELS, arrivato, euro, trascorso } from "../../format";
 import { useOra, useStages, useUsers } from "../../hooks";
 import { AzioniRiga, CellaFase, FogliRiga, scegliFase, useCestina, useSpostaFase, type FoglioRiga } from "./AzioniLead";
-import { classePallino, classeScadenza } from "./coloriLead";
+import { classeScadenza } from "./coloriLead";
+import { EtichettaFase, faseDi } from "./EtichettaFase";
 import { csvLead, nomeFileCsv, scaricaCsv } from "./esportaLead";
 import { MenuPunti } from "./Tendina";
 import { toast } from "sonner";
@@ -73,7 +74,6 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   if (fasi.error) return <Errore errore={fasi.error} onRiprova={() => void fasi.refetch()} />;
 
   const n = conteggi(tutti, filtri);
-  const etichetta = new Map((fasi.data ?? []).map((f) => [f.id, f.label]));
   // Nella colonna stretta basta il nome di battesimo; quello intero sta nel title.
   const nome = new Map((utenti.data ?? []).map((u) => [u.id, u.name]));
   const apri = (id: string) => vai(`/commerciale/lead/${id}`);
@@ -188,8 +188,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                     {l.prossima?.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>}
                   </span>
                   <span className="flex min-w-0 items-center gap-2 text-[13px] text-grigio">
-                    <span className={cx("size-2 shrink-0 rounded-full", classePallino(l.stageId))} aria-hidden />
-                    <span className="shrink-0">{etichetta.get(l.stageId) ?? l.stageId}</span>
+                    <EtichettaFase {...faseDi(fasi.data, l.stageId)} className="shrink-0" />
                     {l.prossima?.azione && <span className="min-w-0 truncate text-ink">{l.prossima.azione}</span>}
                   </span>
                 </Link>

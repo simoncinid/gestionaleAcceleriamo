@@ -13,6 +13,7 @@ import { FoglioFissaCall } from "./FoglioFissaCall";
 import { FoglioRimanda } from "./FoglioRimanda";
 import { CALL_DEL_CODICE, CALL_DELL_FASE } from "../../../worker/regole/fasi-call";
 import { RigaDaFare, type Apertura } from "./RigaOggi";
+import { faseDi } from "./EtichettaFase";
 import { useTask } from "../lavori/dati";
 import { RigaTask } from "../lavori/RigaTask";
 
@@ -104,7 +105,7 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
           </div>
         ) : (
           <ul aria-label="Da fare oggi" className="divide-y divide-[#EFE9E1]">
-            {d.righe.map((l, i) => <RigaDaFare key={l.id} l={l} ora={ora} primaria={i === 0} onApri={(a, c) => apri(a, l, c)} />)}
+            {d.righe.map((l, i) => <RigaDaFare key={l.id} l={l} ora={ora} fase={faseDi(fasi.data, l.stageId)} primaria={i === 0} onApri={(a, c) => apri(a, l, c)} />)}
           </ul>
         )}
       </Blocco>

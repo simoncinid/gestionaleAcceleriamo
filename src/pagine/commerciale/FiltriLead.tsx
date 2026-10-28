@@ -2,7 +2,7 @@ import { FunnelSimple, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { useState } from "react";
 import { Foglio, Pulsante, Selettore, SelettoreMultiplo, cx } from "../../ds";
 import type { Stage } from "../../types";
-import { classePallino } from "./coloriLead";
+import { EtichettaFase } from "./EtichettaFase";
 import { Filtro } from "./Tendina";
 import { COLONNE_EXTRA, FILTRI_BASE, NESSUNO, SEGMENTI, fasiDelSegmento, quantiFiltri, type ColonnaExtra, type Filtri, type Segmento } from "./tabellaLead";
 
@@ -24,7 +24,6 @@ export function Segmenti({ valore, onCambia }: { valore: Segmento; onCambia: (s:
   );
 }
 
-const pallino = (id: string) => <span className={cx("size-2 shrink-0 rounded-full", classePallino(id))} aria-hidden />;
 
 function opzioniResponsabile(utenti: Persona[], senzaResponsabile: boolean) {
   return [...utenti.map((u) => ({ valore: u.id, etichetta: u.name })), ...(senzaResponsabile ? [{ valore: NESSUNO, etichetta: "Nessuno" }] : [])];
@@ -53,7 +52,7 @@ export function FiltriComputer({ filtri, onCambia, fasi, utenti, campagne, senza
     <div className="hidden flex-wrap items-center gap-2 md:flex">
       <Segmenti valore={filtri.seg} onCambia={(seg) => cambia({ seg, fasi: [] })} />
       <Filtro etichetta="Fase" multipla valori={filtri.fasi} onCambia={(fasi) => cambia({ fasi })} larghezza={280}
-        opzioni={fasiDelSegmento(fasi, filtri.seg).map((f) => ({ valore: f.id, etichetta: f.label, prima: pallino(f.id) }))} />
+        opzioni={fasiDelSegmento(fasi, filtri.seg).map((f) => ({ valore: f.id, etichetta: f.label, voce: <EtichettaFase label={f.label} tone={f.tone} /> }))} />
       <Filtro etichetta="Responsabile" tutte="Tutti" valori={filtri.resp ? [filtri.resp] : []} onCambia={([r]) => cambia({ resp: r ?? "" })}
         opzioni={opzioniResponsabile(utenti, senzaResponsabile)} />
       {campagne.length > 0 && (

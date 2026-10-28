@@ -32,7 +32,8 @@ import { FoglioSpostaCall } from "./lead/FoglioSpostaCall";
 import { NextActionCard, type ComandoScheda } from "./lead/NextActionCard";
 import { poiSeRiesce } from "./lead/salvataggi";
 import { Sezione } from "./lead/Sezione";
-import { LINK, coloreFase } from "./lead/stile";
+import { LINK } from "./lead/stile";
+import { EtichettaFase, faseDi } from "./EtichettaFase";
 import { Timeline } from "./lead/Timeline";
 import { confermaNonPartita, idPerPreventivo } from "./scheda";
 import { useCambioFase } from "./StepperFasi";
@@ -139,11 +140,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
           <h1 className="line-clamp-2 break-words font-sans text-[28px] font-semibold leading-[1.15] tracking-[-0.01em]">{lead.company}</h1>
           <div className="flex flex-wrap items-center gap-x-3">
             {lead.contactName && <p className="text-[15px]">{lead.contactName}</p>}
-            <button type="button" onClick={() => setFoglio("fase")} aria-label={`Fase: ${fase?.label ?? lead.stageId}. Cambia fase`} className="inline-flex min-h-11 items-center">
-              <span className="inline-flex h-8 items-center gap-2 rounded-full border border-[#E5DED4] bg-white px-3 text-[13px] font-semibold hover:border-[#CFC6B9]">
-                <span aria-hidden className="size-2 rounded-full" style={{ background: coloreFase(lead.stageId) }} />
-                {fase?.label ?? lead.stageId}
-              </span>
+            <button type="button" onClick={() => setFoglio("fase")} aria-label={`Fase: ${fase?.label ?? lead.stageId}. Cambia fase`} className="inline-flex min-h-11 min-w-0 items-center hover:[&>span]:brightness-95">
+              <EtichettaFase {...faseDi(fasi.data, lead.stageId)} freccia />
             </button>
           </div>
           {fase?.kind === "won" && coll.data?.cliente && <PassaggioCliente clienteId={coll.data.cliente.id} dal={coll.data.cliente.dal} />}

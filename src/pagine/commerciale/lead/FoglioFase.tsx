@@ -2,9 +2,9 @@ import { Check } from "@phosphor-icons/react";
 import { Foglio } from "../../../ds";
 import type { Stage } from "../../../types";
 import { callPerFase } from "../../../../worker/regole/fasi-call";
-import { coloreFase } from "./stile";
+import { EtichettaFase } from "../EtichettaFase";
 
-// Foglio del cambio fase, aperto dalla pillola dell'intestazione: le nove fasi una per riga, col pallino.
+// Foglio del cambio fase, aperto dalla pillola dell'intestazione: le fasi una per riga, con la loro etichetta colorata.
 // Scegliere una fase che chiede data o motivo apre il foglio giusto; la fase attuale è spuntata e non fa niente.
 // "scegli" arriva da useCambioFase della scheda: il salvataggio (e il suo "Annulla") vive oltre la chiusura del foglio.
 export function FoglioFase({ attuale, ordinate, scegli, onChiudi }: {
@@ -24,8 +24,7 @@ export function FoglioFase({ attuale, ordinate, scegli, onChiudi }: {
                 if (!serveFoglio) onChiudi();
               }}
               className="flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-[15px] hover:bg-crema focus-visible:bg-crema">
-              <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: coloreFase(f.id) }} />
-              <span className="min-w-0 flex-1">{f.label}</span>
+              <span className="flex min-w-0 flex-1"><EtichettaFase label={f.label} tone={f.tone} /></span>
               <span className="flex w-5 justify-end">{f.id === attuale && <Check size={18} weight="bold" aria-hidden />}</span>
             </button>
           </li>

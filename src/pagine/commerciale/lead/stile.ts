@@ -26,18 +26,4 @@ export const OCRA = "#B7791F";
 
 export const COLORE_STATO: Record<StatoScadenza, string> = { scaduto: ROSSO, oggi: ARANCIONE_TESTO, futuro: GRIGIO };
 
-// Pallini di fase: arancione tocca a noi (10, 20, 35, 50), blu c'è una data (30, 40, 45, 55), ocra aspettiamo il cliente (60),
-// verde Cliente, grigio chiusi.
-const PALLINO: Record<string, string> = {
-  "da-chiamare-prima-volta": ARANCIONE,
-  "da-richiamare": ARANCIONE,
-  "in-attesa-preventivo": ARANCIONE,
-  "in-attesa-progetto": ARANCIONE,
-  "appuntamento-confermato": BLU,
-  "presentazione-confermata": BLU,
-  "analisi-fissata": BLU,
-  "progetto-fissato": BLU,
-  "in-attesa-decisione": OCRA,
-  chiuso: VERDE,
-};
-export const coloreFase = (stageId: string) => PALLINO[stageId] ?? GRIGIO;
+// I colori delle fasi stanno in EtichettaFase.tsx (blocco 1 bis): un aspetto solo in tutto il gestionale.

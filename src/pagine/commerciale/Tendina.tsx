@@ -83,7 +83,7 @@ export function VoceTendina({ scelta, onClick, children, ruolo = "menuitemradio"
 // Selettore a espansione compatto della riga dei filtri: riga chiusa con etichetta, valore e freccia;
 // aperto mostra le voci una per riga. "multipla": ogni tocco accende o spegne una voce e l'elenco resta aperto.
 export function Filtro<T extends string>({ etichetta, opzioni, valori, onCambia, multipla = false, tutte = "Tutte", chiuso, larghezza = 260 }: {
-  etichetta: string; opzioni: { valore: T; etichetta: string; prima?: ReactNode }[]; valori: T[]; onCambia: (v: T[]) => void;
+  etichetta: string; opzioni: { valore: T; etichetta: string; prima?: ReactNode; voce?: ReactNode }[]; valori: T[]; onCambia: (v: T[]) => void;
   multipla?: boolean; tutte?: string; larghezza?: number;
   // Testo da chiuso quando non c'è scelta (di default quello della voce "tutte"); vuoto = solo l'etichetta.
   chiuso?: string;
@@ -114,7 +114,7 @@ export function Filtro<T extends string>({ etichetta, opzioni, valori, onCambia,
                   if (!multipla) { onCambia([o.valore]); return setAperta(false); }
                   onCambia(scelta ? valori.filter((v) => v !== o.valore) : [...valori, o.valore]);
                 }}>
-                {o.prima}<span className="min-w-0 break-words">{o.etichetta}</span>
+                {o.voce ?? <>{o.prima}<span className="min-w-0 break-words">{o.etichetta}</span></>}
               </VoceTendina>
             );
           })}

@@ -1,4 +1,4 @@
-import { CaretDown, Phone, WhatsappLogo } from "@phosphor-icons/react";
+import { Phone, WhatsappLogo } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -9,7 +9,7 @@ import { useModelli } from "../../hooks";
 import type { Stage } from "../../types";
 import { callPerFase } from "../../../worker/regole/fasi-call";
 import { avviaContatto } from "./chiamata";
-import { classePallino } from "./coloriLead";
+import { EtichettaFase, faseDi } from "./EtichettaFase";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFissaCall } from "./FoglioFissaCall";
@@ -65,22 +65,19 @@ export function CellaFase({ lead, fasi, onScegli }: { lead: RigaLead; fasi: Stag
   const [aperta, setAperta] = useState(false);
   const ancora = useRef<HTMLButtonElement>(null);
   const ordinate = [...fasi].sort((a, b) => a.sortOrder - b.sortOrder);
-  const nome = fasi.find((f) => f.id === lead.stageId)?.label ?? lead.stageId;
+  const { label: nome, tone } = faseDi(fasi, lead.stageId);
   return (
     <>
       <button ref={ancora} type="button" aria-haspopup="menu" aria-expanded={aperta} aria-label={`Fase di ${lead.company}: ${nome}. Cambia`}
         onClick={() => setAperta((a) => !a)}
-        className={cx("group/fase -mx-1.5 flex h-8 w-[calc(100%+12px)] min-w-0 items-center gap-2 rounded-[6px] px-1.5 text-left hover:bg-avorio hover:ring-1 hover:ring-sabbia-2", aperta && "bg-avorio ring-1 ring-ink")}>
-        <span className={cx("size-2 shrink-0 rounded-full", classePallino(lead.stageId))} aria-hidden />
-        <span title={nome} className="min-w-0 flex-1 truncate">{nome}</span>
-        <CaretDown size={12} weight="bold" aria-hidden className={cx("shrink-0 text-grigio opacity-0 group-hover/fase:opacity-100", aperta && "opacity-100")} />
+        className={cx("-mx-1 flex h-8 max-w-[calc(100%+8px)] min-w-0 items-center rounded-[8px] px-1 text-left hover:[&>span]:brightness-95", aperta && "ring-1 ring-ink")}>
+        <EtichettaFase label={nome} tone={tone} freccia />
       </button>
       <Tendina ancora={ancora} aperta={aperta} onChiudi={() => setAperta(false)} etichetta={`Fase di ${lead.company}`} larghezza={260}>
         <div role="menu" aria-label={`Fase di ${lead.company}`}>
           {ordinate.map((f) => (
             <VoceTendina key={f.id} scelta={f.id === lead.stageId} onClick={() => { setAperta(false); onScegli(f); }}>
-              <span className={cx("size-2 shrink-0 rounded-full", classePallino(f.id))} aria-hidden />
-              <span className="min-w-0 truncate">{f.label}</span>
+              <EtichettaFase label={f.label} tone={f.tone} />
             </VoceTendina>
           ))}
         </div>
