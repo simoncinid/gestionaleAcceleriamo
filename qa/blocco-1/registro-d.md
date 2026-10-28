@@ -1,0 +1,7 @@
+# Registro corsia D (gestione CRM): modifiche 5, 8, 9
+
+Silvio (sviluppatore), ramo `blocco1-corsia-d`, anteprima sulla porta 5214.
+
+| N | Commit | Esito | Cosa resta | Ruling |
+|---|---|---|---|---|
+| 5 | (questo commit) | Seed con 11 lead (`demo-lead-10` ... `demo-lead-90`, `demo-lead-senza-telefono`, `demo-lead-doppione`), utenti Diego (`demo`) e Tommaso (`demo-tommaso`), assegnazione scritta nelle impostazioni. Via i "Collaudo ...": non li crea nessun e2e, erano righe scritte a mano nel D1 locale e il seed svuota la tabella. Prove `tests/b1d-seed.test.ts` (9) e `tests/demo.test.ts` aggiornata. Foto `05-seed-tabella-*` (la Scaletta di oggi mostra solo gli aperti: 8). | I pallini di fase vengono da `stages.tone` della 0016: la 20 e la 60 sono "yellow", il contratto vuole 20 arancione e 60 ocra. Da allineare nella passata UI (modifica 23) o con una migrazione all'unione. Gli e2e puntano ai nuovi id (`demo-lead-10`, `-20`, `-30`); le foto di `schermate.spec.ts` vanno rifatte dopo l'unione (dati diversi). | Ruling: il lead in 90 tiene `lostReason = fuori_target` (codice vecchio) perché `MOTIVI_PERSI` non ha un codice per il non profilato. Costo se sbagliato: un campo da svuotare nel seed. Ruling: la chiave del telefono nel seed è `normalizePhone` (cifre senza +39), la stessa del gestionale, non "+39..." scritto a mano come prima (i doppioni demo non si trovavano). Costo se sbagliato: nessuno, è la chiave in uso. |

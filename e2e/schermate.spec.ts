@@ -10,7 +10,7 @@ const SCHERMATE: Schermata[] = [
   { nome: "lunedi", percorso: "/commerciale/oggi/lunedi" },
   { nome: "diario", percorso: "/commerciale/oggi/diario" },
   { nome: "scaletta", percorso: "/commerciale/scaletta" },
-  { nome: "scheda-lead", percorso: "/commerciale/lead/demo-lead-17" },
+  { nome: "scheda-lead", percorso: "/commerciale/lead/demo-lead-30" },
   { nome: "call", percorso: "/commerciale/call" },
   { nome: "proposte", percorso: "/commerciale/proposte" },
   { nome: "clienti", percorso: "/commerciale/clienti" },

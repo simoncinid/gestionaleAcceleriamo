@@ -35,7 +35,7 @@ async function callDomani(page: Page, foglio: ReturnType<Page["getByRole"]>, pre
 test("dalla prima chiamata al contratto", async ({ page }) => {
   test.skip(test.info().project.name !== "desk", "un giro solo: il percorso modifica i dati della demo");
   await entraOraVera(page);
-  await page.goto("/commerciale/lead/demo-lead-01");
+  await page.goto("/commerciale/lead/demo-lead-10");
   await expect(fase(page)).toContainText("Nuovo, da chiamare");
 
   // 1. Prima telefonata: consulenza fissata (il link senza https va bene).
@@ -76,7 +76,7 @@ test("dalla prima chiamata al contratto", async ({ page }) => {
 // Il bug del 26/10: dentro "Com'è andata?" la scelta della fase (selettore lungo, in un foglio figlio) chiudeva tutto.
 test("scegliere la fase dentro il foglio dell'esito non chiude il foglio", async ({ page }) => {
   await entraOraVera(page);
-  await page.goto("/commerciale/lead/demo-lead-17");
+  await page.goto("/commerciale/lead/demo-lead-30");
   await page.getByRole("button", { name: "Segna esito" }).click();
   const foglio = page.getByRole("dialog", { name: "Com'è andata?" });
   await foglio.getByRole("option", { name: "Richiamare", exact: true }).click();
@@ -89,7 +89,7 @@ test("scegliere la fase dentro il foglio dell'esito non chiude il foglio", async
 // Collaudo del 26/10, voce 1: Esc con il selettore della fase aperto chiudeva tutto il foglio e la nota scritta andava persa.
 test("Esc nel selettore della fase chiude solo il selettore", async ({ page }) => {
   await entraOraVera(page);
-  await page.goto("/commerciale/lead/demo-lead-18");
+  await page.goto("/commerciale/lead/demo-lead-20");
   await page.getByRole("button", { name: "Segna esito" }).click();
   const foglio = page.getByRole("dialog", { name: "Com'è andata?" });
   await foglio.getByRole("option", { name: "Richiamare", exact: true }).click();

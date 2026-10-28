@@ -5,6 +5,7 @@ import { app } from "../worker/app";
 import { RisultatoCoach } from "../worker/claude/coach";
 import { hashPassword } from "../worker/auth/password";
 import { LEAD_SOURCES, LOST_REASONS } from "../worker/db/schema";
+import { MOTIVI_PERSI } from "../worker/processo/motivi";
 import { call, createUser, loginCookie } from "./helpers";
 
 const ORA = Date.UTC(2026, 9, 15, 9);
@@ -15,21 +16,21 @@ async function semina() {
 }
 
 describe("dati della demo", () => {
-  it("40 lead di settori veri, contatti finti, tre automazioni anonime", () => {
+  it("11 lead di settori veri, contatti finti, un'automazione anonima", () => {
     const d = datiDemo(ORA, "hash");
-    expect(d.leads).toHaveLength(40);
+    expect(d.leads).toHaveLength(11);
     expect(new Set(d.leads.map((l) => l.notes)).size).toBeGreaterThanOrEqual(5);
     expect(d.leads.every((l) => l.email == null || l.email.endsWith("@esempio.invalid"))).toBe(true);
     expect(d.leads.every((l) => l.phone == null || l.phone.startsWith("+39 000"))).toBe(true);
-    expect(d.automations).toHaveLength(3);
+    expect(d.automations).toHaveLength(1);
     expect(d.automations.every((a) => !d.clients.some((c) => a.name.includes(c.name)))).toBe(true);
-    expect(d.companyProfiles.length).toBeGreaterThanOrEqual(5);
+    expect(d.companyProfiles.length).toBeGreaterThanOrEqual(2);
     expect(d.callAnalyses.length).toBeGreaterThanOrEqual(2);
     expect(datiDemo(ORA, "hash")).toEqual(d);
   });
   it("lavori finti dei clienti attivi: task dell'utente demo, ricorrenti del mese e passaggi dell'automazione", () => {
     const d = datiDemo(ORA, "hash");
-    expect(d.jobs).toHaveLength(2);
+    expect(d.jobs).toHaveLength(1);
     expect(d.jobs.every((j) => d.clients.some((c) => c.id === j.clientId) && j.templateId === "lt-automazione-su-misura")).toBe(true);
     expect(d.tasks.every((t) => t.assigneeId === "demo" && d.jobs.some((j) => j.id === t.jobId))).toBe(true);
     expect(d.tasks.some((t) => t.doneAt == null)).toBe(true);
@@ -39,7 +40,9 @@ describe("dati della demo", () => {
   it("valori ammessi dallo schema: fonti, motivi di perdita, siti su esempio.invalid", () => {
     const d = datiDemo(ORA, "hash");
     expect(d.leads.every((l) => (LEAD_SOURCES as readonly string[]).includes(l.source!))).toBe(true);
-    expect(d.leads.every((l) => l.lostReason == null || (LOST_REASONS as readonly string[]).includes(l.lostReason))).toBe(true);
+    // Blocco 1: i motivi a codice (MOTIVI_PERSI) accanto a quelli vecchi di Impostazioni.
+    const motivi = [...LOST_REASONS, ...MOTIVI_PERSI.map((m) => m.id)] as string[];
+    expect(d.leads.every((l) => l.lostReason == null || motivi.includes(l.lostReason))).toBe(true);
     expect(d.leads.every((l) => l.website == null || new URL(l.website).hostname.endsWith(".esempio.invalid"))).toBe(true);
   });
   it("nessun dominio vero: niente esempio.it in email, siti e testi", () => {
@@ -63,7 +66,7 @@ describe("dati della demo", () => {
     await semina();
     await semina();
     const n = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM leads) AS l, (SELECT COUNT(*) FROM users) AS u, (SELECT COUNT(*) FROM automations) AS a").first<{ l: number; u: number; a: number }>();
-    expect(n).toEqual({ l: 40, u: 1, a: 3 });
+    expect(n).toEqual({ l: 11, u: 2, a: 1 });
     // Gli a capo della scheda tornano a capo veri dopo char(10).
     const scheda = await env.DB.prepare("SELECT content FROM company_profiles LIMIT 1").first<{ content: string }>();
     expect(scheda?.content).toContain("\n## Cosa fa l'azienda");
@@ -82,7 +85,10 @@ describe("dati della demo", () => {
     expect(base.every((q) => !q.includes("\n"))).toBe(true);
     const sql = sqlDemo(datiDemo(ORA, await hashPassword("password-demo-1", 1000)), base);
     await env.DB.batch(sql.map((q) => env.DB.prepare(q)));
-    expect(await leggi()).toEqual(prima);
+    // Blocco 1: il seed scrive anche l'assegnazione (prima chiamata a Diego, presentazione a Tommaso); il resto torna come prima.
+    const dopo = await leggi();
+    expect((dopo.settings as { key: string }[]).map((r) => r.key)).toEqual(["assegnazione"]);
+    expect({ ...dopo, settings: prima.settings }).toEqual(prima);
   });
   it("l'utente demo entra con la sua password", async () => {
     await semina();
