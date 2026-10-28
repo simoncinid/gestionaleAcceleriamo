@@ -1,11 +1,12 @@
 import { ArrowDown, ArrowUp } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, type MouseEvent, type ReactNode } from "react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../../api";
 import { Errore, Pulsante, Skeleton, StatoVuoto, cx } from "../../ds";
 import { SOURCE_LABELS, arrivato, euro, trascorso } from "../../format";
 import { useOra, useStages, useUsers } from "../../hooks";
+import { AzioniRiga, CellaFase, FogliRiga, scegliFase, useCestina, useSpostaFase, type FoglioRiga } from "./AzioniLead";
 import { classePallino, classeScadenza } from "./coloriLead";
 import { FiltriComputer, FiltriTelefono } from "./FiltriLead";
 import {
@@ -20,14 +21,14 @@ import {
 // Con le colonne a richiesta la tabella passa a larghezze fisse in px e scorre di lato dentro il suo contenitore.
 type IdColonna = "azienda" | "fase" | "dafare" | "scadenza" | "responsabile" | "fonte" | "contatto" | "azioni";
 export const COLONNE: { id: IdColonna; titolo: string; largo: string; px: number; ordine?: Ordine }[] = [
-  { id: "azienda", titolo: "Azienda", largo: "18%", px: 210, ordine: "azienda" },
-  { id: "fase", titolo: "Fase", largo: "16%", px: 190, ordine: "fase" },
+  { id: "azienda", titolo: "Azienda", largo: "17%", px: 210, ordine: "azienda" },
+  { id: "fase", titolo: "Fase", largo: "17%", px: 200, ordine: "fase" },
   { id: "dafare", titolo: "Da fare", largo: "19%", px: 220 },
-  { id: "scadenza", titolo: "Scadenza", largo: "11%", px: 130, ordine: "scadenza" },
+  { id: "scadenza", titolo: "Scadenza", largo: "10%", px: 130, ordine: "scadenza" },
   { id: "responsabile", titolo: "Responsabile", largo: "8%", px: 110 },
   { id: "fonte", titolo: "Fonte", largo: "10%", px: 130 },
   { id: "contatto", titolo: "Ultimo contatto", largo: "9%", px: 130, ordine: "contatto" },
-  { id: "azioni", titolo: "Azioni", largo: "9%", px: 110 },
+  { id: "azioni", titolo: "Azioni", largo: "10%", px: 110 },
 ];
 const PX_EXTRA: Record<ColonnaExtra, number> = { telefono: 160, email: 230, punteggio: 110, arrivato: 110, tentativi: 100, proposta: 210 };
 const TITOLO_EXTRA: Record<ColonnaExtra, string> = { telefono: "Telefono", email: "Email", punteggio: "Punteggio", arrivato: "Arrivato il", tentativi: "Tentativi", proposta: "Proposta" };
@@ -60,6 +61,9 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   const setFiltri = (f: Filtri) => setParams(scriviFiltri(f), { replace: true });
   const tutti = leads.data ?? [];
   const righe = useMemo(() => ordina(filtra(tutti, filtri), filtri, fasi.data ?? []), [tutti, filtri, fasi.data]);
+  const [foglio, setFoglio] = useState<FoglioRiga | null>(null);
+  const sposta = useSpostaFase(fasi.data ?? []);
+  const cestina = useCestina();
 
   if (leads.isLoading || fasi.isLoading) return <Skeleton righe={8} />;
   if (leads.error) return <Errore errore={leads.error} onRiprova={() => void leads.refetch()} />;
@@ -134,10 +138,8 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                         {l.contactName && <span className={secondaria}>{l.contactName}</span>}
                       </td>
                       <td className={cella}>
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className={cx("size-2 shrink-0 rounded-full", classePallino(l.stageId))} aria-hidden />
-                          <span className="truncate">{etichetta.get(l.stageId) ?? l.stageId}</span>
-                        </span>
+                        <CellaFase lead={l} fasi={fasi.data ?? []}
+                          onScegli={(f) => scegliFase(l, f, setFoglio, (stageId) => sposta.mutate({ lead: l, stageId, prima: l.stageId }))} />
                       </td>
                       <td className={cella}><span title={l.prossima?.azione ?? undefined} className={cx("block truncate", !l.prossima?.azione && "text-grigio")}>{l.prossima?.azione ?? "Nessuna azione"}</span></td>
                       <td className={cx(cella, "tabular-nums")}>
@@ -152,7 +154,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                         <span className={cx("block truncate", l.ultimoContatto == null && "text-grigio")}>{l.ultimoContatto != null ? trascorso(l.ultimoContatto, ora) : "Mai"}</span>
                       </td>
                       {extra.map((c) => <td key={c} className={cx(cella, "tabular-nums")}><span className="block truncate">{cellaExtra(c, l, ora)}</span></td>)}
-                      <td className={cx(cella, "px-1")} />
+                      <td className={cx(cella, "px-1")}><AzioniRiga lead={l} onApri={setFoglio} onCestina={() => cestina.mutate(l)} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -180,6 +182,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
           </ul>
         </>
       )}
+      <FogliRiga foglio={foglio} utenti={utenti.data ?? []} onChiudi={() => setFoglio(null)} />
     </div>
   );
 }
