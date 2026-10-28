@@ -48,3 +48,13 @@ describe("riga del contatto", () => {
     expect(solo).not.toContain("/commerciale/lead/");
   });
 });
+
+describe("collegamenti di un lead perso", async () => {
+  const { Collegamenti } = await import("../src/pagine/commerciale/lead/Collegamenti");
+  it("niente promessa del cliente né riga di automazioni e canoni", () => {
+    const html = render(<Collegamenti dati={{ proposte: [], call: [], cliente: null, automazioni: [], canoni: [] }} ora={0} perso onCrea={() => undefined} />);
+    expect(html).toContain("Nessun cliente");
+    expect(html).not.toContain("Diventa cliente");
+    expect(html).not.toContain("Compaiono quando è cliente");
+  });
+});

@@ -46,7 +46,8 @@ const Vuota = ({ children }: { children: ReactNode }) => <li className={`${SECON
 
 // Sezione "Collegamenti" della scheda (contratto blocco 1, sezione 3, modifica 14): tutto quello che è nato dal lead.
 // Automazioni e canoni esistono solo dal cliente: prima c'è una riga grigia che dice quando compaiono.
-export function Collegamenti({ dati, ora, onCrea }: { dati: Dati | undefined; ora: number; onCrea: (a: AzioneCollegamenti) => void }) {
+// Lead perso o scartato (80, 90): niente promessa del cliente, solo che non c'è.
+export function Collegamenti({ dati, ora, perso = false, onCrea }: { dati: Dati | undefined; ora: number; perso?: boolean; onCrea: (a: AzioneCollegamenti) => void }) {
   const crea = (a: AzioneCollegamenti, testo: string) => <button type="button" className={`${LINK} shrink-0 text-[15px]`} onClick={() => onCrea(a)}>{testo}</button>;
   if (!dati) return <Sezione titolo="Collegamenti" nome="collegamenti"><p className={SECONDARIO}>Carico i collegamenti…</p></Sezione>;
   const { proposte, call, cliente, automazioni, canoni } = dati;
@@ -78,7 +79,7 @@ export function Collegamenti({ dati, ora, onCrea }: { dati: Dati | undefined; or
                 </Link>
               </li>
             )
-            : <Vuota>Diventa cliente quando segni il sì: da lì compaiono automazioni e canoni.</Vuota>}
+            : <Vuota>{perso ? "Nessun cliente" : "Diventa cliente quando segni il sì: da lì compaiono automazioni e canoni."}</Vuota>}
         </Gruppo>
         {cliente
           ? (
@@ -95,7 +96,7 @@ export function Collegamenti({ dati, ora, onCrea }: { dati: Dati | undefined; or
               </Gruppo>
             </>
           )
-          : (
+          : !perso && (
             <Gruppo titolo="Automazioni e canoni">
               <li className="py-2 text-[13px]" style={{ color: GRIGIO }}>Compaiono quando è cliente.</li>
             </Gruppo>

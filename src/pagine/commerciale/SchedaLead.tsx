@@ -181,7 +181,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
               inLinea={{ call: prossimaCall, proposta: ultimaProposta, cliente: d.data.cliente ? { id: d.data.cliente.id, name: d.data.cliente.name } : null }} />
           </div>
           <div className="order-3 @4xl:order-none">
-            <Collegamenti dati={coll.data} ora={ora}
+            <Collegamenti dati={coll.data} ora={ora} perso={fase?.kind === "lost"}
               onCrea={(a) => (a === "proposta" ? setFoglio("proposta") : a === "call" ? setFoglio("fissa") : setFoglio(a))} />
           </div>
           <div className="order-5 @4xl:order-none">
