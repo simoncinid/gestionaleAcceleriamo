@@ -23,7 +23,13 @@ type Seo = { title?: string; description?: string; jsonld?: Record<string, unkno
 const leggiSeo = (s: string | null | undefined): Seo => {
   try {
     const v = s ? JSON.parse(s) : null;
-    return v && typeof v === "object" ? v : {};
+    if (!v || typeof v !== "object") return {};
+    // Solo testi e oggetti: un valore di tipo sbagliato nella semina non deve far cadere la pagina.
+    return {
+      title: typeof v.title === "string" ? v.title : undefined,
+      description: typeof v.description === "string" ? v.description : undefined,
+      jsonld: v.jsonld && typeof v.jsonld === "object" && !Array.isArray(v.jsonld) ? v.jsonld : null,
+    };
   } catch {
     return {};
   }
@@ -97,6 +103,7 @@ export async function paginaRisorsa(c: Context<AppEnv>) {
   const risposta = riscrittore.transform(new Response(html.body, html));
   const intestazioni = new Headers(risposta.headers);
   intestazioni.set("content-type", "text/html; charset=utf-8");
+  intestazioni.delete("etag"); // l'HTML cambia da una risorsa all'altra: l'ETag di index.html non vale
   // Pochi minuti in cache: quando cambia un testo, l'anteprima nelle chat si aggiorna presto.
   intestazioni.set("cache-control", "public, max-age=300");
   return new Response(risposta.body, { status: attiva ? 200 : 404, headers: intestazioni });
@@ -104,7 +111,7 @@ export async function paginaRisorsa(c: Context<AppEnv>) {
 
 // robots.txt: si indicizzano solo le pagine risorsa (e quello che serve a disegnarle); il gestionale resta fuori.
 export function robots(c: Context<AppEnv>) {
-  const testo = ["User-agent: *", "Allow: /r/", "Allow: /api/pubblico/", "Disallow: /api/", "", `Sitemap: ${base(c)}/sitemap.xml`, ""].join("\n");
+  const testo = ["User-agent: *", "Allow: /r/", "Allow: /api/pubblico/", "Allow: /assets/", "Allow: /risorse/", "Allow: /brand/", "Allow: /fonts/", "Allow: /icone/", "Allow: /icone-3d/", "Disallow: /", "", `Sitemap: ${base(c)}/sitemap.xml`, ""].join("\n");
   return c.text(testo, 200, { "cache-control": "public, max-age=3600" });
 }
 

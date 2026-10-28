@@ -59,7 +59,7 @@ describe("pagina /r/:slug per le anteprime nelle chat", () => {
     await inserisci("no", "No", "", 0);
     const robots = await (await apri("/robots.txt")).text();
     expect(robots).toContain("Allow: /r/");
-    expect(robots).toContain("Disallow: /api/");
+    expect(robots).toContain("Disallow: /\n");
     expect(robots).toContain("Sitemap: https://risorse.acceleriamo.it/sitemap.xml");
     const res = await apri("/sitemap.xml");
     expect(res.headers.get("content-type")).toContain("application/xml");
