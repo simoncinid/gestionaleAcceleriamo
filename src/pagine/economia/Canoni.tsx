@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "react-router";
+import { LINK } from "../commerciale/lead/stile";
 import { ETICHETTE_CANONE } from "../../../worker/economia/calcoli";
 import { Errore, Intestazione, Riga, Skeleton, StatoVuoto, Tag } from "../../ds";
 import { euro } from "../../format";
@@ -7,8 +9,13 @@ import type { CanoneRiga } from "../../types";
 import { useCanoni } from "../dati-gestione";
 import { FoglioCanone } from "./Fogli";
 
+// La riga apre il foglio del canone; sotto, fuori dal pulsante, il link all'automazione che il canone paga
+// (blocco 1, modifica 16): dall'automazione la riga del contatto porta al lead e al cliente.
 const RigaCanone = ({ c, onClick }: { c: CanoneRiga; onClick: () => void }) => (
-  <Riga titolo={c.cliente} secondaria={`${euro(c.amountCents)} al mese`} meta={`Fatturazione il giorno ${c.billingDay}`} destra={<Tag>{ETICHETTE_CANONE[c.status]}</Tag>} onClick={onClick} />
+  <div className="flex flex-col">
+    <Riga titolo={c.cliente} secondaria={`${euro(c.amountCents)} al mese`} meta={`Fatturazione il giorno ${c.billingDay}`} destra={<Tag>{ETICHETTE_CANONE[c.status]}</Tag>} onClick={onClick} />
+    {c.automationId && <Link className={`${LINK} self-start px-4 text-[15px]`} to={`/automazioni/${c.automationId}`}>Apri l'automazione</Link>}
+  </div>
 );
 
 // Spec 9.2: nessun primario; il canone nuovo nasce dal "+", le azioni stanno nel foglio del canone.

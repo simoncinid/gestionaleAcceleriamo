@@ -25,3 +25,12 @@ describe("riga del contatto", () => {
     expect(render(<ContattoDalCliente clienteId="C2" azienda="Diretto" />, { dati: [[["clienti", "C2"], { lead: null }]] })).not.toContain("/commerciale/lead/");
   });
 });
+
+describe("dal canone all'automazione", async () => {
+  const { Canoni } = await import("../src/pagine/economia/Canoni");
+  it("ogni canone con automazione ha il link, fuori dal pulsante della riga", () => {
+    const html = render(<Canoni ora={0} />, { dati: [[["economia", "canoni"], [{ id: "F1", clientId: "C1", automationId: "A1", amountCents: 30000, billingDay: 1, status: "attivo", cliente: "Officina Prova" }]]] });
+    expect(html).toContain('href="/automazioni/A1"');
+    expect(html).not.toMatch(/<button[^>]*>(?:(?!<\/button>).)*href="\/automazioni\/A1"/s);
+  });
+});
