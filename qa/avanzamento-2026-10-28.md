@@ -32,13 +32,30 @@ Chi: Silvio (sviluppatore). Ramo `acceleriamo-os`, commit locali, niente push.
 | `zod` | 3.25.76, 4.6.7 | Alta, online (memoria esaurita con liste enormi) | Versione maggiore, nessuna correzione sulla 3. Usato in 32 file, 5 punti con API cambiate. Oggi i limiti di dimensione del corpo riducono il rischio. | Medio-alto: resta al blocco 6 |
 | `drizzle-kit` (esbuild vecchio) | 0.31.11, già l'ultima | Moderata, solo per generare migrazioni | Nessuna correzione disponibile (l'audit propone di tornare alla 0.18: no). | Accettato |
 
-## Da fare quando Dante dà il via (anteprima libera)
+## Installazione (via di Dante alle 08:30, anteprima libera)
 
-1. `npm install drizzle-orm@^0.45.4 wrangler@^4.154 @cloudflare/vite-plugin@^1.65`, poi test, typecheck, build. Commit.
-2. `vitest@~4.1.12` e `@cloudflare/vitest-pool-workers@^0.23`, riscrittura di `vitest.config.ts`, test finché verdi. Commit.
-3. `npm audit --omit=dev`: atteso solo l'avviso su `zod`.
-4. `npm run e2e` (Playwright) a fine giro.
-5. Push su `diego acceleriamo-os` solo a fine lavori, dopo il collaudo.
+1. `drizzle-orm` 0.45.4, `wrangler` 4.154.0, `@cloudflare/vite-plugin` 1.65.0, e `@cloudflare/workers-types` 5.20261028.1 perché lo chiede wrangler. Commit `b2413c1`.
+2. `vitest` 4.1.12 e `@cloudflare/vitest-plugin` 1.4.9 al posto di `@cloudflare/vitest-pool-workers`. Commit `fe5ebbe`.
+   - Il pool 0.23 non partiva: il suo motore arriva al 22/08/2026, il Worker usa la data del 15/09/2026. Il pacchetto è stato rinominato in `@cloudflare/vitest-plugin`.
+   - `vitest.config.ts` con il plugin `cloudflareTest()`; tipi in `tsconfig.json` e `tests/env.d.ts` (`Cloudflare.Env`).
+   - Il plugin isola i dati solo tra i file, quindi `tests/apply-migrations.ts` svuota e rimigra il database prima di ogni prova (come faceva il pool vecchio).
+   - `tests/dati.test.ts`: il CSV si controlla sui byte (`text()` toglie il BOM per standard). Provato che senza BOM nel codice la prova fallisce.
+   - Vitest 5 non va: il plugin lo accetta, ma il salto è stato evitato per restare stretti.
+3. Browser di Playwright riscaricato (`npx playwright install chromium`): sul Mac mancava la cartella, quindi le 86 prove a schermo non partivano. Nessun cambio al repo.
+
+## Esiti dopo l'installazione
+
+- `npm test`: 111 file, 1.209 prove passano; prove Node 1 su 1.
+- `npm run typecheck`: pulito. `npm run build`: pulita (resta l'avviso sul pacchetto sopra 500 kB).
+- `npm audit --omit=dev`: 1 voce alta, `zod` (blocco 6).
+- `npm audit` completo: da 16 a 9 voci, nessuna critica; restano `zod` e l'esbuild vecchio di `drizzle-kit` (solo migrazioni, nessuna correzione disponibile).
+- `npm run e2e`: 84 passano, 2 saltate di proposito (una sola larghezza per quelle prove).
+- Anteprima 5210: mai riavviata, risponde (pagina e `/api/health`). Gira ancora con i moduli caricati prima dell'install: al prossimo riavvio prende quelli nuovi.
+
+## Resta
+
+- `zod` 4: blocco 6.
+- Push su `diego acceleriamo-os` a fine lavori, dopo il collaudo.
 
 ## Seguiti notati, non fatti
 
