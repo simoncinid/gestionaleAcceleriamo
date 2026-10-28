@@ -6,8 +6,10 @@ import { cx } from "../../ds";
 // Elenco a tendina sopra la pagina, agganciato al pulsante che lo apre: serve dentro la tabella (che scorre per conto
 // suo e taglierebbe un elenco normale) e nella riga dei filtri. Una voce per riga, niente ombra: bordo e fondo bianco.
 // Si chiude con Esc (il fuoco torna al pulsante), con un tocco fuori, scorrendo la pagina o cambiando la finestra.
-export function Tendina({ ancora, aperta, onChiudi, etichetta, larghezza = 240, children }: {
-  ancora: RefObject<HTMLElement | null>; aperta: boolean; onChiudi: () => void; etichetta: string; larghezza?: number; children: ReactNode;
+export function Tendina({ ancora, aperta, onChiudi, etichetta, larghezza = 240, alta = false, children }: {
+  ancora: RefObject<HTMLElement | null>; aperta: boolean; onChiudi: () => void; etichetta: string; larghezza?: number;
+  // "alta": elenco con campi sotto le voci (filtro Arrivati con il periodo), più spazio prima di scorrere.
+  alta?: boolean; children: ReactNode;
 }) {
   const pannello = useRef<HTMLDivElement>(null);
   const [posto, setPosto] = useState<{ top: number; left: number; sopra: boolean } | null>(null);
@@ -20,7 +22,7 @@ export function Tendina({ ancora, aperta, onChiudi, etichetta, larghezza = 240, 
     const sopra = a.bottom + 4 + alto > window.innerHeight - 8 && a.top - 4 - alto > 8;
     const left = Math.max(8, Math.min(a.left, window.innerWidth - larghezza - 8));
     setPosto({ top: sopra ? a.top - 4 - alto : a.bottom + 4, left, sopra });
-  }, [aperta, ancora, larghezza]);
+  }, [aperta, ancora, larghezza, alta]);
   useEffect(() => {
     if (!aperta) return;
     const fuori = (e: PointerEvent) => {
@@ -58,7 +60,7 @@ export function Tendina({ ancora, aperta, onChiudi, etichetta, larghezza = 240, 
   return createPortal(
     <div ref={pannello} role="dialog" aria-label={etichetta} onKeyDown={tasti}
       style={{ top: posto?.top ?? -9999, left: posto?.left ?? -9999, width: larghezza }}
-      className={cx("fixed z-40 max-h-[min(420px,70dvh)] overflow-y-auto rounded-controllo border border-sabbia-2 bg-avorio p-1",
+      className={cx("fixed z-40 overflow-y-auto", alta ? "max-h-[min(560px,85dvh)]" : "max-h-[min(420px,70dvh)]", "rounded-controllo border border-sabbia-2 bg-avorio p-1",
         posto && "motion-safe:animate-[appare_150ms_var(--ease-uscita)]", posto?.sopra ? "origin-bottom" : "origin-top")}>
       {children}
     </div>,

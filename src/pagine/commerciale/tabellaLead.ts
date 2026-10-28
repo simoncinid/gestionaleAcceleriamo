@@ -1,5 +1,5 @@
 import { FASI_APERTE } from "../../../worker/processo/processo";
-import { partiRoma } from "../../../worker/lib/roma";
+import { daRoma, partiRoma } from "../../../worker/lib/roma";
 import type { LeadListItem, ProssimaAzione, Stage } from "../../types";
 
 // Logica della tabella dei lead (contratto blocco 1, sezione 4): filtri letti e scritti nell'indirizzo, segmento,
@@ -14,8 +14,61 @@ export type Filtri = {
   seg: Segmento; fasi: string[]; resp: string; camp: string; q: string;
   // "oggi": solo le scadenze entro oggi (scadute comprese), lo stesso insieme della lista di Oggi.
   scad: "" | "oggi";
+  // Filtro "Arrivati" sulla data di arrivo (createdAt); con "periodo" valgono dal e al ("AAAA-MM-GG", giorni di Roma interi).
+  arr: Arrivo; dal: string; al: string;
   ord: Ordine; dir: "asc" | "desc";
 };
+
+export type Arrivo = "" | "oggi" | "ieri" | "7g" | "30g" | "mese" | "mese-scorso" | "periodo";
+export const ARRIVI: { id: Exclude<Arrivo, "">; etichetta: string }[] = [
+  { id: "oggi", etichetta: "Oggi" },
+  { id: "ieri", etichetta: "Ieri" },
+  { id: "7g", etichetta: "Ultimi 7 giorni" },
+  { id: "30g", etichetta: "Ultimi 30 giorni" },
+  { id: "mese", etichetta: "Questo mese" },
+  { id: "mese-scorso", etichetta: "Mese scorso" },
+  { id: "periodo", etichetta: "Periodo..." },
+];
+const ID_ARRIVI = new Set<string>(ARRIVI.map((a) => a.id));
+const DATA = /^\d{4}-\d{2}-\d{2}$/;
+const giornoDa = (s: string) => DATA.test(s) ? s.split("-").map(Number) as [number, number, number] : null;
+
+// Intervallo [da, a) in ms degli arrivi, sul calendario di Roma; null = nessun limite. "Ultimi 7 giorni" è oggi
+// più i sei giorni prima; il periodo prende interi i giorni "dal" e "al" (anche uno solo dei due, o invertiti).
+export function intervalloArrivo(f: Pick<Filtri, "arr" | "dal" | "al">, ora: number): { da: number | null; a: number | null } | null {
+  if (!f.arr) return null;
+  const { anno, mese, giorno } = partiRoma(ora);
+  const g = (n: number) => daRoma(anno, mese, giorno + n);
+  switch (f.arr) {
+    case "oggi": return { da: g(0), a: g(1) };
+    case "ieri": return { da: g(-1), a: g(0) };
+    case "7g": return { da: g(-6), a: g(1) };
+    case "30g": return { da: g(-29), a: g(1) };
+    case "mese": return { da: daRoma(anno, mese, 1), a: daRoma(anno, mese + 1, 1) };
+    case "mese-scorso": return { da: daRoma(anno, mese - 1, 1), a: daRoma(anno, mese, 1) };
+    case "periodo": {
+      let [dal, al] = [giornoDa(f.dal), giornoDa(f.al)];
+      if (dal && al && f.dal > f.al) [dal, al] = [al, dal];
+      if (!dal && !al) return null;
+      return { da: dal ? daRoma(dal[0], dal[1], dal[2]) : null, a: al ? daRoma(al[0], al[1], al[2] + 1) : null };
+    }
+  }
+}
+
+export const arrivatoNel = (ms: number, i: ReturnType<typeof intervalloArrivo>) =>
+  !i || ((i.da == null || ms >= i.da) && (i.a == null || ms < i.a));
+
+// Testo del filtro chiuso: "Ultimi 7 giorni", "dal 01/10 al 15/10", "dal 01/10", "fino al 15/10".
+export function etichettaArrivo(f: Pick<Filtri, "arr" | "dal" | "al">): string {
+  if (!f.arr) return "Sempre";
+  if (f.arr !== "periodo") return ARRIVI.find((a) => a.id === f.arr)!.etichetta;
+  const breve = (s: string) => { const d = giornoDa(s); return d ? `${String(d[2]).padStart(2, "0")}/${String(d[1]).padStart(2, "0")}` : ""; };
+  const [dal, al] = f.dal && f.al && f.dal > f.al ? [f.al, f.dal] : [f.dal, f.al];
+  if (breve(dal) && breve(al)) return `dal ${breve(dal)} al ${breve(al)}`;
+  if (breve(dal)) return `dal ${breve(dal)}`;
+  if (breve(al)) return `fino al ${breve(al)}`;
+  return "Periodo";
+}
 
 export const SEGMENTI: { id: Segmento; etichetta: string }[] = [
   { id: "aperti", etichetta: "Aperti" },
@@ -25,7 +78,7 @@ export const SEGMENTI: { id: Segmento; etichetta: string }[] = [
 // Responsabile non assegnato: valore del filtro (nell'indirizzo "resp=nessuno").
 export const NESSUNO = "nessuno";
 
-export const FILTRI_BASE: Filtri = { seg: "aperti", fasi: [], resp: "", camp: "", q: "", scad: "", ord: "scadenza", dir: "asc" };
+export const FILTRI_BASE: Filtri = { seg: "aperti", fasi: [], resp: "", camp: "", q: "", scad: "", arr: "", dal: "", al: "", ord: "scadenza", dir: "asc" };
 
 const ORDINI: Ordine[] = ["azienda", "fase", "scadenza", "contatto"];
 const lista = (v: string | null) => (v ? v.split(",").filter(Boolean) : []);
@@ -40,6 +93,9 @@ export function leggiFiltri(p: URLSearchParams): Filtri {
     camp: p.get("camp") ?? "",
     q: p.get("q") ?? "",
     scad: p.get("scad") === "oggi" ? "oggi" : "",
+    arr: ID_ARRIVI.has(p.get("arr") ?? "") ? (p.get("arr") as Arrivo) : "",
+    dal: p.get("arr") === "periodo" && DATA.test(p.get("dal") ?? "") ? p.get("dal")! : "",
+    al: p.get("arr") === "periodo" && DATA.test(p.get("al") ?? "") ? p.get("al")! : "",
     ord: ORDINI.includes(ord as Ordine) ? (ord as Ordine) : "scadenza",
     dir: p.get("dir") === "desc" ? "desc" : "asc",
   };
@@ -54,12 +110,15 @@ export function scriviFiltri(f: Filtri): URLSearchParams {
   if (f.camp) p.set("camp", f.camp);
   if (f.q) p.set("q", f.q);
   if (f.scad) p.set("scad", f.scad);
+  if (f.arr) p.set("arr", f.arr);
+  if (f.arr === "periodo" && f.dal) p.set("dal", f.dal);
+  if (f.arr === "periodo" && f.al) p.set("al", f.al);
   if (f.ord !== "scadenza" || f.dir !== "asc") { p.set("ord", f.ord); p.set("dir", f.dir); }
   return p;
 }
 
-// Il numero sul pulsante "Filtri" del telefono: fase, responsabile, campagna e scadenza (segmento e ricerca si vedono già).
-export const quantiFiltri = (f: Filtri) => [f.fasi.length > 0, !!f.resp, !!f.camp, !!f.scad].filter(Boolean).length;
+// Il numero sul pulsante "Filtri" del telefono: fase, responsabile, campagna, scadenza e arrivo (segmento e ricerca si vedono già).
+export const quantiFiltri = (f: Filtri) => [f.fasi.length > 0, !!f.resp, !!f.camp, !!f.scad, !!f.arr].filter(Boolean).length;
 
 const APERTE = new Set(FASI_APERTE);
 export const aperto = (l: Pick<LeadListItem, "stageId">) => APERTE.has(l.stageId);
@@ -84,20 +143,21 @@ export function trova(l: RigaLead, q: string): boolean {
 
 const entroOggi = (l: RigaLead) => l.prossima?.stato === "scaduto" || l.prossima?.stato === "oggi";
 
-// Tutti i filtri tranne il segmento: servono anche ai conteggi del titolo.
-function passaAltri(l: RigaLead, f: Filtri): boolean {
+// Tutti i filtri tranne il segmento: servono anche ai conteggi del titolo. "ora" serve agli arrivi relativi (oggi, 7 giorni...).
+function passaAltri(l: RigaLead, f: Filtri, ora: number): boolean {
   if (f.fasi.length && !f.fasi.includes(l.stageId)) return false;
   if (f.resp === NESSUNO ? l.ownerId != null : f.resp && l.ownerId !== f.resp) return false;
   if (f.camp && l.metaCampaign !== f.camp) return false;
   if (f.scad === "oggi" && !entroOggi(l)) return false;
+  if (f.arr && !arrivatoNel(l.createdAt, intervalloArrivo(f, ora))) return false;
   return trova(l, f.q);
 }
 
-export const filtra = (righe: RigaLead[], f: Filtri) => righe.filter((l) => nelSegmento(l, f.seg) && passaAltri(l, f));
+export const filtra = (righe: RigaLead[], f: Filtri, ora = Date.now()) => righe.filter((l) => nelSegmento(l, f.seg) && passaAltri(l, f, ora));
 
 // Titolo "<n> lead aperti, <m> scaduti": gli stessi numeri che danno i segmenti Aperti e Scaduti con gli altri filtri.
-export function conteggi(righe: RigaLead[], f: Filtri) {
-  const altri = righe.filter((l) => passaAltri(l, f));
+export function conteggi(righe: RigaLead[], f: Filtri, ora = Date.now()) {
+  const altri = righe.filter((l) => passaAltri(l, f, ora));
   return { aperti: altri.filter((l) => nelSegmento(l, "aperti")).length, scaduti: altri.filter((l) => nelSegmento(l, "scaduti")).length };
 }
 

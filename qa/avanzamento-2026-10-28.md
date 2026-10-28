@@ -161,3 +161,14 @@ Tre richieste di Tommaso dopo aver visto la pagina Lead in produzione (`cbbb9a3`
 - Prove: vitest 1359/1359 (più 1/1 della suite nodo), typecheck pulito, build ok. e2e non lanciati (foto di riferimento già da rifare).
 - Foto: `qa/blocco-1/bis2-lead-1440.png` e `bis2-lead-390.png`, fatte con `qa/blocco-1/bis2-foto.mjs` sull'anteprima 5210: Aperti (9 fasi) sopra e Chiusi (3 fasi) sotto, solo i 12 lead `demo-lead-<fase>` (le copie `-bis` nascoste a schermo). Nella foto a 390 la barra in basso finisce a metà pagina: è la barra fissa nella foto a pagina intera, non un difetto.
 - Seguiti: il campo `tone` e il suo valore in `PATCH /api/stages` sono ormai inutili, si possono togliere in una pulizia futura (serve una migrazione, non urgente).
+
+## Blocco 1 bis, filtro per data di arrivo
+
+Richiesta di Tommaso (via Dante): filtrare la tabella Lead per quando sono arrivati (`created_at`, colonna "Arrivato il"). Fatto da Silvio (sviluppatore), nessuna migrazione.
+
+- **Filtro "Arrivati"** dopo Campagna (`FiltroArrivi` in `FiltriLead.tsx`), stesso aspetto degli altri: chiuso "Arrivati  Sempre", "Arrivati  Ultimi 7 giorni", "Arrivati  dal 08/10 al 28/10"; bordo scuro e valore in grassetto quando è acceso. Voci: Sempre (azzera), Oggi, Ieri, Ultimi 7 giorni (oggi più i sei prima), Ultimi 30 giorni, Questo mese, Mese scorso, Periodo... (resta aperto e mostra "Dal" e "Al"; date invertite si scambiano, una sola vale come "dal" o "fino al").
+- **Logica** in `tabellaLead.ts`: `intervalloArrivo` (giorni di Roma interi con `daRoma`, cambio d'ora compreso), `etichettaArrivo`; `filtra` e `conteggi` ricevono `ora`, quindi titolo, righe, "Mostra N lead" e CSV rispettano il filtro. Nell'indirizzo come gli altri: `arr=7g`, `arr=periodo&dal=2026-10-01&al=2026-10-15`; valori sbagliati ignorati.
+- **Telefono**: a 390 la riga dei filtri non c'è (i filtri stanno nel foglio "Filtri"), quindi "Arrivati" è nel foglio con i campi Dal e Al sotto, e conta nel numero del pulsante Filtri.
+- `Tendina.tsx`: opzione `alta` (fino a 560 px prima di scorrere), usata solo con il periodo aperto, larghezza 340.
+- Prove: `tests/b1bis-arrivati.test.tsx` (9 prove: oggi, ieri, 7 e 30 giorni a cavallo del 25/10, mese, mese scorso a gennaio, periodo, lead delle 00:30 e delle 23:59, segmenti, conteggi, indirizzo, pagina). vitest 1368/1368 (più 1/1 nodo), typecheck pulito, build ok. Nel browser sulla demo: Ultimi 7 giorni e Oggi danno 0 (la demo non ha lead recenti), periodo 08/10-28/10 dà 25 aperti, indirizzo aggiornato.
+- Foto: `qa/blocco-1/bis3-lead-filtro-arrivati-1440.png` (tendina aperta su Periodo) e `-390.png` (foglio Filtri), con `qa/blocco-1/bis3-foto.mjs`. Nella foto i campi data sono in formato americano perché il browser di prova è in inglese; su un browser italiano si vedono gg/mm/aaaa.

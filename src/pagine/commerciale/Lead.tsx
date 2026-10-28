@@ -54,7 +54,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   const filtri = useMemo(() => leggiFiltri(params), [params]);
   const setFiltri = (f: Filtri) => setParams(scriviFiltri(f), { replace: true });
   const tutti = leads.data ?? [];
-  const righe = useMemo(() => ordina(filtra(tutti, filtri), filtri, fasi.data ?? []), [tutti, filtri, fasi.data]);
+  const righe = useMemo(() => ordina(filtra(tutti, filtri, ora), filtri, fasi.data ?? []), [tutti, filtri, fasi.data, ora]);
   const [foglio, setFoglio] = useState<FoglioRiga | null>(null);
   const sposta = useSpostaFase(fasi.data ?? []);
   const cestina = useCestina();
@@ -66,7 +66,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   if (leads.error) return <Errore errore={leads.error} onRiprova={() => void leads.refetch()} />;
   if (fasi.error) return <Errore errore={fasi.error} onRiprova={() => void fasi.refetch()} />;
 
-  const n = conteggi(tutti, filtri);
+  const n = conteggi(tutti, filtri, ora);
   const apri = (id: string) => vai(`/commerciale/lead/${id}`);
   // Il clic su un link o un pulsante dentro la riga fa il suo lavoro, non apre la scheda.
   const clicRiga = (e: MouseEvent, id: string) => { if (!(e.target as HTMLElement).closest("a, button, [role=dialog], [role=menu]")) apri(id); };
@@ -109,7 +109,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   const largo = larghezza > 0 && totale > larghezza;
   const propsFiltri = {
     filtri, onCambia: setFiltri, fasi: fasi.data ?? [], utenti: utenti.data ?? [], campagne: campagneDi(tutti),
-    senzaResponsabile: tutti.some((l) => l.ownerId == null), conta: (f: Filtri) => filtra(tutti, f).length,
+    senzaResponsabile: tutti.some((l) => l.ownerId == null), conta: (f: Filtri) => filtra(tutti, f, ora).length,
     colonne: visibili, onColonne: setVisibili,
   };
   const conFiltri = JSON.stringify({ ...filtri, ord: "", dir: "" }) !== JSON.stringify({ ...FILTRI_BASE, seg: filtri.seg, ord: "", dir: "" });

@@ -1,11 +1,11 @@
 import { CaretDown, FunnelSimple, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
-import { Foglio, Pulsante, Selettore, SelettoreMultiplo, cx } from "../../ds";
+import { Campo, Foglio, Pulsante, Selettore, SelettoreMultiplo, cx } from "../../ds";
 import type { Stage } from "../../types";
 import { EtichettaFase } from "./EtichettaFase";
 import { COLONNE, type IdColonna } from "./colonneLead";
 import { Filtro, Tendina, VoceTendina } from "./Tendina";
-import { FILTRI_BASE, NESSUNO, SEGMENTI, fasiDelSegmento, quantiFiltri, type Filtri, type Segmento } from "./tabellaLead";
+import { ARRIVI, FILTRI_BASE, NESSUNO, SEGMENTI, etichettaArrivo, fasiDelSegmento, quantiFiltri, type Arrivo, type Filtri, type Segmento } from "./tabellaLead";
 
 type Persona = { id: string; name: string };
 type Props = { filtri: Filtri; onCambia: (f: Filtri) => void; fasi: Stage[]; utenti: Persona[]; campagne: string[]; senzaResponsabile: boolean; conta: (f: Filtri) => number;
@@ -47,6 +47,45 @@ export function Ricerca({ valore, onCambia, className }: { valore: string; onCam
   );
 }
 
+// Filtro "Arrivati" (data di arrivo del lead): stesso aspetto degli altri Filtro, una voce per riga. "Periodo..." resta
+// aperto e mostra i campi "Dal" e "Al" (giorni di Roma interi); le altre voci chiudono l'elenco.
+export function FiltroArrivi({ filtri, onCambia }: { filtri: Filtri; onCambia: (p: Partial<Filtri>) => void }) {
+  const [aperta, setAperta] = useState(false);
+  const ancora = useRef<HTMLButtonElement>(null);
+  const attivo = !!filtri.arr;
+  const scegli = (arr: Arrivo) => {
+    onCambia(arr === "periodo" ? { arr } : { arr, dal: "", al: "" });
+    if (arr !== "periodo") setAperta(false);
+  };
+  return (
+    <>
+      <button ref={ancora} type="button" aria-expanded={aperta} aria-haspopup="dialog" onClick={() => setAperta((a) => !a)} data-filtro="Arrivati"
+        className={cx("flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-controllo border-[1.5px] bg-avorio px-3 text-secondaria transition-colors duration-(--durata-veloce) hover:border-ink",
+          attivo ? "border-ink" : "border-sabbia-2")}>
+        <span className="shrink-0 font-medium">Arrivati</span>
+        <span className={cx("min-w-0 truncate", attivo ? "font-semibold text-ink" : "text-grigio")}>{etichettaArrivo(filtri)}</span>
+        <CaretDown size={14} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperta && "rotate-180")} />
+      </button>
+      <Tendina ancora={ancora} aperta={aperta} onChiudi={() => setAperta(false)} etichetta="Arrivati" larghezza={filtri.arr === "periodo" ? 340 : 260} alta={filtri.arr === "periodo"}>
+        <div role="menu" aria-label="Arrivati">
+          <VoceTendina scelta={!attivo} onClick={() => scegli("")}>Sempre</VoceTendina>
+          {ARRIVI.map((a) => <VoceTendina key={a.id} scelta={filtri.arr === a.id} onClick={() => scegli(a.id)}>{a.etichetta}</VoceTendina>)}
+        </div>
+        {filtri.arr === "periodo" && <CampiPeriodo filtri={filtri} onCambia={onCambia} className="border-t border-sabbia-2 p-2 pt-3" />}
+      </Tendina>
+    </>
+  );
+}
+
+function CampiPeriodo({ filtri, onCambia, className }: { filtri: Filtri; onCambia: (p: Partial<Filtri>) => void; className?: string }) {
+  return (
+    <div className={cx("grid grid-cols-2 gap-2", className)}>
+      <Campo etichetta="Dal" type="date" value={filtri.dal} max={filtri.al || undefined} onChange={(e) => onCambia({ dal: e.target.value })} className="px-2 text-secondaria" />
+      <Campo etichetta="Al" type="date" value={filtri.al} min={filtri.dal || undefined} onChange={(e) => onCambia({ al: e.target.value })} className="px-2 text-secondaria" />
+    </div>
+  );
+}
+
 // Riga dei filtri del computer (contratto, sezione 4): segmento, Fase a più scelte, Responsabile, Campagna, ricerca, Colonne.
 export function FiltriComputer({ filtri, onCambia, fasi, utenti, campagne, senzaResponsabile, colonne, onColonne }: Props) {
   const cambia = (p: Partial<Filtri>) => onCambia({ ...filtri, ...p });
@@ -61,6 +100,7 @@ export function FiltriComputer({ filtri, onCambia, fasi, utenti, campagne, senza
         <Filtro etichetta="Campagna" valori={filtri.camp ? [filtri.camp] : []} onCambia={([c]) => cambia({ camp: c ?? "" })} larghezza={300}
           opzioni={campagne.map((c) => ({ valore: c, etichetta: c }))} />
       )}
+      <FiltroArrivi filtri={filtri} onCambia={cambia} />
       {/* "Entro oggi" arriva da Oggi: si vede solo quando è acceso e si toglie da qui. */}
       {filtri.scad && (
         <Filtro etichetta="Scadenza" valori={["oggi"]} onCambia={([s]) => cambia({ scad: s === "oggi" ? "oggi" : "" })} opzioni={[{ valore: "oggi", etichetta: "Entro oggi" }]} />
@@ -109,6 +149,9 @@ function FoglioFiltriLead({ filtri: iniziali, onCambia, fasi, utenti, campagne, 
           <Selettore etichetta="Campagna" opzioni={[{ valore: "", etichetta: "Tutte" }, ...campagne.map((c) => ({ valore: c, etichetta: c }))]}
             valore={filtri.camp} onCambia={(camp) => cambia({ camp })} />
         )}
+        <Selettore etichetta="Arrivati" opzioni={[{ valore: "", etichetta: "Sempre" }, ...ARRIVI.map((a) => ({ valore: a.id, etichetta: a.id === "periodo" ? "Periodo" : a.etichetta }))]}
+          valore={filtri.arr} onCambia={(arr) => cambia(arr === "periodo" ? { arr } : { arr: arr as Arrivo, dal: "", al: "" })} />
+        {filtri.arr === "periodo" && <CampiPeriodo filtri={filtri} onCambia={cambia} />}
         <Selettore etichetta="Scadenza" opzioni={[{ valore: "", etichetta: "Tutte" }, { valore: "oggi", etichetta: "Entro oggi" }]}
           valore={filtri.scad} onCambia={(scad) => cambia({ scad: scad === "oggi" ? "oggi" : "" })} />
         {n > 0 && (
