@@ -4,7 +4,9 @@ import { normalizza } from "../../worker/risponditore/parola";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-export type RisorsaSeme = { slug: string; titolo: string; sottotitolo: string; corpo: string; pdfUrl: string | null; attiva: boolean };
+// seo: title, description e jsonld per i motori di ricerca (la chiave "seo" del file di Simone), salvati come JSON.
+export type SeoSeme = { title: string; description: string; jsonld: Record<string, unknown> | null };
+export type RisorsaSeme = { slug: string; titolo: string; sottotitolo: string; corpo: string; pdfUrl: string | null; attiva: boolean; seo: SeoSeme | null };
 export type CampagnaSeme = {
   nome: string; parola: string; mediaId: string | null; rispostePubbliche: string[]; testoPrivato: string;
   etichettaPulsante: string; risorsaSlug: string; testoLink: string; attiva: boolean;
@@ -53,8 +55,22 @@ export function validaSemina(json: unknown): Semina {
       if (!ok) errori.push(`${dove}: "pdfUrl" deve essere un link http o https`);
       if (pdfUrl.length > 500) errori.push(`${dove}: "pdfUrl" supera 500 caratteri`);
     } else if (r.pdfUrl !== undefined && r.pdfUrl !== null && r.pdfUrl !== "") errori.push(`${dove}: "pdfUrl" deve essere un testo`);
+    let seo: SeoSeme | null = null;
+    if (r.seo !== undefined && r.seo !== null) {
+      if (!obj(r.seo)) errori.push(`${dove}: "seo" deve essere un oggetto`);
+      else {
+        const jsonld = r.seo.jsonld;
+        if (jsonld !== undefined && jsonld !== null && !obj(jsonld)) errori.push(`${dove}: "seo.jsonld" deve essere un oggetto`);
+        seo = {
+          title: testo(errori, `${dove}.seo`, r.seo.title, "title", 70),
+          description: testo(errori, `${dove}.seo`, r.seo.description, "description", 170),
+          jsonld: obj(jsonld) ? jsonld : null,
+        };
+        if (seo.jsonld && JSON.stringify(seo.jsonld).length > 15_000) errori.push(`${dove}: "seo.jsonld" supera 15000 caratteri`);
+      }
+    }
     risorse.push({
-      slug, titolo: testo(errori, dove, r.titolo, "titolo", 200), sottotitolo: testo(errori, dove, r.sottotitolo, "sottotitolo", 300, true),
+      seo, slug, titolo: testo(errori, dove, r.titolo, "titolo", 200), sottotitolo: testo(errori, dove, r.sottotitolo, "sottotitolo", 300, true),
       corpo: testo(errori, dove, r.corpo, "corpo", 20_000, true), pdfUrl, attiva: r.attiva === undefined ? true : r.attiva === true,
     });
   });
@@ -99,8 +115,8 @@ export function sqlSemina(s: Semina, ora: number, nuovoId: () => string = () => 
   const righe: string[] = [];
   for (const r of s.risorse) {
     righe.push(
-      `INSERT INTO risorse (slug, titolo, sottotitolo, corpo, pdf_url, attiva, creata_il) VALUES (${q(r.slug)}, ${q(r.titolo)}, ${q(r.sottotitolo)}, ${q(r.corpo)}, ${q(r.pdfUrl)}, ${b(r.attiva)}, ${ora}) ` +
-      `ON CONFLICT(slug) DO UPDATE SET titolo = excluded.titolo, sottotitolo = excluded.sottotitolo, corpo = excluded.corpo, pdf_url = excluded.pdf_url, attiva = excluded.attiva;`,
+      `INSERT INTO risorse (slug, titolo, sottotitolo, corpo, pdf_url, attiva, creata_il, seo) VALUES (${q(r.slug)}, ${q(r.titolo)}, ${q(r.sottotitolo)}, ${q(r.corpo)}, ${q(r.pdfUrl)}, ${b(r.attiva)}, ${ora}, ${q(r.seo ? JSON.stringify(r.seo) : null)}) ` +
+      `ON CONFLICT(slug) DO UPDATE SET titolo = excluded.titolo, sottotitolo = excluded.sottotitolo, corpo = excluded.corpo, pdf_url = excluded.pdf_url, attiva = excluded.attiva, seo = excluded.seo;`,
     );
   }
   for (const c of s.campagne) {

@@ -219,16 +219,20 @@ npm run risponditore:semina -- mio-file.json --remote   # database online
 
 Lo script controlla il file (slug in minuscolo con i trattini, `pdfUrl` solo http o https, parola unica dopo la normalizzazione, almeno una risposta pubblica, pulsante di massimo 20 caratteri) e si ferma con l'elenco degli errori. Si può rilanciare: una risorsa con lo stesso slug o una campagna con la stessa parola (e lo stesso post) viene aggiornata, mai duplicata. Senza `--remote` non tocca il database online.
 
-### Grafiche del messaggio con il link
+### Anteprima della risorsa (messaggio e link nelle chat)
 
-Quando la persona tocca il pulsante, il messaggio con il link è fatto di una riga, un'animazione dello schema e un carosello con una scheda per passo e la chiamata gratuita in fondo (al secondo tocco solo il carosello). Le grafiche si generano dallo stesso file JSON della semina, con Google Chrome e ffmpeg installati:
+Quando la persona tocca il pulsante riceve due cose: una riga di testo (`testoLink` della campagna, scritta come da una persona) e una scheda sola con l'anteprima della risorsa, il titolo, "N passaggi, si legge in M minuti" e il pulsante per aprirla. Ai tocchi successivi arriva solo la scheda. La stessa immagine è l'anteprima del link quando la pagina `/r/<slug>` viene incollata in una chat: il Worker aggiunge all'HTML titolo, descrizione e immagine (`worker/risorse/pagina.ts`, `"/r/*"` in `run_worker_first`).
+
+Le anteprime si generano dallo stesso file JSON della semina, con Google Chrome installato:
 
 ```bash
 npm run risorse:grafiche -- mio-file.json                     # tutte le risorse
 npm run risorse:grafiche -- mio-file.json --solo slug1,slug2  # solo alcune
 ```
 
-Lo script scrive `public/risorse/<slug>/` (`passo-<n>.png`, `chiamata.png`, `schema.mp4`) e `worker/risponditore/grafiche-risorse.ts`, poi si fa commit e deploy. Il Worker usa le grafiche solo se i passi della risorsa nel database sono ancora quelli da cui sono state disegnate: se cambi titoli o numeri dei passi, rigenera; fino ad allora parte la scheda singola di sempre.
+Lo script scrive `public/risorse/<slug>/anteprima.png` (1200x630) e `worker/risponditore/grafiche-risorse.ts`, poi si fa commit e deploy. Il Worker usa l'anteprima solo se titolo e passi della risorsa nel database sono ancora quelli da cui è stata disegnata: se li cambi, rigenera; fino ad allora parte l'immagine generica del brand.
+
+**Motori di ricerca.** Le pagine `/r/<slug>` delle risorse attive si possono indicizzare (il resto dell'app resta `noindex`). Se nel file di semina la risorsa ha la chiave `seo` (`title`, `description`, `jsonld`), il Worker usa quel titolo e quella descrizione e mette i dati strutturati nella pagina, con l'anteprima come immagine. `/robots.txt` apre `/r/` e chiude `/api/`; `/sitemap.xml` elenca le risorse attive. La colonna `seo` arriva con la migrazione `0017_risorse_seo.sql`: va applicata prima di seminare il file nuovo.
 
 ### Prove dal vivo
 

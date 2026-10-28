@@ -1,0 +1,1 @@
+ALTER TABLE `risorse` ADD `seo` text;

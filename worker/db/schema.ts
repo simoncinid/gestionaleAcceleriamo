@@ -639,6 +639,8 @@ export const risorse = sqliteTable("risorse", {
   pdfUrl: text("pdf_url"),
   attiva: integer("attiva", { mode: "boolean" }).notNull(),
   creataIl: integer("creata_il").notNull(),
+  // Dati per i motori di ricerca (JSON: title, description, jsonld), dal file di semina; null = si usano titolo e sottotitolo.
+  seo: text("seo"),
 });
 
 export const risorseRichieste = sqliteTable("risorse_richieste", {

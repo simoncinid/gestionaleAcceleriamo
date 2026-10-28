@@ -145,3 +145,6 @@ export function firmaPassi(passi: Passo[]): string {
   }
   return h.toString(16).padStart(8, "0");
 }
+
+// Firma dell'anteprima di una risorsa: titolo e passi. Se cambia uno dei due, l'immagine disegnata non vale più.
+export const firmaGrafiche = (titolo: string, passi: Passo[]) => firmaPassi([{ numero: 0, titolo, descrizione: "" }, ...passi]);
