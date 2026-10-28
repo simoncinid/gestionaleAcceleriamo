@@ -6,7 +6,8 @@ import { activities, auditLog, clients, documents, fees, leads, stages, users, t
 import { audit } from "../lib/audit";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
-import { leggiImpostazioni } from "../impostazioni/service";
+import { contestoRegole, leggiImpostazioni } from "../impostazioni/service";
+import { propostaEvento } from "../regole/motore";
 import { callPerFase } from "../regole/fasi-call";
 import { responsabileDellaFase } from "../regole/applica";
 import { MOTIVI_CON_DATA, MOTIVI_CON_TESTO, eMotivoPerso, etichettaMotivo } from "../processo/motivi";
@@ -176,6 +177,14 @@ export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: 
     if (owner !== undefined) next.ownerId = owner;
   }
 
+  // Fase scelta a mano (blocco 1, modifica 12): azione e scadenza di base dalla transizione (evento cambio_fase).
+  // Le fasi 30 e 50 le fissa la call (rotta PATCH /:id).
+  if (stageChanged && stage.kind === "open" && !callPerFase(stage.id)) {
+    const p = propostaEvento({ tipo: "cambio_fase", stageId: stage.id }, await contestoRegole(db, now));
+    next.nextAction = patch.nextAction = p.nextAction;
+    next.nextActionAt = patch.nextActionAt = p.nextActionAt;
+    if (p.sequenceStep !== undefined) next.sequenceStep = p.sequenceStep;
+  }
   if (stage.kind === "open") {
     const at = patch.nextActionAt !== undefined ? patch.nextActionAt : current.nextActionAt;
     const action = patch.nextAction !== undefined ? patch.nextAction : current.nextAction;

@@ -60,7 +60,7 @@ describe("porta della posta", () => {
 });
 
 describe("inviti Meet sulla call del lead", () => {
-  it("abbinato per email: call creata con data, durata e link, lead in Consulenza fissata; la stessa mail due volte non duplica", async () => {
+  it("abbinato per email: call creata con data, durata e link, fase proposta da confermare; la stessa mail due volte non duplica", async () => {
     await insertLead("rossi", "Officina Rossi Finta", { email: "Mario@Officina-Rossi-Finta.it", email_norm: "mario@officina-rossi-finta.it" });
     const m = mail({ calendario: ICS_GOOGLE(), oggetto: "Invito: Acceleriamo x Officina Rossi Finta" });
     const r = await posta(m);
@@ -69,7 +69,10 @@ describe("inviti Meet sulla call del lead", () => {
     const c = await tutte<Record<string, unknown>>("SELECT * FROM calls WHERE lead_id = 'rossi'");
     expect(c).toHaveLength(1);
     expect(c[0]).toMatchObject({ kind: "conoscenza", scheduled_at: ALLE_10, duration_min: 45, meet_link: "https://meet.google.com/abc-defg-hij", ics_uid: "abc123finto@google.com" });
-    expect(await env.DB.prepare("SELECT stage_id FROM leads WHERE id = 'rossi'").first("stage_id")).toBe("appuntamento-confermato");
+    // Blocco 1, modifica 12: la fase non cambia da sola, l'invito diventa una proposta da confermare.
+    expect(await env.DB.prepare("SELECT stage_id FROM leads WHERE id = 'rossi'").first("stage_id")).toBe("da-chiamare-prima-volta");
+    expect(await tutte("SELECT body, outcome, call_id FROM activities WHERE lead_id = 'rossi' AND type = 'invito_proposta'"))
+      .toEqual([{ body: expect.stringMatching(/^Il cliente ha accettato la call di .+: conferma$/), outcome: "da_confermare", call_id: c[0].id }]);
     expect((await posta(m)).status).toBe(200);
     expect(await tutte("SELECT * FROM calls WHERE lead_id = 'rossi'")).toHaveLength(1);
   });
@@ -97,7 +100,8 @@ describe("inviti Meet sulla call del lead", () => {
     await insertLead("rossi", "Officina Rossi Finta", { email_norm: "mario@officina-rossi-finta.it", stage_id: "in-attesa-preventivo" });
     await posta(mail({ calendario: ICS_GOOGLE() }));
     expect(await env.DB.prepare("SELECT kind FROM calls WHERE lead_id = 'rossi'").first("kind")).toBe("presentazione");
-    expect(await env.DB.prepare("SELECT stage_id FROM leads WHERE id = 'rossi'").first("stage_id")).toBe("presentazione-confermata");
+    expect(await env.DB.prepare("SELECT stage_id FROM leads WHERE id = 'rossi'").first("stage_id")).toBe("in-attesa-preventivo");
+    expect(await tutte("SELECT outcome FROM activities WHERE lead_id = 'rossi' AND type = 'invito_proposta'")).toEqual([{ outcome: "da_confermare" }]);
   });
 
   it("senza email nota: abbinato per nome del partecipante", async () => {

@@ -6,6 +6,8 @@ export const LEAD_SOURCES = ["meta", "manuale", "sito", "passaparola", "altro", 
 export const ACTIVITY_TYPES = [
   "creazione", "nota", "chiamata", "email", "cambio_fase", "meta", "documento", "cestino", "ripristino", "unione", "migrazione",
   "esito", "call", "proposta", "foglio", "ia", "email_auto", "contatto",
+  // Invito di Google accettato o spostato dal cliente: la fase cambia solo quando una persona conferma (blocco 1, modifica 12).
+  "invito_proposta",
 ] as const;
 export const LOST_REASONS = ["non_raggiungibile", "non_interessato", "budget", "fuori_target", "privato", "fake", "gia_servito", "altro"] as const;
 export type LeadSource = (typeof LEAD_SOURCES)[number];

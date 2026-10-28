@@ -61,19 +61,15 @@ describe("lead", () => {
     expect(detail.activities.find((a) => a.type === "cambio_fase")?.body).toBe('Da "Nuovo, da chiamare" a "Cliente"');
   });
 
-  it("riaprire un lead chiuso senza prossima azione dà 422, con la prossima azione funziona", async () => {
+  it("riaprire un lead chiuso: azione e scadenza le dà la transizione (blocco 1, modifica 12)", async () => {
     const cookie = await authed();
     const { body } = await create(cookie, { company: "C" });
     await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "non-chiuso", lostReason: "prezzo" } }, cookie);
-    const bad = await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "da-richiamare" } }, cookie);
-    expect(bad.status).toBe(422);
-    expect(await bad.json()).toEqual({ error: "Serve una prossima azione con data per i lead aperti" });
-    const ok = await call(
-      `/api/leads/${body.lead.id}`,
-      { method: "PATCH", json: { stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: 1_900_000_000_000 } },
-      cookie,
-    );
+    const ok = await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "da-richiamare" } }, cookie);
     expect(ok.status).toBe(200);
+    const { lead } = (await ok.json()) as LeadBody;
+    expect(lead).toMatchObject({ stageId: "da-richiamare", nextAction: "Richiamare" });
+    expect(lead.nextActionAt).toBeGreaterThan(Date.now());
   });
 
   it("modificare solo un campo non cancella gli altri", async () => {

@@ -17,6 +17,7 @@ import { proposteDelLead } from "../proposte/service";
 import { conScadenzaSla, leggiSla } from "../regole/sla";
 import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
 import { conProssima } from "../processo/leggi";
+import { confermaInvito } from "../posta/service";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -129,6 +130,15 @@ leadRoutes.post("/:id/no-show", async (c) => {
   const db = getDb(c.env.DB);
   const id = c.req.param("id");
   await segnaNoShow(db, id, kind, c.get("user").id, Date.now());
+  const [lead] = await conProssima(db, [conScadenzaSla(await getLead(db, id), await leggiSla(db))], Date.now());
+  return c.json({ lead });
+});
+
+// Invito di Google accettato o spostato dal cliente: la fase cambia solo con questa conferma (blocco 1, modifica 12).
+leadRoutes.post("/:id/inviti/:activityId/conferma", async (c) => {
+  const db = getDb(c.env.DB);
+  const id = c.req.param("id");
+  await confermaInvito(db, id, c.req.param("activityId"), c.get("user").id, Date.now());
   const [lead] = await conProssima(db, [conScadenzaSla(await getLead(db, id), await leggiSla(db))], Date.now());
   return c.json({ lead });
 });
