@@ -6,7 +6,7 @@ import { FoglioFattura } from "../src/pagine/economia/Fogli";
 import { scorciatoiaRicerca } from "../src/guscio/scorciatoie";
 import { eBloccoDemo, eCallNelPassato, messaggioImportInterrotto, testoBloccoDemo } from "../src/errori";
 import { CorpoEsporta } from "../src/pagine/impostazioni/Dati";
-import { Fasi, FoglioFase } from "../src/pagine/impostazioni/Fasi";
+import { Fasi } from "../src/pagine/impostazioni/Fasi";
 import { IntegrazioneDettaglio } from "../src/pagine/impostazioni/IntegrazioneDettaglio";
 import { Utenti } from "../src/pagine/impostazioni/Utenti";
 import { RiordinaFasi, spostaFase } from "../src/pagine/impostazioni/RiordinaFasi";
@@ -35,9 +35,9 @@ describe("Riordina", () => {
     expect(html).toContain('aria-label="Sposta B più su"');
     expect(contaPrimari(html)).toBe(1);
   });
-  it("pagina Fasi: pulsante Riordina secondario accanto all'elenco", () => {
+  it("pagina Fasi: niente Riordina, le fasi sono fisse (blocco 1, modifica 4)", () => {
     const html = render(<Fasi />, { percorso: "/impostazioni/fasi", dati: [[["stages"], FASI], [["stage-rules"], []], [["settings"], IMPOSTAZIONI_DEFAULT], [["users"], []]] });
-    expect(html).toContain(">Riordina<");
+    expect(html).not.toContain(">Riordina<");
     expect(html).not.toContain("arriva nel Piano B");
     expect(contaPrimari(html)).toBe(1);
   });
@@ -50,10 +50,6 @@ describe("Fasi senza checkbox nativi", () => {
     expect(html).not.toContain('type="checkbox"');
     expect(html).toContain("Giorni di lavoro");
     expect(html).toContain("lun, mar, mer, gio, ven");
-  });
-  it("foglio della fase: senza modifiche il salvataggio è spento", () => {
-    const html = render(<FoglioFase fase={FASI[0]} onChiudi={() => {}} />);
-    expect(html).toContain('aria-disabled="true"');
   });
 });
 

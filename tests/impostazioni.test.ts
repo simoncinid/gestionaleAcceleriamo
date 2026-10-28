@@ -29,23 +29,24 @@ describe("impostazioni", () => {
     expect((await call("/api/settings", { method: "PUT", json: { key: "boh", value: 1 } }, cookie)).status).toBe(400);
   });
 
-  it("regole: si leggono e si spostano su un'altra fase", async () => {
+  it("regole: si leggono, ma le scadenze sono fisse (blocco 1, modifica 4)", async () => {
     const cookie = await authed();
     const { rules } = (await (await call("/api/stage-rules", {}, cookie)).json()) as { rules: { id: string; stageId: string | null; params: unknown; active: boolean }[] };
     expect(rules).toHaveLength(6);
     const sla = rules.find((r) => r.id === "sla-prima")!;
     const res = await call("/api/stage-rules", { method: "PUT", json: { rules: [{ ...sla, params: { minuti: 60, avvisoMinuti: 45 } }] } }, cookie);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(422);
     const dopo = (await (await call("/api/stage-rules", {}, cookie)).json()) as { rules: { id: string; params: { minuti: number } }[] };
-    expect(dopo.rules.find((r) => r.id === "sla-prima")!.params.minuti).toBe(60);
+    expect(dopo.rules.find((r) => r.id === "sla-prima")!.params.minuti).toBe(30);
   });
 
-  it("fase: probabilità e motivo obbligatorio", async () => {
+  it("fase: la probabilità si cambia, l'azione no (blocco 1, modifica 4)", async () => {
     const cookie = await authed();
-    const res = await call("/api/stages/in-attesa-decisione", { method: "PATCH", json: { probability: 75, suggestedNextAction: "Sentire Diego" } }, cookie);
+    const res = await call("/api/stages/in-attesa-decisione", { method: "PATCH", json: { probability: 75 } }, cookie);
     expect(res.status).toBe(200);
+    expect((await call("/api/stages/in-attesa-decisione", { method: "PATCH", json: { suggestedNextAction: "Sentire Diego" } }, cookie)).status).toBe(422);
     const { stages } = (await (await call("/api/stages", {}, cookie)).json()) as { stages: { id: string; probability: number; suggestedNextAction: string }[] };
-    expect(stages.find((s) => s.id === "in-attesa-decisione")).toMatchObject({ probability: 75, suggestedNextAction: "Sentire Diego" });
+    expect(stages.find((s) => s.id === "in-attesa-decisione")).toMatchObject({ probability: 75 });
     expect((await call("/api/stages/chiuso", { method: "PATCH", json: { probability: 140 } }, cookie)).status).toBe(400);
   });
 
@@ -85,19 +86,20 @@ describe("impostazioni", () => {
     const base = await contestoRegole(db, 1_000);
     expect(base).toMatchObject({ ora: 1_000, sequenze: false, ricontatti: [3, 7, 14], pausaMesi: 2, oreProposta: 24, massimoTentativi: 5 });
     await call("/api/settings", { method: "PUT", json: { key: "sequenze", value: { attive: true } } }, cookie);
-    const { rules } = (await (await call("/api/stage-rules", {}, cookie)).json()) as { rules: { id: string; stageId: string | null; event: string | null; params: unknown; active: boolean }[] };
-    const ric = rules.find((r) => r.id === "ricontatti-decisione")!;
-    const pausa = rules.find((r) => r.id === "pausa-bloccato")!;
-    await call("/api/stage-rules", { method: "PUT", json: { rules: [{ ...ric, params: { giorni: [2, 5] } }, { ...pausa, active: false }] } }, cookie);
+    // Le regole non si cambiano più dalla pagina (blocco 1, modifica 4): si cambiano nella tabella, come farebbe una migrazione.
+    await env.DB.batch([
+      env.DB.prepare("UPDATE stage_rules SET params = '{\"giorni\":[2,5]}' WHERE id = 'ricontatti-decisione'"),
+      env.DB.prepare("UPDATE stage_rules SET active = 0 WHERE id = 'pausa-bloccato'"),
+    ]);
     const dopo = await contestoRegole(db, 1_000);
     expect(dopo).toMatchObject({ sequenze: true, ricontatti: [2, 5], pausaMesi: 2 });
   });
 
-  it("regole: ricontatti vuoti e fase inesistente rifiutati", async () => {
+  it("regole: qualsiasi salvataggio rifiutato, le scadenze sono fisse", async () => {
     const cookie = await authed();
     const { rules } = (await (await call("/api/stage-rules", {}, cookie)).json()) as { rules: { id: string; stageId: string | null; event: string | null; params: unknown; active: boolean }[] };
     const ric = rules.find((r) => r.id === "ricontatti-decisione")!;
-    expect((await call("/api/stage-rules", { method: "PUT", json: { rules: [{ ...ric, params: { giorni: [] } }] } }, cookie)).status).toBe(400);
-    expect((await call("/api/stage-rules", { method: "PUT", json: { rules: [{ ...ric, stageId: "boh" }] } }, cookie)).status).toBe(400);
+    expect((await call("/api/stage-rules", { method: "PUT", json: { rules: [{ ...ric, params: { giorni: [] } }] } }, cookie)).status).toBe(422);
+    expect((await call("/api/stage-rules", { method: "PUT", json: { rules: [{ ...ric, stageId: "boh" }] } }, cookie)).status).toBe(422);
   });
 });
