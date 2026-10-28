@@ -13,75 +13,59 @@ async function insertLead(id: string, extra: Record<string, unknown> = {}) {
 }
 const oggi = async (cookie: string, chi = "tutte") => (await (await call(`/api/today?chi=${chi}&now=${NOW}`, {}, cookie)).json()) as Oggi;
 
+// Contratto blocco 1, sezione 5: una lista sola, scaduti più oggi, un lead una volta; "mie" solo i propri.
 describe("GET /today", () => {
   it("401 senza sessione", async () => {
     expect((await call("/api/today")).status).toBe(401);
   });
 
-  it("divide i lead nei gruppi della spec 6.4", async () => {
+  it("righe: aperti scaduti o di oggi, dal più vecchio; niente futuri, chiusi, cestinati", async () => {
     const cookie = await authed();
-    await insertLead("nuovo", { stage_id: "da-chiamare-prima-volta", next_action: "Prima chiamata", next_action_at: NOW - 30 * 60_000, created_at: NOW - 30 * 60_000 });
-    await insertLead("scaduto", { next_action_at: NOW - GIORNO });
+    await insertLead("scaduto", { next_action_at: NOW - 3 * GIORNO });
+    await insertLead("stamattina", { next_action_at: NOW - 3_600_000 });
     await insertLead("stasera", { next_action_at: NOW + 5 * 3_600_000 });
     await insertLead("domani", { next_action_at: NOW + GIORNO });
-    await insertLead("proposta", { stage_id: "in-attesa-decisione", next_action: "Follow-up preventivo", next_action_at: NOW - 1000 });
-    await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('p1', 'proposta', 'ACC-2026-001', 'registrata', 'aggancio', ?, ?)").bind(NOW, NOW).run();
-    await insertLead("fermo", { stage_changed_at: NOW - 9 * GIORNO });
-    await insertLead("pausa", { stage_id: "in-attesa-decisione", next_action: "Richiamare dopo la pausa", next_action_at: NOW - 1000, paused_until: null });
     await insertLead("chiuso", { stage_id: "chiuso", next_action_at: NOW - GIORNO });
     await insertLead("cestino", { next_action_at: NOW - GIORNO, deleted_at: NOW });
     await insertLead("con-call", { stage_id: "appuntamento-confermato" });
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k1', 'con-call', 'conoscenza', ?, ?, ?)").bind(NOW + 3_600_000, NOW, NOW).run();
 
     const o = await oggi(cookie);
-    expect(o.nuovi.map((l) => l.id)).toEqual(["nuovo"]);
-    expect(o.nuovi[0].slaScadenza).toBe(NOW); // SLA di 30 minuti (blocco 1): arrivato 30 minuti fa, scade adesso
-    // "scaduto" sta in Adesso e non si ripete in Da fare (ogni lead una volta sola).
-    expect(o.daFare.map((l) => l.id)).toEqual(["stasera"]);
-    expect(o.proposte.map((p) => p.number)).toEqual(["ACC-2026-001"]);
-    expect(o.finePausa.map((l) => l.id)).toEqual(["pausa"]);
-    expect(o.fermi.map((l) => l.id)).toEqual(["fermo"]);
+    const ids = o.righe.map((l) => l.id);
+    expect(ids[0]).toBe("scaduto");
+    expect(ids).toContain("stamattina");
+    expect(ids).toContain("stasera");
+    for (const x of ["domani", "chiuso", "cestino"]) expect(ids).not.toContain(x);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(o.righe.every((l) => l.prossima.stato === "scaduto" || l.prossima.stato === "oggi")).toBe(true);
+    const scadenze = o.righe.map((l) => l.prossima.scadenza!);
+    expect(scadenze).toEqual([...scadenze].sort((x, y) => x - y));
+    expect(o.totale).toBe(o.righe.length);
     expect(o.call.map((k) => k.id)).toEqual(["k1"]);
-    expect(o.adesso).toMatchObject({ tipo: "lead", id: "scaduto" });
-    expect(o.totale).toBe(1 + 1 + 1 + 1 + 1 + 1);
-    expect(o.numeri.proposteAperte).toBe(1);
-    expect(o.numeri.leadNuovi).toBe(1);
   });
 
-  it("proposta registrata con il lead ancora in attesa del preventivo: una volta sola, nel blocco proposte con Segna presentata", async () => {
-    const cookie = await authed();
-    await insertLead("attesa", { stage_id: "in-attesa-preventivo", next_action: "Fissare la call di presentazione", next_action_at: NOW - 1000, stage_changed_at: NOW - 9 * GIORNO });
-    await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('p1', 'attesa', 'ACC-2026-070', 'registrata', 'aggancio', ?, ?)").bind(NOW, NOW).run();
-    const o = await oggi(cookie);
-    expect(o.proposte.map((p) => [p.leadId, p.status])).toEqual([["attesa", "registrata"]]);
-    expect(o.daFare).toEqual([]);
-    expect(o.fermi).toEqual([]);
-    expect(o.adesso).toBeNull();
-    expect(o.totale).toBe(1);
-  });
-
-  it("Mie mostra i miei e quelli senza responsabile", async () => {
+  it("Miei: solo i lead con me responsabile; i non assegnati stanno in Tutti", async () => {
     const cookie = await authed();
     await createUser("diego", "password-lunga-2", "Diego");
     await insertLead("mio", { next_action_at: NOW - 1000 });
     await insertLead("libero", { next_action_at: NOW - 2000, owner_id: null });
     await insertLead("suo", { next_action_at: NOW - 3000, owner_id: "diego" });
-    const ids = (o: Oggi) => [o.adesso?.tipo === "lead" ? o.adesso.id : null, ...o.daFare.map((l) => l.id)].filter(Boolean).sort();
-    expect(ids(await oggi(cookie, "mie"))).toEqual(["libero", "mio"]);
-    expect(ids(await oggi(cookie, "tutte"))).toEqual(["libero", "mio", "suo"]);
+    expect((await oggi(cookie, "mie")).righe.map((l) => l.id)).toEqual(["mio"]);
+    expect((await oggi(cookie, "tutte")).righe.map((l) => l.id).sort()).toEqual(["libero", "mio", "suo"]);
   });
 
-  it("call e proposte di lead cestinati non contano nei numeri", async () => {
+  it("stesso numero della tabella: GET /api/leads filtrato su scaduti più oggi dello stesso responsabile", async () => {
     const cookie = await authed();
-    await insertLead("vivo");
-    await insertLead("cestinato", { deleted_at: NOW });
-    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k1', 'vivo', 'conoscenza', ?, ?, ?), ('k2', 'cestinato', 'conoscenza', ?, ?, ?)")
-      .bind(NOW + 3_600_000, NOW, NOW, NOW + 3_600_000, NOW, NOW).run();
-    await env.DB.prepare("INSERT INTO proposals (id, lead_id, number, status, registered_via, created_at, updated_at) VALUES ('p1', 'vivo', 'ACC-2026-001', 'registrata', 'aggancio', ?, ?), ('p2', 'cestinato', 'ACC-2026-002', 'presentata', 'aggancio', ?, ?)")
-      .bind(NOW, NOW, NOW, NOW).run();
-    const o = await oggi(cookie);
-    expect(o.numeri.callSettimana).toBe(1);
-    expect(o.numeri.proposteAperte).toBe(1);
+    const adesso = Date.now();
+    await insertLead("a", { next_action_at: adesso - 2 * GIORNO });
+    await insertLead("b", { next_action_at: adesso + 60_000 });
+    await insertLead("c", { next_action_at: adesso + 3 * GIORNO });
+    await insertLead("d", { next_action_at: adesso - GIORNO, owner_id: null });
+    const o = (await (await call("/api/today?chi=mie", {}, cookie)).json()) as Oggi;
+    const { leads } = (await (await call("/api/leads", {}, cookie)).json()) as { leads: { id: string; ownerId: string | null; prossima?: { stato: string | null } }[] };
+    const tabella = leads.filter((l) => l.ownerId === "tommaso" && (l.prossima?.stato === "scaduto" || l.prossima?.stato === "oggi"));
+    expect(o.righe.map((l) => l.id).sort()).toEqual(tabella.map((l) => l.id).sort());
+    expect(o.totale).toBe(tabella.length);
   });
 
   it("il giorno finisce a mezzanotte di Roma anche quando dura 25 ore (cambio d'ora)", async () => {
@@ -90,8 +74,7 @@ describe("GET /today", () => {
     await insertLead("tardi", { next_action_at: Date.UTC(2026, 9, 25, 22, 30) }); // 23:30 a Roma, stesso giorno
     await insertLead("lunedi", { next_action_at: Date.UTC(2026, 9, 25, 23, 30) }); // 00:30 di lunedì a Roma
     const o = (await (await call(`/api/today?chi=tutte&now=${domenica}`, {}, cookie)).json()) as Oggi;
-    expect(o.adesso).toMatchObject({ tipo: "lead", id: "tardi" });
-    expect(o.daFare).toEqual([]);
+    expect(o.righe.map((l) => l.id)).toEqual(["tardi"]);
   });
 });
 

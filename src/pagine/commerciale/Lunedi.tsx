@@ -8,7 +8,6 @@ import { partiRoma } from "../../../worker/lib/roma";
 import { useUsers } from "../../hooks";
 import type { RevisioneApi } from "../../types";
 import { Gruppo, Voce } from "./numeri/righe";
-import { SegmentiOggi } from "./SegmentiOggi";
 
 type Decisioni = [string, string, string];
 const GIORNO_MESE = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "long" });
@@ -74,7 +73,6 @@ export function Lunedi() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-0 md:pb-8">
       <Intestazione titolo="Lunedì" numero={n.arrivati} coda="lead" eyebrow={`Settimana ${conArticolo("dal", partiRoma(n.da).giorno, GIORNO_MESE.format(n.da))} ${conArticolo("al", partiRoma(n.a - 1).giorno, GIORNO_MESE.format(n.a - 1))}`} />
-      <SegmentiOggi attivo="lunedi" />
       {/* Schermo largo: a sinistra numeri, soldi, decisioni e commento; a destra l'elenco (lungo) di ciò che è fermo. */}
       <div className="flex flex-col gap-6 @5xl:grid @5xl:grid-cols-2 @5xl:grid-rows-[auto_auto_auto_auto_1fr] @5xl:items-start @5xl:gap-x-8">
       <div className="@5xl:col-start-1">

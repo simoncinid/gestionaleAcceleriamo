@@ -6,7 +6,6 @@ import { Errore, Intestazione, Pulsante, Selettore, Skeleton, StatoVuoto } from 
 import { giorno, momento } from "../../format";
 import { useUsers } from "../../hooks";
 import type { VoceDiario } from "../../types";
-import { SegmentiOggi } from "./SegmentiOggi";
 
 const AREE = [{ valore: "tutte", etichetta: "Tutte le aree" }, { valore: "commerciale", etichetta: "Commerciale" }, { valore: "economia", etichetta: "Economia" }, { valore: "automazioni", etichetta: "Automazioni" }];
 const TIPI = [
@@ -41,7 +40,6 @@ export function Diario({ ora = Date.now() }: { ora?: number }) {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-0 md:pb-8">
       <Intestazione titolo="Diario" eyebrow="Chi ha fatto cosa" />
-      <SegmentiOggi attivo="diario" />
       <div className="flex flex-col gap-3 @4xl:grid @4xl:grid-cols-3 @4xl:gap-4">
         <Selettore etichetta="Chi" opzioni={persone} valore={chi} onCambia={setChi} />
         <Selettore etichetta="Area" opzioni={AREE} valore={area} onCambia={setArea} />

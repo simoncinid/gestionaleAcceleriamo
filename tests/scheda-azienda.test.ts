@@ -227,8 +227,7 @@ describe("classificazione e scheda", () => {
     }
     await env.DB.prepare("INSERT INTO company_profiles (id, lead_id, version, status, created_at, updated_at) VALUES ('a1', 'K1', 1, 'error', 0, 0), ('a2', 'K1', 2, 'ready', 0, 0), ('b1', 'K2', 1, 'queued', 0, 0), ('c1', 'K3', 1, 'ready', 0, 0), ('c2', 'K3', 2, 'queued', 0, 0)").run();
     const o = await calcolaOggi(env.DB, "tommaso", "tutte", ora);
-    const voci = [...o.call, ...(o.adesso?.tipo === "call" ? [o.adesso] : [])];
-    expect(Object.fromEntries(voci.map((k) => [k.leadId, k.scheda]))).toEqual({ K1: "pronta", K2: "in_preparazione", K3: "pronta" });
+    expect(Object.fromEntries(o.call.map((k) => [k.leadId, k.scheda]))).toEqual({ K1: "pronta", K2: "in_preparazione", K3: "pronta" });
   });
 });
 

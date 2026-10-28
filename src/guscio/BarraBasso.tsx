@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router";
 import { Badge, cx } from "../ds";
+import { BadgeIntero } from "./BadgeIntero";
 import { AREE, areaDi } from "./aree";
 import { Icona3D } from "./Icona3D";
 
@@ -19,7 +20,7 @@ export function BarraBasso({ badge }: { badge: BadgeDati | undefined }) {
             className={cx("group relative flex flex-col items-center justify-center gap-0.5 text-etichetta transition-colors duration-(--durata-veloce)", on ? "text-chrome-testo" : "text-chrome-testo-2")}>
             <span className="transition-transform duration-(--durata-veloce) ease-(--ease-uscita) group-active:scale-94"><Icona3D area={a.id} attiva={on} /></span>
             <span>{a.etichetta}</span>
-            <span className="absolute top-1 left-1/2 ml-1.5"><Badge n={n} /></span>
+            <span className="absolute top-1 left-1/2 ml-1.5">{a.id === "commerciale" ? <BadgeIntero n={n} etichetta="da fare oggi" /> : <Badge n={n} />}</span>
             {on && <span className="absolute bottom-0.5 left-1/2 h-[3px] w-7 -translate-x-1/2 rounded-full bg-accento" aria-hidden />}
           </Link>
         );
