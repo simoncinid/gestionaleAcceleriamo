@@ -8,6 +8,7 @@ import { BarraLaterale } from "./BarraLaterale";
 import { FoglioCerca } from "./FoglioCerca";
 import { FoglioCrea } from "./FoglioCrea";
 import { leggiScorciatoia, scorciatoiaRicerca } from "./scorciatoie";
+import { scorciatoiaBarra, useBarraRidotta } from "./barraRidotta";
 import { Testata } from "./Testata";
 import { useAzzeraAnonimoFuoriArea } from "../pagine/automazioni/anonimo";
 
@@ -20,14 +21,25 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
   const [menu, setMenu] = useState(false);
   const [cerca, setCerca] = useState(false);
   const attesa = useRef<string | null>(null);
+  const ridottaRef = useRef(false);
   const badge = useBadge().data;
+  const [ridotta, setRidotta] = useBarraRidotta();
+  const [animata, setAnimata] = useState(true);
+  const riduci = (v: boolean) => { setAnimata(true); setRidotta(v); };
 
+  ridottaRef.current = ridotta;
   useEffect(() => {
     const suTasto = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       // Cmd K o Ctrl K aprono la ricerca anche da dentro un campo, mai sopra un altro foglio (voce 65).
       const k = scorciatoiaRicerca(e, document.querySelector("dialog[open]") != null);
       if (k !== "no") { e.preventDefault(); if (k === "si") setCerca(true); return; }
+      // Cmd B o Ctrl B: barra laterale ridotta o aperta. Solo sul computer (sul telefono la barra non c'è),
+      // mai sopra un foglio aperto né dentro un testo con formattazione. Da tastiera niente animazione.
+      if (scorciatoiaBarra(e)) {
+        if (document.querySelector("dialog[open]") || t.closest("[contenteditable]") || !window.matchMedia("(min-width: 48rem)").matches) return;
+        e.preventDefault(); setAnimata(false); setRidotta(!ridottaRef.current); return;
+      }
       if (t.closest("input, textarea, select, [contenteditable], dialog[open]") || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); return setCerca(true); }
       if (e.key === "n" && attesa.current === null) return setCrea(creazioneDelPiu(pathname));
@@ -37,7 +49,7 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
     };
     window.addEventListener("keydown", suTasto);
     return () => window.removeEventListener("keydown", suTasto);
-  }, [pathname, vai]);
+  }, [pathname, vai, setRidotta]);
 
   const chiudi = () => setCrea(null);
   const voci = creazioniDelPercorso(pathname);
@@ -46,7 +58,7 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
   return (
     <>
       <div className="flex min-h-dvh bg-crema">
-        <BarraLaterale nome={nome} badge={badge} onCrea={setCrea} onEsci={onEsci} onCerca={() => setCerca(true)} />
+        <BarraLaterale nome={nome} badge={badge} onCrea={setCrea} onEsci={onEsci} onCerca={() => setCerca(true)} ridotta={ridotta} onRiduci={riduci} animata={animata} />
         <div className="min-w-0 flex-1">
           <div className="sticky top-0 z-10">
             <BannerDemo />
