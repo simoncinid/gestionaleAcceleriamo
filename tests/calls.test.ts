@@ -151,12 +151,12 @@ describe("API delle call", () => {
     expect(fase?.body).toBe('Da "Presentazione fissata" a "In attesa decisione"');
   });
 
-  it("call saltata: si torna a richiamare", async () => {
+  it("call saltata: regola del no-show, la fase resta e si rifissa (blocco 1)", async () => {
     const cookie = await authed();
     await insertLead("l6", { stage_id: "appuntamento-confermato" });
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('k6', 'l6', 'conoscenza', ?, ?, ?)").bind(NOW - 3_600_000, NOW, NOW).run();
     await call("/api/calls/k6", { method: "PATCH", json: { outcome: "saltata" } }, cookie);
-    expect(await lead("l6")).toMatchObject({ stage_id: "da-richiamare", next_action: "Richiamare" });
+    expect(await lead("l6")).toMatchObject({ stage_id: "appuntamento-confermato", next_action: "Rifissare la call", no_show: 1 });
   });
 
   it("call rimandata con nuova data: resta in programma e la prossima azione segue la data", async () => {

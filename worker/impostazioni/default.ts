@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MOTIVI_PERSI } from "../processo/motivi";
 import { ORARIO_DEFAULT } from "../regole/orario";
 
 const ora = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Orario nel formato 08:30");
@@ -56,17 +57,9 @@ export const IMPOSTAZIONI_DEFAULT: Impostazioni = {
     { campo: "email", operatore: "non_contiene", valore: "gmail.", punti: 1 },
     { campo: "website", operatore: "presente", valore: "", punti: 1 },
   ],
-  motivi: [
-    { id: "non_raggiungibile", etichetta: "Non raggiungibile" },
-    { id: "non_interessato", etichetta: "Non interessato" },
-    { id: "budget", etichetta: "Budget" },
-    { id: "fuori_target", etichetta: "Fuori target, non profilato" },
-    { id: "privato", etichetta: "Privato" },
-    { id: "fake", etichetta: "Contatti falsi o inutilizzabili" },
-    { id: "gia_servito", etichetta: "Già servito" },
-    { id: "altro", etichetta: "Altro" },
-  ],
-  assegnazione: { primaChiamata: "diego", presentazione: "diego", proposta: "diego", via: { utente: null, fino: null } },
+  // Lista fissa con codice (blocco 1, modifica 7): le etichette si rinominano, i codici no.
+  motivi: MOTIVI_PERSI.map((m) => ({ id: m.id, etichetta: m.etichetta })),
+  assegnazione: { primaChiamata: "diego", presentazione: "tommaso", proposta: "diego", via: { utente: null, fino: null } },
   conferma: {
     attiva: true,
     mittente: "Tommaso di Acceleriamo <tommaso@mail.acceleriamo.it>",

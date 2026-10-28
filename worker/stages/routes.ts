@@ -22,6 +22,8 @@ const stagePatchSchema = z
   .refine((p) => Object.keys(p).length > 0, { message: "Niente da modificare" });
 const orderSchema = z.object({ ids: z.array(z.string()).min(1) }).strict();
 
+const FISSI = ["label", "suggestedNextAction", "suggestedDelayHours", "requiresReason"] as const;
+
 export const stageRoutes = new Hono<AppEnv>();
 
 stageRoutes.get("/", async (c) => {
@@ -45,6 +47,8 @@ stageRoutes.put("/order", async (c) => {
 stageRoutes.patch("/:id", async (c) => {
   const db = getDb(c.env.DB);
   const patch = stagePatchSchema.parse(await c.req.json());
+  // Blocco 1, modifica 4: nome, azione e scadenza delle fasi stanno nel codice (worker/processo), non si cambiano da qui.
+  if (FISSI.some((k) => k in patch)) throw new HTTPException(422, { message: "Nome, azione e scadenza delle fasi sono fissi" });
   const id = c.req.param("id");
   const existing = await db.select().from(stages).where(eq(stages.id, id)).get();
   if (!existing) return c.json({ error: "Fase inesistente" }, 404);

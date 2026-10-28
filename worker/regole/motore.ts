@@ -15,7 +15,7 @@ export const CONTESTO_BASE: Omit<Contesto, "ora"> = { orario: ORARIO_DEFAULT, se
 
 export type Proposta = {
   stageId: string | null; nextAction: string | null; nextActionAt: number | null;
-  lostReason?: string; attemptCount?: number; sequenceStep?: number; pausedUntil?: number | null; passo?: string;
+  lostReason?: string; attemptCount?: number; sequenceStep?: number; pausedUntil?: number | null; passo?: string; noShow?: number;
 };
 
 export { AZIONE_PAUSA };

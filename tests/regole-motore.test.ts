@@ -22,9 +22,10 @@ describe("le regole sanno quale call c'è stata (spec 6.3)", () => {
     expect(propostaEvento({ tipo: "call_fatta", kind: "conoscenza", presentazioneAt: null }, ctx()))
       .toMatchObject({ stageId: "in-attesa-preventivo", nextAction: "Preparare il preventivo" });
   });
-  it("call saltata riparte dai tentativi", () => {
-    expect(propostaEvento({ tipo: "call_saltata" }, ctx()))
-      .toMatchObject({ stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: r(14, 10), attemptCount: 0, sequenceStep: 0 });
+  it("call saltata (no-show, blocco 1): la fase resta, si rifissa entro 2 ore lavorative, tentativi invariati", () => {
+    const p = propostaEvento({ tipo: "no_show" }, ctx());
+    expect(p).toMatchObject({ stageId: null, nextAction: "Rifissare la call", nextActionAt: r(13, 12), noShow: 1 });
+    expect(p.attemptCount).toBeUndefined();
   });
   it("proposta registrata dal wiki: promemoria solo se manca la call di presentazione", () => {
     expect(propostaEvento({ tipo: "proposta_registrata", haCallPresentazione: false }, ctx()))
@@ -89,7 +90,7 @@ describe("esiti del Foglio Esito (DS 6.6)", () => {
     ["risposto", { stageId: null, nextAction: "Follow-up", nextActionAt: r(16, 10) }],
     ["occupato", { stageId: null, nextAction: "Richiamare", nextActionAt: ORA + 3_600_000 }],
     ["richiamare", { stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: r(14, 10) }],
-    ["non_interessato", { stageId: "non-chiuso", lostReason: "non_interessato", nextAction: null }],
+    ["non_interessato", { stageId: "non-chiuso", nextAction: null }], // blocco 1: niente lostReason, il motivo lo sceglie la persona
     ["fuori_target", { stageId: "fake", lostReason: "fuori_target", nextAction: null }],
   ] as const)("%s", (esito, attesa) => {
     expect(propostaEsito(esito, lead, ctx())).toMatchObject(attesa);

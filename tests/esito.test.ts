@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { env } from "cloudflare:test";
 import { authed, call } from "./helpers";
+import { alleOre, ORARIO_DEFAULT } from "../worker/regole/orario";
 
 const NOW = Date.now();
 
@@ -49,7 +50,8 @@ describe("PATCH /leads/:id/esito", () => {
     expect(res.status).toBe(200);
     const a = await env.DB.prepare("SELECT type, outcome, attempt_no, body FROM activities WHERE lead_id = 'l1' AND type = 'esito'").first();
     expect(a).toEqual({ type: "esito", outcome: "non_risponde", attempt_no: 1, body: "Non risponde. Squilla a vuoto" });
-    expect(await leadRow("l1")).toMatchObject({ attempt_count: 1, next_action_at: NOW + 86_400_000, first_response_at: null });
+    // Fase e scadenza le decide il server (blocco 1, modifica 12): la data mandata dal foglio non conta.
+    expect(await leadRow("l1")).toMatchObject({ attempt_count: 1, next_action: "Richiamare", next_action_at: alleOre(NOW, 1, 10, 0, ORARIO_DEFAULT), first_response_at: null });
   });
 
   it("appuntamento: crea la call, cambia fase, segna la prima risposta", async () => {
@@ -70,15 +72,16 @@ describe("PATCH /leads/:id/esito", () => {
     const cookie = await authed();
     await insertLead("lc");
     const quando = NOW + 2 * 86_400_000;
-    const res = await esito("lc", { requestId: crypto.randomUUID(), esito: "risposto", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: quando }, cookie);
+    const res = await esito("lc", { requestId: crypto.randomUUID(), esito: "appuntamento" }, cookie);
     expect(res.status).toBe(422);
     expect((await res.json<{ error: string }>()).error).toBe("Per questa fase serve la call: scegli giorno e ora");
     expect(await conta("SELECT count(*) n FROM activities WHERE lead_id = 'lc'")).toBe(0);
     expect((await leadRow("lc"))!.stage_id).toBe("da-richiamare");
     // Con una call di conoscenza già in programma l'esito passa.
     await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('kc', 'lc', 'conoscenza', ?1, 0, 0)").bind(quando).run();
-    const ok = await esito("lc", { requestId: crypto.randomUUID(), esito: "risposto", stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: quando }, cookie);
+    const ok = await esito("lc", { requestId: crypto.randomUUID(), esito: "appuntamento" }, cookie);
     expect(ok.status).toBe(200);
+    expect(await leadRow("lc")).toMatchObject({ stage_id: "appuntamento-confermato", next_action_at: quando });
   });
 
   it("call nel passato: 422 con un messaggio in italiano, niente scritto", async () => {
@@ -164,11 +167,12 @@ describe("contatti e proposta", () => {
 });
 
 describe("PATCH /leads/:id con motivo e vinto", () => {
-  it("fase persa chiede il motivo, Chiuso chiede setup, canone e inizio", async () => {
+  it("Non interessato chiede il motivo, Non profilato no (è già il motivo), Chiuso chiede setup, canone e inizio", async () => {
     const cookie = await authed();
     await insertLead("v1");
-    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "fake" } }, cookie)).status).toBe(422);
-    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "fake", lostReason: "fake" } }, cookie)).status).toBe(200);
+    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "non-chiuso" } }, cookie)).status).toBe(422);
+    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "fake" } }, cookie)).status).toBe(200);
+    expect(await env.DB.prepare("SELECT lost_reason FROM leads WHERE id = 'v1'").first()).toEqual({ lost_reason: "fuori_target" });
     await insertLead("v2");
     const senza = await call("/api/leads/v2", { method: "PATCH", json: { stageId: "chiuso" } }, cookie);
     expect(((await senza.json()) as { error: string }).error).toBe("Per Cliente servono setup, canone e data di inizio");

@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { getDb, type Db } from "../db/client";
 import { activities, calls, leads, mailLette, stages } from "../db/schema";
@@ -125,14 +126,13 @@ async function invito(db: Db, m: Mail, now: number): Promise<Esito> {
     call = daFare.sort((a, b) => Math.abs(a.scheduledAt - inv.inizio) - Math.abs(b.scheduledAt - inv.inizio))[0];
   }
   const passi: BatchItem<"sqlite">[] = [];
-  const ctx = await contestoRegole(db, now);
   if (call) {
     if (call.outcome === "fatta" || call.outcome === "saltata") return { tipo: "invito", esito: "call già chiusa", leadId };
     const spostata = call.scheduledAt !== inv.inizio;
     passi.push(db.update(calls).set({ scheduledAt: inv.inizio, durationMin: inv.durataMin, meetLink: link ?? call.meetLink, icsUid: inv.uid, icsSequence: inv.versione, outcome: null, outcomeAt: null, updatedAt: now }).where(eq(calls.id, call.id)));
     if (spostata) {
       passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `Call di ${call.kind} spostata dall'invito di Google: ${quando(inv.inizio)}`, authorId: null, createdAt: now, callId: call.id }));
-      if (aperta) passi.push(...(await passiProposta(db, leadId, propostaEvento({ tipo: "call_fissata", kind: call.kind, scheduledAt: inv.inizio }, ctx), null, now)));
+      if (aperta) passi.push(propostaInvito(db, leadId, call.id, `Il cliente ha chiesto di spostare la call a ${quando(inv.inizio)}: conferma`, now));
     }
     await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
     return { tipo: "invito", esito: spostata ? "call spostata" : "call aggiornata", leadId };
@@ -142,9 +142,29 @@ async function invito(db: Db, m: Mail, now: number): Promise<Esito> {
   const id = crypto.randomUUID();
   passi.push(db.insert(calls).values({ id, leadId, kind, scheduledAt: inv.inizio, durationMin: inv.durataMin, meetLink: link, icsUid: inv.uid, icsSequence: inv.versione, createdBy: null, createdAt: now, updatedAt: now }));
   passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body: `Call di ${kind} fissata dall'invito di Google: ${quando(inv.inizio)}`, authorId: null, createdAt: now, callId: id }));
-  if (aperta) passi.push(...(await passiProposta(db, leadId, propostaEvento({ tipo: "call_fissata", kind, scheduledAt: inv.inizio }, ctx), null, now)));
+  if (aperta) passi.push(propostaInvito(db, leadId, id, `Il cliente ha accettato la call di ${quando(inv.inizio)}: conferma`, now));
   await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
   return { tipo: "invito", esito: "call creata", leadId };
+}
+
+// Invito accettato o spostato: la call è già aggiornata, la fase e la prossima azione aspettano la conferma
+// di una persona (contratto blocco 1, ipotesi 10). L'attività resta "da_confermare" finché non si conferma.
+const propostaInvito = (db: Db, leadId: string, callId: string, body: string, now: number) =>
+  db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "invito_proposta", body, authorId: null, createdAt: now, callId, outcome: "da_confermare" });
+
+// Conferma della proposta dell'invito: applica "call fissata" con la stessa transizione del gestionale.
+export async function confermaInvito(db: Db, leadId: string, activityId: string, actorId: string, now: number): Promise<void> {
+  const proposta = await db.select().from(activities).where(and(eq(activities.id, activityId), eq(activities.leadId, leadId), eq(activities.type, "invito_proposta"))).get();
+  if (!proposta) throw new HTTPException(404, { message: "Proposta dell'invito non trovata" });
+  if (proposta.outcome !== "da_confermare") throw new HTTPException(409, { message: "Questa proposta è già confermata" });
+  const call = proposta.callId ? await db.select().from(calls).where(and(eq(calls.id, proposta.callId), isNull(calls.deletedAt))).get() : undefined;
+  if (!call || call.outcome) throw new HTTPException(422, { message: "La call di questo invito non è più in programma" });
+  const lead = await db.select({ kind: stages.kind }).from(leads).innerJoin(stages, eq(stages.id, leads.stageId)).where(eq(leads.id, leadId)).get();
+  if (lead?.kind !== "open") throw new HTTPException(422, { message: "Il lead è chiuso: riaprilo prima di confermare la call" });
+  const p = propostaEvento({ tipo: "call_fissata", kind: call.kind, scheduledAt: call.scheduledAt }, await contestoRegole(db, now));
+  const passi = await passiProposta(db, leadId, p, actorId, now);
+  passi.push(db.update(activities).set({ outcome: "confermata" }).where(eq(activities.id, activityId)));
+  await db.batch(passi as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
 }
 
 // --- Richieste dal modulo del sito ---
