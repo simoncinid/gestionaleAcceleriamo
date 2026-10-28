@@ -6,5 +6,5 @@ import { api } from "../api";
 export function BannerDemo() {
   const q = useQuery({ queryKey: ["spazio"], queryFn: () => api<{ demo: boolean }>("/spazio"), staleTime: Infinity });
   if (!q.data?.demo) return null;
-  return <p role="status" className="border-b border-sabbia bg-tinta px-4 py-1.5 text-center text-meta font-semibold text-accento-testo">Spazio demo, dati finti</p>;
+  return <p role="status" data-banner-demo className="border-b border-sabbia bg-tinta px-4 py-1.5 text-center text-meta font-semibold text-accento-testo">Spazio demo, dati finti</p>;
 }

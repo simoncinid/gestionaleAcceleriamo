@@ -106,7 +106,11 @@
   --anello-focus: var(--color-accento);
   --barra-altezza: 56px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Quanto occupa in alto la fascia fissa sopra le pagine (sul computer c'è solo l'avviso della demo): l'intestazione
+     della tabella dei lead si ferma subito sotto. */
+  --sopra-pagina: 0px;
 }
+:root:has([data-banner-demo]) { --sopra-pagina: 31px; }
 
 @layer base {
   html { -webkit-tap-highlight-color: transparent; }

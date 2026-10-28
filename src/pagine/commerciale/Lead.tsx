@@ -113,16 +113,19 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
 
       {righe.length === 0 ? vuoto : (
         <>
-          {/* Computer: la tabella scorre dentro il suo contenitore, così l'intestazione resta ferma. */}
-          <section aria-label="Tabella dei lead" className="hidden overflow-hidden rounded-[10px] border border-[#E5DED4] bg-avorio md:block">
-            <div className="max-h-[calc(100dvh-292px)] overflow-auto overscroll-contain">
+          {/* Computer: scorre la pagina, non un riquadro interno (blocco 1 bis: col riquadro alto quanto la finestra l'ultima
+              riga restava a metà e la rotella sulla pagina non portava in fondo). L'intestazione resta ferma in cima alla
+              finestra; overflow-clip taglia gli angoli senza creare un riquadro che scorre. Con le colonne a richiesta la
+              tabella è più larga della pagina e scorre di lato: lì l'intestazione non resta ferma. */}
+          <section aria-label="Tabella dei lead" className="hidden overflow-clip rounded-[10px] border border-[#E5DED4] bg-avorio md:block">
+            <div className={cx(largo && "overflow-x-auto")}>
               <table className={cx("table-fixed border-collapse text-left text-[14px] leading-5", !largo && "w-full")} style={largo ? { width: larghezzaFissa } : undefined}>
                 <colgroup>
                   {COLONNE.filter((c) => c.id !== "azioni").map((c) => <col key={c.id} style={{ width: largo ? c.px : c.largo }} />)}
                   {extra.map((c) => <col key={c} style={{ width: PX_EXTRA[c] }} />)}
                   <col style={{ width: largo ? COLONNE[7].px : COLONNE[7].largo }} />
                 </colgroup>
-                <thead className="sticky top-0 z-[1] bg-avorio">
+                <thead className={cx("bg-avorio", !largo && "sticky top-(--sopra-pagina) z-[1] shadow-[0_1px_0_#E5DED4]")}>
                   <tr>
                     {COLONNE.filter((c) => c.id !== "azioni").map((c) => (
                       <th key={c.id} scope="col" aria-sort={c.ordine && filtri.ord === c.ordine ? (filtri.dir === "asc" ? "ascending" : "descending") : undefined}
