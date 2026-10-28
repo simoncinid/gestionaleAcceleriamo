@@ -7,8 +7,8 @@ import { activities, calls, leads, mailLette, stages } from "../db/schema";
 import type { Env } from "../env";
 import { avvisa } from "../avvisi/service";
 import { contestoRegole } from "../impostazioni/service";
-import { createLead, findDuplicate } from "../leads/service";
-import { normalizeEmail, normalizePhone } from "../lib/normalize";
+import { ingressoLead } from "../leads/service";
+import { normalizeEmail } from "../lib/normalize";
 import { partiRoma } from "../lib/roma";
 import { accorcia, normalizzaAzienda } from "../lib/testo";
 import { passiProposta } from "../regole/applica";
@@ -173,19 +173,17 @@ async function modulo(env: Env, db: Db, m: Mail, r: NonNullable<ReturnType<typeo
   // Senza email nel modulo vale l'indirizzo di risposta, se non è nostro.
   const email = r.email ?? (m.rispondiA && !daNoi(m.rispondiA) ? m.rispondiA : null);
   const dettagli = [r.ruolo ? `Ruolo: ${r.ruolo}` : null, ...r.risposte.map((x) => `${x.etichetta}: ${x.valore}`)].filter(Boolean).join("\n");
-  const doppione = await findDuplicate(db, normalizeEmail(email), normalizePhone(r.telefono));
-  if (doppione) {
-    await db.insert(activities).values({ id: crypto.randomUUID(), leadId: doppione, type: "contatto", body: `Nuova richiesta dal modulo del sito${dettagli ? `\n${dettagli}` : ""}`, authorId: null, createdAt: now });
-    return { tipo: "modulo", esito: "lead già presente", leadId: doppione };
-  }
-  const lead = await createLead(db, {
+  // Stessa regola dei doppioni di Meta, a mano e CSV (blocco 1, modifica 8).
+  const ing = await ingressoLead(db, {
     company: r.azienda || r.nome || "Richiesta dal sito",
     contactName: r.nome,
     email,
     phone: r.telefono,
     source: "sito",
     notes: dettagli ? `Dal modulo del sito:\n${dettagli}` : null,
-  }, null, now);
+  }, `modulo del sito${dettagli ? `\n${dettagli}` : ""}`, null, now);
+  if (ing.esito !== "creato") return { tipo: "modulo", esito: ing.esito === "riaperto" ? "lead riaperto" : "lead già presente", leadId: ing.lead.id };
+  const lead = ing.lead;
   await catenaLeadNuovo(env, lead.id, "sito", now);
   return { tipo: "modulo", esito: "lead creato", leadId: lead.id };
 }

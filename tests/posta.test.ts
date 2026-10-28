@@ -161,7 +161,12 @@ describe("richieste dal modulo del sito", () => {
     const r2 = await posta(mail({ testo: MODULO_SITO.replace("giulia@carpenteria-neri-finta.it", "") }));
     expect(await r2.json()).toMatchObject({ esito: "lead già presente", leadId: corpo.leadId });
     expect(await tutte("SELECT * FROM leads")).toHaveLength(1);
-    expect(await tutte("SELECT * FROM activities WHERE type = 'contatto'")).toHaveLength(1);
+    const contatti = await tutte<{ body: string }>("SELECT body FROM activities WHERE type = 'contatto'");
+    expect(contatti).toHaveLength(1);
+    // Stessa regola dei doppioni di Meta, a mano e CSV (blocco 1, modifica 8): storico "Arrivato di nuovo" e punteggio alzato.
+    expect(contatti[0].body).toMatch(/^Arrivato di nuovo da modulo del sito\n/);
+    expect(contatti[0].body).toContain("Cosa fa perdere più tempo: Fare i preventivi");
+    expect((await env.DB.prepare("SELECT score FROM leads WHERE id = ?").bind(corpo.leadId).first<{ score: string }>())!.score).not.toBeNull();
     expect(await tutte("SELECT * FROM notifications WHERE evento = 'lead_nuovo'")).toHaveLength(1);
   });
 });
