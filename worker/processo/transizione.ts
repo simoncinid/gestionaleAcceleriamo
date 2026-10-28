@@ -1,6 +1,6 @@
 import { daRoma, partiRoma } from "../lib/roma";
-import { alleOre } from "../regole/orario";
-import { giorniLavorativiDopo } from "./processo";
+import { alleOre, scadenzaLavorativa } from "../regole/orario";
+import { AZIONE_RIFISSARE, AZIONE_RIPROVARE, giorniLavorativiDopo } from "./processo";
 import type { Contesto, Esito, Proposta } from "../regole/motore";
 
 // Unico punto dei cambi di fase (contratto blocco 1, sezione 2, colonna "Cosa succede dopo"): riceve il lead e
@@ -10,14 +10,18 @@ import type { Contesto, Esito, Proposta } from "../regole/motore";
 // Azione della fine pausa: la usano il motore, il giro degli avvisi e il gruppo "Fine pausa" di Oggi.
 export const AZIONE_PAUSA = "Richiamare dopo la pausa";
 
-export type LeadTransizione = { stageId: string; attemptCount: number; primoTentativoAt: number | null };
+// noShow e pausedUntil servono solo alla regola del no-show (fasi 30 e 50).
+export type LeadTransizione = { stageId: string; attemptCount: number; primoTentativoAt: number | null; noShow?: number | null; pausedUntil?: number | null };
+
+const FASI_CALL = ["appuntamento-confermato", "presentazione-confermata"];
 
 export type Evento =
   | { tipo: "esito"; esito: Esito; call?: { scheduledAt: number } }
   | { tipo: "call_fissata"; kind: "conoscenza" | "presentazione"; scheduledAt: number }
   | { tipo: "call_fatta"; kind: "conoscenza"; presentazioneAt: number | null }
   | { tipo: "call_fatta"; kind: "presentazione" }
-  | { tipo: "call_saltata" }
+  // "Non si è presentato" (fasi 30 e 50): la fase resta, si rifissa; alla seconda assenza pausa di 2 mesi.
+  | { tipo: "no_show" }
   | { tipo: "proposta_registrata"; haCallPresentazione: boolean }
   | { tipo: "ricontatto_senza_risposta"; base: number; passo: number }
   | { tipo: "proposta_senza_call"; sentAt: number }
@@ -61,9 +65,12 @@ function daEsito(esito: Esito, lead: LeadTransizione, c: Contesto, call?: { sche
     case "risposto":
       return { stageId: null, nextAction: "Follow-up", nextActionAt: alleOre(c.ora, 3, 10, 0, c.orario) };
     case "non_risponde":
-      return tentativo(lead, c, () => domaniAlle10(c));
     case "occupato":
-      return tentativo(lead, c, () => c.ora + ORA_MS, false);
+      // Dopo la pausa della seconda assenza: una chiamata a vuoto chiude il lead.
+      if (FASI_CALL.includes(lead.stageId) && (lead.noShow ?? 0) >= 2 && (lead.pausedUntil == null || lead.pausedUntil <= c.ora)) {
+        return { stageId: "non-chiuso", lostReason: "no_show", nextAction: null, nextActionAt: null };
+      }
+      return esito === "non_risponde" ? tentativo(lead, c, () => domaniAlle10(c)) : tentativo(lead, c, () => c.ora + ORA_MS, false);
     case "richiamare":
       return { stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: domaniAlle10(c) };
     case "appuntamento":
@@ -81,7 +88,7 @@ function daEsito(esito: Esito, lead: LeadTransizione, c: Contesto, call?: { sche
   }
 }
 
-function pausa(c: Contesto, stageId = "in-attesa-decisione"): Proposta {
+function pausa(c: Contesto, stageId: string | null = "in-attesa-decisione"): Proposta {
   const p = partiRoma(c.ora);
   // Il 31 più un mese non deve sforare nel mese dopo: ci si ferma all'ultimo giorno.
   const ultimo = partiRoma(daRoma(p.anno, p.mese + c.pausaMesi + 1, 0, 12, 0)).giorno;
@@ -102,8 +109,12 @@ export function transizione(lead: LeadTransizione, e: Evento, c: Contesto): Prop
         return { stageId: e.presentazioneAt ? "presentazione-confermata" : "in-attesa-preventivo", nextAction: "Preparare il preventivo", nextActionAt: quandoPreventivo(c) };
       }
       return { stageId: "in-attesa-decisione", nextAction: "Follow-up preventivo", nextActionAt: alleOre(c.ora, c.ricontatti[0], 10, 0, c.orario), ...passoSequenza(c, 1) };
-    case "call_saltata":
-      return { stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: domaniAlle10(c), attemptCount: 0, sequenceStep: 0 };
+    case "no_show": {
+      const noShow = (lead.noShow ?? 0) + 1;
+      // Prima assenza: fase e tentativi restano, si rifissa entro 2 ore lavorative.
+      if (noShow < 2) return { stageId: null, nextAction: AZIONE_RIFISSARE, nextActionAt: scadenzaLavorativa(c.ora, 120, c.orario), noShow };
+      return { ...pausa(c, null), nextAction: AZIONE_RIPROVARE, noShow };
+    }
     case "proposta_registrata":
       return e.haCallPresentazione
         ? { stageId: null, nextAction: null, nextActionAt: null }

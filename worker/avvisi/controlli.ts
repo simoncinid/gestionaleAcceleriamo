@@ -1,6 +1,7 @@
 import { getDb } from "../db/client";
 import type { Env } from "../env";
 import { giornoRoma, inizioGiornoRoma, meseRoma } from "../lib/roma";
+import { AZIONE_RIPROVARE } from "../processo/processo";
 import { finePausa } from "../regole/motore";
 import { FASE_PRIMA_CHIAMATA, leggiSla, scadenzaPrimaChiamata } from "../regole/sla";
 import { avvisa, chiaveAvviso, destinatari, type NuovoAvviso } from "./service";
@@ -65,7 +66,8 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
     const azione = finePausa(l, now);
     if (!azione) continue;
     await raw.batch([
-      raw.prepare("UPDATE leads SET paused_until = NULL, next_action = ?1, next_action_at = ?2, updated_at = ?2 WHERE id = ?3").bind(azione.nextAction, azione.nextActionAt, l.id),
+      // Dopo la seconda assenza (no-show) l'azione resta "Riprovare": la funzione unica mostra l'ultima chiamata.
+      raw.prepare("UPDATE leads SET paused_until = NULL, next_action = CASE WHEN next_action = ?4 THEN next_action ELSE ?1 END, next_action_at = ?2, updated_at = ?2 WHERE id = ?3").bind(azione.nextAction, azione.nextActionAt, l.id, AZIONE_RIPROVARE),
       raw.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES (?1, ?2, 'nota', 'Fine della pausa: da richiamare', NULL, ?3)").bind(crypto.randomUUID(), l.id, now),
     ]);
     pausa.push({ evento: "fine_pausa", entityId: l.id, turno: String(l.pausedUntil), titolo: `Fine della pausa: ${l.company}`, href: `/commerciale/lead/${l.id}`, responsabile: l.ownerId });

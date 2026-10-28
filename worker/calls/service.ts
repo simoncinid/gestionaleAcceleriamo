@@ -1,16 +1,18 @@
-import { and, eq, gte, isNotNull, isNull, lt } from "drizzle-orm";
+import { and, asc, eq, gte, isNotNull, isNull, lt } from "drizzle-orm";
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { getDb, type Db } from "../db/client";
-import { activities, calls, leads, proposals } from "../db/schema";
+import { activities, calls, leads, proposals, type Lead } from "../db/schema";
 import type { Env } from "../env";
 import { CHIAVE_MANCANTE, base64Utf8, indirizzoDi, inviaEmail } from "../email/resend";
 import { contestoRegole, leggiImpostazioni } from "../impostazioni/service";
 import { segnaErrore, segnaOk } from "../integrazioni/stato";
 import { partiRoma } from "../lib/roma";
 import { passiProposta } from "../regole/applica";
-import { propostaEvento } from "../regole/motore";
+import { propostaEvento, type Contesto } from "../regole/motore";
+import { dataTesto } from "../processo/processo";
+import { transizione } from "../processo/transizione";
 import { creaIcs } from "./ics";
 import { linkHttp } from "../leads/validation";
 
@@ -177,7 +179,9 @@ export async function aggiornaCall(db: Db, id: string, input: z.infer<typeof cal
       passi.push(db.update(proposals).set({ status: "presentata", presentedAt: now, updatedAt: now })
         .where(and(eq(proposals.leadId, k.leadId), eq(proposals.status, "registrata"), isNull(proposals.deletedAt))));
     } else if (input.outcome === "saltata") {
-      passi.push(...(await passiProposta(db, k.leadId, propostaEvento({ tipo: "call_saltata" }, ctx), actorId, now)));
+      // Stessa regola di "Non si è presentato", solo se il lead è ancora nella fase di quella call.
+      const lead = await db.select().from(leads).where(eq(leads.id, k.leadId)).get();
+      if (lead && lead.stageId === FASE_DELLA_CALL[k.kind]) passi.push(...(await passiNoShow(db, lead, ctx, actorId, now)).passi);
     }
     const testo = { fatta: "fatta", saltata: "saltata", rimandata: "rimandata" }[input.outcome ?? "rimandata"];
     passi.push(db.insert(activities).values({ id: crypto.randomUUID(), leadId: k.leadId, type: "call", body: `Call di ${k.kind} ${testo}`, authorId: actorId, createdAt: now, callId: id }));
@@ -190,6 +194,32 @@ export async function aggiornaCall(db: Db, id: string, input: z.infer<typeof cal
   }
   await db.batch([db.update(calls).set(set).where(eq(calls.id, id)), ...passi]);
   return unaCall(db, id);
+}
+
+const FASE_DELLA_CALL = { conoscenza: "appuntamento-confermato", presentazione: "presentazione-confermata" } as const;
+
+// Regola unica del no-show (contratto blocco 1, sezione 2): la usano "Non si è presentato" e la call segnata saltata.
+async function passiNoShow(db: Db, lead: Lead, ctx: Contesto, actorId: string | null, now: number) {
+  const p = transizione({ stageId: lead.stageId, attemptCount: lead.attemptCount, primoTentativoAt: null, noShow: lead.noShow, pausedUntil: lead.pausedUntil }, { tipo: "no_show" }, ctx);
+  return { p, passi: await passiProposta(db, lead.id, p, actorId, now) };
+}
+
+// "Non si è presentato": chiude come saltata la call aperta di quel tipo, scrive lo storico e applica la regola, tutto in un batch.
+// Il WhatsApp "ci siamo persi?" non parte da qui: nessun invio senza il sì di una persona.
+export async function segnaNoShow(db: Db, leadId: string, kind: "conoscenza" | "presentazione", actorId: string, now: number) {
+  const lead = await db.select().from(leads).where(and(eq(leads.id, leadId), isNull(leads.deletedAt))).get();
+  if (!lead) throw new HTTPException(404, { message: "Lead non trovato" });
+  if (lead.stageId !== FASE_DELLA_CALL[kind]) throw new HTTPException(422, { message: `Non si è presentato vale solo con la ${kind === "conoscenza" ? "consulenza" : "presentazione"} fissata` });
+  const aperta = await db.select({ id: calls.id }).from(calls)
+    .where(and(eq(calls.leadId, leadId), eq(calls.kind, kind), isNull(calls.deletedAt), isNull(calls.outcome))).orderBy(asc(calls.scheduledAt)).get();
+  const { p, passi } = await passiNoShow(db, lead, await contestoRegole(db, now), actorId, now);
+  const cosa = kind === "conoscenza" ? "alla consulenza" : "alla presentazione";
+  const body = p.pausedUntil ? `Non si è presentato ${cosa} (seconda volta): si riprova ${dataTesto(p.pausedUntil)}` : `Non si è presentato ${cosa} (prima volta)`;
+  await db.batch([
+    db.insert(activities).values({ id: crypto.randomUUID(), leadId, type: "call", body, authorId: actorId, createdAt: now, callId: aperta?.id ?? null }),
+    ...(aperta ? [db.update(calls).set({ outcome: "saltata" as const, outcomeAt: now, updatedAt: now }).where(eq(calls.id, aperta.id))] : []),
+    ...passi,
+  ]);
 }
 
 // Giro programmato: manda gli inviti rimasti in coda, solo per le call ancora da fare e solo se Resend è collegato.

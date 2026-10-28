@@ -11,7 +11,7 @@ import { catenaLeadNuovo } from "../regole/catena";
 import { z } from "zod";
 import { ESITI, propostaEsito } from "../regole/motore";
 import { contestoRegole } from "../impostazioni/service";
-import { callDelLead, callNuovaSchema, fissaCall } from "../calls/service";
+import { callDelLead, callNuovaSchema, fissaCall, segnaNoShow } from "../calls/service";
 import { esitoSchema, primoTentativoAt, registraContatto, salvaEsito } from "./esito";
 import { proposteDelLead } from "../proposte/service";
 import { conScadenzaSla, leggiSla } from "../regole/sla";
@@ -116,6 +116,16 @@ leadRoutes.patch("/:id/esito", async (c) => {
   const input = esitoSchema.parse(await c.req.json());
   const r = await salvaEsito(getDb(c.env.DB), c.req.param("id"), input, c.get("user").id, Date.now());
   return c.json(r);
+});
+
+// "Non si è presentato" (fasi 30 e 50): regola del no-show, la fase resta (contratto blocco 1, sezione 2).
+leadRoutes.post("/:id/no-show", async (c) => {
+  const { kind } = z.object({ kind: z.enum(["conoscenza", "presentazione"]) }).strict().parse(await c.req.json());
+  const db = getDb(c.env.DB);
+  const id = c.req.param("id");
+  await segnaNoShow(db, id, kind, c.get("user").id, Date.now());
+  const [lead] = await conProssima(db, [conScadenzaSla(await getLead(db, id), await leggiSla(db))], Date.now());
+  return c.json({ lead });
 });
 
 const contattoSchema = z.object({ canale: z.enum(["chiamata", "whatsapp", "email"]), modello: z.string().optional() }).strict();

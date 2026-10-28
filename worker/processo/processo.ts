@@ -141,6 +141,12 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
       const consulenza = lead.stageId === FASE.consulenza;
       const cosa = consulenza ? "la consulenza" : "la presentazione";
       // No-show: la data è tolta, si rifissa (o si riprova dopo la pausa della seconda assenza).
+      if ((lead.noShow ?? 0) > 0 && lead.nextAction === AZIONE_RIPROVARE && !inPausa) {
+        // Pausa finita dopo la seconda assenza: un'ultima chiamata, a vuoto il lead va in 80.
+        return fine("Ultima chiamata dopo la pausa", salvata, {
+          pulsante: chiama, secondarie: [comando("Segna l'esito", "segna_esito"), comando(consulenza ? "Fissa la consulenza" : "Fissa la presentazione", consulenza ? "fissa_consulenza" : "fissa_presentazione")],
+        });
+      }
       if ((lead.noShow ?? 0) > 0 && (lead.nextAction === AZIONE_RIFISSARE || lead.nextAction === AZIONE_RIPROVARE)) {
         const azione = inPausa ? `Riprovare il ${dataTesto(lead.pausedUntil!)}` : `Rifissare ${cosa}`;
         return fine(azione, salvata, {

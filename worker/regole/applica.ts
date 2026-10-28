@@ -27,6 +27,7 @@ export async function passiProposta(db: Db, leadId: string, p: Proposta, actorId
   if (p.sequenceStep !== undefined) set.sequenceStep = p.sequenceStep;
   if (p.pausedUntil !== undefined) set.pausedUntil = p.pausedUntil;
   if (p.lostReason !== undefined) set.lostReason = p.lostReason;
+  if (p.noShow !== undefined) set.noShow = p.noShow;
   passi.unshift(db.update(leads).set(set).where(eq(leads.id, leadId)));
   return passi;
 }
