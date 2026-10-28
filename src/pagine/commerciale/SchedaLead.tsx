@@ -21,6 +21,7 @@ import { FoglioRimanda } from "./FoglioRimanda";
 import { FoglioScrivi } from "./FoglioScrivi";
 import { Assistente } from "./lead/Assistente";
 import { Collegamenti } from "./lead/Collegamenti";
+import { PassaggioCliente } from "./lead/Passaggio";
 import { Contatti } from "./lead/Contatti";
 import { DatiLead } from "./lead/DatiLead";
 import { Documents } from "./lead/Documents";
@@ -148,6 +149,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
               </span>
             </button>
           </div>
+          {fase?.kind === "won" && coll.data?.cliente && <PassaggioCliente clienteId={coll.data.cliente.id} dal={coll.data.cliente.dal} />}
         </div>
         <Pulsante ref={menu} variante="icona" aria-label="Altre azioni" title="Altre azioni" className="w-11 shrink-0 px-0!" icona={<DotsThree size={22} weight="bold" aria-hidden />} onClick={() => setFoglio("menu")} />
       </header>

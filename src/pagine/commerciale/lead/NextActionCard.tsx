@@ -80,7 +80,6 @@ export function NextActionCard({ lead, kind, ora, inLinea = {}, onComando }: {
   const link = [
     inLinea.call && !chiuso ? { to: `/commerciale/call/${inLinea.call.id}`, testo: `Call: ${dataEOra(inLinea.call.scheduledAt)}` } : null,
     inLinea.proposta ? { to: `/commerciale/proposte/${inLinea.proposta.id}`, testo: `Proposta ${inLinea.proposta.number}` } : null,
-    lead.stageId === "chiuso" && inLinea.cliente ? { to: `/commerciale/clienti/${inLinea.cliente.id}`, testo: `Cliente: ${inLinea.cliente.name}` } : null,
   ].filter((x): x is { to: string; testo: string } => x != null);
 
   return (

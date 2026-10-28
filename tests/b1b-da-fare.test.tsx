@@ -78,7 +78,7 @@ describe("Da fare, lead chiusi", () => {
     const html = scheda(lead({ stageId: "chiuso" }), { cliente: { id: "k1", name: "Officina Prova" } });
     expect(html).toContain("Chiuso come cliente il");
     expect(html).toContain(">Apri il cliente<");
-    expect(html).toContain("Cliente: Officina Prova");
+    expect(html).not.toContain("Cliente: Officina Prova"); // il passaggio sta sotto il titolo (modifica 15)
     expect(contaPrimari(html)).toBe(1);
   });
   it("80: chiuso col motivo, Riapri secondario, nessun primario", () => {
@@ -95,5 +95,18 @@ describe("distanza nel tempo", () => {
     expect(distanza(ORA + 86_400_000, "futuro", ORA)).toBe("domani alle 10:00");
     expect(distanza(ORA + 3 * 86_400_000, "futuro", ORA)).toBe("fra 3 giorni");
     expect(distanza(ORA - 2 * 86_400_000, "scaduto", ORA)).toBe("scaduta da 2 giorni");
+  });
+});
+
+describe("passaggio da lead a cliente (modifica 15)", async () => {
+  const { PassaggioCliente, PassaggioLead } = await import("../src/pagine/commerciale/lead/Passaggio");
+  it("una riga sola, un link per verso", () => {
+    const c = render(<PassaggioCliente clienteId="C1" dal={Date.UTC(2026, 9, 14, 10)} />);
+    expect(c).toContain("È cliente dal 14\u00a0ottobre");
+    expect(c).toContain('href="/commerciale/clienti/C1"');
+    const l = render(<PassaggioLead leadId="L1" azienda="Officina Prova" il={Date.UTC(2026, 9, 14, 10)} />);
+    expect(l).toContain("Nato dal lead Officina Prova il 14\u00a0ottobre");
+    expect(l).toContain('href="/commerciale/lead/L1"');
+    expect(render(<PassaggioLead leadId="L1" azienda="X" il={null} />)).toContain("Nato dal lead X:");
   });
 });
