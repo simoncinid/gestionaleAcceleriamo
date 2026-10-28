@@ -21,6 +21,7 @@ import { metaRoutes } from "./meta/routes";
 import { webhookInstagram } from "./risponditore/webhook";
 import { risponditoreRoutes } from "./risponditore/routes";
 import { risorsePubbliche } from "./risorse/routes";
+import { paginaRisorsa, robots, sitemap } from "./risorse/pagina";
 import { stageRoutes, userRoutes } from "./stages/routes";
 import { settingsRoutes, stageRuleRoutes, templateRoutes } from "./impostazioni/routes";
 import { integrazioniRoutes } from "./integrazioni/routes";
@@ -59,6 +60,10 @@ app.get("/api/spazio", (c) => c.json({ demo: c.env.SPAZIO === "demo" }));
 app.route("/api/webhooks/meta", metaRoutes);
 app.route("/api/webhooks/instagram", webhookInstagram);
 app.route("/api/pubblico/risorse", risorsePubbliche);
+// HTML della pagina risorsa con titolo e anteprima per le chat (wrangler.jsonc: "/r/*" passa prima dal Worker).
+app.get("/r/:slug", paginaRisorsa);
+app.get("/robots.txt", robots);
+app.get("/sitemap.xml", sitemap);
 app.route("/api/auth", authRoutes);
 // Prima delle rotte dei lead: /api/leads/:id/scheda-azienda.
 app.route("/api/leads", schedeRoutes);

@@ -128,62 +128,119 @@
 @keyframes respiro { 50% { opacity: 0.55; } }
 .skeleton { background: var(--color-sabbia); animation: respiro 1.4s ease-in-out infinite; }
 
-/* Pagina pubblica della risorsa (/r/:slug): si legge dal telefono, dentro il browser di Instagram. */
+/* Pagina pubblica della risorsa (/r/:slug): si legge dal telefono, dentro il browser di Instagram.
+   Carta crema per tutta la pagina; lo schema sta in una fascia scura, come lo schema del reel da cui si arriva. */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-.risorsa { overflow-wrap: break-word; }
+.risorsa { overflow-wrap: break-word; --margine: 1.25rem; }
+@media (min-width: 40rem) { .risorsa { --margine: 2rem; } }
+
+/* Testata: titolo, sottotitolo, una riga di servizio. */
+.risorsa-testata { display: grid; gap: 1rem; margin-top: 2.5rem; }
+@media (min-width: 40rem) { .risorsa-testata { margin-top: 3.5rem; } }
 .risorsa-titolo {
   font-family: var(--font-display); font-weight: 500; text-transform: lowercase; text-wrap: balance;
-  font-size: clamp(2.375rem, 1.6rem + 4.2vw, 3.5rem); line-height: 0.94; letter-spacing: -0.025em;
+  font-size: clamp(2.5rem, 1.6rem + 4.2vw, 3.625rem); line-height: 0.93; letter-spacing: -0.025em;
 }
 .risorsa-sottotitolo { font-size: clamp(1.125rem, 1.05rem + 0.35vw, 1.25rem); line-height: 1.45; color: var(--testo-2); text-wrap: pretty; max-width: 34em; }
+.risorsa-meta { font-size: 0.875rem; font-weight: 500; color: var(--testo-2); padding-top: 0.25rem; }
+.risorsa-stato { display: grid; gap: 1.25rem; margin-top: 3rem; padding-bottom: 4rem; }
+
+/* Corpo: testo da leggere, un solo livello di titoli di sezione. */
 .risorsa-corpo { font-size: clamp(1.0625rem, 1rem + 0.3vw, 1.125rem); line-height: 1.62; max-width: 65ch; text-wrap: pretty; }
 .risorsa-corpo > * + * { margin-top: 1.1em; }
 .risorsa-corpo strong { font-weight: 600; }
 .risorsa-corpo h2 {
   font-weight: 500; text-transform: lowercase; text-wrap: balance;
   font-size: clamp(1.75rem, 1.5rem + 1vw, 2.125rem); line-height: 1; letter-spacing: -0.018em;
-  margin-top: 2.6em;
+  margin-top: 2.75em;
 }
-.risorsa-corpo > h2:first-child { margin-top: 1.6em; }
-.risorsa-corpo h2 + * { margin-top: 0.8em; }
+.risorsa-corpo > h2:first-child { margin-top: 2em; }
+.risorsa-corpo h2 + * { margin-top: 0.75em; }
 .risorsa-corpo h3 { font-family: var(--font-sans); font-weight: 600; font-size: 1.125em; line-height: 1.35; margin-top: 2em; }
-
-/* Lo schema: numero grande in arancione, titolo del passo, descrizione; un filo sottile unisce i passi. */
-.risorsa-passi { display: grid; margin-top: 1.4em !important; }
-.risorsa-passi > li { position: relative; display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); column-gap: 1rem; padding-bottom: 1.75rem; }
-.risorsa-passi > li:last-child { padding-bottom: 0; }
-.risorsa-passi > li:not(:last-child)::after {
-  content: ""; position: absolute; left: calc(1.375rem - 0.75px); top: 3.4rem; bottom: 0.6rem; width: 1.5px; background: var(--color-sabbia-2); border-radius: 1px;
-}
-.risorsa-numero {
-  font-family: var(--font-display); font-weight: 500; font-variant-numeric: tabular-nums lining-nums;
-  font-size: 2.875rem; line-height: 0.82; letter-spacing: -0.04em; color: var(--color-accento); text-align: center;
-}
-.risorsa-passo { font-family: var(--font-display); font-weight: 500; text-transform: lowercase; font-size: 1.5rem; line-height: 1.02; letter-spacing: -0.012em; padding-top: 0.2rem; text-wrap: balance; }
-.risorsa-descrizione { color: var(--testo); opacity: 0.86; font-size: 0.97em; line-height: 1.55; }
 .risorsa-numeri { display: grid; gap: 0.9em; }
 .risorsa-numeri > li { display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); column-gap: 0.75rem; align-items: baseline; }
-.risorsa-numeri .risorsa-numero { font-size: 1.75rem; line-height: 1; text-align: left; }
-.risorsa-punti { display: grid; gap: 0.55em; }
-.risorsa-punti > li { position: relative; padding-left: 1.4rem; }
-.risorsa-punti > li::before { content: ""; position: absolute; left: 0.2rem; top: 0.68em; width: 0.45rem; height: 0.45rem; border-radius: 2px; background: var(--color-accento); }
+.risorsa-numeri .risorsa-numero { font-family: var(--font-display); font-weight: 500; font-size: 1.75rem; line-height: 1; color: var(--color-accento); font-variant-numeric: tabular-nums lining-nums; }
+.risorsa-punti { display: grid; gap: 0.6em; }
+.risorsa-punti > li { position: relative; padding-left: 1.4rem; min-width: 0; overflow-wrap: anywhere; }
+.risorsa-punti > li::before { content: ""; position: absolute; left: 0.25rem; top: 0.62em; width: 0.4rem; height: 0.4rem; border-radius: 999px; background: var(--color-accento); }
 
-/* Chiamata: il blocco arancione chiude la pagina, da bordo a bordo sul telefono. */
-.risorsa-chiamata {
-  display: grid; gap: 1.75rem; margin: 3.5rem -1.25rem 0; padding: 2.5rem 1.25rem calc(3rem + var(--safe-bottom));
-  background: var(--color-accento); color: var(--color-accento-inchiostro);
+/* La fascia scura dello schema: da bordo a bordo sul telefono, blocco con gli angoli tondi da 40rem in su.
+   Griglia a puntini come nel reel, niente bagliori. */
+.risorsa-schema {
+  margin: 2.75em calc(var(--margine) * -1) 0; padding: 2.75rem var(--margine) 3rem;
+  background-color: var(--color-ink); color: var(--color-crema);
+  background-image: radial-gradient(rgb(247 242 236 / 0.07) 1px, transparent 1.4px); background-size: 18px 18px; background-position: 9px 9px;
 }
-.risorsa-chiamata label { color: var(--color-ink); font-weight: 600; }
-@media (min-width: 40rem) { .risorsa-chiamata { margin: 4.5rem 0 3rem; padding: 2.5rem; border-radius: var(--radius-blocco); } }
-.risorsa-invia {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; height: 3.5rem; margin-top: 0.25rem;
-  border-radius: var(--radius-controllo); background: var(--color-ink); color: var(--color-crema); font-weight: 600; font-size: 1.0625rem;
+@media (min-width: 40rem) { .risorsa-schema { margin-inline: 0; padding: 3rem 2rem 3.25rem; border-radius: var(--radius-blocco); } }
+.risorsa-schema > h2 { margin-top: 0 !important; color: var(--color-crema); }
+.risorsa-schema > h2 + .risorsa-passi { margin-top: 2.25rem !important; }
+
+/* Un nodo per passo. Fuori dalla fascia (secondo schema del corpo) gli stessi nodi in chiaro. */
+.risorsa-passi { --nodo: var(--color-avorio); --nodo-bordo: var(--color-sabbia); --nodo-testo: var(--color-ink); --nodo-testo-2: var(--color-grigio);
+  display: grid; gap: 2rem; margin-top: 1.75em !important; }
+.risorsa-schema .risorsa-passi { --nodo: #26221E; --nodo-bordo: #3A352F; --nodo-testo: var(--color-crema); --nodo-testo-2: #C9C0B5; }
+.risorsa-passi > li { position: relative; scroll-margin-top: 2.75rem; }
+.risorsa-passi > li:not(:last-child)::after {
+  content: ""; position: absolute; left: calc(1.125rem + 1.125rem - 1px); top: 100%; height: 2rem; width: 2px; border-radius: 1px;
+  background: var(--color-accento); transform-origin: top;
+}
+.risorsa-nodo {
+  position: relative; display: grid; gap: 0.625rem; padding: 1.125rem 1.125rem 1.25rem;
+  background: var(--nodo); color: var(--nodo-testo); border: 1px solid var(--nodo-bordo); border-radius: var(--radius-blocco);
+}
+.risorsa-nodo-testa { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); column-gap: 0.75rem; align-items: start; padding-right: 3.75rem; }
+.risorsa-passi .risorsa-numero {
+  display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 999px;
+  background: var(--color-accento); color: var(--color-ink);
+  font-family: var(--font-display); font-weight: 600; font-size: 1.1875rem; line-height: 1; font-variant-numeric: tabular-nums lining-nums;
+}
+.risorsa-passo {
+  font-family: var(--font-display); font-weight: 500; text-transform: lowercase; text-wrap: balance;
+  font-size: 1.5rem; line-height: 1.02; letter-spacing: -0.012em; padding-top: 0.32rem;
+}
+.risorsa-descrizione { color: var(--nodo-testo-2); font-size: 0.97em; line-height: 1.55; }
+.risorsa-icona {
+  position: absolute; top: -1.375rem; right: -0.375rem; width: 5.25rem; height: 5.25rem; pointer-events: none; user-select: none;
+  background: center / contain no-repeat; transform: rotate(6deg); filter: drop-shadow(0 8px 10px rgb(0 0 0 / 0.28));
+}
+.risorsa-passi > li:nth-child(even) .risorsa-icona { transform: rotate(-5deg); }
+.risorsa-corpo > .risorsa-passi .risorsa-icona { filter: drop-shadow(0 6px 8px rgb(28 25 21 / 0.14)); }
+
+/* Ingresso dei nodi: solo se lo script ha messo data-anima (quindi mai con il movimento ridotto). */
+@keyframes risorsa-nodo { from { opacity: 0; transform: translateY(16px); } }
+@keyframes risorsa-icona { from { opacity: 0; transform: scale(0.6) rotate(-14deg); } }
+@keyframes risorsa-filo { from { transform: scaleY(0); } }
+.risorsa-passi[data-anima] > li:not([data-visto]) { opacity: 0; }
+.risorsa-passi[data-anima] > li:not([data-visto])::after { transform: scaleY(0); }
+.risorsa-passi[data-anima] > li[data-visto] .risorsa-nodo { animation: risorsa-nodo 520ms var(--ease-foglio) both; }
+.risorsa-passi[data-anima] > li[data-visto] .risorsa-icona { animation: risorsa-icona 560ms cubic-bezier(0.34, 1.4, 0.64, 1) 140ms both; }
+.risorsa-passi[data-anima] > li[data-visto]::after { animation: risorsa-filo 420ms var(--ease-uscita) 320ms both; }
+
+/* Chiusura: una domanda, una riga, un pulsante. Il modulo si apre sotto, sul posto. */
+.risorsa-chiusura { position: relative; display: grid; gap: 1rem; margin-top: 4rem; padding: 2.5rem 0 calc(4rem + var(--safe-bottom)); border-top: 1px solid var(--bordo); }
+.risorsa-chiusura-icona { display: block; width: 4.5rem; height: 4.5rem; background: center / contain no-repeat; margin: -0.5rem 0 -0.25rem -0.375rem; transform: rotate(-6deg); }
+.risorsa-chiusura-titolo { font-family: var(--font-display); font-weight: 500; text-transform: lowercase; text-wrap: balance; font-size: clamp(2.125rem, 1.7rem + 2vw, 2.75rem); line-height: 0.95; letter-spacing: -0.02em; scroll-margin-top: 1.5rem; }
+.risorsa-chiusura-testo { font-size: 1.0625rem; line-height: 1.55; color: var(--testo-2); text-wrap: pretty; max-width: 34em; margin-bottom: 0.5rem; }
+.risorsa-apri, .risorsa-invia {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; min-height: 3.5rem; padding: 0 1.25rem;
+  border-radius: var(--radius-controllo); background: var(--color-accento); color: var(--color-ink); font-weight: 600; font-size: 1.0625rem;
   transition: transform 160ms var(--ease-uscita), background-color 150ms ease;
 }
-.risorsa-invia:active:not(:disabled) { transform: scale(0.97); }
+.risorsa-apri:active, .risorsa-invia:active:not(:disabled) { transform: scale(0.97); }
 .risorsa-invia:disabled { opacity: 0.75; }
-@media (hover: hover) and (pointer: fine) { .risorsa-invia:hover:not(:disabled) { background: #2E2924; } }
+.risorsa-apri:focus-visible, .risorsa-invia:focus-visible { outline-color: var(--color-ink); }
+@media (hover: hover) and (pointer: fine) { .risorsa-apri:hover, .risorsa-invia:hover:not(:disabled) { background: var(--color-accento-premuto); } }
+.risorsa-modulo { display: grid; gap: 1rem; animation: risorsa-entra 360ms var(--ease-foglio) both; }
+.risorsa-modulo label { font-weight: 600; color: var(--color-ink); }
+.risorsa-modulo input[aria-invalid="true"] { border-color: var(--color-errore); }
+.risorsa-invia { margin-top: 0.25rem; }
+.risorsa-grazie {
+  display: flex; align-items: center; gap: 0.75rem; padding: 1.125rem 1.25rem; border-radius: var(--radius-blocco);
+  background: var(--color-avorio); border: 1px solid var(--bordo);
+  font-family: var(--font-display); font-weight: 500; font-size: 1.5rem; line-height: 1.05; text-transform: lowercase;
+  animation: risorsa-entra 360ms var(--ease-foglio) both;
+}
 
-/* Ingresso: una sola volta all'apertura, testata e corpo salgono di poco, uno dopo l'altro. */
+/* Ingresso della testata: una sola volta all'apertura, salgono di poco, uno dopo l'altro. */
 @keyframes risorsa-entra { from { opacity: 0; transform: translateY(10px); } }
 .risorsa-entra { animation: risorsa-entra 420ms var(--ease-foglio) both; animation-delay: calc(var(--i, 0) * 60ms); }

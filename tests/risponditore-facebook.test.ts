@@ -138,11 +138,11 @@ describe("webhook della Pagina: commenti e tocchi", () => {
     chiamate = [];
     const raw = { object: "page", entry: [{ id: PAGINA, time: 1, messaging: [{ sender: { id: "psid-42" }, recipient: { id: PAGINA }, timestamp: 1, postback: { title: "Mandami il link", payload: `RISORSA:camp-1:${POST}_1` } }] }] };
     expect((await postMeta(raw)).status).toBe(200);
-    expect(chiamate).toHaveLength(1);
-    expect(chiamate[0].url).toBe(`https://graph.facebook.com/v23.0/${PAGINA}/messages`);
+    expect(chiamate).toHaveLength(2); // la riga e la scheda
+    expect(chiamate.every((c) => c.url === `https://graph.facebook.com/v23.0/${PAGINA}/messages`)).toBe(true);
     expect(chiamate[0].auth).toBe("Bearer token-test");
-    expect(chiamate[0].corpo.recipient).toEqual({ id: "psid-42" });
-    expect(chiamate[0].corpo.message.attachment.payload.elements[0].default_action.url).toBe("https://risorse.acceleriamo.it/r/guida");
+    expect(chiamate.every((c) => c.corpo.recipient.id === "psid-42")).toBe(true);
+    expect(chiamate[1].corpo.message.attachment.payload.elements[0].default_action.url).toBe("https://risorse.acceleriamo.it/r/guida");
     expect(await evento(`${POST}_1`)).toMatchObject({ stato: "link_inviato" });
     expect(await evento(`${POST}_2`)).toMatchObject({ stato: "inviato" });
   });

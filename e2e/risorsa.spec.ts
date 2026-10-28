@@ -7,6 +7,9 @@ test("pagina risorsa pubblica: senza accesso si legge e si richiede la chiamata"
   await expect(page.getByRole("heading", { level: 1, name: "lo schema del workflow" })).toBeVisible();
   await expect(page).toHaveURL(/\/r\/prova$/);
   await expect(page.getByRole("link", { name: "Scarica la scheda" })).toBeVisible();
+  // Il modulo resta chiuso dietro un solo pulsante: si apre al tocco.
+  await expect(page.getByLabel("Telefono")).toHaveCount(0);
+  await page.getByRole("button", { name: "Lascia il tuo numero" }).click();
   await expect(page.getByLabel("Telefono")).toBeVisible();
   // Nessun guscio dell'app e nessun modulo di accesso.
   await expect(page.getByLabel("Password")).toHaveCount(0);
@@ -25,11 +28,19 @@ test("pagina risorsa pubblica: senza accesso si legge e si richiede la chiamata"
 
 test("pagina risorsa pubblica: telefono troppo corto, errore scritto sotto il modulo", async ({ page }) => {
   await page.goto("/r/prova");
+  await page.getByRole("button", { name: "Lascia il tuo numero" }).click();
+  // Modulo vuoto: nessun fumetto del browser, errore scritto e cursore sul primo campo da riempire.
+  await page.getByRole("button", { name: "Richiedi la chiamata" }).click();
+  await expect(page.getByRole("alert")).toContainText("nome, azienda e telefono");
+  await expect(page.getByLabel("Nome")).toBeFocused();
+  await expect(page.getByLabel("Nome")).toHaveAttribute("aria-invalid", "true");
   await page.getByLabel("Nome").fill("Mario");
   await page.getByLabel("Azienda").fill("Rossi Srl");
   await page.getByLabel("Telefono").fill("12345");
   await page.getByRole("button", { name: "Richiedi la chiamata" }).click();
   await expect(page.getByRole("alert")).toContainText("telefono");
+  await expect(page.getByLabel("Telefono")).toBeFocused();
+  await expect(page.getByLabel("Telefono")).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByRole("button", { name: "Richiedi la chiamata" })).toBeEnabled();
 });
 

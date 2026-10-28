@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "ea2a349b-0aff-4e87-b7f4-84c6f37edf08",
+  "id": "d3cc549e-6409-4197-b5a7-064d49200a25",
   "prevId": "23d2be90-0844-4fad-84f6-9df24885ebdd",
   "tables": {
     "activities": {
@@ -2153,22 +2153,6 @@
           "autoincrement": false,
           "default": 0
         },
-        "no_show": {
-          "name": "no_show",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
-        },
-        "owner_manual": {
-          "name": "owner_manual",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "sequence_step": {
           "name": "sequence_step",
           "type": "integer",
@@ -2972,6 +2956,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "seo": {
+          "name": "seo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },

@@ -131,8 +131,15 @@
     {
       "idx": 18,
       "version": "6",
-      "when": 1793174731370,
-      "tag": "0018_blocco1",
+      "when": 1793172739537,
+      "tag": "0018_risorse_seo",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1793177557708,
+      "tag": "0019_blocco1",
       "breakpoints": true
     }
   ]
