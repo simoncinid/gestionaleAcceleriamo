@@ -17,6 +17,7 @@ import { proposteDelLead } from "../proposte/service";
 import { conScadenzaSla, leggiSla } from "../regole/sla";
 import { AZIONE_CALL, callPerFase } from "../regole/fasi-call";
 import { conProssima } from "../processo/leggi";
+import { conUltimoContatto } from "./ultimo-contatto";
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -30,7 +31,8 @@ leadRoutes.get("/", async (c) => {
     listLeads(db, { q: q.q, stageId: q.stageId, source: q.source, campaign: q.campaign, ownerId: q.ownerId, score, vista, da: num(q.da), a: num(q.a) }),
     leggiSla(db),
   ]);
-  return c.json({ leads: await conProssima(db, rows.map((l) => conScadenzaSla(l, sla)), Date.now()) });
+  // Corsia C (modifica 18): la tabella mostra anche l'ultimo contatto.
+  return c.json({ leads: await conUltimoContatto(c.env.DB, await conProssima(db, rows.map((l) => conScadenzaSla(l, sla)), Date.now())) });
 });
 
 // Prima delle rotte con /:id.

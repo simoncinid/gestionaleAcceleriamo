@@ -1,7 +1,7 @@
 // Spec 5.2: "g" seguita da una lettera porta a un'area.
 export const SCORCIATOIE: Record<string, string> = {
   "g o": "/commerciale/oggi",
-  "g c": "/commerciale/scaletta",
+  "g c": "/commerciale/lead",
   "g e": "/economia",
   "g a": "/automazioni",
   "g i": "/impostazioni",

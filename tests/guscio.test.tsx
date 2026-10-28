@@ -13,7 +13,7 @@ import { contaPrimari, render } from "./render";
 describe("aree e sottomenu", () => {
   it("tre aree nell'ordine deciso da Tommaso: Commerciale, Automazioni al centro, Economia", () => {
     expect(AREE.map((a) => a.etichetta)).toEqual(["Commerciale", "Automazioni", "Economia"]);
-    expect(SOTTOMENU.commerciale.map((s) => s.etichetta)).toEqual(["Oggi", "Scaletta", "Call", "Proposte", "Clienti", "Numeri"]);
+    expect(SOTTOMENU.commerciale.map((s) => s.etichetta)).toEqual(["Oggi", "Lead", "Call", "Proposte", "Clienti", "Numeri"]);
     expect(SOTTOMENU.economia.map((s) => s.etichetta)).toEqual(["Cruscotto", "Canoni", "Fatture", "Costi"]);
     expect(SOTTOMENU.automazioni.map((s) => s.etichetta)).toEqual(["Pannello", "In costruzione", "Lavori", "Risponditore", "Stato"]);
   });
@@ -35,7 +35,7 @@ describe("il + nella testata", () => {
     expect(creazioniDelPercorso("/automazioni").map((c) => c.id)).toEqual(["automazione", "task"]);
   });
   it.each([
-    ["/commerciale/oggi", "lead"], ["/commerciale/scaletta", "lead"], ["/commerciale/call", "lead"], ["/commerciale/lead/x", "lead"],
+    ["/commerciale/oggi", "lead"], ["/commerciale/lead", "lead"], ["/commerciale/call", "lead"], ["/commerciale/lead/x", "lead"],
     ["/commerciale/proposte", "proposta"], ["/commerciale/clienti", "cliente"], ["/commerciale/clienti/x", "cliente"],
     ["/economia", "fattura"], ["/economia/fatture", "fattura"], ["/economia/canoni", "canone"], ["/economia/costi", "costo"],
     ["/automazioni", "automazione"], ["/automazioni/in-costruzione", "automazione"], ["/automazioni/lavori", "task"], ["/impostazioni", "lead"],
@@ -51,7 +51,7 @@ describe("redirect della 1A", () => {
   it("sei indirizzi vecchi", () => {
     expect(REDIRECT_1A).toEqual([
       { da: "/oggi", a: "/commerciale/oggi" },
-      { da: "/scaletta", a: "/commerciale/scaletta" },
+      { da: "/scaletta", a: "/commerciale/lead" },
       { da: "/lead/:id", a: "/commerciale/lead/:id" },
       { da: "/numeri", a: "/commerciale/numeri" },
       { da: "/cestino", a: "/impostazioni/dati/cestino" },
@@ -124,7 +124,7 @@ describe("BarraLaterale", () => {
     const html = render(<BarraLaterale nome="Tommaso" badge={undefined} onCrea={() => {}} onEsci={() => {}} />, { percorso: "/commerciale/oggi" });
     const aree = [...html.matchAll(/data-area="([^"]+)"/g)].map((m) => m[1]);
     expect(aree).toEqual(["commerciale", "automazioni", "economia"]);
-    expect(html).toContain('href="/commerciale/scaletta"');
+    expect(html).toContain('href="/commerciale/lead"');
     expect(html).not.toContain('href="/economia/canoni"');
     expect(contaPrimari(html)).toBe(0);
   });

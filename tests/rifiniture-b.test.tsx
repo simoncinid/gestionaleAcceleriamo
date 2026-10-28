@@ -11,8 +11,7 @@ import { IntegrazioneDettaglio } from "../src/pagine/impostazioni/IntegrazioneDe
 import { Utenti } from "../src/pagine/impostazioni/Utenti";
 import { RiordinaFasi, spostaFase } from "../src/pagine/impostazioni/RiordinaFasi";
 import { FoglioAbbina } from "../src/pagine/commerciale/FoglioProposta";
-import { Voci } from "../src/pagine/commerciale/MenuRapido";
-import type { LeadListItem, Stage } from "../src/types";
+import type { Stage } from "../src/types";
 import { IMPOSTAZIONI_DEFAULT } from "../worker/impostazioni/default";
 import { contaPrimari, render } from "./render";
 
@@ -127,16 +126,6 @@ describe("Guscio e Foglio: voci 43 e 65", () => {
     expect(PRIMO_CAMPO).toContain("input");
     expect(PRIMO_CAMPO).toContain("[role=switch]");
     expect(PRIMO_CAMPO).toContain("button[aria-expanded]");
-  });
-});
-
-describe("Commerciale: voci 34 e 42", () => {
-  it("42: le voci del menu rapido sono tutte allineate a sinistra", () => {
-    const lead = { id: "L1", company: "Officina", phone: "+393330000001", email: null, stageId: "a", contactName: null } as unknown as LeadListItem;
-    const html = render(<Voci lead={lead} chiudi={() => {}} onEsito={() => {}} onSposta={() => {}} />, { percorso: "/commerciale/scaletta" });
-    const voci = html.match(/<(a|button)[^>]*class="[^"]*"/g) ?? [];
-    expect(voci.length).toBe(4);
-    for (const v of voci) expect(v).toContain("justify-start");
   });
 });
 

@@ -11,7 +11,7 @@ export const AREE: { id: Area; etichetta: string; percorso: string }[] = [
 export const SOTTOMENU: Record<Area, { etichetta: string; percorso: string }[]> = {
   commerciale: [
     { etichetta: "Oggi", percorso: "/commerciale/oggi" },
-    { etichetta: "Scaletta", percorso: "/commerciale/scaletta" },
+    { etichetta: "Lead", percorso: "/commerciale/lead" },
     { etichetta: "Call", percorso: "/commerciale/call" },
     { etichetta: "Proposte", percorso: "/commerciale/proposte" },
     { etichetta: "Clienti", percorso: "/commerciale/clienti" },
@@ -83,7 +83,7 @@ export function creazioneDelPiu(percorso: string): Creazione {
 
 export const REDIRECT_1A = [
   { da: "/oggi", a: "/commerciale/oggi" },
-  { da: "/scaletta", a: "/commerciale/scaletta" },
+  { da: "/scaletta", a: "/commerciale/lead" },
   { da: "/lead/:id", a: "/commerciale/lead/:id" },
   { da: "/numeri", a: "/commerciale/numeri" },
   { da: "/cestino", a: "/impostazioni/dati/cestino" },

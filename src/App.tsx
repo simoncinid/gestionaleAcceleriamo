@@ -31,7 +31,6 @@ import { Modelli } from "./pagine/impostazioni/Modelli";
 import { Registro } from "./pagine/impostazioni/Registro";
 import { Stato } from "./pagine/impostazioni/Stato";
 import { Utenti } from "./pagine/impostazioni/Utenti";
-import { Scaletta } from "./pagine/commerciale/Scaletta";
 import { InCostruzione } from "./pagine/automazioni/InCostruzione";
 import { Pannello } from "./pagine/automazioni/Pannello";
 import { Risponditore } from "./pagine/automazioni/Risponditore";
@@ -101,7 +100,7 @@ function AppPrivata() {
         <Route path="/commerciale/oggi" element={<Oggi />} />
         <Route path="/commerciale/oggi/lunedi" element={<Lunedi />} />
         <Route path="/commerciale/oggi/diario" element={<Diario />} />
-        <Route path="/commerciale/scaletta" element={<Scaletta />} />
+        <Route path="/commerciale/scaletta" element={<Navigate to="/commerciale/lead" replace />} />
         <Route path="/commerciale/lead" element={<Lead />} />
         <Route path="/commerciale/call" element={<Call />} />
         <Route path="/commerciale/call/:id" element={<DettaglioCall />} />

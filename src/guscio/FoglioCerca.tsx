@@ -14,7 +14,7 @@ const COMANDI: { testo: string; href?: string; crea?: Creazione }[] = [
   { testo: "Vai a Campagne", href: "/commerciale/numeri?vista=campagne" },
   { testo: "Vai a Lunedì", href: "/commerciale/oggi/lunedi" },
   { testo: "Vai al Diario", href: "/commerciale/oggi/diario" },
-  { testo: "Vai alla Scaletta", href: "/commerciale/scaletta" },
+  { testo: "Vai ai lead", href: "/commerciale/lead" },
   { testo: "Vai a Impostazioni", href: "/impostazioni" },
 ];
 const MINIMO = 2;
