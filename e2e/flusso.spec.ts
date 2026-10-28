@@ -34,7 +34,7 @@ test("Annulla riporta il fuoco a chi ha aperto il foglio", async ({ page }) => {
 // fuoco torna al pulsante "Altre azioni" della scheda e non finisce su body.
 test("Fissa call aperto da Altre azioni riporta il fuoco ad Altre azioni", async ({ page }) => {
   await entra(page);
-  await page.goto("/commerciale/lead/demo-lead-17");
+  await page.goto("/commerciale/lead/demo-lead-30");
   await fermo(page);
   const altre = page.getByRole("button", { name: "Altre azioni" });
   await altre.click();

@@ -31,14 +31,16 @@ describe("lead", () => {
     expect(body.error).toBe("Serve il nome dell'azienda");
   });
 
+  // Blocco 1, modifica 8: il doppione di un lead aperto non nasce più, la risposta è 409 con l'esistente.
   it("riconosce i doppioni da telefono scritto diverso e da email con maiuscole", async () => {
     const cookie = await authed();
     const a = await create(cookie, { company: "A", phone: "+39 333 1234567", email: "info@a.it" });
     const b = await create(cookie, { company: "A bis", phone: "0039 3331234567" });
     const c = await create(cookie, { company: "A ter", email: " INFO@A.it" });
     const d = await create(cookie, { company: "Altro", phone: "3470000000" });
-    expect(b.body.lead.duplicateOfId).toBe(a.body.lead.id);
-    expect(c.body.lead.duplicateOfId).toBe(a.body.lead.id);
+    expect([b.res.status, c.res.status]).toEqual([409, 409]);
+    expect((b.body as unknown as { esistente: { id: string } }).esistente.id).toBe(a.body.lead.id);
+    expect((c.body as unknown as { esistente: { id: string } }).esistente.id).toBe(a.body.lead.id);
     expect(d.body.lead.duplicateOfId).toBeNull();
   });
 
@@ -46,7 +48,8 @@ describe("lead", () => {
     const cookie = await authed();
     const a = await create(cookie, { company: "H", phone: "+39 333 1234567" });
     const b = await create(cookie, { company: "H bis", phone: "333-123-4567" });
-    expect(b.body.lead.duplicateOfId).toBe(a.body.lead.id);
+    expect(b.res.status).toBe(409);
+    expect((b.body as unknown as { esistente: { id: string } }).esistente.id).toBe(a.body.lead.id);
   });
 
   it("cambio di fase: storico e, se chiuso, niente prossima azione", async () => {
@@ -107,7 +110,7 @@ describe("lead", () => {
   it("unire un doppione sposta lo storico e completa i campi vuoti", async () => {
     const cookie = await authed();
     const a = await create(cookie, { company: "G", phone: "3331112222" });
-    const b = await create(cookie, { company: "G doppio", phone: "333 111 2222", email: "g@g.it", website: "g.it" });
+    const b = await create(cookie, { company: "G doppio", email: "g@g.it", website: "g.it" });
     const res = await call(`/api/leads/${b.body.lead.id}/merge`, { method: "POST", json: { intoId: a.body.lead.id } }, cookie);
     const merged = ((await res.json()) as LeadBody).lead;
     expect(merged).toMatchObject({ id: a.body.lead.id, company: "G", email: "g@g.it", website: "g.it" });
