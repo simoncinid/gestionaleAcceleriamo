@@ -4,7 +4,7 @@ import { MOTIVI_PERSI } from "../worker/processo/motivi";
 import { FASI_APERTE, prossimaAzione, type LeadPerProcesso } from "../worker/processo/processo";
 import { normalizePhone } from "../worker/lib/normalize";
 
-// Blocco 1, modifica 5: undici lead demo coerenti con la funzione unica (contratto, sezioni 2, 6 e 10).
+// Blocco 1, modifiche 5 e 25: quattordici lead demo coerenti con la funzione unica (contratto, sezioni 2, 6 e 10).
 const ORA = Date.UTC(2026, 9, 15, 9); // giovedì 15 ottobre, 11:00 a Roma
 const d = datiDemo(ORA, "hash");
 const lead = (id: string) => {
@@ -21,9 +21,13 @@ const perProcesso = (id: string): LeadPerProcesso => {
 };
 
 describe("seed demo del blocco 1", () => {
-  it("undici lead: uno per fase, uno senza telefono, un doppione", () => {
-    expect(d.leads).toHaveLength(11);
-    for (const f of ["10", "20", "30", "40", "50", "60", "70", "80", "90"]) expect(lead(`demo-lead-${f}`)).toBeTruthy();
+  it("quattordici lead: uno per ognuna delle dodici fasi, uno senza telefono, un doppione", () => {
+    expect(d.leads).toHaveLength(14);
+    const FASI: Record<string, string> = {
+      10: "da-chiamare-prima-volta", 20: "da-richiamare", 30: "appuntamento-confermato", 35: "in-attesa-preventivo", 40: "presentazione-confermata",
+      45: "analisi-fissata", 50: "in-attesa-progetto", 55: "progetto-fissato", 60: "in-attesa-decisione", 70: "chiuso", 80: "non-chiuso", 90: "fake",
+    };
+    for (const [f, stageId] of Object.entries(FASI)) expect(lead(`demo-lead-${f}`).stageId).toBe(stageId);
     expect(d.leads.map((l) => l.stageId).filter((s) => s === "da-chiamare-prima-volta")).toHaveLength(3);
     expect(d.leads.some((l) => /collaudo/i.test(l.company))).toBe(false);
   });
@@ -56,21 +60,40 @@ describe("seed demo del blocco 1", () => {
     expect(stati).toContain("futuro");
   });
 
-  it("30: consulenza futura con link Meet; 40: consulenza fatta", () => {
+  it("30: conoscenza futura con link Meet; 35: conoscenza fatta", () => {
     const c30 = d.calls.find((c) => c.leadId === "demo-lead-30")!;
     expect(c30.kind).toBe("conoscenza");
     expect(c30.scheduledAt).toBeGreaterThan(ORA);
     expect(c30.meetLink).toMatch(/^https:\/\/meet\.esempio\.invalid\//);
     expect(c30.outcome ?? null).toBeNull();
     expect(lead("demo-lead-30").nextActionAt).toBe(c30.scheduledAt);
-    expect(d.calls.find((c) => c.leadId === "demo-lead-40" && c.kind === "conoscenza")?.outcome).toBe("fatta");
+    expect(d.calls.find((c) => c.leadId === "demo-lead-35" && c.kind === "conoscenza")?.outcome).toBe("fatta");
   });
 
-  it("50: proposta e presentazione futura; 60: proposta presentata", () => {
-    expect(d.proposals.some((p) => p.leadId === "demo-lead-50")).toBe(true);
-    const pres = d.calls.find((c) => c.leadId === "demo-lead-50" && c.kind === "presentazione")!;
-    expect(pres.scheduledAt).toBeGreaterThan(ORA);
-    expect(pres.outcome ?? null).toBeNull();
+  it("35: proposta dell'offerta con la forbice, nessuna call dell'offerta", () => {
+    const p35 = d.proposals.find((p) => p.leadId === "demo-lead-35")!;
+    expect(p35.forbiceDaCents).toBeGreaterThan(0);
+    expect(p35.forbiceACents).toBeGreaterThanOrEqual(p35.forbiceDaCents!);
+    expect(d.calls.some((c) => c.leadId === "demo-lead-35" && c.kind === "offerta")).toBe(false);
+  });
+
+  it("40, 45, 55: la call della fase è futura e del tipo giusto; 50: analisi fatta", () => {
+    for (const [id, kind] of [["demo-lead-40", "offerta"], ["demo-lead-45", "analisi"], ["demo-lead-55", "progetto"]] as const) {
+      const k = d.calls.find((c) => c.leadId === id && c.kind === kind)!;
+      expect(k.scheduledAt, id).toBeGreaterThan(ORA);
+      expect(k.outcome ?? null, id).toBeNull();
+      expect(lead(id).nextActionAt, id).toBe(k.scheduledAt);
+    }
+    expect(d.proposals.some((p) => p.leadId === "demo-lead-40")).toBe(true);
+    expect(d.calls.find((c) => c.leadId === "demo-lead-50" && c.kind === "analisi")?.outcome).toBe("fatta");
+  });
+
+  it("le call dicono solo i quattro tipi nuovi", () => {
+    expect(new Set(d.calls.map((c) => c.kind))).toEqual(new Set(["conoscenza", "offerta", "analisi", "progetto"]));
+  });
+
+  it("60: proposta presentata alla call del progetto", () => {
+    expect(d.calls.find((c) => c.leadId === "demo-lead-60" && c.kind === "progetto")?.outcome).toBe("fatta");
     const p60 = d.proposals.find((p) => p.leadId === "demo-lead-60")!;
     expect(p60.status).toBe("presentata");
     expect(p60.presentedAt).toBeLessThan(ORA);
@@ -98,8 +121,8 @@ describe("seed demo del blocco 1", () => {
     const val = JSON.parse(imp.value);
     expect(val.primaChiamata).toBe("demo");
     expect(val.presentazione).toBe(tommaso!.id);
-    // Responsabile di default per fase: Diego da 10 a 30, Tommaso da 40 a 70.
-    expect(lead("demo-lead-30").ownerId).toBe("demo");
-    expect(lead("demo-lead-40").ownerId).toBe(tommaso!.id);
+    // Responsabile di default per fase (modifica 25): Diego in 10 e 20, Tommaso da 30 a 70.
+    expect(lead("demo-lead-20").ownerId).toBe("demo");
+    for (const f of ["30", "35", "40", "45", "50", "55", "60", "70"]) expect(lead(`demo-lead-${f}`).ownerId).toBe(tommaso!.id);
   });
 });

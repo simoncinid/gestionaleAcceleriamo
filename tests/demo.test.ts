@@ -16,9 +16,9 @@ async function semina() {
 }
 
 describe("dati della demo", () => {
-  it("11 lead di settori veri, contatti finti, un'automazione anonima", () => {
+  it("14 lead di settori veri, contatti finti, un'automazione anonima", () => {
     const d = datiDemo(ORA, "hash");
-    expect(d.leads).toHaveLength(11);
+    expect(d.leads).toHaveLength(14);
     expect(new Set(d.leads.map((l) => l.notes)).size).toBeGreaterThanOrEqual(5);
     expect(d.leads.every((l) => l.email == null || l.email.endsWith("@esempio.invalid"))).toBe(true);
     expect(d.leads.every((l) => l.phone == null || l.phone.startsWith("+39 000"))).toBe(true);
@@ -66,7 +66,7 @@ describe("dati della demo", () => {
     await semina();
     await semina();
     const n = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM leads) AS l, (SELECT COUNT(*) FROM users) AS u, (SELECT COUNT(*) FROM automations) AS a").first<{ l: number; u: number; a: number }>();
-    expect(n).toEqual({ l: 11, u: 2, a: 1 });
+    expect(n).toEqual({ l: 14, u: 2, a: 1 });
     // Gli a capo della scheda tornano a capo veri dopo char(10).
     const scheda = await env.DB.prepare("SELECT content FROM company_profiles LIMIT 1").first<{ content: string }>();
     expect(scheda?.content).toContain("\n## Cosa fa l'azienda");

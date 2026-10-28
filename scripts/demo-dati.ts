@@ -5,10 +5,10 @@ import { getTableColumns } from "drizzle-orm";
 import { getTableConfig, type SQLiteTable } from "drizzle-orm/sqlite-core";
 import type { CoachSalvato } from "../worker/claude/coach";
 import {
-  activities, automationSteps, automations, callAnalyses, calls, clients, companyProfiles, fees, invoices, jobs, leads, PROPOSAL_STATUSES, proposals, settings, tasks, users,
+  activities, automationSteps, automations, callAnalyses, type CallKind, calls, clients, companyProfiles, fees, invoices, jobs, leads, PROPOSAL_STATUSES, proposals, settings, tasks, users,
 } from "../worker/db/schema";
 import { normalizeEmail, normalizePhone } from "../worker/lib/normalize";
-import { giorniLavorativiDopo } from "../worker/processo/processo";
+import { AZIONE_FISSA_OFFERTA, giorniLavorativiDopo } from "../worker/processo/processo";
 import { ORARIO_DEFAULT, scadenzaLavorativa } from "../worker/regole/orario";
 import { primoMeseRicorrenti, scadenzaRicorrente, scadenzaUnaTantum } from "../worker/lavori/calcoli";
 import { daRoma, meseRoma, partiRoma } from "../worker/lib/roma";
@@ -78,15 +78,15 @@ Quale gestionale usano, chi aggiorna oggi i fogli, quante telefonate al giorno.`
 // Stesso formato che il coach salva in call_analyses.result (CoachSalvato, Task 8).
 const coach = (prossimaAzioneAt: number): CoachSalvato => ({
   riassunto: "Call di conoscenza andata bene: il titolare passa due ore al giorno a ricopiare ordini dalle email al gestionale.",
-  faseSuggerita: "presentazione-confermata",
-  prossimaAzione: { testo: "Fissare la call di presentazione con la proposta", entroGiorni: 3 },
+  faseSuggerita: "in-attesa-preventivo",
+  prossimaAzione: { testo: "Preparare l'offerta con la forbice", entroGiorni: 3 },
   bozzaFollowUp: "Buongiorno, grazie per il tempo di oggi. Come detto, preparo una proposta per togliere la ricopiatura degli ordini: la vediamo insieme in una call di mezz'ora la prossima settimana?",
   risposteObiezioni: [{ obiezione: "Teme di dover cambiare gestionale", risposta: "L'automazione lavora sul gestionale che usa già: legge le email e compila gli ordini, senza cambiare programma." }],
   controlli: ["Chiedere quante persone toccano gli ordini", "Verificare chi aggiorna oggi il gestionale"],
   prossimaAzioneAt,
 });
 
-// Undici lead (contratto blocco 1, sezioni 6 e 10, modifica 5): uno per fase, uno senza telefono, un doppione.
+// Quattordici lead (contratto blocco 1, sezioni 6 e 10, modifiche 5 e 25): uno per ognuna delle dodici fasi, uno senza telefono, un doppione.
 // Gli id dicono la fase (demo-lead-10 ... demo-lead-90): li usano le prove e le foto delle altre corsie.
 // Azione e scadenza salvate sono quelle che la funzione unica si aspetta, con scadenze miste: scaduto, oggi, futuro.
 const TOMMASO = "demo-tommaso";
@@ -98,7 +98,7 @@ type SchemaLead = {
 
 export function datiDemo(ora: number, hashDemo: string): DatiDemo {
   const d: DatiDemo = { users: [], settings: [], leads: [], calls: [], proposals: [], clients: [], automations: [], fees: [], invoices: [], companyProfiles: [], callAnalyses: [], activities: [], jobs: [], tasks: [], automationSteps: [] };
-  // "demo" resta l'utente del login e fa Diego (prima chiamata, da 10 a 30); Tommaso fa preventivi e presentazioni (da 40 a 70).
+  // "demo" resta l'utente del login e fa Diego (prima chiamata, 10 e 20); Tommaso fa le call dalla conoscenza in poi (da 30 a 70).
   d.users.push({ id: "demo", username: "demo", name: "Diego", passwordHash: hashDemo, active: true, failedLogins: 0, createdAt: ora - 90 * GIORNO });
   d.users.push({ id: TOMMASO, username: "tommaso", name: "Tommaso", passwordHash: hashDemo, active: true, failedLogins: 0, createdAt: ora - 90 * GIORNO });
   d.settings.push({ key: "assegnazione", value: JSON.stringify({ primaChiamata: "demo", presentazione: TOMMASO, proposta: TOMMASO, via: { utente: null, fino: null } }), updatedBy: null, updatedAt: ora - 90 * GIORNO });
@@ -106,8 +106,11 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
   const ORA_MS = 3_600_000;
   const domaniAlle = (giorni: number, h: number) => { const p = partiRoma(ora); return daRoma(p.anno, p.mese, p.giorno + giorni, h, 0); };
   const callConoscenza30 = domaniAlle(1, 10);
-  const consulenza40 = ora - GIORNO - 2 * ORA_MS;
-  const presentazione50 = domaniAlle(2, 15);
+  const conoscenza35 = ora - GIORNO - 2 * ORA_MS;
+  const offerta40 = domaniAlle(2, 15);
+  const analisi45 = domaniAlle(3, 11);
+  const analisi50 = ora - 2 * GIORNO;
+  const progetto55 = domaniAlle(1, 16);
   const presentata60 = ora - 5 * GIORNO;
   const MEET = "https://meet.esempio.invalid/demo-demo-demo";
 
@@ -128,18 +131,30 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
     { id: "demo-lead-doppione", fase: "da-chiamare-prima-volta", azienda: "Studio Partitadoppia Srl", settore: "Studio commercialista", referente: "Luca Conti",
       telefono: "+39 000 1000020", email: "studio.partitadoppia@esempio.invalid", fonte: "meta", creatoFa: ORA_MS, azione: "Prima chiamata",
       scadenza: (c) => scadenzaLavorativa(c, 30, ORARIO_DEFAULT), extra: { duplicateOfId: "demo-lead-20" } },
-    // 30: consulenza domani alle 10 con il link Meet (blu, futuro).
+    // 30: conoscenza domani alle 10 con il link Meet (blu, futuro).
     { id: "demo-lead-30", fase: "appuntamento-confermato", azienda: "Elettro Impianti Voltolini", settore: "Impianti elettrici", referente: "Sara Ricci",
       telefono: "+39 000 1000030", email: "sara.ricci@esempio.invalid", fonte: "meta", creatoFa: 4 * GIORNO, azione: "Call di conoscenza",
       scadenza: () => callConoscenza30, extra: { appointmentAt: callConoscenza30, meetLink: MEET, firstResponseAt: ora - 3 * GIORNO } },
-    // 40: consulenza fatta ieri, preventivo entro due giorni lavorativi (futuro).
-    { id: "demo-lead-40", fase: "in-attesa-preventivo", azienda: "Trasporti Pacchettoni", settore: "Logistica e trasporti", referente: "Andrea Greco",
-      telefono: "+39 000 1000040", email: "andrea.greco@esempio.invalid", fonte: "foglio_andrea", creatoFa: 8 * GIORNO, azione: "Preparare il preventivo",
-      scadenza: () => giorniLavorativiDopo(consulenza40, 2, ORARIO_DEFAULT), extra: { firstResponseAt: ora - 7 * GIORNO } },
-    // 50: preventivo pronto, presentazione dopodomani (blu, futuro).
-    { id: "demo-lead-50", fase: "presentazione-confermata", azienda: "Studio Dentistico Molarini", settore: "Studio dentistico", referente: "Elena Bruno",
-      telefono: "+39 000 1000050", email: "elena.bruno@esempio.invalid", fonte: "meta", creatoFa: 12 * GIORNO, azione: "Call di presentazione",
-      scadenza: () => presentazione50, extra: { appointmentAt: presentazione50, meetLink: MEET, setupCents: 250_000, feeCents: 20_000, firstResponseAt: ora - 11 * GIORNO } },
+    // 35: conoscenza fatta ieri, offerta con la forbice già pronta: si fissa la call dell'offerta entro 4 giorni lavorativi.
+    { id: "demo-lead-35", fase: "in-attesa-preventivo", azienda: "Trasporti Pacchettoni", settore: "Logistica e trasporti", referente: "Andrea Greco",
+      telefono: "+39 000 1000035", email: "andrea.greco@esempio.invalid", fonte: "foglio_andrea", creatoFa: 8 * GIORNO, azione: AZIONE_FISSA_OFFERTA,
+      scadenza: () => giorniLavorativiDopo(conoscenza35, 4, ORARIO_DEFAULT), extra: { firstResponseAt: ora - 7 * GIORNO } },
+    // 40: offerta pronta, call dell'offerta dopodomani (blu, futuro).
+    { id: "demo-lead-40", fase: "presentazione-confermata", azienda: "Studio Dentistico Molarini", settore: "Studio dentistico", referente: "Elena Bruno",
+      telefono: "+39 000 1000040", email: "elena.bruno@esempio.invalid", fonte: "meta", creatoFa: 12 * GIORNO, azione: "Call dell'offerta",
+      scadenza: () => offerta40, extra: { appointmentAt: offerta40, meetLink: MEET, setupCents: 250_000, feeCents: 20_000, firstResponseAt: ora - 11 * GIORNO } },
+    // 45: offerta presentata, call di analisi fra tre giorni (blu, futuro).
+    { id: "demo-lead-45", fase: "analisi-fissata", azienda: "Panificio Lievitelli", settore: "Panificio", referente: "Roberto Marini",
+      telefono: "+39 000 1000045", email: "roberto.marini@esempio.invalid", fonte: "meta", creatoFa: 16 * GIORNO, azione: "Call di analisi",
+      scadenza: () => analisi45, extra: { appointmentAt: analisi45, meetLink: MEET, setupCents: 280_000, feeCents: 22_000, firstResponseAt: ora - 15 * GIORNO } },
+    // 50: analisi fatta due giorni fa, il progetto va preparato entro 3 giorni lavorativi.
+    { id: "demo-lead-50", fase: "in-attesa-progetto", azienda: "Ferramenta Chiodini", settore: "Ferramenta", referente: "Silvia Ferri",
+      telefono: "+39 000 1000050", email: "silvia.ferri@esempio.invalid", fonte: "manuale", creatoFa: 18 * GIORNO, azione: "Preparare il progetto",
+      scadenza: () => giorniLavorativiDopo(analisi50, 3, ORARIO_DEFAULT), extra: { setupCents: 320_000, feeCents: 25_000, firstResponseAt: ora - 17 * GIORNO } },
+    // 55: progetto pronto, call del progetto domani alle 16 (blu, futuro).
+    { id: "demo-lead-55", fase: "progetto-fissato", azienda: "Ottica Lentini", settore: "Ottica", referente: "Marta Leone",
+      telefono: "+39 000 1000055", email: "marta.leone@esempio.invalid", fonte: "meta", creatoFa: 22 * GIORNO, azione: "Call del progetto",
+      scadenza: () => progetto55, extra: { appointmentAt: progetto55, meetLink: MEET, setupCents: 350_000, feeCents: 28_000, firstResponseAt: ora - 21 * GIORNO } },
     // 60: preventivo presentato cinque giorni fa, il richiamo per la decisione è scaduto da due giorni (rosso).
     { id: "demo-lead-60", fase: "in-attesa-decisione", azienda: "Immobiliare Mattonelli", settore: "Agenzia immobiliare", referente: "Paolo Gallo",
       telefono: "+39 000 1000060", email: "paolo.gallo@esempio.invalid", fonte: "manuale", creatoFa: 15 * GIORNO, azione: "Follow-up preventivo",
@@ -157,7 +172,7 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
       telefono: "+39 000 1000090", email: "francesca.moretti@esempio.invalid", fonte: "meta", creatoFa: 6 * GIORNO, azione: null, scadenza: () => null,
       extra: { lostReason: "fuori_target", firstResponseAt: ora - 6 * GIORNO + ORA_MS } },
   ];
-  const DI_TOMMASO = ["in-attesa-preventivo", "presentazione-confermata", "in-attesa-decisione", "chiuso"];
+  const DI_TOMMASO = ["appuntamento-confermato", "in-attesa-preventivo", "presentazione-confermata", "analisi-fissata", "in-attesa-progetto", "progetto-fissato", "in-attesa-decisione", "chiuso"];
   schemi.forEach((s, i) => {
     const creato = ora - s.creatoFa;
     const meta = s.fonte === "meta";
@@ -181,36 +196,65 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
   fase("demo-lead-20", 'Da "Nuovo, da chiamare" a "Da richiamare"', ora - GIORNO);
   d.activities.push({ id: "demo-lead-doppione-a2", leadId: "demo-lead-doppione", type: "nota", body: "Possibile doppione di Studio Partitadoppia (stesso telefono)", authorId: null, createdAt: ora - ORA_MS });
 
-  // 30: consulenza in calendario.
+  // 30: conoscenza in calendario.
   d.calls.push({ id: "demo-lead-30-c1", leadId: "demo-lead-30", kind: "conoscenza", scheduledAt: callConoscenza30, meetLink: MEET, createdBy: "demo", createdAt: ora - 3 * GIORNO, updatedAt: ora - 3 * GIORNO });
-  fase("demo-lead-30", 'Da "Nuovo, da chiamare" a "Consulenza fissata"', ora - 3 * GIORNO);
-  // Le call di conoscenza fatte (40, 50, 60, 70, 80): una ciascuno, nel passato.
+  fase("demo-lead-30", 'Da "Nuovo, da chiamare" a "Conoscenza fissata"', ora - 3 * GIORNO);
+  // Le call fatte, nel passato: una per tipo, fino a quella che ha portato il lead nella sua fase.
+  const callFatta = (id: string, n: number, kind: CallKind, quando: number, chi: string) =>
+    d.calls.push({ id: `${id}-c${n}`, leadId: id, kind, scheduledAt: quando, meetLink: MEET, outcome: "fatta", outcomeAt: quando, createdBy: chi, createdAt: quando - 2 * GIORNO, updatedAt: quando });
+  const callFissata = (id: string, n: number, kind: CallKind, quando: number, creata: number) =>
+    d.calls.push({ id: `${id}-c${n}`, leadId: id, kind, scheduledAt: quando, meetLink: MEET, createdBy: TOMMASO, createdAt: creata, updatedAt: creata });
   const conoscenzaFatta = (id: string, quando: number, coachSi = false) => {
-    d.calls.push({ id: `${id}-c1`, leadId: id, kind: "conoscenza", scheduledAt: quando, meetLink: MEET, outcome: "fatta", outcomeAt: quando, createdBy: "demo", createdAt: quando - 2 * GIORNO, updatedAt: quando });
+    callFatta(id, 1, "conoscenza", quando, "demo");
     if (coachSi) d.callAnalyses.push({ id: `${id}-coach`, leadId: id, callId: `${id}-c1`, status: "ready", transcript: "Trascrizione finta dello spazio demo.", result: JSON.stringify(coach(quando + 3 * GIORNO)), model: "demo", createdAt: quando });
   };
-  conoscenzaFatta("demo-lead-40", consulenza40, true);
-  fase("demo-lead-40", 'Da "Consulenza fissata" a "In attesa preventivo"', consulenza40);
-  conoscenzaFatta("demo-lead-50", ora - 9 * GIORNO, true);
-  conoscenzaFatta("demo-lead-60", ora - 12 * GIORNO);
+  conoscenzaFatta("demo-lead-35", conoscenza35, true);
+  fase("demo-lead-35", 'Da "Conoscenza fissata" a "In attesa offerta"', conoscenza35);
+  conoscenzaFatta("demo-lead-40", ora - 9 * GIORNO, true);
+  conoscenzaFatta("demo-lead-45", ora - 12 * GIORNO);
+  conoscenzaFatta("demo-lead-50", ora - 14 * GIORNO);
+  conoscenzaFatta("demo-lead-55", ora - 18 * GIORNO);
+  conoscenzaFatta("demo-lead-60", ora - 14 * GIORNO);
   conoscenzaFatta("demo-lead-70", ora - 40 * GIORNO);
   conoscenzaFatta("demo-lead-80", ora - 17 * GIORNO);
 
-  // Proposte: 50 registrata con la presentazione in calendario, 60 presentata, 70 accettata, 80 rifiutata.
-  const proposta = (id: string, n: number, status: (typeof PROPOSAL_STATUSES)[number], creata: number, presentata: number | null, decisa: number | null) => {
+  // Proposte: 35 con la forbice (offerta pronta, call da fissare), 40 registrata con la call dell'offerta in calendario,
+  // 45, 50 e 55 presentate alla call dell'offerta, 60 presentata, 70 accettata, 80 rifiutata.
+  const proposta = (id: string, n: number, status: (typeof PROPOSAL_STATUSES)[number], creata: number, presentata: number | null, decisa: number | null, forbice?: [number, number]) => {
     const l = ultimo(id);
     d.proposals.push({
       id: `${id}-p1`, leadId: id, number: `DEMO-2026-${String(n).padStart(3, "0")}`, company: l.company, option: "standard",
       setupCents: l.setupCents ?? 250_000, feeCents: l.feeCents ?? 20_000, status, sentAt: creata, presentedAt: presentata, decidedAt: decisa,
+      forbiceDaCents: forbice?.[0] ?? null, forbiceACents: forbice?.[1] ?? null,
       registeredVia: "manuale", createdAt: creata, updatedAt: decisa ?? presentata ?? creata,
     });
   };
-  proposta("demo-lead-50", 50, "registrata", ora - 2 * GIORNO, null, null);
-  d.calls.push({ id: "demo-lead-50-c2", leadId: "demo-lead-50", kind: "presentazione", scheduledAt: presentazione50, meetLink: MEET, createdBy: TOMMASO, createdAt: ora - 2 * GIORNO, updatedAt: ora - 2 * GIORNO });
-  fase("demo-lead-50", 'Da "In attesa preventivo" a "Presentazione fissata"', ora - 2 * GIORNO);
-  proposta("demo-lead-60", 60, "presentata", ora - 7 * GIORNO, presentata60, null);
-  d.calls.push({ id: "demo-lead-60-c2", leadId: "demo-lead-60", kind: "presentazione", scheduledAt: presentata60, meetLink: MEET, outcome: "fatta", outcomeAt: presentata60, createdBy: TOMMASO, createdAt: ora - 7 * GIORNO, updatedAt: presentata60 });
-  fase("demo-lead-60", 'Da "Presentazione fissata" a "In attesa decisione"', presentata60);
+  proposta("demo-lead-35", 35, "registrata", ora - 2 * ORA_MS, null, null, [300_000, 500_000]);
+  proposta("demo-lead-40", 40, "registrata", ora - 2 * GIORNO, null, null, [200_000, 300_000]);
+  callFissata("demo-lead-40", 2, "offerta", offerta40, ora - 2 * GIORNO);
+  fase("demo-lead-40", 'Da "In attesa offerta" a "Offerta fissata"', ora - 2 * GIORNO);
+  // 45: offerta presentata quattro giorni fa, analisi fissata nello stesso foglio.
+  proposta("demo-lead-45", 45, "presentata", ora - 8 * GIORNO, ora - 4 * GIORNO, null, [250_000, 350_000]);
+  callFatta("demo-lead-45", 2, "offerta", ora - 4 * GIORNO, TOMMASO);
+  callFissata("demo-lead-45", 3, "analisi", analisi45, ora - 4 * GIORNO);
+  fase("demo-lead-45", 'Da "Offerta fissata" a "Analisi fissata"', ora - 4 * GIORNO);
+  // 50: offerta e analisi fatte, il progetto è da preparare.
+  proposta("demo-lead-50", 50, "presentata", ora - 10 * GIORNO, ora - 7 * GIORNO, null, [280_000, 400_000]);
+  callFatta("demo-lead-50", 2, "offerta", ora - 7 * GIORNO, TOMMASO);
+  callFatta("demo-lead-50", 3, "analisi", analisi50, TOMMASO);
+  fase("demo-lead-50", 'Da "Analisi fissata" a "In attesa progetto"', analisi50);
+  // 55: offerta e analisi fatte, progetto pronto, call del progetto domani.
+  proposta("demo-lead-55", 55, "presentata", ora - 14 * GIORNO, ora - 11 * GIORNO, null, [300_000, 450_000]);
+  callFatta("demo-lead-55", 2, "offerta", ora - 11 * GIORNO, TOMMASO);
+  callFatta("demo-lead-55", 3, "analisi", ora - 7 * GIORNO, TOMMASO);
+  callFissata("demo-lead-55", 4, "progetto", progetto55, ora - GIORNO);
+  fase("demo-lead-55", 'Da "In attesa progetto" a "Progetto fissato"', ora - GIORNO);
+  // 60: tutte le call fatte, l'ultima è la call del progetto.
+  proposta("demo-lead-60", 60, "presentata", ora - 13 * GIORNO, ora - 12 * GIORNO, null);
+  callFatta("demo-lead-60", 2, "offerta", ora - 12 * GIORNO, TOMMASO);
+  callFatta("demo-lead-60", 3, "analisi", ora - 9 * GIORNO, TOMMASO);
+  callFatta("demo-lead-60", 4, "progetto", presentata60, TOMMASO);
+  fase("demo-lead-60", 'Da "Progetto fissato" a "In attesa decisione"', presentata60);
   proposta("demo-lead-70", 70, "accettata", ora - 36 * GIORNO, ora - 34 * GIORNO, ora - 31 * GIORNO);
   fase("demo-lead-70", 'Da "In attesa decisione" a "Cliente"', ora - 31 * GIORNO);
   proposta("demo-lead-80", 80, "rifiutata", ora - 15 * GIORNO, ora - 13 * GIORNO, ora - 10 * GIORNO);
@@ -218,8 +262,8 @@ export function datiDemo(ora: number, hashDemo: string): DatiDemo {
   d.activities.push({ id: "demo-lead-80-a9", leadId: "demo-lead-80", type: "nota", body: "Motivo: Troppo caro", authorId: TOMMASO, createdAt: ora - 10 * GIORNO });
   fase("demo-lead-90", 'Da "Nuovo, da chiamare" a "Non profilato"', ora - 5 * GIORNO);
 
-  // Scheda azienda (ricerca) per i lead in 30 e 40.
-  for (const id of ["demo-lead-30", "demo-lead-40"]) {
+  // Scheda azienda (ricerca) per i lead in 30 e 35.
+  for (const id of ["demo-lead-30", "demo-lead-35"]) {
     const l = ultimo(id);
     d.companyProfiles.push({
       id: `${id}-scheda`, leadId: id, version: 1, status: "ready", content: SCHEDA(l.company, l.notes ?? ""), sources: "[]", model: "demo",
