@@ -8,6 +8,9 @@ import { SOURCE_LABELS, arrivato, euro, trascorso } from "../../format";
 import { useOra, useStages, useUsers } from "../../hooks";
 import { AzioniRiga, CellaFase, FogliRiga, scegliFase, useCestina, useSpostaFase, type FoglioRiga } from "./AzioniLead";
 import { classePallino, classeScadenza } from "./coloriLead";
+import { csvLead, nomeFileCsv, scaricaCsv } from "./esportaLead";
+import { MenuPunti } from "./Tendina";
+import { toast } from "sonner";
 import { FiltriComputer, FiltriTelefono } from "./FiltriLead";
 import {
   FILTRI_BASE, campagne as campagneDi, conteggi, filtra, leggiFiltri, ordina, scadenzaBreve, scriviFiltri, titoloLead,
@@ -94,7 +97,15 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   return (
     <div className="flex flex-col gap-4 pb-8">
       <header className="flex items-start justify-between gap-3">
-        <h1 className="font-sans text-[28px] font-semibold leading-[1.15] tracking-[-0.01em] tabular-nums">{titoloLead(n)}</h1>
+        <h1 className="font-sans text-[24px] md:text-[28px] font-semibold leading-[1.15] tracking-[-0.01em] tabular-nums">{titoloLead(n)}</h1>
+        {/* Esporta le righe che si vedono (filtri e ordine compresi), con tutte le colonne. */}
+        <MenuPunti etichetta="Altre azioni dei lead" larghezza={220} voci={[{
+          testo: righe.length === 1 ? "Esporta CSV (1 lead)" : `Esporta CSV (${righe.length} lead)`,
+          onClick: () => {
+            if (righe.length === 0) return void toast("Nessun lead da esportare con questi filtri");
+            scaricaCsv(csvLead(righe, fasi.data ?? [], utenti.data ?? []), nomeFileCsv(Date.now()));
+          },
+        }]} />
       </header>
 
       <FiltriComputer {...propsFiltri} />
