@@ -4,16 +4,17 @@ import { useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import { api } from "../../api";
-import { Contatto, Errore, Foglio, Pulsante, Riga, Skeleton, classiPulsante } from "../../ds";
+import { Errore, Foglio, Pulsante, Riga, Skeleton } from "../../ds";
 import { useOra, useStages, useUsers } from "../../hooks";
-import type { LeadDetail, Stage } from "../../types";
-import { avviaContatto } from "./chiamata";
+import type { CallAgenda, LeadDetail, PropostaRiga, Stage } from "../../types";
 import { callPerFase } from "../../../worker/regole/fasi-call";
 import { FoglioAvvioLavoro } from "../lavori/FoglioAvvioLavoro";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioNuovoCliente } from "./FoglioCliente";
 import { FoglioEsito } from "./FoglioEsito";
 import { FoglioFissaCall } from "./FoglioFissaCall";
+import { FoglioPropostaManuale } from "./FoglioProposta";
+import { FoglioRimanda } from "./FoglioRimanda";
 import { FoglioScrivi } from "./FoglioScrivi";
 import { Assistente } from "./lead/Assistente";
 import { Contatti } from "./lead/Contatti";
@@ -21,7 +22,8 @@ import { DatiLead } from "./lead/DatiLead";
 import { Documents } from "./lead/Documents";
 import { FoglioFase } from "./lead/FoglioFase";
 import { LeadForm } from "./lead/LeadForm";
-import { NextActionCard } from "./lead/NextActionCard";
+import { FoglioSpostaCall } from "./lead/FoglioSpostaCall";
+import { NextActionCard, type ComandoScheda } from "./lead/NextActionCard";
 import { poiSeRiesce } from "./lead/salvataggi";
 import { Sezione } from "./lead/Sezione";
 import { LINK, coloreFase } from "./lead/stile";
@@ -29,7 +31,8 @@ import { Timeline } from "./lead/Timeline";
 import { confermaNonPartita, idPerPreventivo } from "./scheda";
 import { useCambioFase } from "./StepperFasi";
 
-type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase" | { fase: Stage };
+type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase"
+  | "sposta" | "link" | "rimanda" | "proposta" | { fase: Stage } | { fissa: "conoscenza" | "presentazione" };
 
 // Avviso in riga in cima alla scheda: una frase, al massimo un link. Mai finestre del browser.
 function Avviso({ children }: { children: ReactNode }) {
@@ -60,6 +63,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   // Il modulo dati si rimonta solo dopo un suo salvataggio riuscito: gli altri salvataggi non cancellano quello che si scrive.
   const [versione, setVersione] = useState(0);
   const d = useQuery({ queryKey: ["lead", id], queryFn: () => api<LeadDetail>(`/leads/${id}`), enabled: !uscito });
+  const calls = useQuery({ queryKey: ["lead", id, "calls"], queryFn: () => api<{ calls: CallAgenda[] }>(`/leads/${id}/calls`).then((r) => r.calls), enabled: !uscito });
+  const proposte = useQuery({ queryKey: ["lead", id, "proposte"], queryFn: () => api<{ proposte: PropostaRiga[] }>(`/leads/${id}/proposals`).then((r) => r.proposte), enabled: !uscito });
   const fase = fasi.data?.find((f) => f.id === d.data?.lead.stageId);
   const cambioFase = useCambioFase({
     leadId: id, attuale: d.data?.lead.stageId ?? "", fasi: fasi.data ?? [],
@@ -81,6 +86,11 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
     onSuccess: () => { esci(); toast.success("Spostato nel cestino"); vai("/commerciale/lead"); },
     onError: (e) => toast.error(e.message),
   });
+  const nonPresentato = useMutation({
+    mutationFn: (kind: "conoscenza" | "presentazione") => api(`/leads/${id}/no-show`, { method: "POST", json: { kind } }),
+    onSuccess: () => { toast.success("Segnato: non si è presentato"); for (const k of [["lead", id], ["leads"], ["today"], ["badge"], ["calls"]]) void qc.invalidateQueries({ queryKey: k }); },
+    onError: (e) => toast.error(e.message),
+  });
   const unisci = useMutation({
     mutationFn: (intoId: string) => api<{ lead: { id: string } }>(`/leads/${id}/merge`, { method: "POST", json: { intoId } }),
     onSuccess: ({ lead }) => { esci(); toast.success("Lead uniti"); vai(`/commerciale/lead/${lead.id}`); },
@@ -91,6 +101,25 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   if (d.error || !d.data) return <div className="pb-8"><Errore errore={d.error ?? new Error("Lead non trovato")} onRiprova={() => void d.refetch()} /></div>;
   const { lead, activities, documents, duplicateOf } = d.data;
   const chiudi = () => { setFoglio(null); setChiede(null); };
+  // La call in programma (la prima non ancora fatta) e l'ultima proposta: link in linea nel Da fare.
+  // Prima quella all'ora dell'appuntamento del lead (è la stessa della riga Da fare), poi la prima ancora da fare.
+  const aperte = (calls.data ?? []).filter((c) => c.outcome == null).sort((a, b) => a.scheduledAt - b.scheduledAt);
+  const prossimaCall = aperte.find((c) => c.scheduledAt === lead.appointmentAt) ?? aperte[0] ?? null;
+  const ultimaProposta = (proposte.data ?? []).at(-1) ?? null;
+  const kindCall = lead.stageId === "presentazione-confermata" ? "presentazione" : "conoscenza";
+  // Ogni codice della tabella apre il suo foglio; chiamare, aprire la videochiamata e il cliente sono link nel Da fare.
+  const comando = (c: ComandoScheda) => {
+    if (c === "segna_consulenza" || c === "segna_presentazione" || c === "segna_preventivo" || c === "segna_esito" || c === "segna_decisione") setFoglio("esito");
+    else if (c === "fissa_consulenza") setFoglio({ fissa: "conoscenza" });
+    else if (c === "fissa_presentazione") setFoglio({ fissa: "presentazione" });
+    else if (c === "sposta_call") setFoglio(prossimaCall ? "sposta" : { fissa: kindCall });
+    else if (c === "aggiungi_link") setFoglio(prossimaCall ? "link" : { fissa: kindCall });
+    else if (c === "non_presentato") nonPresentato.mutate(kindCall);
+    else if (c === "rimanda") setFoglio("rimanda");
+    else if (c === "riapri") setFoglio("fase");
+    else if (c === "apri_cliente") setCreaCliente(true);
+    else if (c === "crea_proposta") setFoglio("proposta");
+  };
   const leadEsito = { id: lead.id, company: lead.company, contactName: lead.contactName, stageId: lead.stageId, attemptCount: lead.attemptCount, email: lead.email };
 
   return (
@@ -131,12 +160,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       <div className="flex flex-col gap-6 @4xl:grid @4xl:grid-cols-[minmax(0,58fr)_minmax(0,42fr)] @4xl:items-start">
         <div className="contents @4xl:flex @4xl:min-w-0 @4xl:flex-col @4xl:gap-6">
           <div className="order-1 @4xl:order-none">
-            <Sezione titolo="Da fare" nome="da-fare">
-              <NextActionCard key={`${lead.nextAction}-${lead.nextActionAt}`} lead={lead} kind={fase?.kind} ora={ora} onSave={patch.mutate} pending={patch.isPending} />
-              {fase?.kind === "won" && d.data.cliente && <Link to={`/commerciale/clienti/${d.data.cliente.id}`} data-variante="primario" className={classiPulsante("primario", "lg")}>Apri cliente</Link>}
-              {fase?.kind === "won" && !d.data.cliente && <Pulsante variante="primario" misura="lg" onClick={() => setCreaCliente(true)}>Crea il cliente</Pulsante>}
-              {fase?.kind === "open" && <Contatto tipo="chiama" lead={lead} variante="primario" misura="lg" onAvvio={() => avviaContatto(lead.id, "chiamata")} />}
-            </Sezione>
+            <NextActionCard lead={lead} kind={fase?.kind} ora={ora} onComando={comando}
+              inLinea={{ call: prossimaCall, proposta: ultimaProposta, cliente: d.data.cliente ? { id: d.data.cliente.id, name: d.data.cliente.name } : null }} />
           </div>
           <div className="order-5 @4xl:order-none">
             <Sezione titolo="Storico" nome="storico"><Timeline leadId={lead.id} activities={activities} ora={ora} /></Sezione>
@@ -162,7 +187,13 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} ritorno={menu} />}
       {(foglio === "whatsapp" || foglio === "email") && <FoglioScrivi lead={lead} canale={foglio} onChiudi={chiudi} />}
       {foglio === "fase" && <FoglioFase attuale={lead.stageId} ordinate={cambioFase.ordinate} scegli={cambioFase.scegli} onChiudi={chiudi} />}
-      {foglio && typeof foglio === "object" && (() => {
+      {foglio && typeof foglio === "object" && "fissa" in foglio && (
+        <FoglioFissaCall leadId={lead.id} haEmail={!!lead.email} fase={{ label: foglio.fissa === "presentazione" ? "Presentazione" : "Consulenza", kind: foglio.fissa }} onChiudi={chiudi} />
+      )}
+      {(foglio === "sposta" || foglio === "link") && prossimaCall && <FoglioSpostaCall leadId={lead.id} call={prossimaCall} soloLink={foglio === "link"} onChiudi={chiudi} />}
+      {foglio === "rimanda" && <FoglioRimanda leadId={lead.id} onChiudi={() => { chiudi(); void qc.invalidateQueries({ queryKey: ["lead", id] }); }} />}
+      {foglio === "proposta" && <FoglioPropostaManuale leadIniziale={lead} onChiudi={() => { chiudi(); void qc.invalidateQueries({ queryKey: ["lead", id] }); }} />}
+      {foglio && typeof foglio === "object" && "fase" in foglio && (() => {
         const kind = callPerFase(foglio.fase.id);
         return kind
           ? <FoglioFissaCall leadId={lead.id} haEmail={!!lead.email} fase={{ label: foglio.fase.label, kind }} onChiudi={chiudi} />

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { SchedaLead } from "../src/pagine/commerciale/SchedaLead";
 import { euroPerCampo, precompilaChiusura } from "../src/pagine/commerciale/scheda";
 import type { LeadDetail, Stage } from "../src/types";
+import { prossimaAzione } from "../worker/processo/processo";
 import { contaPrimari, render } from "./render";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0);
@@ -9,7 +10,7 @@ const fase = (id: string, label: string, sortOrder: number, kind: Stage["kind"] 
   ({ id, label, sortOrder, kind, tone: "neutro", probability: 10, suggestedNextAction: null, suggestedDelayHours: null, requiresReason: kind === "lost" });
 const FASI = [fase("da-richiamare", "Da richiamare", 30), fase("chiuso", "Chiuso", 90, "won"), fase("fake", "Fake", 120, "lost")];
 
-const dettaglio = (stageId: string, cliente: LeadDetail["cliente"]) => ({
+const dettaglio = (stageId: string, cliente: LeadDetail["cliente"]) => conProssima({
   lead: {
     id: "abc", company: "Officina Prova", contactName: null, email: null, phone: "+393330000001", source: "manuale",
     metaCampaign: null, metaStatus: null, stageId, stageChangedAt: ORA, estimatedValue: null, ownerId: null,
@@ -19,7 +20,12 @@ const dettaglio = (stageId: string, cliente: LeadDetail["cliente"]) => ({
     confirmationSentAt: null, confirmationAttempts: 0, confirmationError: null,
   },
   activities: [], documents: [], duplicateOf: null, cliente,
-}) as unknown as LeadDetail;
+}) ;
+// Il lead arriva dall'API con la riga "Da fare" già calcolata (prossimaAzione sul server).
+function conProssima(d: object): LeadDetail {
+  const x = d as unknown as LeadDetail;
+  return { ...x, lead: { ...x.lead, prossima: prossimaAzione(x.lead as unknown as Parameters<typeof prossimaAzione>[0], ORA) } };
+}
 
 describe("Q6: foglio di Chiuso precompilato", () => {
   it("euro nel formato dei campi", () => {
@@ -40,15 +46,16 @@ describe("Q6: foglio di Chiuso precompilato", () => {
 });
 
 describe("Q15: scheda di un lead chiuso", () => {
-  it("vinto: l'unica azione in accento è Apri cliente", () => {
+  it("vinto: l'unica azione in accento è Apri il cliente", () => {
     const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], dettaglio("chiuso", { id: "cli1", name: "Officina Prova" })], [["stages"], FASI]] });
-    expect(html).toContain("Apri cliente");
+    expect(html).toContain(">Apri il cliente<");
+    expect(html).toContain("Chiuso come cliente il");
     expect(html).toContain('href="/commerciale/clienti/cli1"');
     expect(contaPrimari(html)).toBe(1);
   });
   it("perso: nessuna azione in accento", () => {
     const html = render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], dettaglio("fake", null)], [["stages"], FASI]] });
-    expect(html).not.toContain("Apri cliente");
+    expect(html).not.toContain("Apri il cliente<");
     expect(contaPrimari(html)).toBe(0);
   });
   it("aperto: Chiama resta l'azione in accento", () => {
@@ -60,12 +67,12 @@ describe("Q15: scheda di un lead chiuso", () => {
 describe("Scheda lead: voci 30 e 41", () => {
   const scheda = (stageId: string, cliente: LeadDetail["cliente"], lead: object = {}) => {
     const d = dettaglio(stageId, cliente);
-    return render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], { ...d, lead: { ...d.lead, ...lead } }], [["stages"], FASI]] });
+    return render(<SchedaLead id="abc" ora={ORA} />, { dati: [[["lead", "abc"], conProssima({ ...d, lead: { ...d.lead, ...lead } })], [["stages"], FASI]] });
   };
   it("30: vinto senza cliente, l'unica azione in accento è Crea il cliente", () => {
     const html = scheda("chiuso", null);
     expect(html).toContain(">Crea il cliente<");
-    expect(html).not.toContain("Apri cliente");
+    expect(html).not.toContain("Apri il cliente<");
     expect(contaPrimari(html)).toBe(1);
   });
   it("41: freccia per tornare indietro, telefono ed email come link", () => {

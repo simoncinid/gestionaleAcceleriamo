@@ -7,6 +7,7 @@ import { centesimi, confermaNonPartita, idPerPreventivo, provenienza } from "../
 import { MAX_TENTATIVI_CONFERMA } from "../worker/email/conferma";
 import type { MessageTemplate } from "../worker/db/schema";
 import type { LeadDetail, Stage } from "../src/types";
+import { prossimaAzione } from "../worker/processo/processo";
 import { contaPrimari, render } from "./render";
 
 const ORA = Date.UTC(2026, 9, 13, 8, 0);
@@ -26,6 +27,7 @@ const DETTAGLIO = {
   activities: [{ id: "a1", type: "esito", body: "Non risponde", createdAt: ORA - 1000, authorId: "tommaso", authorName: "Tommaso" }],
   documents: [], duplicateOf: null,
 } as unknown as LeadDetail;
+DETTAGLIO.lead.prossima = prossimaAzione(DETTAGLIO.lead as unknown as Parameters<typeof prossimaAzione>[0], ORA);
 
 const modello = (id: string, channel: "whatsapp" | "email", key: string | null, stageId: string | null): MessageTemplate =>
   ({ id, channel, key, title: id, subject: "Ciao {azienda}", body: "Ciao {referente} di {azienda}", stageId, sortOrder: 0 });
