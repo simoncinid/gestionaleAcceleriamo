@@ -8,7 +8,7 @@ import type { Db } from "../db/client";
 import { activities, auditLog, calls, leads, messageTemplates, type Lead } from "../db/schema";
 import { callPerFase } from "../regole/fasi-call";
 import { ESITI, type Esito } from "../regole/motore";
-import { assertMotivo, getLead, getStage } from "./service";
+import { assertChiusura, getLead, getStage } from "./service";
 
 export const esitoSchema = z
   .object({
@@ -19,6 +19,9 @@ export const esitoSchema = z
     nextActionAt: z.number().int().nullable(),
     // Stringa libera: i motivi validi stanno in Impostazioni e si controllano qui sotto.
     lostReason: z.string().min(1).max(40).nullish(),
+    // Per andare in 80: testo per "altro", giorno di ricontatto per "non_ora" (blocco 1, modifica 7).
+    lostNote: z.string().trim().max(500).nullish(),
+    recontactAt: z.number().int().nullish(),
     note: z.string().trim().max(4000).optional(),
     call: z
       .object({ kind: z.enum(["conoscenza", "presentazione"]), scheduledAt: z.number().int(), meetLink: linkHttp("Link Meet non valido").nullable() })
@@ -63,9 +66,9 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
   const lead = await getLead(db, leadId);
   const stage = await getStage(db, input.stageId);
   const cambiaFase = stage.id !== lead.stageId;
-  const motivo = await assertMotivo(db, input.lostReason);
   // Come nel PATCH del lead: motivo e blocco su Chiuso solo quando la fase cambia davvero.
-  if (cambiaFase && stage.requiresReason && !input.lostReason) throw new HTTPException(422, { message: "Scegli il motivo" });
+  const versoPerso = cambiaFase && stage.id === "non-chiuso";
+  const motivo = versoPerso ? await assertChiusura(db, input, now) : null;
   if (cambiaFase && stage.kind === "won") throw new HTTPException(422, { message: "Per segnare Cliente usa il cambio di fase nella scheda lead" });
   if (stage.kind === "open" && (!input.nextAction || !input.nextActionAt)) throw new HTTPException(422, { message: "Serve una prossima azione con data per i lead aperti" });
   if (input.call) assertCallFutura(input.call.scheduledAt, now);
@@ -87,17 +90,17 @@ export async function salvaEsito(db: Db, leadId: string, input: EsitoInput, user
   const attemptNo = tentativo ? lead.attemptCount + 1 : null;
   const callId = input.call ? crypto.randomUUID() : null;
   // Collaudo 26/10, voce 3: il motivo del lead perso si legge anche nello storico.
-  const corpo = [ETICHETTE[input.esito], motivo && `Motivo: ${motivo}`, input.note].filter(Boolean).join(". ");
+  const corpo = [ETICHETTE[input.esito], motivo, input.note].filter(Boolean).join(". ");
 
   const patch: Partial<Lead> = {
     stageId: stage.id,
     nextAction: stage.kind === "open" ? input.nextAction : null,
     nextActionAt: stage.kind === "open" ? input.nextActionAt : null,
     attemptCount: attemptNo ?? lead.attemptCount,
-    lostReason: input.lostReason ?? lead.lostReason,
+    lostReason: versoPerso ? input.lostReason : cambiaFase && stage.id === "fake" ? "fuori_target" : lead.lostReason,
     // Prima risposta vera: un tentativo a vuoto non conta.
     firstResponseAt: lead.firstResponseAt ?? (tentativo ? null : now),
-    pausedUntil: cambiaFase ? null : lead.pausedUntil,
+    pausedUntil: versoPerso && input.lostReason === "non_ora" ? input.recontactAt : cambiaFase ? null : lead.pausedUntil,
     updatedAt: now,
     ...(cambiaFase ? { stageChangedAt: now } : {}),
   };

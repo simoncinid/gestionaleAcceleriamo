@@ -1,5 +1,6 @@
 import { getDb } from "../db/client";
 import { leggiImpostazioni } from "../impostazioni/service";
+import { etichettaMotivo } from "../processo/motivi";
 import { leggiSla, scadenzaPrimaChiamata } from "../regole/sla";
 
 export const SOGLIA_MINIMA = 5;
@@ -105,7 +106,6 @@ export async function calcolaFunnel(db: D1Database, from: number, until: number)
   const presentazione = conta((x) => !!x.presentazione);
   const risposte = conSla.filter((x) => x.primaRisposta != null).map((x) => x.primaRisposta! - x.createdAt);
   const mediaMs = risposte.length === 0 ? null : Math.round(risposte.reduce((a, b) => a + b, 0) / risposte.length);
-  const etichette = new Map(imp.motivi.map((m) => [m.id, m.etichetta]));
   return {
     ...stats,
     tappe: [
@@ -118,7 +118,7 @@ export async function calcolaFunnel(db: D1Database, from: number, until: number)
     ],
     sla: { percentuale: percentualeOnesta(dentro, conSla.length), dentro, totale: conSla.length },
     tempi: tempiPerFase(eventi.results, fasi.results),
-    motivi: motivi.results.map((m) => ({ id: m.id, etichetta: etichette.get(m.id) ?? m.id, numero: m.numero })),
+    motivi: motivi.results.map((m) => ({ id: m.id, etichetta: etichettaMotivo(m.id, imp.motivi), numero: m.numero })),
     call: { conoscenza, presentazione, rapporto: percentualeOnesta(presentazione, conoscenza) },
     primaRisposta: { mediaMs, numero: risposte.length },
   };

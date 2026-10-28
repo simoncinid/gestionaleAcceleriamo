@@ -90,7 +90,7 @@ describe("esiti del Foglio Esito (DS 6.6)", () => {
     ["risposto", { stageId: null, nextAction: "Follow-up", nextActionAt: r(16, 10) }],
     ["occupato", { stageId: null, nextAction: "Richiamare", nextActionAt: ORA + 3_600_000 }],
     ["richiamare", { stageId: "da-richiamare", nextAction: "Richiamare", nextActionAt: r(14, 10) }],
-    ["non_interessato", { stageId: "non-chiuso", lostReason: "non_interessato", nextAction: null }],
+    ["non_interessato", { stageId: "non-chiuso", nextAction: null }], // blocco 1: niente lostReason, il motivo lo sceglie la persona
     ["fuori_target", { stageId: "fake", lostReason: "fuori_target", nextAction: null }],
   ] as const)("%s", (esito, attesa) => {
     expect(propostaEsito(esito, lead, ctx())).toMatchObject(attesa);

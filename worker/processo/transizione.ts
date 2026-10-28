@@ -76,7 +76,8 @@ function daEsito(esito: Esito, lead: LeadTransizione, c: Contesto, call?: { sche
     case "appuntamento":
       return { stageId: "appuntamento-confermato", nextAction: "Call di conoscenza", nextActionAt: call?.scheduledAt ?? null };
     case "non_interessato":
-      return { stageId: "non-chiuso", lostReason: "non_interessato", nextAction: null, nextActionAt: null };
+      // Il motivo lo sceglie la persona dalla lista fissa (contratto blocco 1, sezione 7).
+      return { stageId: "non-chiuso", nextAction: null, nextActionAt: null };
     case "fuori_target":
       return { stageId: "fake", lostReason: "fuori_target", nextAction: null, nextActionAt: null };
     case "consulenza_fatta":

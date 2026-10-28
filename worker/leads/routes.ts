@@ -79,8 +79,13 @@ leadRoutes.get("/:id", async (c) => {
   return c.json({ lead, activities: history.map((a) => ({ ...a, authorName: a.authorName ?? "Sistema" })), documents: docs, duplicateOf, cliente });
 });
 
+// Campi per andare in 80 (blocco 1, modifica 7), letti qui perché lo schema del lead resta quello della creazione.
+const chiusuraSchema = z.object({ lostNote: z.string().trim().max(500).nullish(), recontactAt: z.number().int().nullish() });
+
 leadRoutes.patch("/:id", async (c) => {
-  const patch = leadPatchSchema.parse(await c.req.json());
+  const corpo = (await c.req.json()) as Record<string, unknown>;
+  const { lostNote, recontactAt, ...resto } = corpo;
+  const patch = { ...leadPatchSchema.parse(resto), ...chiusuraSchema.parse({ lostNote, recontactAt }) };
   const db = getDb(c.env.DB);
   const id = c.req.param("id");
   const io = c.get("user").id;

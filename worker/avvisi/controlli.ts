@@ -46,7 +46,7 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
         WHERE stage_id = ?1 AND first_response_at IS NULL AND deleted_at IS NULL AND created_at > ?2 ORDER BY created_at DESC LIMIT 20)
       UNION ALL
       SELECT * FROM (SELECT 'pausa' AS tipo, id, company, owner_id AS ownerId, created_at AS createdAt, stage_id AS stageId, paused_until AS pausedUntil FROM leads
-        WHERE paused_until IS NOT NULL AND stage_id IN (SELECT id FROM stages WHERE kind = 'open') AND paused_until <= ?3 AND deleted_at IS NULL ORDER BY paused_until LIMIT ?4)`)
+        WHERE paused_until IS NOT NULL AND (stage_id IN (SELECT id FROM stages WHERE kind = 'open') OR (stage_id = 'non-chiuso' AND lost_reason = 'non_ora')) AND paused_until <= ?3 AND deleted_at IS NULL ORDER BY paused_until LIMIT ?4)`)
       .bind(FASE_PRIMA_CHIAMATA, settimanaFa, now, pauseMax).all<RigaLead>(),
     raw.prepare(`SELECT p.number, l.id, l.company, l.owner_id AS ownerId, l.next_action_at AS nextActionAt FROM proposals p JOIN leads l ON l.id = p.lead_id
       WHERE p.status = 'presentata' AND p.deleted_at IS NULL AND l.deleted_at IS NULL AND l.stage_id = 'in-attesa-decisione'
@@ -65,6 +65,15 @@ export async function controllaAvvisi(env: Env, now: number, limite: number): Pr
   for (const l of righe.results.filter((r) => r.tipo === "pausa")) {
     const azione = finePausa(l, now);
     if (!azione) continue;
+    // "Non è il momento" (blocco 1, modifica 7): il giorno del ricontatto il lead si riapre in 10 con una nota.
+    if (l.stageId === "non-chiuso") {
+      await raw.batch([
+        raw.prepare("UPDATE leads SET stage_id = 'da-chiamare-prima-volta', stage_changed_at = ?1, paused_until = NULL, lost_reason = NULL, next_action = 'Prima chiamata', next_action_at = ?1, attempt_count = 0, no_show = 0, updated_at = ?1 WHERE id = ?2").bind(now, l.id),
+        raw.prepare("INSERT INTO activities (id, lead_id, type, body, author_id, created_at) VALUES (?1, ?2, 'nota', 'Riaperto: era \"Non è il momento\", oggi è il giorno per risentirlo', NULL, ?3)").bind(crypto.randomUUID(), l.id, now),
+      ]);
+      pausa.push({ evento: "fine_pausa", entityId: l.id, turno: String(l.pausedUntil), titolo: `Da risentire oggi: ${l.company}`, href: `/commerciale/lead/${l.id}`, responsabile: l.ownerId });
+      continue;
+    }
     await raw.batch([
       // Dopo la seconda assenza (no-show) l'azione resta "Riprovare": la funzione unica mostra l'ultima chiamata.
       raw.prepare("UPDATE leads SET paused_until = NULL, next_action = CASE WHEN next_action = ?4 THEN next_action ELSE ?1 END, next_action_at = ?2, updated_at = ?2 WHERE id = ?3").bind(azione.nextAction, azione.nextActionAt, l.id, AZIONE_RIPROVARE),

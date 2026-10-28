@@ -11,3 +11,16 @@ export const MOTIVI_PERSI = [
 export type CodiceMotivo = (typeof MOTIVI_PERSI)[number]["id"];
 export const MOTIVI_CON_DATA: CodiceMotivo[] = ["non_ora"];
 export const MOTIVI_CON_TESTO: CodiceMotivo[] = ["altro"];
+
+// Codici di prima del blocco 1: restano sui lead già chiusi e si devono ancora leggere (storico, Numeri).
+const MOTIVI_VECCHI: Record<string, string> = {
+  non_raggiungibile: "Non raggiungibile", non_interessato: "Non interessato", budget: "Budget", fuori_target: "Fuori target, non profilato",
+  privato: "Privato", fake: "Contatti falsi o inutilizzabili", gia_servito: "Già servito",
+};
+
+export const eMotivoPerso = (id: string | null | undefined): id is CodiceMotivo => MOTIVI_PERSI.some((m) => m.id === id);
+
+// Etichetta di un codice, nuovo o vecchio: prima quella rinominata in Impostazioni, poi quella di base.
+export function etichettaMotivo(id: string, rinominati: { id: string; etichetta: string }[] = []): string {
+  return rinominati.find((m) => m.id === id)?.etichetta ?? MOTIVI_PERSI.find((m) => m.id === id)?.etichetta ?? MOTIVI_VECCHI[id] ?? id;
+}

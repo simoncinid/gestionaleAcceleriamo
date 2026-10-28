@@ -5,6 +5,7 @@ import { settings, stageRules } from "../db/schema";
 import { audit } from "../lib/audit";
 import { CONTESTO_BASE, type Contesto } from "../regole/motore";
 import { IMPOSTAZIONI_DEFAULT, SCHEMI, type Impostazioni } from "./default";
+import { MOTIVI_PERSI, eMotivoPerso } from "../processo/motivi";
 
 const eChiave = (k: string): k is keyof Impostazioni => Object.prototype.hasOwnProperty.call(SCHEMI, k);
 
@@ -26,12 +27,16 @@ export async function leggiImpostazioni(db: Db): Promise<Impostazioni> {
     if (valido.success) out[r.key] = valido.data;
     else console.error("impostazione_non_valida", r.key);
   }
+  // I motivi sono sempre la lista fissa: di quella salvata valgono solo le etichette dei codici fissi.
+  const salvati = out.motivi as Impostazioni["motivi"];
+  out.motivi = MOTIVI_PERSI.map((m) => ({ id: m.id, etichetta: salvati.find((s) => s.id === m.id)?.etichetta ?? m.etichetta }));
   return out as Impostazioni;
 }
 
 export async function salvaImpostazione(db: Db, key: string, value: unknown, userId: string, now = Date.now()): Promise<void> {
   if (!eChiave(key)) throw new HTTPException(400, { message: "Impostazione sconosciuta" });
   const valido = SCHEMI[key].parse(value);
+  if (key === "motivi" && (valido as Impostazioni["motivi"]).some((m) => !eMotivoPerso(m.id))) throw new HTTPException(422, { message: "I motivi sono fissi: puoi cambiare solo i nomi" });
   const testo = JSON.stringify(valido);
   await db
     .insert(settings)

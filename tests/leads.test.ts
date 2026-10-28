@@ -64,7 +64,7 @@ describe("lead", () => {
   it("riaprire un lead chiuso senza prossima azione dà 422, con la prossima azione funziona", async () => {
     const cookie = await authed();
     const { body } = await create(cookie, { company: "C" });
-    await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "non-chiuso", lostReason: "non_interessato" } }, cookie);
+    await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "non-chiuso", lostReason: "prezzo" } }, cookie);
     const bad = await call(`/api/leads/${body.lead.id}`, { method: "PATCH", json: { stageId: "da-richiamare" } }, cookie);
     expect(bad.status).toBe(422);
     expect(await bad.json()).toEqual({ error: "Serve una prossima azione con data per i lead aperti" });

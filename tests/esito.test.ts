@@ -164,11 +164,12 @@ describe("contatti e proposta", () => {
 });
 
 describe("PATCH /leads/:id con motivo e vinto", () => {
-  it("fase persa chiede il motivo, Chiuso chiede setup, canone e inizio", async () => {
+  it("Non interessato chiede il motivo, Non profilato no (è già il motivo), Chiuso chiede setup, canone e inizio", async () => {
     const cookie = await authed();
     await insertLead("v1");
-    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "fake" } }, cookie)).status).toBe(422);
-    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "fake", lostReason: "fake" } }, cookie)).status).toBe(200);
+    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "non-chiuso" } }, cookie)).status).toBe(422);
+    expect((await call("/api/leads/v1", { method: "PATCH", json: { stageId: "fake" } }, cookie)).status).toBe(200);
+    expect(await env.DB.prepare("SELECT lost_reason FROM leads WHERE id = 'v1'").first()).toEqual({ lost_reason: "fuori_target" });
     await insertLead("v2");
     const senza = await call("/api/leads/v2", { method: "PATCH", json: { stageId: "chiuso" } }, cookie);
     expect(((await senza.json()) as { error: string }).error).toBe("Per Cliente servono setup, canone e data di inizio");

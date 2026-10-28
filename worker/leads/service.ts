@@ -9,6 +9,8 @@ import { aE164 } from "../lib/telefono";
 import { leggiImpostazioni } from "../impostazioni/service";
 import { callPerFase } from "../regole/fasi-call";
 import { responsabileDellaFase } from "../regole/applica";
+import { MOTIVI_CON_DATA, MOTIVI_CON_TESTO, eMotivoPerso, etichettaMotivo } from "../processo/motivi";
+import { dataTesto, FASE } from "../processo/processo";
 
 export const DEFAULT_NEXT_ACTION = "Prima chiamata";
 
@@ -34,7 +36,9 @@ export type LeadInput = {
   lostReason?: string | null;
   wonStartAt?: number | null;
 };
-export type LeadPatch = Partial<Omit<LeadInput, "source">> & { clientName?: string; callAt?: number };
+export type LeadPatch = Partial<Omit<LeadInput, "source">> & { clientName?: string; callAt?: number } & Chiusura;
+// Dati che servono solo per andare in 80: testo per "altro", giorno di ricontatto per "non_ora".
+export type Chiusura = { lostReason?: string | null; lostNote?: string | null; recontactAt?: number | null };
 
 export async function getStage(db: Db, id: string): Promise<Stage> {
   const stage = await db.select().from(stages).where(eq(stages.id, id)).get();
@@ -42,14 +46,24 @@ export async function getStage(db: Db, id: string): Promise<Stage> {
   return stage;
 }
 
-// I motivi di perdita validi sono quelli in Impostazioni, non l'elenco fisso dello schema.
+// I motivi validi sono la lista fissa con codice (worker/processo/motivi.ts); l'etichetta viene da Impostazioni.
 // Restituisce l'etichetta del motivo, per lo storico.
 export async function assertMotivo(db: Db, motivo: string | null | undefined): Promise<string | null> {
   if (!motivo) return null;
-  const { motivi } = await leggiImpostazioni(db);
-  const trovato = motivi.find((m) => m.id === motivo);
-  if (!trovato) throw new HTTPException(422, { message: "Motivo non valido" });
-  return trovato.etichetta;
+  if (!eMotivoPerso(motivo)) throw new HTTPException(422, { message: "Motivo non valido" });
+  return etichettaMotivo(motivo, (await leggiImpostazioni(db)).motivi);
+}
+
+// Andare in 80 (contratto blocco 1, sezione 7): motivo obbligatorio; "non_ora" vuole il giorno, "altro" il testo.
+// Restituisce la riga dello storico.
+export async function assertChiusura(db: Db, c: Chiusura, now: number): Promise<string> {
+  if (!c.lostReason) throw new HTTPException(422, { message: "Scegli il motivo" });
+  const etichetta = await assertMotivo(db, c.lostReason);
+  const codice = c.lostReason as (typeof MOTIVI_CON_DATA)[number];
+  if (MOTIVI_CON_DATA.includes(codice) && (c.recontactAt == null || c.recontactAt <= now)) throw new HTTPException(422, { message: "Scegli il giorno in cui risentirlo" });
+  if (MOTIVI_CON_TESTO.includes(codice) && !c.lostNote?.trim()) throw new HTTPException(422, { message: "Scrivi il motivo" });
+  const quando = MOTIVI_CON_DATA.includes(codice) ? `Da risentire ${dataTesto(c.recontactAt!)}` : null;
+  return [`Motivo: ${etichetta}`, c.lostNote?.trim() || null, quando].filter(Boolean).join(". ");
 }
 
 export async function firstOpenStage(db: Db): Promise<Stage> {
@@ -127,17 +141,22 @@ export async function createLead(db: Db, input: LeadInput, actorId: string | nul
 }
 
 export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: string | null, now = Date.now()): Promise<Lead> {
-  const { clientName, callAt: _callAt, ...patch } = input;
+  const { clientName, callAt: _callAt, lostNote, recontactAt, ...patch } = input;
   const current = await getLead(db, id);
   if ("ownerId" in patch) await assertOwner(db, patch.ownerId);
   const stage = await getStage(db, patch.stageId ?? current.stageId);
   const stageChanged = patch.stageId !== undefined && patch.stageId !== current.stageId;
-  await assertMotivo(db, patch.lostReason);
+  // 90 "Non profilato" è già il motivo: niente scelta, codice fisso. Il motivo dalla lista vale per l'80.
+  const versoNonProfilato = stageChanged && stage.id === FASE.nonProfilato;
+  if (versoNonProfilato) patch.lostReason = "fuori_target";
+  else await assertMotivo(db, patch.lostReason);
+  const versoPerso = stageChanged && stage.id === FASE.perso;
+  const notaChiusura = versoPerso ? await assertChiusura(db, { lostReason: patch.lostReason, lostNote, recontactAt }, now) : null;
   // Motivo e dati del vinto si chiedono solo quando la fase cambia davvero:
   // un lead 1A già perso o già chiuso senza questi dati resta modificabile.
   if (stageChanged) {
     const motivo = patch.lostReason !== undefined ? patch.lostReason : current.lostReason;
-    if (stage.requiresReason && !motivo) throw new HTTPException(422, { message: "Scegli il motivo" });
+    if (stage.requiresReason && !motivo && !versoNonProfilato) throw new HTTPException(422, { message: "Scegli il motivo" });
     if (stage.kind === "won") {
       const setup = patch.setupCents !== undefined ? patch.setupCents : current.setupCents;
       const canone = patch.feeCents !== undefined ? patch.feeCents : current.feeCents;
@@ -148,6 +167,8 @@ export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: 
   const next: Partial<Lead> = { ...patch, updatedAt: now };
   // La pausa vale solo nella fase in cui è nata: cambiando fase si toglie.
   if (stageChanged) { next.stageChangedAt = now; next.pausedUntil = null; }
+  // "Non è il momento": il giorno del ricontatto sta in pausedUntil, quel giorno il giro degli avvisi lo riapre in 10.
+  if (versoPerso && recontactAt != null && patch.lostReason === "non_ora") next.pausedUntil = recontactAt;
   // Un responsabile scelto a mano resta tale ai cambi di fase; altrimenti la fase porta il suo default.
   if ("ownerId" in patch) next.ownerManual = true;
   else if (stageChanged) {
@@ -179,6 +200,7 @@ export async function updateLead(db: Db, id: string, input: LeadPatch, actorId: 
   if (stageChanged) {
     const from = await getStage(db, current.stageId);
     await addActivity(db, id, "cambio_fase", `Da "${from.label}" a "${stage.label}"`, actorId, now);
+    if (notaChiusura) await addActivity(db, id, "nota", notaChiusura, actorId, now);
     if (stage.kind === "won") await creaClienteDaLead(db, await getLead(db, id), clientName, actorId, now);
   }
   const changes: Record<string, { from: unknown; to: unknown }> = {};

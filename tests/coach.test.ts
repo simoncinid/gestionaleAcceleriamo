@@ -161,11 +161,13 @@ describe("coach", () => {
     const p = await (await call("/api/leads/L1/proposta?esito=non_interessato", {}, cookie)).json<{ stageId: string | null; nextAction: string | null; nextActionAt: number | null; lostReason?: string }>();
     s = applicaProposta({ ...s, esito: "non_interessato" }, p, iniziale);
     expect(s.stageId).toBe("non-chiuso");
-    expect(s.lostReason).toBe("non_interessato");
-    const r = await call("/api/leads/L1/esito", { method: "PATCH", json: corpoEsito(s) }, cookie);
+    // Blocco 1, modifica 7: il motivo non arriva dalle regole, lo sceglie la persona dalla lista fissa.
+    expect(s.lostReason).toBeNull();
+    expect((await call("/api/leads/L1/esito", { method: "PATCH", json: corpoEsito(s) }, cookie)).status).toBe(422);
+    const r = await call("/api/leads/L1/esito", { method: "PATCH", json: corpoEsito({ ...s, requestId: crypto.randomUUID(), lostReason: "concorrente" }) }, cookie);
     expect(r.status).toBe(200);
     const l = await env.DB.prepare("SELECT stage_id, lost_reason FROM leads WHERE id = 'L1'").first<{ stage_id: string; lost_reason: string }>();
-    expect(l).toEqual({ stage_id: "non-chiuso", lost_reason: "non_interessato" });
+    expect(l).toEqual({ stage_id: "non-chiuso", lost_reason: "concorrente" });
   });
 
   it("401 senza sessione", async () => {
