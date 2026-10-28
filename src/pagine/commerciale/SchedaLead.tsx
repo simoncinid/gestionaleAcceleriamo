@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import { api } from "../../api";
 import { Errore, Foglio, Pulsante, Riga, Skeleton } from "../../ds";
 import { useOra, useStages, useUsers } from "../../hooks";
-import type { CallAgenda, LeadDetail, PropostaRiga, Stage } from "../../types";
+import type { LeadDetail, Stage } from "../../types";
+import type { CollegamentiScheda } from "../../../worker/leads/collegamenti";
+import { FoglioNuovaAutomazione } from "../automazioni/FoglioAutomazione";
+import { FoglioNuovoCanone } from "../economia/Fogli";
 import { callPerFase } from "../../../worker/regole/fasi-call";
 import { FoglioAvvioLavoro } from "../lavori/FoglioAvvioLavoro";
 import { FoglioChiusura } from "./FoglioChiusura";
@@ -17,6 +20,7 @@ import { FoglioPropostaManuale } from "./FoglioProposta";
 import { FoglioRimanda } from "./FoglioRimanda";
 import { FoglioScrivi } from "./FoglioScrivi";
 import { Assistente } from "./lead/Assistente";
+import { Collegamenti } from "./lead/Collegamenti";
 import { Contatti } from "./lead/Contatti";
 import { DatiLead } from "./lead/DatiLead";
 import { Documents } from "./lead/Documents";
@@ -32,7 +36,7 @@ import { confermaNonPartita, idPerPreventivo } from "./scheda";
 import { useCambioFase } from "./StepperFasi";
 
 type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase"
-  | "sposta" | "link" | "rimanda" | "proposta" | { fase: Stage } | { fissa: "conoscenza" | "presentazione" };
+  | "sposta" | "link" | "rimanda" | "proposta" | "automazione" | "canone" | { fase: Stage } | { fissa: "conoscenza" | "presentazione" };
 
 // Avviso in riga in cima alla scheda: una frase, al massimo un link. Mai finestre del browser.
 function Avviso({ children }: { children: ReactNode }) {
@@ -63,8 +67,12 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   // Il modulo dati si rimonta solo dopo un suo salvataggio riuscito: gli altri salvataggi non cancellano quello che si scrive.
   const [versione, setVersione] = useState(0);
   const d = useQuery({ queryKey: ["lead", id], queryFn: () => api<LeadDetail>(`/leads/${id}`), enabled: !uscito });
-  const calls = useQuery({ queryKey: ["lead", id, "calls"], queryFn: () => api<{ calls: CallAgenda[] }>(`/leads/${id}/calls`).then((r) => r.calls), enabled: !uscito });
-  const proposte = useQuery({ queryKey: ["lead", id, "proposte"], queryFn: () => api<{ proposte: PropostaRiga[] }>(`/leads/${id}/proposals`).then((r) => r.proposte), enabled: !uscito });
+  const coll = useQuery({ queryKey: ["lead", id, "collegamenti"], queryFn: () => api<CollegamentiScheda>(`/leads/${id}/collegamenti`), enabled: !uscito });
+  const conferma = useMutation({
+    mutationFn: (activityId: string) => api(`/leads/${id}/inviti/${activityId}/conferma`, { method: "POST" }),
+    onSuccess: () => { toast.success("Call confermata"); for (const k of [["lead", id], ["leads"], ["today"], ["badge"], ["calls"]]) void qc.invalidateQueries({ queryKey: k }); },
+    onError: (e) => toast.error(e.message),
+  });
   const fase = fasi.data?.find((f) => f.id === d.data?.lead.stageId);
   const cambioFase = useCambioFase({
     leadId: id, attuale: d.data?.lead.stageId ?? "", fasi: fasi.data ?? [],
@@ -103,9 +111,10 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const chiudi = () => { setFoglio(null); setChiede(null); };
   // La call in programma (la prima non ancora fatta) e l'ultima proposta: link in linea nel Da fare.
   // Prima quella all'ora dell'appuntamento del lead (è la stessa della riga Da fare), poi la prima ancora da fare.
-  const aperte = (calls.data ?? []).filter((c) => c.outcome == null).sort((a, b) => a.scheduledAt - b.scheduledAt);
-  const prossimaCall = aperte.find((c) => c.scheduledAt === lead.appointmentAt) ?? aperte[0] ?? null;
-  const ultimaProposta = (proposte.data ?? []).at(-1) ?? null;
+  const aperte = (coll.data?.call ?? []).filter((c) => c.outcome == null).sort((a, b) => a.scheduledAt - b.scheduledAt);
+  const trovata = aperte.find((c) => c.scheduledAt === lead.appointmentAt) ?? aperte[0];
+  const prossimaCall = trovata ? { id: trovata.id, scheduledAt: trovata.scheduledAt, meetLink: lead.meetLink } : null;
+  const ultimaProposta = coll.data?.proposte[0] ?? null;
   const kindCall = lead.stageId === "presentazione-confermata" ? "presentazione" : "conoscenza";
   // Ogni codice della tabella apre il suo foglio; chiamare, aprire la videochiamata e il cliente sono link nel Da fare.
   const comando = (c: ComandoScheda) => {
@@ -150,6 +159,12 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         </Avviso>
       )}
       {lead.metaStatus && lead.metaStatus !== "ok" && <Avviso>I dati del modulo Meta non sono ancora arrivati: riprovo da solo ogni 15 minuti.</Avviso>}
+      {(coll.data?.inviti ?? []).map((inv) => (
+        <Avviso key={inv.id}>
+          <span>{inv.body}</span>
+          <Pulsante variante="secondario" inCorso={conferma.isPending && conferma.variables === inv.id} onClick={() => conferma.mutate(inv.id)}>Conferma</Pulsante>
+        </Avviso>
+      ))}
       {confermaNonPartita(lead) && (
         <Avviso>
           <span className="font-semibold">Email di conferma non partita</span>
@@ -162,6 +177,10 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
           <div className="order-1 @4xl:order-none">
             <NextActionCard lead={lead} kind={fase?.kind} ora={ora} onComando={comando}
               inLinea={{ call: prossimaCall, proposta: ultimaProposta, cliente: d.data.cliente ? { id: d.data.cliente.id, name: d.data.cliente.name } : null }} />
+          </div>
+          <div className="order-3 @4xl:order-none">
+            <Collegamenti dati={coll.data} ora={ora}
+              onCrea={(a) => (a === "proposta" ? setFoglio("proposta") : a === "call" ? setFoglio("fissa") : setFoglio(a))} />
           </div>
           <div className="order-5 @4xl:order-none">
             <Sezione titolo="Storico" nome="storico"><Timeline leadId={lead.id} activities={activities} ora={ora} /></Sezione>
@@ -192,6 +211,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       )}
       {(foglio === "sposta" || foglio === "link") && prossimaCall && <FoglioSpostaCall leadId={lead.id} call={prossimaCall} soloLink={foglio === "link"} onChiudi={chiudi} />}
       {foglio === "rimanda" && <FoglioRimanda leadId={lead.id} onChiudi={() => { chiudi(); void qc.invalidateQueries({ queryKey: ["lead", id] }); }} />}
+      {foglio === "automazione" && <FoglioNuovaAutomazione onChiudi={() => { chiudi(); void coll.refetch(); }} />}
+      {foglio === "canone" && <FoglioNuovoCanone onChiudi={() => { chiudi(); void coll.refetch(); }} />}
       {foglio === "proposta" && <FoglioPropostaManuale leadIniziale={lead} onChiudi={() => { chiudi(); void qc.invalidateQueries({ queryKey: ["lead", id] }); }} />}
       {foglio && typeof foglio === "object" && "fase" in foglio && (() => {
         const kind = callPerFase(foglio.fase.id);
