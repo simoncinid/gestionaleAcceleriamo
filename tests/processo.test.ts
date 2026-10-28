@@ -35,7 +35,8 @@ describe("prossimaAzione: una riga per fase", () => {
     const prima = prossimaAzione(lead(FASE.conoscenza, { meetLink: "https://meet.example/x" }), ADESSO);
     expect(prima.azione).toBe("Conoscenza con Marco");
     expect(prima.pulsante).toEqual({ testo: "Apri la videochiamata", codice: "apri_videochiamata" });
-    expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call", "Non si è presentato"]);
+    // "Non si è presentato" solo dall'ora della call in poi (collaudo di Corrado).
+    expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call"]);
     expect(prima.poi).toMatch(/^Preparare l'offerta entro /);
     expect(prima.tentativo).toBeNull();
     expect(prima.responsabile).toBe("presentazione");
@@ -84,7 +85,7 @@ describe("prossimaAzione: una riga per fase", () => {
     const prima = prossimaAzione(lead(FASE.analisi), ADESSO);
     expect(prima.azione).toBe("Fai l'analisi con Marco");
     expect(prima.poi).toMatch(/^Preparare il progetto entro /);
-    expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call", "Non si è presentato"]);
+    expect(prima.secondarie.map((s) => s.testo)).toEqual(["Sposta la call"]);
     expect(prima.responsabile).toBe("presentazione");
     const dopo = prossimaAzione(lead(FASE.analisi, { nextActionAt: ADESSO - ORA }), ADESSO);
     expect(dopo.pulsante).toEqual({ testo: "Segna com'è andata l'analisi", codice: "segna_analisi" });

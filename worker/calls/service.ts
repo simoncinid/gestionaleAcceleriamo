@@ -216,8 +216,11 @@ export async function segnaNoShow(db: Db, leadId: string, kind: CallKind, actorI
   const lead = await db.select().from(leads).where(and(eq(leads.id, leadId), isNull(leads.deletedAt))).get();
   if (!lead) throw new HTTPException(404, { message: "Lead non trovato" });
   if (lead.stageId !== CALL_DELL_FASE[kind]) throw new HTTPException(422, { message: `Non si è presentato vale solo con la ${AZIONE_CALL[kind].toLowerCase()} fissata` });
-  const aperta = await db.select({ id: calls.id }).from(calls)
+  const aperta = await db.select({ id: calls.id, scheduledAt: calls.scheduledAt }).from(calls)
     .where(and(eq(calls.leadId, leadId), eq(calls.kind, kind), isNull(calls.deletedAt), isNull(calls.outcome))).orderBy(asc(calls.scheduledAt)).get();
+  // Un'assenza si segna solo dall'ora della call in poi (collaudo di Corrado).
+  const inizio = aperta?.scheduledAt ?? lead.nextActionAt;
+  if (inizio != null && now < inizio) throw new HTTPException(422, { message: "Si può segnare che non si è presentato solo dall'ora della call" });
   const { p, passi } = await passiNoShow(db, lead, await contestoRegole(db, now), actorId, now);
   const cosa = ALLA_CALL[kind];
   const body = p.pausedUntil ? `Non si è presentato ${cosa} (seconda volta): si riprova ${dataTesto(p.pausedUntil)}` : `Non si è presentato ${cosa} (prima volta)`;

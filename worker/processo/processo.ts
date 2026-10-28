@@ -199,7 +199,8 @@ export function prossimaAzione(lead: LeadPerProcesso, adesso: number, regole: Re
       const pulsante = iniziata ? f.segna : lead.meetLink ? comando("Apri la videochiamata", "apri_videochiamata") : chiama;
       return fine(f.titolo(nome), salvata, {
         pulsante, poi: f.poi(salvata, nome, regole.orario),
-        secondarie: [comando("Sposta la call", "sposta_call"), comando("Non si è presentato", "non_presentato")],
+        // "Non si è presentato" solo dall'ora della call in poi (collaudo di Corrado).
+        secondarie: iniziata ? [comando("Sposta la call", "sposta_call"), comando("Non si è presentato", "non_presentato")] : [comando("Sposta la call", "sposta_call")],
       });
     }
     case FASE.attesaOfferta:

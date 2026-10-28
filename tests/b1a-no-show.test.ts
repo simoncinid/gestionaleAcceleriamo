@@ -91,6 +91,16 @@ describe("POST /api/leads/:id/no-show", () => {
     expect((await leggi("ns2"))?.paused_until).toBeTypeOf("number");
   });
 
+  it("422 prima dell'ora della call: non si può segnare un'assenza in anticipo", async () => {
+    const cookie = await authed();
+    await insertLead("ns4", { next_action_at: NOW + 3_600_000 });
+    await env.DB.prepare("INSERT INTO calls (id, lead_id, kind, scheduled_at, created_at, updated_at) VALUES ('kns4', 'ns4', 'conoscenza', ?, ?, ?)").bind(NOW + 3_600_000, NOW, NOW).run();
+    const r = await call("/api/leads/ns4/no-show", { method: "POST", json: { kind: "conoscenza" } }, cookie);
+    expect(r.status).toBe(422);
+    expect(await leggi("ns4")).toMatchObject({ no_show: 0 });
+    expect(await env.DB.prepare("SELECT outcome FROM calls WHERE id = 'kns4'").first()).toEqual({ outcome: null });
+  });
+
   it("422 se la call non è quella della fase", async () => {
     const cookie = await authed();
     await insertLead("ns3", { stage_id: "da-richiamare" });
