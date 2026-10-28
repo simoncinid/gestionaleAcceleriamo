@@ -6,6 +6,7 @@ import { eCallNelPassato } from "../../errori";
 import { AreaTesto, Campo, CampoQuando, Foglio, Pulsante, Selettore } from "../../ds";
 import { momento } from "../../format";
 import type { CallAgenda } from "../../types";
+import { ContattoDalLead } from "./lead/ContattoDa";
 import { NOTE_CALL, leggiNote } from "./note-call";
 
 type Esito = "fatta" | "saltata" | "rimandata";
@@ -46,9 +47,9 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
         </Pulsante>
       }>
       <div className="flex flex-col gap-3">
-        <div className="text-secondaria text-grigio">
-          <p>{k.company}</p>
-          <p className="tabular-nums">{momento(k.scheduledAt)}</p>
+        <div className="flex flex-col">
+          <ContattoDalLead leadId={k.leadId} azienda={k.company} />
+          <p className="text-secondaria text-grigio tabular-nums">{momento(k.scheduledAt)}</p>
         </div>
         <Selettore etichetta="Esito" opzioni={ESITI} valore={esito} onCambia={setEsito} />
         {esito === "rimandata" && <CampoQuando etichetta="Nuova data" valore={nuovaData} onCambia={(ms) => { setNuovaData(ms); setErroreData(null); }} errore={erroreData} />}
