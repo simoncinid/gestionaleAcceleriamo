@@ -22,6 +22,20 @@ import { eliminaPerSempre, leggiCestino } from "./cestino";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { collegamentiDelLead } from "./collegamenti";
 import { conUltimoContatto } from "./ultimo-contatto";
+import { apriFile, caricaDocumento, conNovita, documentiDelLead, segnaVisto, versioniDi } from "./documenti";
+import type { Context } from "hono";
+
+// Corpo grezzo di un caricamento: il file è tutto il corpo, la lunghezza viene da Content-Length.
+// Solo application/octet-stream: un altro tipo obbliga il browser al controllo preventivo, che ferma le pagine estranee (Riccardo).
+export function corpoFile(c: Context<AppEnv>) {
+  if ((c.req.header("content-type") ?? "").split(";")[0].trim().toLowerCase() !== "application/octet-stream") {
+    throw new HTTPException(415, { message: "Il file va mandato come application/octet-stream" });
+  }
+  const size = Number(c.req.header("content-length") ?? Number.NaN);
+  const body = c.req.raw.body;
+  if (!body) throw new HTTPException(411, { message: "Il file è vuoto o manca la sua lunghezza" });
+  return { size, body };
+}
 
 export const leadRoutes = new Hono<AppEnv>();
 
@@ -36,7 +50,9 @@ leadRoutes.get("/", async (c) => {
     leggiSla(db),
   ]);
   // Corsia C (modifica 18): la tabella mostra anche l'ultimo contatto.
-  return c.json({ leads: await conUltimoContatto(c.env.DB, await conProssima(db, rows.map((l) => conScadenzaSla(l, sla)), Date.now())) });
+  // Spec documenti 29/10/2026: "novita" è il pallino arancione delle novità caricate da altri e non viste.
+  const elenco = await conUltimoContatto(c.env.DB, await conProssima(db, rows.map((l) => conScadenzaSla(l, sla)), Date.now()));
+  return c.json({ leads: await conNovita(c.env.DB, c.get("user").id, elenco) });
 });
 
 // Prima delle rotte con /:id.
@@ -81,11 +97,7 @@ leadRoutes.get("/:id", async (c) => {
     .leftJoin(users, eq(users.id, activities.authorId))
     .where(eq(activities.leadId, lead.id))
     .orderBy(desc(activities.createdAt));
-  const docs = await db
-    .select()
-    .from(documents)
-    .where(and(eq(documents.leadId, lead.id), isNull(documents.deletedAt)))
-    .orderBy(desc(documents.createdAt));
+  const docs = await documentiDelLead(db, lead.id);
   const duplicateOf = lead.duplicateOfId
     ? ((await db.select({ id: leads.id, company: leads.company }).from(leads).where(and(eq(leads.id, lead.duplicateOfId), isNull(leads.deletedAt))).get()) ?? null)
     : null;
@@ -195,7 +207,7 @@ leadRoutes.delete("/:id", async (c) => {
 
 // Blocco 1, modifica 9: elimina per sempre un lead che è già nel cestino.
 leadRoutes.delete("/:id/per-sempre", async (c) => {
-  await eliminaPerSempre(getDb(c.env.DB), c.req.param("id"), c.get("user").id);
+  await eliminaPerSempre(getDb(c.env.DB), c.req.param("id"), c.get("user").id, Date.now(), c.env.DOCUMENTI);
   return c.json({ ok: true });
 });
 
@@ -220,8 +232,21 @@ leadRoutes.post("/:id/activities", async (c) => {
   return c.json({ ok: true }, 201);
 });
 
+// Apertura della scheda: azzera il pallino e restituisce le novità che c'erano (la scheda le mostra).
+leadRoutes.post("/:id/visto", async (c) => {
+  const db = getDb(c.env.DB);
+  const lead = await getLead(db, c.req.param("id"));
+  return c.json(await segnaVisto(c.env.DB, c.get("user").id, lead.id, Date.now()));
+});
+
+// Un link (corpo JSON) o un file (corpo grezzo, nome in ?nome=, titolo facoltativo in ?titolo=).
 leadRoutes.post("/:id/documents", async (c) => {
   const db = getDb(c.env.DB);
+  if (!(c.req.header("content-type") ?? "").startsWith("application/json")) {
+    const { size, body } = corpoFile(c);
+    const document = await caricaDocumento(c.env, db, { leadId: c.req.param("id"), fileName: c.req.query("nome") ?? "", titolo: c.req.query("titolo"), size, body, userId: c.get("user").id, now: Date.now() });
+    return c.json({ document }, 201);
+  }
   const lead = await getLead(db, c.req.param("id"));
   const { name, url } = documentSchema.parse(await c.req.json());
   const now = Date.now();
@@ -232,6 +257,25 @@ leadRoutes.post("/:id/documents", async (c) => {
 });
 
 export const documentRoutes = new Hono<AppEnv>();
+
+// Nuova versione di un documento caricato: corpo grezzo, nome del file in ?nome=.
+documentRoutes.post("/:id/versioni", async (c) => {
+  const db = getDb(c.env.DB);
+  const doc = await db.select({ leadId: documents.leadId }).from(documents).where(and(eq(documents.id, c.req.param("id")), isNull(documents.deletedAt))).get();
+  if (!doc) return c.json({ error: "Documento non trovato" }, 404);
+  const { size, body } = corpoFile(c);
+  const document = await caricaDocumento(c.env, db, { leadId: doc.leadId, documentId: c.req.param("id"), fileName: c.req.query("nome") ?? "", size, body, userId: c.get("user").id, now: Date.now() });
+  return c.json({ document }, 201);
+});
+
+documentRoutes.get("/:id/versioni", async (c) => c.json({ versioni: await versioniDi(getDb(c.env.DB), c.req.param("id")) }));
+
+// Il file passa solo da qui, dietro la sessione: ?versione=N per una versione vecchia, ?scarica=1 per scaricarlo.
+documentRoutes.get("/:id/file", async (c) => {
+  const v = c.req.query("versione");
+  const versione = v && /^\d{1,6}$/.test(v) ? Number(v) : null;
+  return apriFile(c.env, getDb(c.env.DB), c.req.param("id"), versione, c.req.query("scarica") === "1");
+});
 
 documentRoutes.delete("/:id", async (c) => {
   const db = getDb(c.env.DB);

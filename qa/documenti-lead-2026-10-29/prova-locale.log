@@ -1,0 +1,20 @@
+lead di prova: Casa Tegolina demo-lead-senza-telefono
+pallino iniziale di Tommaso: 0
+Diego carica un PDF: 201 {
+  id: 'e6ae2fa0-0e0e-4b88-bf10-2440e4ed6af2',
+  version: 1,
+  name: 'preventivo-prova.pdf'
+}
+pallino di Tommaso: 1 | pallino di Diego: 0
+Diego carica la versione 2: 201 {
+  id: 'e6ae2fa0-0e0e-4b88-bf10-2440e4ed6af2',
+  version: 2,
+  name: 'preventivo-prova.pdf'
+}
+pallino di Tommaso: 2
+Tommaso apre la scheda, novità che vede: { novita: 2, nuovi: [ 'e6ae2fa0-0e0e-4b88-bf10-2440e4ed6af2' ] }
+pallino di Tommaso dopo l'apertura: 0
+apertura ultima versione: 200 application/pdf inline; filename="preventivo-prova-v2.pdf"; filename*=UTF-8''preventivo-prova-v2.pdf "%PDF-1.4 versione due"
+apertura versione 1: 200 "%PDF-1.4 versione uno"
+senza sessione: 401
+LEAD_ID=demo-lead-senza-telefono LEAD_NOME="Casa Tegolina"

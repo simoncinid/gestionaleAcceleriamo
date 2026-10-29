@@ -1,5 +1,9 @@
 export type Env = {
   DB: D1Database;
+  // Bucket R2 dei documenti dei lead (wrangler.jsonc). Assente: il caricamento risponde "archivio non collegato".
+  DOCUMENTI?: R2Bucket;
+  // Token dello script di caricamento sul Mac di Tommaso (wrangler secret put CARICA_TOKEN). Vuoto: le rotte /api/carica rispondono 401.
+  CARICA_TOKEN?: string;
   ASSETS?: Fetcher;
   META_APP_SECRET: string;
   META_VERIFY_TOKEN: string;

@@ -21,7 +21,8 @@
     "risorse:grafiche": "tsx scripts/risorse-grafiche.ts",
     "deploy:demo": "CLOUDFLARE_ENV=demo vite build && wrangler deploy",
     "e2e": "playwright test",
-    "e2e:foto": "playwright test --update-snapshots"
+    "e2e:foto": "playwright test --update-snapshots",
+    "carica": "node scripts/carica-documento.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

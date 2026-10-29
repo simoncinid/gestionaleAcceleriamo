@@ -1,0 +1,40 @@
+// Foto della prova vera: lo script carica (a nome di Tommaso) sul primo lead della lista di Diego;
+// Diego vede il pallino in lista e nella scheda, apre il foglio Documenti, il pallino in lista si azzera.
+import { execFileSync } from "node:child_process";
+import { chromium } from "@playwright/test";
+const B = "http://localhost:5232", D = "qa/documenti-lead-2026-10-29";
+const browser = await chromium.launch();
+for (const [nome, vp] of [["1440", { width: 1440, height: 900 }], ["390", { width: 390, height: 844 }]]) {
+  const page = await browser.newPage({ viewport: vp, locale: "it-IT", timezoneId: "Europe/Rome" });
+  await page.goto(`${B}/`);
+  await page.getByLabel("Utente").fill("demo");
+  await page.getByLabel("Password").fill("password-demo-locale-e2e");
+  await page.getByRole("button", { name: "Entra" }).click();
+  await page.waitForURL(/oggi/);
+  await page.goto(`${B}/commerciale/lead`);
+  await page.waitForLoadState("networkidle");
+  const href = await page.locator("a[href^='/commerciale/lead/']").filter({ visible: true }).first().getAttribute("href");
+  const id = href.split("/").pop();
+  execFileSync("node", ["scripts/carica-documento.mjs", "--base", B, "--lead-id", id, `${D}/chiamata-prova.m4a`], { env: { ...process.env, ACCELERIAMO_CARICA_TOKEN: "token-prova-locale" }, stdio: "inherit" });
+  await page.reload();
+  await page.locator("[data-pallino]").filter({ visible: true }).first().waitFor({ timeout: 15000 }).catch(() => {});
+  const p = page.locator("[data-pallino]").filter({ visible: true }).first();
+  console.log(nome, "pallino in lista:", (await p.count()) ? await p.getAttribute("data-pallino") : "assente");
+  await page.screenshot({ path: `${D}/lista-con-pallino-${nome}.png` });
+  await page.goto(`${B}${href}`);
+  await page.getByRole("button", { name: /\d+ document/ }).filter({ visible: true }).first().waitFor({ timeout: 15000 });
+  await page.waitForTimeout(500);
+  const ps = page.locator("[data-pallino]").filter({ visible: true }).first();
+  console.log(nome, "pallino nella scheda:", (await ps.count()) ? await ps.getAttribute("data-pallino") : "assente");
+  await ps.scrollIntoViewIfNeeded().catch(() => {});
+  await page.screenshot({ path: `${D}/scheda-con-pallino-${nome}.png` });
+  await page.getByRole("button", { name: /\d+ document/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${D}/foglio-documenti-${nome}.png` });
+  console.log(nome, "Nuovo nel foglio:", await page.getByText("Nuovo", { exact: true }).filter({ visible: true }).count(), "| caricato da Claude:", await page.getByText(/caricato da Claude/).filter({ visible: true }).count());
+  await page.goto(`${B}/commerciale/lead`);
+  await page.locator(`a[href='${href}']`).filter({ visible: true }).first().waitFor({ timeout: 15000 });
+  console.log(nome, "pallino in lista dopo l'apertura:", await page.locator(`a[href='${href}']`).locator("..").locator("[data-pallino]").count());
+  await page.close();
+}
+await browser.close();

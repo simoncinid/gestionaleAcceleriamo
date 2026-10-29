@@ -37,6 +37,7 @@ import { meRoutes } from "./me/routes";
 import { datiRoutes } from "./dati/routes";
 import { ricercaRoutes } from "./ricerca/routes";
 import { statoRoutes } from "./stato/routes";
+import { caricaRoutes } from "./carica/routes";
 
 export const app = new Hono<AppEnv>();
 
@@ -51,7 +52,7 @@ app.onError((err, c) => {
 const PUBLIC_PATHS = ["/api/health", "/api/_boom", "/api/auth/login", "/api/hooks/proposals", "/api/hooks/posta", "/api/stato/battito"];
 
 app.use("/api/*", async (c, next) => {
-  if (PUBLIC_PATHS.includes(c.req.path) || c.req.path.startsWith("/api/webhooks/") || c.req.path.startsWith("/api/pubblico/")) return next();
+  if (PUBLIC_PATHS.includes(c.req.path) || c.req.path.startsWith("/api/webhooks/") || c.req.path.startsWith("/api/pubblico/") || c.req.path.startsWith("/api/carica/")) return next();
   return requireAuth(c, next);
 });
 
@@ -60,6 +61,8 @@ app.get("/api/spazio", (c) => c.json({ demo: c.env.SPAZIO === "demo" }));
 app.route("/api/webhooks/meta", metaRoutes);
 app.route("/api/webhooks/instagram", webhookInstagram);
 app.route("/api/pubblico/risorse", risorsePubbliche);
+// Script di caricamento con token CARICA_TOKEN (fuori dalla sessione, il controllo lo fa caricaRoutes).
+app.route("/api/carica", caricaRoutes);
 // HTML della pagina risorsa con titolo e anteprima per le chat (wrangler.jsonc: "/r/*" passa prima dal Worker).
 app.get("/r/:slug", paginaRisorsa);
 app.get("/robots.txt", robots);

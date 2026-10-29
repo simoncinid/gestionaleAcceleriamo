@@ -489,6 +489,33 @@ Dopo le due settimane, se l'app ha fatto la scheda per ogni lead nuovo, Tommaso 
 - Collaudo con il lead di prova: da scrivere (giorno/mese/anno).
 - Spegnimento del vecchio server: da scrivere (due settimane dopo).
 
+## Documenti dei lead (file su R2)
+
+Dal 29/10/2026 la sezione Documenti della scheda lead accetta file veri: PDF, TXT, Excel (xls, xlsx, csv), Word (doc, docx),
+audio (m4a, mp3, ogg, opus, wav, aac), immagini (jpg, png, heic), fino a 100 MB. I link restano possibili.
+Ogni file ha le sue versioni; il pallino arancione in lista e su "Documenti" conta i file e le versioni messi da un'altra
+persona e non ancora visti, e si azzera aprendo la scheda. I file non sono pubblici: passano solo da `/api/documents/:id/file`
+con la sessione. Bucket: `acceleriamo-os-documenti` (binding `DOCUMENTI`), demo `acceleriamo-os-demo-documenti`.
+
+Messa online (una volta):
+1. Su Cloudflare attivare R2 e creare i due bucket (o dare il permesso "R2: modifica" alla chiave del deploy e lanciare
+   `npx wrangler r2 bucket create acceleriamo-os-documenti` e `npx wrangler r2 bucket create acceleriamo-os-demo-documenti`).
+2. Copia del database, poi `npm run db:migrate:remote` (migrazione `0021_documenti_file`) e `npm run db:migrate:demo`.
+3. Segreto dello script: generare un token lungo (`openssl rand -base64 32`), `npx wrangler secret put CARICA_TOKEN`,
+   e la stessa stringa nel portachiavi del Mac di Tommaso:
+   `security add-generic-password -a "$USER" -s acceleriamo-carica-token -w '<token>'`.
+4. `npm run deploy` (e `npm run deploy:demo`).
+
+Script per caricare dal Mac (le voci risultano di Tommaso, "caricato da Claude"):
+
+```
+npm run carica -- --lead "Nome azienda" percorso/file.m4a
+npm run carica -- --lead-id <id> preventivo.pdf --versione   # nuova versione del documento con lo stesso nome
+```
+
+Indirizzo di default `https://risorse.acceleriamo.it`; `--base http://localhost:5173` per il server locale
+(token da `ACCELERIAMO_CARICA_TOKEN` in prova). Esce con 2 se il lead non si trova o non è unico.
+
 ## Scelte da sapere
 
 - **Sposta in fase e Abbina:** dopo aver scelto la fase o il lead serve il pulsante principale ("Sposta in X", "Abbina a X"), spento finché non c'è la scelta. Vale anche per un solo lead dal menu rapido e per "Assegna N a X" nelle azioni in blocco della Scaletta. Prima bastava il tocco.

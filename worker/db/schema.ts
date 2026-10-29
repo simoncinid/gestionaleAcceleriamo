@@ -146,8 +146,43 @@ export const documents = sqliteTable(
     createdBy: text("created_by"),
     createdAt: integer("created_at").notNull(),
     deletedAt: integer("deleted_at"),
+    // File caricati (spec 29/10/2026): l'ultima versione sta qui, lo storico in document_versions.
+    mime: text("mime"),
+    size: integer("size"),
+    version: integer("version").notNull().default(1),
+    via: text("via"), // "claude" quando l'ha caricato lo script di Tommaso
+    updatedAt: integer("updated_at"),
   },
   (t) => [index("idx_documents_lead").on(t.leadId)],
+);
+
+// Una riga per ogni file caricato su un documento: la versione 1 è il primo caricamento.
+export const documentVersions = sqliteTable(
+  "document_versions",
+  {
+    id: text("id").primaryKey(),
+    documentId: text("document_id").notNull(),
+    version: integer("version").notNull(),
+    r2Key: text("r2_key").notNull(),
+    fileName: text("file_name").notNull(),
+    mime: text("mime").notNull(),
+    size: integer("size").notNull(),
+    createdBy: text("created_by"),
+    via: text("via"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [uniqueIndex("uq_document_versions").on(t.documentId, t.version), index("idx_document_versions_created").on(t.createdAt)],
+);
+
+// Ultima apertura della scheda di un lead per persona: il pallino conta le novità di altri dopo questo istante.
+export const leadVisti = sqliteTable(
+  "lead_visti",
+  {
+    userId: text("user_id").notNull(),
+    leadId: text("lead_id").notNull(),
+    seenAt: integer("seen_at").notNull(),
+  },
+  (t) => [uniqueIndex("uq_lead_visti").on(t.userId, t.leadId)],
 );
 
 export const companyProfiles = sqliteTable("company_profiles", {
@@ -581,6 +616,7 @@ export type Lead = typeof leads.$inferSelect;
 export type Stage = typeof stages.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type DocumentRow = typeof documents.$inferSelect;
+export type DocumentVersion = typeof documentVersions.$inferSelect;
 export type Call = typeof calls.$inferSelect;
 export type Proposal = typeof proposals.$inferSelect;
 export type StageRule = typeof stageRules.$inferSelect;

@@ -72,6 +72,17 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const [versione, setVersione] = useState(0);
   const d = useQuery({ queryKey: ["lead", id], queryFn: () => api<LeadDetail>(`/leads/${id}`), enabled: !uscito });
   const coll = useQuery({ queryKey: ["lead", id, "collegamenti"], queryFn: () => api<CollegamentiScheda>(`/leads/${id}/collegamenti`), enabled: !uscito });
+  // Apertura della scheda: azzera il pallino dei documenti e tiene le novità di prima per mostrarle qui (spec documenti 29/10/2026).
+  // Chiave fuori da ["lead"]: gli aggiornamenti della scheda non la rifanno, si rifà solo riaprendo la scheda.
+  const visto = useQuery({
+    queryKey: ["visto", id],
+    queryFn: async () => {
+      const r = await api<{ novita: number; nuovi: string[] }>(`/leads/${id}/visto`, { method: "POST" });
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      return r;
+    },
+    enabled: !uscito, staleTime: Infinity, gcTime: 0, retry: false, refetchOnWindowFocus: false,
+  });
   const conferma = useMutation({
     mutationFn: (activityId: string) => api(`/leads/${id}/inviti/${activityId}/conferma`, { method: "POST" }),
     onSuccess: () => { toast.success("Call confermata"); for (const k of [["lead", id], ["leads"], ["today"], ["badge"], ["calls"]]) void qc.invalidateQueries({ queryKey: k }); },
@@ -188,7 +199,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
             <Contatti lead={lead} onScrivi={setFoglio} onAggiungi={() => setFoglio("dati")} />
           </div>
           <div className="order-4 @4xl:order-none">
-            <DatiLead lead={lead} fasi={fasi.data ?? []} utenti={utenti.data ?? []} documenti={documents.length}
+            <DatiLead lead={lead} fasi={fasi.data ?? []} utenti={utenti.data ?? []} documenti={documents.length} novita={visto.data?.novita ?? 0}
               onServeFoglio={(f) => setFoglio({ fase: f })} onResponsabile={(ownerId) => patch.mutate({ ownerId })}
               onDocumenti={() => setFoglio("documenti")} onModifica={() => setFoglio("dati")} />
           </div>
@@ -223,7 +234,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         </Foglio>
       )}
       {foglio === "documenti" && (
-        <Foglio aperto lato titolo="Documenti" onChiudi={chiudi}><Documents leadId={lead.id} documents={documents} ora={ora} /></Foglio>
+        <Foglio aperto lato titolo="Documenti" onChiudi={chiudi}><Documents leadId={lead.id} documents={documents} ora={ora} nuovi={visto.data?.nuovi} /></Foglio>
       )}
       {foglio === "responsabile" && (
         <Foglio aperto lato titolo="Cambia responsabile" onChiudi={chiudi}>

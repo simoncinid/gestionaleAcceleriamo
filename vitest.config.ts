@@ -18,6 +18,7 @@ export default defineConfig({
           compatibilityDate: "2026-09-15",
           compatibilityFlags: ["nodejs_compat"],
           d1Databases: ["DB", "DB_PRE"],
+          r2Buckets: ["DOCUMENTI"],
           bindings: {
             TEST_MIGRATIONS: migrations,
             META_APP_SECRET: "segreto-test",
@@ -30,6 +31,7 @@ export default defineConfig({
             IG_GRAPH_VERSION: "v25.0",
             RESEND_API_KEY: "re_test",
             PROPOSAL_HOOK_KEY: "chiave-aggancio-test",
+            CARICA_TOKEN: "token-carica-test",
             MAIL_HOOK_KEY: "chiave-posta-test",
             GOOGLE_SA_EMAIL: "",
             GOOGLE_SA_PRIVATE_KEY: "",

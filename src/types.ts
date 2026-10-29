@@ -17,6 +17,8 @@ export type LeadListItem = {
   metaAd?: string | null; metaFormId?: string | null; metaAnswers?: string | null;
   // Riga "Da fare" della funzione unica (worker/processo/processo.ts): la mostrano scheda, tabella e Oggi.
   prossima?: ProssimaAzione;
+  // Pallino arancione: documenti e versioni caricati da altri e non ancora visti (spec documenti 29/10/2026).
+  novita?: number;
 };
 
 export type Lead = LeadListItem & {
@@ -26,7 +28,12 @@ export type Lead = LeadListItem & {
 };
 
 export type Activity = { id: string; type: string; body: string; createdAt: number; authorId: string | null; authorName: string };
-export type DocumentRow = { id: string; leadId: string; name: string; url: string | null; createdAt: number };
+// Documento della scheda: link (url) o file caricato (file, versione, peso). "via" vale "claude" per lo script di Tommaso.
+export type DocumentRow = {
+  id: string; leadId: string; name: string; url: string | null; createdAt: number;
+  file?: boolean; version?: number; mime?: string | null; size?: number | null; via?: string | null; authorName?: string | null; updatedAt?: number | null;
+};
+export type VersioneDocumento = { id: string; version: number; fileName: string; size: number; via: string | null; createdAt: number; authorName: string | null };
 export type LeadDetail = { lead: Lead; activities: Activity[]; documents: DocumentRow[]; duplicateOf: { id: string; company: string } | null; cliente?: { id: string; name: string; haLavori?: boolean } | null };
 
 export type Stats = {

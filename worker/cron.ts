@@ -143,8 +143,8 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
     esegui: (e, n, l) => generaRicorrenti(getDb(e.DB), n, l),
   },
   // Cestino (blocco 1, modifica 9): alle 6:30 di Roma toglie per sempre i lead nel cestino da oltre 30 giorni, 3 per giro.
-  // A lead: 3 letture (lead, cestino, cliente) e una batch da 10 scritture; fisse 1 per la lista.
-  cestino: { quando: (p) => p.ore === 6 && p.minuti >= 30 && p.minuti < 35, fisse: 1, perUnita: 13, sottoPerUnita: 0, max: 3, esegui: (e, n) => togliScaduti(getDb(e.DB), n) },
+  // A lead: 4 letture (lead, cestino, cliente, documenti) e una batch da 10 scritture, più versioni e R2; fisse 1 per la lista.
+  cestino: { quando: (p) => p.ore === 6 && p.minuti >= 30 && p.minuti < 35, fisse: 1, perUnita: 15, sottoPerUnita: 0, max: 3, esegui: (e, n) => togliScaduti(getDb(e.DB), n, e.DOCUMENTI) },
   // Lunedì (spec 6.4): il lunedì dalle 7:00 alle 7:55 (ora di Roma) il giro congela i numeri della settimana chiusa
   // in weekly_reviews. Dopo il lead e i suoi avvisi, prima di Claude: se il budget non basta riprova al giro dopo.
   // La revisione nasce una volta sola per settimana (settimana unica, ON CONFLICT): nei giri dopo il primo costa

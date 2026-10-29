@@ -1,4 +1,4 @@
-import { Punto, Selettore } from "../../../ds";
+import { Badge, Punto, Selettore } from "../../../ds";
 import { SOURCE_LABELS } from "../../../format";
 import type { Lead, Stage, User } from "../../../types";
 import { dataTesto } from "../../../../worker/processo/processo";
@@ -11,8 +11,8 @@ const PUNTEGGIO = { verde: "Verde", giallo: "Giallo", grigio: "Grigio" } as cons
 
 // Dati del lead: fase e responsabile come selettori a espansione, poi un elenco etichetta e valore.
 // Ogni dato compare una volta sola nella scheda (fonte, campagna e responsabile stanno solo qui).
-export function DatiLead({ lead, fasi, utenti, documenti, onServeFoglio, onResponsabile, onDocumenti, onModifica }: {
-  lead: Lead; fasi: Stage[]; utenti: Pick<User, "id" | "name">[]; documenti: number;
+export function DatiLead({ lead, fasi, utenti, documenti, novita = 0, onServeFoglio, onResponsabile, onDocumenti, onModifica }: {
+  lead: Lead; fasi: Stage[]; utenti: Pick<User, "id" | "name">[]; documenti: number; novita?: number;
   onServeFoglio: (f: Stage) => void; onResponsabile: (ownerId: string) => void; onDocumenti: () => void; onModifica: () => void;
 }) {
   const risposte = leggiRisposte(lead.metaAnswers);
@@ -31,9 +31,12 @@ export function DatiLead({ lead, fasi, utenti, documenti, onServeFoglio, onRespo
         {inserzione && <Voce etichetta="Inserzione">{inserzione}</Voce>}
         <Voce etichetta="Arrivato il">{dataTesto(lead.createdAt)}</Voce>
         <Voce etichetta="Documenti">
-          <button type="button" className={documenti ? LINK : `${LINK} font-normal text-[#6B645C]`} onClick={onDocumenti}>
-            {documenti ? `${documenti} file` : "nessuno: aggiungi un link"}
-          </button>
+          <span className="inline-flex items-center gap-2">
+            <button type="button" className={documenti ? LINK : `${LINK} font-normal text-[#6B645C]`} onClick={onDocumenti}>
+              {documenti ? (documenti === 1 ? "1 documento" : `${documenti} documenti`) : "nessuno: carica un file"}
+            </button>
+            {novita > 0 && <span data-pallino={novita} aria-label={novita === 1 ? "1 novità da vedere" : `${novita} novità da vedere`}><Badge n={novita} /></span>}
+          </span>
         </Voce>
       </dl>
       {risposte.length > 0 && (

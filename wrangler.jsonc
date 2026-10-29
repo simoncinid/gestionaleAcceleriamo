@@ -8,6 +8,8 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "acceleriamo-os", "database_id": "a974e4dd-129a-461d-9793-bd50b2aaf1b5", "migrations_dir": "drizzle" }
   ],
+  // File dei documenti dei lead (spec 29/10/2026): mai pubblici, si leggono solo dal Worker con la sessione.
+  "r2_buckets": [{ "binding": "DOCUMENTI", "bucket_name": "acceleriamo-os-documenti" }],
   "vars": {
     "META_GRAPH_VERSION": "v23.0",
     // Id della Pagina Facebook con i moduli dei lead (non è un segreto).
@@ -35,6 +37,7 @@
         // database_id: id del database demo creato il 19/10/2026 su account diego@acceleriamo.it (non è un segreto).
         { "binding": "DB", "database_name": "acceleriamo-os-demo", "database_id": "4d356e6d-f9fb-4816-acc2-a5198ed4a8ab", "migrations_dir": "drizzle" }
       ],
+      "r2_buckets": [{ "binding": "DOCUMENTI", "bucket_name": "acceleriamo-os-demo-documenti" }],
       "vars": { "META_GRAPH_VERSION": "v23.0", "IG_GRAPH_VERSION": "v25.0", "SPAZIO": "demo", "DEMO_URL": "", "APP_URL": "https://acceleriamo-os-demo.diego-faf.workers.dev" },
       "triggers": { "crons": [] }
     }

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { api } from "../../api";
-import { Errore, Pulsante, Skeleton, StatoVuoto, cx } from "../../ds";
+import { Badge, Errore, Pulsante, Skeleton, StatoVuoto, cx } from "../../ds";
 import { SOURCE_LABELS, linkTel, telefonoMostrato, trascorso } from "../../format";
 import { useMe, useOra, useStages, useUsers } from "../../hooks";
 import { AzioniRiga, CellaFase, FogliRiga, scegliFase, useCestina, useSpostaFase, type FoglioRiga } from "./AzioniLead";
@@ -75,7 +75,10 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   const contenuto = (id: IdColonna, l: RigaLead): ReactNode => {
     switch (id) {
       case "azienda": return <>
-        <Link to={`/commerciale/lead/${l.id}`} title={l.company} className="block truncate font-semibold text-ink after:absolute after:inset-0 hover:underline">{l.company}</Link>
+        <span className="flex min-w-0 items-center gap-2">
+          <Link to={`/commerciale/lead/${l.id}`} title={l.company} className="block min-w-0 truncate font-semibold text-ink after:absolute after:inset-0 hover:underline">{l.company}</Link>
+          <PallinoDocumenti n={l.novita} />
+        </span>
         {l.contactName && <span className={secondaria}>{l.contactName}</span>}
       </>;
       case "telefono": return l.phone
@@ -185,7 +188,10 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
               <li key={l.id}>
                 <Link to={`/commerciale/lead/${l.id}`} data-lead={l.id} className="flex min-h-[60px] flex-col justify-center gap-1 px-4 py-2.5 active:bg-crema">
                   <span className="flex items-baseline gap-3">
-                    <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{l.company}</span>
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="min-w-0 truncate text-[15px] font-semibold">{l.company}</span>
+                      <PallinoDocumenti n={l.novita} />
+                    </span>
                     {l.prossima?.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>}
                   </span>
                   <span className="flex min-w-0 items-center gap-2 text-[13px] text-grigio">
@@ -201,4 +207,10 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
       <FogliRiga foglio={foglio} utenti={utenti.data ?? []} onChiudi={() => setFoglio(null)} />
     </div>
   );
+}
+
+// Pallino arancione col numero dei documenti caricati da altri e non ancora visti (spec documenti 29/10/2026). A zero sparisce.
+function PallinoDocumenti({ n }: { n?: number }) {
+  if (!n) return null;
+  return <span className="shrink-0" data-pallino={n} title={n === 1 ? "1 documento nuovo" : `${n} documenti nuovi`}><span className="sr-only">{n === 1 ? "1 documento nuovo" : `${n} documenti nuovi`}</span><span aria-hidden><Badge n={n} /></span></span>;
 }

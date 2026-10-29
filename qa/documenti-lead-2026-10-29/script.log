@@ -1,0 +1,23 @@
+--- per nome
+Caricato "chiamata-prova.m4a" su Casa Tegolina (versione 1)
+uscita 0
+--- nuova versione
+Caricato "chiamata-prova.m4a" su Casa Tegolina (versione 2)
+uscita 0
+--- per id con titolo
+Caricato "Offerta rivista" su demo-lead-senza-telefono (versione 1)
+uscita 0
+--- lead inesistente
+Nessun lead trovato per "Nessuno Che Esiste"
+uscita 2
+--- token sbagliato
+Errore 401: Token non valido
+uscita 1
+--- http fuori da localhost
+Serve un indirizzo https (http solo per localhost)
+uscita 1
+--- pallino di Diego
+Diego vede novita: 3
+Offerta rivista v1 Tommaso claude
+chiamata-prova.m4a v2 Tommaso claude
+preventivo-prova.pdf v2 Diego 
