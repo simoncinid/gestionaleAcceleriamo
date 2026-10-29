@@ -497,6 +497,11 @@ Ogni file ha le sue versioni; il pallino arancione in lista e su "Documenti" con
 persona e non ancora visti, e si azzera aprendo la scheda. I file non sono pubblici: passano solo da `/api/documents/:id/file`
 con la sessione. Bucket: `acceleriamo-os-documenti` (binding `DOCUMENTI`), demo `acceleriamo-os-demo-documenti`.
 
+Togliere un documento lo nasconde subito; dopo 30 giorni il giro programmato (ogni giorno alle 6:40 di Roma, a lotti
+di 20) cancella davvero i file su R2 di tutte le versioni e poi le righe. Nello stesso giro toglie le cartelle R2
+`lead/<id>/` di lead che non esistono più nel database (i lead nel cestino restano). Voce nella pagina Stato:
+"Documenti tolti oltre 30 giorni" (spenta finché il bucket non è collegato). Decisione di Tommaso del 29/10/2026.
+
 Messa online (una volta):
 1. Su Cloudflare attivare R2 e creare i due bucket (o dare il permesso "R2: modifica" alla chiave del deploy e lanciare
    `npx wrangler r2 bucket create acceleriamo-os-documenti` e `npx wrangler r2 bucket create acceleriamo-os-demo-documenti`).

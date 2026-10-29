@@ -6,6 +6,7 @@ import { getDb, type Db } from "./db/client";
 import { activities, proposals } from "./db/schema";
 import { generaRicorrenti } from "./lavori/service";
 import { togliScaduti } from "./leads/cestino";
+import { COSTO_PULIZIA, pulisciDocumenti } from "./leads/pulizia-documenti";
 import { mandaInvitiInCoda } from "./calls/service";
 import { lavoraCoda, orologioCoda } from "./claude/coda";
 import "./claude/tipi";
@@ -24,7 +25,7 @@ import { giroTelegram } from "./telegram/bot";
 import { COSTO_STATO, controllaStato, potaStorico, scriviEsiti, type EsitoGiro } from "./stato/service";
 import { idVoceGiro, VOCE_GIRO, VOCI_GIRO } from "./stato/voci";
 
-export type Lavoro = "avvisi" | "risponditore" | "ig_token" | "consegna" | "foglio" | "meta_recupero" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "cestino" | "lunedi" | "stato";
+export type Lavoro = "avvisi" | "risponditore" | "ig_token" | "consegna" | "foglio" | "meta_recupero" | "meta" | "meta_48h" | "conferme" | "claude" | "telegram" | "proposte_scadute" | "lavori" | "cestino" | "documenti" | "lunedi" | "stato";
 
 // Ogni lavoro dichiara quanto costa: query fisse (letture di impostazioni e stato), query per unità
 // (un lead, una conferma, un invito, una push) e sottorichieste per unità. Misure con contaD1, che conta anche
@@ -145,6 +146,9 @@ export const LAVORI: Partial<Record<Lavoro, DefLavoro>> = {
   // Cestino (blocco 1, modifica 9): alle 6:30 di Roma toglie per sempre i lead nel cestino da oltre 30 giorni, 3 per giro.
   // A lead: 4 letture (lead, cestino, cliente, documenti) e una batch da 10 scritture, più versioni e R2; fisse 1 per la lista.
   cestino: { quando: (p) => p.ore === 6 && p.minuti >= 30 && p.minuti < 35, fisse: 1, perUnita: 15, sottoPerUnita: 0, max: 3, esegui: (e, n) => togliScaduti(getDb(e.DB), n, e.DOCUMENTI) },
+  // Documenti tolti (29/10/2026): alle 6:40 di Roma cancella davvero quelli tolti da oltre 30 giorni (file su R2 e righe)
+  // e le cartelle R2 orfane di lead che non esistono più. Costi in worker/leads/pulizia-documenti.ts.
+  documenti: { quando: (p) => p.ore === 6 && p.minuti >= 40 && p.minuti < 45, ...COSTO_PULIZIA, esegui: (e, n, l) => pulisciDocumenti(getDb(e.DB), e.DB, e.DOCUMENTI, n, l) },
   // Lunedì (spec 6.4): il lunedì dalle 7:00 alle 7:55 (ora di Roma) il giro congela i numeri della settimana chiusa
   // in weekly_reviews. Dopo il lead e i suoi avvisi, prima di Claude: se il budget non basta riprova al giro dopo.
   // La revisione nasce una volta sola per settimana (settimana unica, ON CONFLICT): nei giri dopo il primo costa

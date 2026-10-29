@@ -54,3 +54,19 @@ Chi: Silvio (sviluppatore). Revisione: Riccardo (revisore e sicurezza). Ramo `ac
 2. Copia del database, `npm run db:migrate:remote` e `npm run db:migrate:demo` (migrazione 0021).
 3. `npx wrangler secret put CARICA_TOKEN` e la stessa stringa nel portachiavi del Mac (`acceleriamo-carica-token`).
 4. `npm run deploy` e `npm run deploy:demo`. Senza i bucket il deploy si ferma.
+
+## Pulizia dei documenti tolti (ordine di Dante (direttore), decisione di Tommaso del 29/10/2026)
+
+1. `worker/leads/pulizia-documenti.ts`: documenti con `deleted_at` oltre 30 giorni, prima via da R2 tutte le versioni,
+   poi le righe; poi le cartelle R2 `lead/<id>/` senza lead nel database (i lead nel cestino restano).
+2. Lavoro `documenti` nel giro (ogni giorno alle 6:40 di Roma, al massimo 20 unità a giro), voce "Documenti tolti
+   oltre 30 giorni" nella pagina Stato, spenta senza bucket.
+3. Prove: `tests/documenti-pulizia.test.ts` (4) e `tests/cron.test.ts` aggiornato. `npm test`: 1.407 su 1.407,
+   typecheck e build pulite.
+4. Prova vera in locale (database di produzione locale, server `vite`, giro lanciato con l'API locale di Wrangler
+   alle 6:40 del 02/11/2026): `qa/documenti-lead-2026-10-29/pulizia.log`. Il documento tolto da 31 giorni sparisce con le sue
+   2 versioni, quello vivo e il suo file restano, la cartella orfana su R2 sparisce, la voce dello Stato è "ok".
+   Dati di prova tolti dal database locale alla fine.
+5. Riccardo (revisore e sicurezza): via libera, nessun file vivo a rischio. Applicati i due bassi: elenco delle cartelle
+   su più pagine (fino a 3000 cartelle a giro) e cancellazione su R2 a blocchi da 1000. Non fatto: riga nello storico
+   del lead per la cancellazione definitiva (da chiedere a Tommaso se la vuole).

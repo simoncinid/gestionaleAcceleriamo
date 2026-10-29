@@ -1,0 +1,16 @@
+Caricato "offerta-prova.pdf" su Prova Pulizia Srl (versione 1)
+Caricato "offerta-prova.pdf" su Prova Pulizia Srl (versione 2)
+Caricato "chiamata-prova.m4a" su Prova Pulizia Srl (versione 1)
+documento da far scadere: c9f4cc30-24a1-4e55-8278-2dd4f9b6287f
+Upload complete.
+--- giro avviato con scheduled_time = 02/11/2026 6:40 (Roma)
+{"success":true,"errors":[],"messages":[],"result":{"outcome":"ok","noRetry":false}}
+        "voce_id": "giro:documenti",
+        "esito": "ok"
+        "name": "chiamata-prova.m4a",
+        "tolto": 0
+        "versioni_rimaste": 1
+--- cartella orfana lead/lead-sparito su R2:
+🪵  Logs were written to "/Users/tommasorovini/Library/Preferences/.wrangler/logs/wrangler-2026-10-29_17-59-26_145.log"
+--- file del documento vivo ancora su R2:
+ID3 audio di prova

@@ -119,7 +119,7 @@ describe("calendario del giro", () => {
     expect(quali(mar0600)).not.toContain("foglio");
   });
   it("ordine del giro: i canali (push e Telegram) dopo gli avvisi, prima delle conferme; le task ricorrenti dopo Meta 48 ore; il lunedì prima di Claude; Claude per ultimo", () => {
-    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta_recupero", "meta", "avvisi", "risponditore", "ig_token", "consegna", "telegram", "conferme", "meta_48h", "lavori", "cestino", "lunedi", "stato", "claude"]);
+    expect(Object.keys(LAVORI)).toEqual(["proposte_scadute", "foglio", "meta_recupero", "meta", "avvisi", "risponditore", "ig_token", "consegna", "telegram", "conferme", "meta_48h", "lavori", "cestino", "documenti", "lunedi", "stato", "claude"]);
   });
   it("un giro partito con qualche secondo di ritardo resta lo stesso giro", () => {
     expect(quali(lun1015 + 40_000)).toContain("meta");
@@ -134,6 +134,9 @@ describe("calendario del giro", () => {
     expect(quali(r(6, 30))).toContain("cestino");
     expect(quali(r(6, 0))).not.toContain("cestino");
     expect(quali(r(6, 35))).not.toContain("cestino");
+    expect(quali(r(6, 40))).toContain("documenti");
+    expect(quali(r(6, 30))).not.toContain("documenti");
+    expect(quali(r(6, 45))).not.toContain("documenti");
   });
   it("le 6 sono le 6 di Roma anche il giorno del cambio d'ora", () => {
     expect(quali(daRoma(2026, 10, 25, 6, 0))).toContain("proposte_scadute");

@@ -17,6 +17,7 @@ export const VOCI_GIRO: Record<Lavoro, { nome: string; intervalloMin: number; sp
   meta_48h: { nome: "Controllo Meta senza lead da 48 ore", intervalloMin: 60, spento: (e) => !e.META_PAGE_TOKEN },
   lavori: { nome: "Task ricorrenti dei lavori", intervalloMin: 1440 },
   cestino: { nome: "Cestino dei lead oltre 30 giorni", intervalloMin: 1440 },
+  documenti: { nome: "Documenti tolti oltre 30 giorni", intervalloMin: 1440, spento: (e) => !e.DOCUMENTI },
   lunedi: { nome: "Revisione del lunedì", intervalloMin: 10_080 },
   claude: { nome: "Lavori di Claude", intervalloMin: 5, spento: (e) => !e.ANTHROPIC_API_KEY },
   proposte_scadute: { nome: "Preventivi scaduti", intervalloMin: 1440 },
