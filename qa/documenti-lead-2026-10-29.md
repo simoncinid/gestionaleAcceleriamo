@@ -70,3 +70,5 @@ Chi: Silvio (sviluppatore). Revisione: Riccardo (revisore e sicurezza). Ramo `ac
 5. Riccardo (revisore e sicurezza): via libera, nessun file vivo a rischio. Applicati i due bassi: elenco delle cartelle
    su più pagine (fino a 3000 cartelle a giro) e cancellazione su R2 a blocchi da 1000. Non fatto: riga nello storico
    del lead per la cancellazione definitiva (da chiedere a Tommaso se la vuole).
+
+- 29/10 19:06: `tests/badge.test.ts` (conta cose da fare) fallisce anche sul commit di partenza 040994e: dipende dall ora reale (sera), non dai cambi della pulizia. Da sistemare a parte.
