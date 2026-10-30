@@ -11,7 +11,7 @@ import { corpoFile } from "../leads/routes";
 // Rotte dello script di caricamento sul Mac di Tommaso (spec documenti 29/10/2026, punto 6).
 // Token dedicato CARICA_TOKEN: permette solo di cercare un lead e caricargli un documento, a nome di Tommaso con "caricato da Claude".
 export const caricaRoutes = new Hono<AppEnv>();
-export const UTENTE_CLAUDE = "tommaso";
+export const UTENTE_CLAUDE = "tommaso.rovini";
 
 caricaRoutes.use("*", async (c, next) => {
   const auth = c.req.header("authorization") ?? "";

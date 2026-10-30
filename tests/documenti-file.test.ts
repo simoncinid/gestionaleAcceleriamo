@@ -188,7 +188,11 @@ describe("rotte dello script (CARICA_TOKEN)", () => {
   });
 
   it("cerca il lead per nome e carica a nome di Tommaso con \"caricato da Claude\"", async () => {
-    const { tommaso, diego } = await dueUtenti();
+    // In produzione l'utente di Tommaso è "tommaso.rovini" (UTENTE_CLAUDE).
+    await createUser("tommaso.rovini", "password-lunga-3", "Tommaso");
+    const tommaso = await loginCookie("tommaso.rovini", "password-lunga-3");
+    await createUser("diego", "password-lunga-2", "Diego");
+    const diego = await loginCookie("diego", "password-lunga-2");
     const id = await nuovoLead(tommaso, "Pizzeria Da Mario");
     await nuovoLead(tommaso, "Altra Ditta");
     const cerca = (await (await call("/api/carica/lead?q=mario", { headers: conToken() })).json()) as { leads: { id: string; company: string }[] };
