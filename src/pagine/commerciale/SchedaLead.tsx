@@ -39,7 +39,7 @@ import { confermaNonPartita, idPerPreventivo } from "./scheda";
 import { useCambioFase } from "./StepperFasi";
 import { useNonPresentato } from "./nonPresentato";
 
-type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase"
+type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase" | "dettagli" | "collegamenti" | "assistente" | "storico"
   | "sposta" | "link" | "rimanda" | "proposta" | "automazione" | "canone" | { fase: Stage } | { fissa: CallKind };
 
 // Avviso in riga in cima alla scheda: una frase, al massimo un link. Mai finestre del browser.
@@ -52,9 +52,7 @@ export function SchedaLeadRotta() {
   return <SchedaLead key={id} id={id} />;
 }
 
-// Scheda del lead, struttura B2 (contratto blocco 1, sezione 3): intestazione pulita, cinque sezioni in contenitori bianchi.
-// A due colonne: a sinistra Da fare, Collegamenti, Storico; a destra Contatti, Dati del lead, Assistente.
-// In una colonna l'ordine è Da fare, Contatti, Collegamenti, Dati del lead, Storico, Assistente (order sui figli).
+// Vista operativa a tutta altezza: azione e contatti sempre disponibili, dettagli nei fogli.
 export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) {
   const qc = useQueryClient();
   const vai = useNavigate();
@@ -142,16 +140,15 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const leadEsito = { id: lead.id, company: lead.company, contactName: lead.contactName, stageId: lead.stageId, attemptCount: lead.attemptCount, email: lead.email };
 
   return (
-    <div className="flex flex-col gap-6 pb-8">
-      <header className="flex items-start gap-3">
+    <div className="lead-workspace flex h-full min-h-0 flex-col gap-3">
+      <header className="lead-heading flex shrink-0 items-center gap-3">
         {/* Si torna da dove si è venuti (la tabella ritrova i filtri); aperta da un link diretto, la scheda torna alla tabella. */}
         <Pulsante variante="icona" aria-label="Torna indietro" title="Torna indietro" className="w-11 shrink-0 px-0!" icona={<ArrowLeft size={22} weight="bold" aria-hidden />}
           onClick={() => (chiaveStoria === "default" ? vai("/commerciale/lead") : vai(-1))} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h1 className="line-clamp-2 break-words font-sans text-[28px] font-semibold leading-[1.15] tracking-[-0.01em]">{lead.company}</h1>
+          <h1 className="truncate font-sans text-[22px] font-semibold leading-tight tracking-[-0.01em]" title={lead.company}>{lead.company}</h1>
           <div className="flex flex-wrap items-center gap-x-3">
-            {lead.contactName && <p className="text-[15px]">{lead.contactName}</p>}
-            <button type="button" onClick={() => setFoglio("fase")} aria-label={`Fase: ${fase?.label ?? lead.stageId}. Cambia fase`} className="inline-flex min-h-11 min-w-0 items-center hover:[&>span]:brightness-95">
+            <button type="button" onClick={() => setFoglio("fase")} aria-label={`Fase: ${fase?.label ?? lead.stageId}. Cambia fase`} className="inline-flex min-h-8 min-w-0 items-center hover:[&>span]:brightness-95">
               <EtichettaFase {...faseDi(fasi.data, lead.stageId)} freccia />
             </button>
           </div>
@@ -180,34 +177,41 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         </Avviso>
       )}
 
-      <div className="flex flex-col gap-6 @4xl:grid @4xl:grid-cols-[minmax(0,58fr)_minmax(0,42fr)] @4xl:items-start">
-        <div className="contents @4xl:flex @4xl:min-w-0 @4xl:flex-col @4xl:gap-6">
-          <div className="order-1 @4xl:order-none">
+      <nav aria-label="Dettagli del lead" className="lead-tools grid shrink-0 grid-cols-4 gap-2">
+        <button type="button" onClick={() => setFoglio("dettagli")}>Dati e note</button>
+        <button type="button" onClick={() => setFoglio("documenti")}>Documenti <span>{documents.length}{(visto.data?.novita ?? 0) > 0 ? " •" : ""}</span></button>
+        <button type="button" onClick={() => setFoglio("collegamenti")}>Collegamenti <span>{coll.data ? coll.data.call.length + coll.data.proposte.length + coll.data.automazioni.length + coll.data.canoni.length + Number(!!coll.data.cliente) : "…"}</span></button>
+        <button type="button" onClick={() => setFoglio("assistente")}>Assistente</button>
+      </nav>
+
+      <div className="lead-overview grid shrink-0 gap-3 @3xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <div className="min-w-0">
             <NextActionCard lead={lead} kind={fase?.kind} ora={ora} onComando={comando}
               inLinea={{ call: prossimaCall, proposta: ultimaProposta, cliente: d.data.cliente ? { id: d.data.cliente.id, name: d.data.cliente.name } : null }} />
           </div>
-          <div className="order-3 @4xl:order-none">
-            <Collegamenti dati={coll.data} ora={ora} perso={fase?.kind === "lost"}
-              onCrea={(a) => (a === "proposta" ? setFoglio("proposta") : a === "call" ? setFoglio("fissa") : setFoglio(a))} />
-          </div>
-          <div className="order-5 @4xl:order-none">
-            <Sezione titolo="Storico" nome="storico"><Timeline leadId={lead.id} activities={activities} ora={ora} /></Sezione>
-          </div>
-        </div>
-        <div className="contents @4xl:flex @4xl:min-w-0 @4xl:flex-col @4xl:gap-6">
-          <div className="order-2 @4xl:order-none">
+          <div className="min-w-0">
             <Contatti lead={lead} onScrivi={setFoglio} onAggiungi={() => setFoglio("dati")} />
           </div>
-          <div className="order-4 @4xl:order-none">
-            <DatiLead lead={lead} fasi={fasi.data ?? []} utenti={utenti.data ?? []} documenti={documents.length} novita={visto.data?.novita ?? 0}
-              onServeFoglio={(f) => setFoglio({ fase: f })} onResponsabile={(ownerId) => patch.mutate({ ownerId })}
-              onDocumenti={() => setFoglio("documenti")} onModifica={() => setFoglio("dati")} />
-          </div>
-          <div className="order-6 @4xl:order-none">
-            <Assistente lead={leadEsito} manuale={lead.source === "manuale"} />
-          </div>
-        </div>
       </div>
+      <Sezione titolo="Storico" nome="storico" className="lead-history min-h-0 flex-1"
+        destra={<button type="button" className="text-[13px] font-semibold underline decoration-sabbia-2 underline-offset-4" onClick={() => setFoglio("storico")}>Aggiungi attività</button>}>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" tabIndex={0} role="region" aria-label="Cronologia del lead">
+          <Timeline leadId={lead.id} activities={activities} ora={ora} compatta />
+        </div>
+      </Sezione>
+
+      {foglio === "storico" && <Foglio aperto lato titolo="Storico e attività" onChiudi={chiudi}><Timeline leadId={lead.id} activities={activities} ora={ora} /></Foglio>}
+      {foglio === "collegamenti" && <Foglio aperto lato titolo="Collegamenti" onChiudi={chiudi}>
+        <Collegamenti dati={coll.data} ora={ora} perso={fase?.kind === "lost"}
+          onCrea={(a) => setFoglio(a === "call" ? "fissa" : a)} />
+      </Foglio>}
+      {foglio === "assistente" && <Foglio aperto lato titolo="Assistente" onChiudi={chiudi}><Assistente lead={leadEsito} manuale={lead.source === "manuale"} /></Foglio>}
+      {foglio === "dettagli" && <Foglio aperto lato titolo="Dati e note" onChiudi={chiudi}>
+        <Pulsante variante="secondario" onClick={() => setFoglio("dati")}>Modifica dati</Pulsante>
+        <DatiLead lead={lead} fasi={fasi.data ?? []} utenti={utenti.data ?? []} documenti={documents.length} novita={visto.data?.novita ?? 0}
+          onServeFoglio={(f) => setFoglio({ fase: f })} onResponsabile={(ownerId) => patch.mutate({ ownerId })}
+          onDocumenti={() => setFoglio("documenti")} onModifica={() => setFoglio("dati")} />
+      </Foglio>}
 
       {foglio === "esito" && <FoglioEsito lead={leadEsito} onChiudi={chiudi} />}
       {foglio === "avvio" && d.data.cliente && <FoglioAvvioLavoro leadId={lead.id} clientId={d.data.cliente.id} nomeCliente={d.data.cliente.name} canoneIniziale={lead.feeCents} documenti={d.data.documents} onChiudi={chiudi} />}

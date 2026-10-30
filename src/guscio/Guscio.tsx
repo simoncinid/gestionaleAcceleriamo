@@ -16,6 +16,7 @@ import { useAzzeraAnonimoFuoriArea } from "../pagine/automazioni/anonimo";
 export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => void; fogli: (crea: Creazione | null, chiudi: () => void) => ReactNode }) {
   useAzzeraAnonimoFuoriArea();
   const { pathname } = useLocation();
+  const schedaLead = /^\/commerciale\/lead\/[^/]+$/.test(pathname);
   const vai = useNavigate();
   const [crea, setCrea] = useState<Creazione | null>(null);
   const [menu, setMenu] = useState(false);
@@ -57,16 +58,16 @@ export function Guscio({ nome, onEsci, fogli }: { nome: string; onEsci: () => vo
   const piu = () => (voci.length === 1 ? setCrea(voci[0].id) : setMenu(true));
   return (
     <>
-      <div className="flex min-h-dvh bg-crema">
+      <div className={schedaLead ? "lead-shell flex h-dvh overflow-hidden bg-crema" : "flex min-h-dvh bg-crema"}>
         <BarraLaterale nome={nome} badge={badge} onCrea={setCrea} onEsci={onEsci} onCerca={() => setCerca(true)} ridotta={ridotta} onRiduci={riduci} animata={animata} />
-        <div className="min-w-0 flex-1">
+        <div className={schedaLead ? "flex min-h-0 min-w-0 flex-1 flex-col" : "min-w-0 flex-1"}>
           <div className="sticky top-0 z-10">
             <BannerDemo />
             <Testata nome={nome} puntoAvatar={badge?.avatar ?? false} avvisi={badge?.avvisi ?? 0} onCerca={() => setCerca(true)} onPiu={piu} />
           </div>
           {/* Tutta la larghezza a destra della barra laterale. Le pagine si impaginano sulla larghezza del contenitore
               (varianti @5xl, @7xl di Tailwind), non su quella della finestra: la barra laterale non conta. */}
-          <main className="@container w-full px-4 pt-4 md:px-8 md:pt-8"><Outlet /></main>
+          <main className={schedaLead ? "@container lead-main min-h-0 w-full flex-1 px-3 pt-3 md:px-6 md:pt-4" : "@container w-full px-4 pt-4 md:px-8 md:pt-8"}><Outlet /></main>
         </div>
       </div>
       <BarraBasso badge={badge} />

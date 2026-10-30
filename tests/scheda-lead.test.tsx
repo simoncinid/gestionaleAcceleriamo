@@ -69,21 +69,22 @@ describe("scheda lead, pagina (struttura B2, modifica 10)", () => {
   it("una sola azione primaria, Chiama col nome", () => {
     expect(contaPrimari(html)).toBe(1);
     expect(html).toContain("Chiama Luca");
-    expect(html).toMatch(/data-selettore="Fase"(?:(?!<\/button>).)*>Da richiamare</s);
+    expect(html).toContain('aria-label="Fase: Da richiamare. Cambia fase"');
   });
-  it("cinque sezioni con titolo più Assistente, nessuna fisarmonica salvo la ricerca", () => {
-    for (const titolo of ["Da fare", "Contatti", "Dati del lead", "Storico", "Assistente"]) expect(html).toContain(`>${titolo}</h2>`);
-    expect((html.match(/<details/g) ?? []).length).toBe(1);
-    expect(html).toContain("Ricerca sull&#x27;azienda");
-    expect(html).toContain("Le altre funzioni arrivano con il blocco 7");
-    for (const via of ["Note e dati", "Risposte del modulo</span>", "Doppioni", "Scheda azienda di Claude"]) expect(html).not.toContain(via);
+  it("vista operativa con dettagli nei fogli e storico senza modulo sempre aperto", () => {
+    for (const titolo of ["Da fare", "Contatti", "Storico"]) expect(html).toContain(`>${titolo}</h2>`);
+    for (const titolo of ["Dati e note", "Documenti", "Collegamenti", "Assistente", "Aggiungi attività"]) expect(html).toContain(titolo);
+    expect(html).toContain('aria-label="Cronologia del lead"');
+    expect(html).not.toContain("Cosa è successo");
+    expect(html).not.toContain("Ricerca sull&#x27;azienda");
+    expect(html).not.toContain("Le altre funzioni arrivano con il blocco 7");
   });
   it("intestazione pulita: pillola della fase, niente provenienza né responsabile ripetuti", () => {
     expect(html).toContain('aria-label="Fase: Da richiamare. Cambia fase"');
     expect(html).not.toContain("Dal Foglio Andrea");
     expect(html).not.toContain("Responsabile:");
-    // Fonte e campagna una volta sola, in Dati del lead.
-    expect(html.match(/>Autunno</g)?.length).toBe(1);
+    // Fonte e campagna restano nel foglio Dati e note.
+    expect(html).not.toContain(">Autunno<");
   });
   it("doppione come avviso in cima solo quando c'è", () => {
     expect(html).not.toContain("Possibile doppione");

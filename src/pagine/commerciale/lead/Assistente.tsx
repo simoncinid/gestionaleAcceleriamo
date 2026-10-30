@@ -6,7 +6,6 @@ import { CoachCall } from "../CoachCall";
 import type { LeadEsito } from "../esito";
 import { SezioneSchedaAzienda } from "../SezioneSchedaAzienda";
 import { Sezione } from "./Sezione";
-import { SECONDARIO } from "./stile";
 
 // Riquadro Assistente (contratto blocco 1, sezione 9): solo quello che c'è già. La ricerca sull'azienda resta chiusa
 // (è l'unica parte che si apre e si chiude nella scheda), il coach compare dopo una call fatta.
@@ -28,7 +27,6 @@ export function Assistente({ lead, manuale }: { lead: LeadEsito; manuale: boolea
           <CoachCall callId={fatta.id} leadId={lead.id} lead={lead} />
         </div>
       )}
-      <p className={`${SECONDARIO} border-t border-[#E5DED4] pt-3`}>Le altre funzioni arrivano con il blocco 7.</p>
     </Sezione>
   );
 }

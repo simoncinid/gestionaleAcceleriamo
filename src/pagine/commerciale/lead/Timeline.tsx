@@ -22,7 +22,7 @@ export const automatica = (a: Pick<Activity, "type" | "authorId">) => a.authorId
 
 // Storico: in cima "Cosa è successo" con il tipo (Nota di default) e Aggiungi, attivo solo con del testo;
 // sotto la cronologia dal più recente, una voce per riga: tipo e testo, poi chi e quando.
-export function Timeline({ leadId, activities, ora }: { leadId: string; activities: Activity[]; ora: number }) {
+export function Timeline({ leadId, activities, ora, compatta = false }: { leadId: string; activities: Activity[]; ora: number; compatta?: boolean }) {
   const refresh = useRefreshLeads();
   const [tipo, setTipo] = useState<Tipo>("nota");
   const [testo, setTesto] = useState("");
@@ -33,7 +33,7 @@ export function Timeline({ leadId, activities, ora }: { leadId: string; activiti
   });
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3">
+      {!compatta && <div className="flex flex-col gap-3">
         <AreaTesto etichetta="Cosa è successo" rows={2} value={testo} onChange={(e) => setTesto(e.target.value)} />
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
           <Selettore etichetta="Tipo" valore={tipo} opzioni={[...TIPI]} onCambia={setTipo} />
@@ -41,7 +41,7 @@ export function Timeline({ leadId, activities, ora }: { leadId: string; activiti
             Aggiungi
           </Pulsante>
         </div>
-      </div>
+      </div>}
       {activities.length === 0 ? <p className={SECONDARIO}>Nessun contatto ancora: la prima chiamata è il primo passo.</p> : (
         <ol className={ELENCO}>
           {activities.map((a) => {

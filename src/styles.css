@@ -1,6 +1,44 @@
 @import "tailwindcss";
 @import "./temi/acceleriamo.css"; /* i colori del brand, uguali in ogni app, vedi 4.9 */
 
+/* Scheda lead: l'altezza disponibile viene dal guscio, incluso il banner demo.
+   Solo cronologia e fogli scorrono; su finestre basse anche il riepilogo resta raggiungibile. */
+.lead-main { padding-bottom: calc(var(--barra-altezza) + var(--safe-bottom) + 12px); }
+.lead-workspace > [role="status"] { flex-shrink: 0; padding: 6px 12px; font-size: 12px; }
+.lead-overview { min-height: 0; max-height: 65%; overflow-y: auto; overscroll-behavior: contain; }
+.lead-workspace [data-sezione] { padding: 12px 14px; gap: 8px; background: var(--color-avorio); }
+.lead-overview [data-sezione] { height: 100%; }
+.lead-workspace [data-sezione] h2 { font-size: 13px; line-height: 20px; }
+.lead-overview [data-sezione="da-fare"] > div:first-of-type > p:first-child { font-size: 18px; line-height: 22px; }
+.lead-overview [data-sezione="da-fare"] p { font-size: 13px; line-height: 19px; }
+.lead-overview [data-sezione="da-fare"] .border-t { padding-top: 6px; }
+.lead-overview [data-sezione="da-fare"] a,
+.lead-overview [data-sezione="da-fare"] button { min-height: 32px; font-size: 13px; }
+.lead-overview [data-sezione="da-fare"] [data-variante="primario"] { height: auto; min-height: 36px; padding: 7px 12px; }
+.lead-overview [data-sezione="contatti"] dl > div { min-height: 28px; padding-block: 2px; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
+.lead-overview [data-sezione="contatti"] dd,
+.lead-overview [data-sezione="contatti"] a,
+.lead-overview [data-sezione="contatti"] button { min-height: 28px; font-size: 13px; line-height: 20px; }
+.lead-overview [role="group"] > * { height: 36px; min-height: 36px; padding-block: 6px; }
+.lead-tools > button { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 40px; padding: 6px; border: 1px solid var(--color-sabbia); border-radius: 8px; background: var(--color-avorio); font-size: 12px; font-weight: 600; }
+.lead-tools > button:hover { background: var(--color-tinta); border-color: var(--color-sabbia-2); }
+.lead-tools > button span { color: var(--color-grigio); font-variant-numeric: tabular-nums; }
+.lead-history > header { flex-shrink: 0; }
+.lead-history ol > li { padding-block: 8px; }
+.lead-history ol > li > p:first-child { font-size: 13px; line-height: 20px; }
+.lead-history ol > li > p:last-child { font-size: 11px; line-height: 17px; }
+@media (min-width: 48rem) { .lead-main { padding-bottom: 16px; } }
+@media (max-width: 47.999rem) {
+  .lead-workspace { gap: 8px; }
+  .lead-workspace [data-sezione] { padding: 10px 12px; gap: 6px; }
+  .lead-overview { gap: 8px; max-height: 75%; }
+  .lead-overview [data-sezione="da-fare"] > div.border-t { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .lead-overview [data-sezione="da-fare"] > div.border-t > * { width: auto; }
+  .lead-overview [data-sezione="da-fare"] button { height: 36px; padding: 6px 8px; }
+  .lead-tools { gap: 4px; }
+  .lead-tools > button { font-size: 11px; gap: 3px; padding-inline: 3px; }
+}
+
 @font-face { font-family: "Degular Display"; src: url("/fonts/DegularDisplay-Medium.otf") format("opentype"); font-weight: 500; font-display: swap; }
 @font-face { font-family: "Degular Display"; src: url("/fonts/DegularDisplay-Semibold.otf") format("opentype"); font-weight: 600; font-display: swap; }
 @font-face { font-family: "Degular Display"; src: url("/fonts/DegularDisplay-Bold.otf") format("opentype"); font-weight: 700; font-display: swap; }
