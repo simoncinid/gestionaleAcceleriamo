@@ -1,27 +1,22 @@
 @import "tailwindcss";
 @import "./temi/acceleriamo.css"; /* i colori del brand, uguali in ogni app, vedi 4.9 */
 
-/* Scheda lead: l'altezza disponibile viene dal guscio, incluso il banner demo.
-   Solo cronologia e fogli scorrono; su finestre basse anche il riepilogo resta raggiungibile.
+/* Scheda lead: dal giro 4 (30/10/2026) la scheda scorre con la pagina, niente riquadri con barra propria:
+   Da fare e Storico si leggono interi.
    Giro 3: tolte le regole sul vecchio Da fare e sui vecchi Contatti (ora lista con righe da 60 e icone da 44)
    e quella che rimpiccioliva i titoli: Da fare e Contatti seguono la scala unica e il segno di sezione. */
 .lead-main { padding-bottom: calc(var(--barra-altezza) + var(--safe-bottom) + 12px); }
 .lead-workspace > [role="status"] { flex-shrink: 0; padding: 6px 12px; font-size: 12px; }
-.lead-overview { min-height: 0; max-height: 65%; overflow-y: auto; overscroll-behavior: contain; }
 .lead-workspace [data-sezione] { padding: 12px 14px; gap: 8px; background: var(--color-avorio); }
 .lead-overview > div > [data-sezione]:only-child { height: 100%; }
 .lead-tools > button { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 40px; padding: 6px; border: 1px solid var(--color-sabbia); border-radius: 8px; background: var(--color-avorio); font-size: 12px; font-weight: 600; }
 .lead-tools > button:hover { background: var(--color-tinta); border-color: var(--color-sabbia-2); }
 .lead-tools > button span { color: var(--color-grigio); font-variant-numeric: tabular-nums; }
-.lead-history > header { flex-shrink: 0; }
-.lead-history ol > li { padding-block: 8px; }
-.lead-history ol > li > p:first-child { font-size: 13px; line-height: 20px; }
-.lead-history ol > li > p:last-child { font-size: 11px; line-height: 17px; }
 @media (min-width: 48rem) { .lead-main { padding-bottom: 16px; } }
 @media (max-width: 47.999rem) {
   .lead-workspace { gap: 8px; }
   .lead-workspace [data-sezione] { padding: 10px 12px; gap: 6px; }
-  .lead-overview { gap: 8px; max-height: 75%; }
+  .lead-overview { gap: 8px; }
   .lead-tools { gap: 4px; }
   .lead-tools > button { font-size: 11px; gap: 3px; padding-inline: 3px; }
 }

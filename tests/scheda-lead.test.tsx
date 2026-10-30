@@ -75,9 +75,11 @@ describe("scheda lead, pagina (struttura B2, modifica 10)", () => {
   });
   it("vista operativa con dettagli nei fogli e storico senza modulo sempre aperto", () => {
     for (const titolo of ["Da fare", "Contatti", "Storico"]) expect(html).toContain(`>${titolo}</h2>`);
-    for (const titolo of ["Dati e note", "Documenti", "Collegamenti", "Assistente", "Aggiungi attività"]) expect(html).toContain(titolo);
-    expect(html).toContain('aria-label="Cronologia del lead"');
-    expect(html).not.toContain("Cosa è successo");
+    for (const titolo of ["Dati e note", "Documenti", "Assistente", "Tutte le attività"]) expect(html).toContain(titolo);
+    // Giro 4: Collegamenti sparisce, lo storico è una tabella a tappe senza modulo aperto.
+    expect(html).not.toContain(">Collegamenti<");
+    expect(html).toContain('aria-label="Storico del lead"');
+    expect(html.slice(html.indexOf('aria-label="Storico del lead"'))).not.toContain("<textarea");
     expect(html).not.toContain("Ricerca sull&#x27;azienda");
     expect(html).not.toContain("Le altre funzioni arrivano con il blocco 7");
   });

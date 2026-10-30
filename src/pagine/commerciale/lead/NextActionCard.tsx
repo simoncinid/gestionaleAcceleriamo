@@ -12,7 +12,7 @@ import { dataTesto } from "../../../../worker/processo/processo";
 import { AZIONE_CALL } from "../../../../worker/regole/fasi-call";
 import { avviaContatto } from "../chiamata";
 import { leggiNote } from "../note-call";
-import { FASI_CON_CALL, FASI_TENTATIVI, dataEOra, distanza, orarioBreve, statoDi } from "./daFare";
+import { FASI_CON_CALL, FASI_TENTATIVI, dataEOra, orarioBreve, statoDi } from "./daFare";
 import { fileDi } from "./documentiScheda";
 import { Sezione } from "./Sezione";
 import { useTaskDelLead, type TaskLead } from "./taskLead";
@@ -126,10 +126,9 @@ export function NextActionCard({ lead, kind, ora, inLinea = {}, onComando, onCal
 
   const dettagliPasso = (
     <>
-      {/* Call: canale e giorno, come nella riga di una call. Altri passi: la scadenza con la sua distanza, nel colore dello stato. */}
-      {p?.scadenza != null && p.stato && !chiuso && (conCall
-        ? <p className="text-testo tabular-nums">{lead.meetLink ? "Google Meet" : "Al telefono"}, {dataEOra(p.scadenza).toLowerCase()}</p>
-        : <p className="text-nota font-semibold tabular-nums" style={{ color: COLORE_STATO[p.stato] }}>Entro {dataEOra(p.scadenza).toLowerCase()}, {distanza(p.scadenza, p.stato, ora)}</p>)}
+      {/* Call: canale e giorno, come nella riga di una call. Altri passi: la scadenza sta solo a destra sulla riga (Tommaso, 30/10). */}
+      {p?.scadenza != null && p.stato && !chiuso && conCall && (
+        <p className="text-testo tabular-nums">{lead.meetLink ? "Google Meet" : "Al telefono"}, {dataEOra(p.scadenza).toLowerCase()}</p>)}
       {p?.poi && !chiuso && <p className="text-testo"><span className={SECONDARIO}>Poi: </span>{p.poi}</p>}
       {(pulsante || secondarie.length > 0) && (
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">

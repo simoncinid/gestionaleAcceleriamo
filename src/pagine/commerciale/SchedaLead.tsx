@@ -22,7 +22,6 @@ import { FoglioPropostaManuale } from "./FoglioProposta";
 import { FoglioRimanda } from "./FoglioRimanda";
 import { FoglioScrivi } from "./FoglioScrivi";
 import { Assistente } from "./lead/Assistente";
-import { Collegamenti } from "./lead/Collegamenti";
 import { PassaggioCliente } from "./lead/Passaggio";
 import { Contatti } from "./lead/Contatti";
 import { DatiLead } from "./lead/DatiLead";
@@ -40,11 +39,13 @@ import { Sezione } from "./lead/Sezione";
 import { LINK } from "./lead/stile";
 import { EtichettaFase, faseDi } from "./EtichettaFase";
 import { Timeline } from "./lead/Timeline";
+import { Storico } from "./lead/Storico";
+import { tappe } from "./lead/storicoTappe";
 import { confermaNonPartita, idPerPreventivo } from "./scheda";
 import { useCambioFase } from "./StepperFasi";
 import { useNonPresentato } from "./nonPresentato";
 
-type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase" | "dettagli" | "collegamenti" | "assistente" | "storico"
+type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase" | "dettagli" | "assistente" | "storico"
   | "sposta" | "link" | "rimanda" | "proposta" | "automazione" | "canone" | { fase: Stage } | { fissa: CallKind } | { call: CallAgenda; modo: ModoCall };
 
 // Avviso in riga in cima alla scheda: una frase, al massimo un link. Mai finestre del browser.
@@ -154,7 +155,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   const leadEsito = { id: lead.id, company: lead.company, contactName: lead.contactName, stageId: lead.stageId, attemptCount: lead.attemptCount, email: lead.email };
 
   return (
-    <div className="lead-workspace flex h-full min-h-0 flex-col gap-3">
+    <div className="lead-workspace flex flex-col gap-3">
       <header className="lead-heading flex shrink-0 items-center gap-3">
         {/* Si torna da dove si è venuti (la tabella ritrova i filtri); aperta da un link diretto, la scheda torna alla tabella. */}
         <Pulsante variante="icona" aria-label="Torna indietro" title="Torna indietro" className="w-11 shrink-0 px-0!" icona={<ArrowLeft size={22} weight="bold" aria-hidden />}
@@ -191,14 +192,13 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         </Avviso>
       )}
 
-      <nav aria-label="Dettagli del lead" className="lead-tools grid shrink-0 grid-cols-4 gap-2">
+      <nav aria-label="Dettagli del lead" className="lead-tools grid shrink-0 grid-cols-3 gap-2">
         <button type="button" onClick={() => setFoglio("dettagli")}>Dati e note</button>
         <button type="button" onClick={() => setFoglio("documenti")}>Documenti <span>{altri.length}{novitaAltri > 0 ? " •" : ""}</span></button>
-        <button type="button" onClick={() => setFoglio("collegamenti")}>Collegamenti <span>{coll.data ? coll.data.call.length + coll.data.proposte.length + coll.data.automazioni.length + coll.data.canoni.length + Number(!!coll.data.cliente) : "…"}</span></button>
         <button type="button" onClick={() => setFoglio("assistente")}>Assistente</button>
       </nav>
 
-      <div className="lead-overview grid shrink-0 gap-3 @3xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      <div className="lead-overview grid items-start gap-3 @3xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
           <div className="min-w-0">
             <NextActionCard lead={lead} kind={fase?.kind} ora={ora} onComando={comando} onCall={(k, modo) => setFoglio({ call: k, modo })}
               documentiTask={perTask} nuovi={nuovi} caricando={caricaUno.inCorso === "Documento della cosa da fare caricato"}
@@ -215,20 +215,12 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
             <Contatti lead={lead} onScrivi={setFoglio} onAggiungi={() => setFoglio("dati")} />
           </div>
       </div>
-      <Sezione titolo="Storico" nome="storico" className="lead-history min-h-0 flex-1"
-        destra={<button type="button" className="text-[13px] font-semibold underline decoration-sabbia-2 underline-offset-4" onClick={() => setFoglio("storico")}>Aggiungi attività</button>}>
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" tabIndex={0} role="region" aria-label="Cronologia del lead">
-          <Timeline leadId={lead.id} activities={activities} ora={ora} compatta />
-        </div>
-      </Sezione>
+      <Storico className="lead-history" ora={ora} fase={faseDi(fasi.data, lead.stageId)} onTutte={() => setFoglio("storico")}
+        tappe={tappe({ lead, attivita: activities, dati: coll.data, documentiCall: perCall, preventivi, nuovi, ora })}
+        caricando={caricaUno.inCorso === "Registrazione caricata"}
+        onCaricaRegistrazione={(callId) => caricaUno.avvia((n) => `/leads/${lead.id}/documents?nome=${enc(n)}&tipo=registrazione&call=${enc(callId)}`, "Registrazione caricata")} />
 
-      {foglio === "storico" && <Foglio aperto lato titolo="Storico e attività" onChiudi={chiudi}><Timeline leadId={lead.id} activities={activities} ora={ora} /></Foglio>}
-      {foglio === "collegamenti" && <Foglio aperto lato titolo="Collegamenti" onChiudi={chiudi}>
-        <Collegamenti dati={coll.data} ora={ora} perso={fase?.kind === "lost"}
-          onCrea={(a) => setFoglio(a === "call" ? "fissa" : a)}
-          documentiCall={perCall} nuovi={nuovi} caricando={caricaUno.inCorso === "Registrazione caricata"}
-          onCaricaRegistrazione={(callId) => caricaUno.avvia((n) => `/leads/${lead.id}/documents?nome=${enc(n)}&tipo=registrazione&call=${enc(callId)}`, "Registrazione caricata")} />
-      </Foglio>}
+      {foglio === "storico" && <Foglio aperto lato titolo="Tutte le attività" onChiudi={chiudi}><Timeline leadId={lead.id} activities={activities} ora={ora} /></Foglio>}
       {foglio === "assistente" && <Foglio aperto lato titolo="Assistente" onChiudi={chiudi}><Assistente lead={leadEsito} manuale={lead.source === "manuale"} /></Foglio>}
       {foglio === "dettagli" && <Foglio aperto lato titolo="Dati e note" onChiudi={chiudi}>
         <Pulsante variante="secondario" onClick={() => setFoglio("dati")}>Modifica dati</Pulsante>
@@ -282,6 +274,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       {foglio === "menu" && (
         <Foglio aperto titolo="Altre azioni" onChiudi={chiudi}>
           <ul className="flex flex-col gap-2">
+            <li><Riga titolo="Fissa una call" onClick={() => { setChiede(null); setFoglio("fissa"); }} /></li>
+            <li><Riga titolo="Crea una proposta" onClick={() => { setChiede(null); setFoglio("proposta"); }} /></li>
             <li><Riga titolo="Modifica dati" secondaria="Nome, persona, telefono, email, nota" onClick={() => { setChiede(null); setFoglio("dati"); }} /></li>
             <li><Riga titolo="Cambia responsabile" onClick={() => { setChiede(null); setFoglio("responsabile"); }} /></li>
             {duplicateOf && (
