@@ -1,13 +1,30 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "echo skip",
-  "buildCommand": "mkdir -p .proxy-out && printf ok > .proxy-out/keep",
-  "outputDirectory": ".proxy-out",
+  "installCommand": "npm ci",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/client",
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "https://acceleriamo-os.diego-faf.workers.dev/$1"
-    }
+      "source": "/api/:path*",
+      "destination": "https://acceleriamo-os.diego-faf.workers.dev/api/:path*"
+    },
+    {
+      "source": "/r/:path*",
+      "destination": "https://acceleriamo-os.diego-faf.workers.dev/r/:path*"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "https://acceleriamo-os.diego-faf.workers.dev/robots.txt"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "https://acceleriamo-os.diego-faf.workers.dev/sitemap.xml"
+    },
+    {
+      "source": "/assets/:path*",
+      "destination": "https://acceleriamo-os.diego-faf.workers.dev/assets/:path*"
+    },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

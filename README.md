@@ -97,6 +97,15 @@ npm run e2e:foto  # rifà le foto di confronto: guardarle prima del commit
 
 ## Mettere online
 
+### Interfaccia su Vercel
+
+Ogni push sul branch di produzione `acceleriamo-os` avvia la build Vercel: `npm ci`, `npm run build`, pubblicazione di `dist/client`.
+Le pagine del gestionale e i file statici vengono serviti dalla nuova build. Le API, le pagine pubbliche `/r/*`, `robots.txt` e `sitemap.xml` vengono inoltrate al Worker Cloudflare.
+Il ripiego `/assets/*` recupera dal Worker i file delle pagine pubbliche quando non sono nella build Vercel; i file presenti in `dist/client` hanno precedenza sulle riscritture.
+Non configurare Vercel come semplice proxy di tutto il sito: il deploy risulterebbe riuscito ma l'interfaccia resterebbe quella pubblicata sul Worker.
+
+### Backend su Cloudflare
+
 Servono due variabili d'ambiente con le credenziali Cloudflare (chiave API e identificativo dell'account), da esportare nel terminale prima dei comandi `wrangler`:
 
 ```bash
