@@ -100,6 +100,7 @@ npm run e2e:foto  # rifà le foto di confronto: guardarle prima del commit
 ### Interfaccia su Vercel
 
 Ogni push sul branch di produzione `acceleriamo-os` avvia la build Vercel: `npm ci`, `npm run build`, pubblicazione di `dist/client`.
+Nel progetto Vercel, **Settings > Environments > Production > Branch Tracking** deve essere `acceleriamo-os`, con assegnazione automatica dei domini attiva. Se resta `main`, i push su `acceleriamo-os` creano soltanto anteprime e `risorse.acceleriamo.it` resta alla versione precedente.
 Le pagine del gestionale e i file statici vengono serviti dalla nuova build. Le API, le pagine pubbliche `/r/*`, `robots.txt` e `sitemap.xml` vengono inoltrate al Worker Cloudflare.
 Il ripiego `/assets/*` recupera dal Worker i file delle pagine pubbliche quando non sono nella build Vercel; i file presenti in `dist/client` hanno precedenza sulle riscritture.
 Non configurare Vercel come semplice proxy di tutto il sito: il deploy risulterebbe riuscito ma l'interfaccia resterebbe quella pubblicata sul Worker.
