@@ -28,7 +28,7 @@ export function CercaLead({ onScelto }: { onScelto: (l: LeadListItem) => void })
   return (
     <div className="flex flex-col gap-3">
       <Campo etichetta="Cerca il lead" placeholder="Azienda, referente o telefono" autoFocus value={q} onChange={(e) => setQ(e.target.value)} />
-      {cerca.length > 1 && r.data?.length === 0 && <p className="text-secondaria text-grigio">Nessun lead trovato.</p>}
+      {cerca.length > 1 && r.data?.length === 0 && <p className="text-nota text-grigio">Nessun lead trovato.</p>}
       <ul className="flex flex-col gap-2">
         {r.data?.slice(0, 8).map((l) => (
           <li key={l.id}><Riga titolo={l.company} secondaria={l.contactName ?? undefined} onClick={() => onScelto(l)} /></li>
@@ -128,7 +128,7 @@ export function FoglioAccettazione({ proposta: p, onChiudi }: { proposta: Propos
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>Segna accettata</Pulsante>}>
       <div className="flex flex-col gap-3">
         <Selettore etichetta="Opzione accettata" opzioni={opzioni} valore={opzione} onCambia={setOpzione} />
-        <p className="text-secondaria text-grigio tabular-nums">{opzioni.find((o) => o.valore === opzione)?.meta}</p>
+        <p className="text-nota text-grigio tabular-nums">{opzioni.find((o) => o.valore === opzione)?.meta}</p>
       </div>
     </Foglio>
   );

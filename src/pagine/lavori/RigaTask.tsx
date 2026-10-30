@@ -26,11 +26,11 @@ export function RigaTask({ t, ora, nomeResponsabile, senzaCliente = false }: { t
         <span className={cx("inline-flex size-6 items-center justify-center rounded-full border-[1.5px]", t.doneAt ? "border-ink bg-ink text-avorio" : "border-ink bg-avorio")}>{!!t.doneAt && <Check size={14} weight="bold" aria-hidden />}</span>
       </button>
       <div className="min-w-0 flex-1 py-2">
-        <p className={cx("text-corpo font-semibold break-words", !!t.doneAt && "text-grigio line-through")}>{t.title}</p>
-        {!senzaCliente && t.cliente && t.clientId && <Link to={`/commerciale/clienti/${t.clientId}`} className="-my-3 block w-fit py-3 text-secondaria text-grigio hover:underline">{t.cliente}</Link>}
-        {nomeResponsabile && <p className="text-secondaria text-grigio">{nomeResponsabile}</p>}
+        <p className={cx("text-testo font-semibold break-words", !!t.doneAt && "text-grigio line-through")}>{t.title}</p>
+        {!senzaCliente && t.cliente && t.clientId && <Link to={`/commerciale/clienti/${t.clientId}`} className="-my-3 block w-fit py-3 text-nota text-grigio hover:underline">{t.cliente}</Link>}
+        {nomeResponsabile && <p className="text-nota text-grigio">{nomeResponsabile}</p>}
       </div>
-      <p className={cx("shrink-0 text-secondaria tabular-nums", scaduta ? "font-semibold text-errore" : "text-grigio")}>{t.dueAt != null ? giorno(t.dueAt, ora) : "Senza scadenza"}</p>
+      <p className={cx("shrink-0 text-nota tabular-nums", scaduta ? "font-semibold text-errore" : "text-grigio")}>{t.dueAt != null ? giorno(t.dueAt, ora) : "Senza scadenza"}</p>
     </li>
   );
 }

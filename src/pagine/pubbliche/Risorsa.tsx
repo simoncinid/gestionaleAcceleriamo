@@ -177,7 +177,7 @@ function ModuloChiamata({ slug, metti }: { slug: string; metti: boolean }) {
       <div aria-hidden className="absolute h-0 w-0 overflow-hidden opacity-0 [clip-path:inset(50%)]">
         <label>Sito<input name="sito" tabIndex={-1} autoComplete="off" /></label>
       </div>
-      {errore && <p id="errore-chiamata" role="alert" className="rounded-controllo bg-errore-fondo px-3 py-2.5 text-secondaria font-medium text-errore">{errore}</p>}
+      {errore && <p id="errore-chiamata" role="alert" className="rounded-controllo bg-errore-fondo px-3 py-2.5 text-nota font-medium text-errore">{errore}</p>}
       <button type="submit" disabled={inCorso} aria-busy={inCorso || undefined} className="risorsa-invia">
         {inCorso && <CircleNotch size={20} weight="bold" className="spinner animate-spin" aria-hidden />}
         {inCorso ? "Invio in corso" : "Richiedi la chiamata"}
@@ -201,7 +201,7 @@ function Chiusura({ slug }: { slug: string }) {
       ) : (
         <div className="grid gap-3">
           <button type="button" aria-expanded={false} onClick={() => { setToccato(true); setAperto(true); }} className="risorsa-apri">Lascia il tuo numero</button>
-          <p className="text-meta text-grigio">Ti richiamiamo noi, entro un giorno lavorativo.</p>
+          <p className="text-nota text-grigio">Ti richiamiamo noi, entro un giorno lavorativo.</p>
         </div>
       )}
     </section>

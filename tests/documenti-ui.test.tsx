@@ -7,7 +7,7 @@ import { contaPrimari, render } from "./render";
 
 // Spec documenti 29/10/2026: foglio Documenti e pallino sulla voce Documenti della scheda.
 const ORA = Date.UTC(2026, 9, 29, 10);
-const file: DocumentRow = { id: "D1", leadId: "L1", name: "offerta.pdf", url: null, createdAt: ORA - 3_600_000, updatedAt: ORA - 60_000, file: true, version: 2, size: 1_500_000, via: "claude", authorName: "Tommaso", mime: "application/pdf" };
+const file: DocumentRow = { id: "D1", leadId: "L1", name: "offerta.pdf", url: null, createdAt: ORA - 3_600_000, updatedAt: ORA - 60_000, file: true, version: 2, size: 1_500_000, authorName: "Tommaso", mime: "application/pdf" };
 const link: DocumentRow = { id: "D2", leadId: "L1", name: "Cartella Drive", url: "https://drive.google.com/x", createdAt: ORA - 7_200_000 };
 
 describe("foglio Documenti", () => {
@@ -19,7 +19,7 @@ describe("foglio Documenti", () => {
     expect(html).toContain('href="/api/documents/D1/file?scarica=1"');
     expect(html).toContain('href="https://drive.google.com/x"');
     expect(html).toContain("Versione 2 · 1,4 MB · Tommaso");
-    expect(html).toContain("caricato da Claude");
+    expect(html).not.toMatch(/claude/i);
     expect(html).toContain("Nuovo");
     expect(html).toContain("Nuova versione");
     expect(html).toContain("Versioni precedenti");
@@ -44,10 +44,10 @@ describe("foglio Documenti", () => {
 
   it("pallino sulla voce Documenti solo con novità", () => {
     const lead = { id: "L1", company: "Rossi", source: "manuale", stageId: "da-richiamare", createdAt: ORA } as unknown as Lead;
-    const con = render(<DatiLead lead={lead} fasi={[]} utenti={[]} documenti={2} novita={3} onServeFoglio={() => {}} onResponsabile={() => {}} onDocumenti={() => {}} onModifica={() => {}} />);
+    const con = render(<DatiLead lead={lead} utenti={[]} documenti={2} novita={3} onResponsabile={() => {}} onDocumenti={() => {}} onModifica={() => {}} />);
     expect(con).toContain("2 documenti");
     expect(con).toContain("3 novità da vedere");
-    const senza = render(<DatiLead lead={lead} fasi={[]} utenti={[]} documenti={0} novita={0} onServeFoglio={() => {}} onResponsabile={() => {}} onDocumenti={() => {}} onModifica={() => {}} />);
+    const senza = render(<DatiLead lead={lead} utenti={[]} documenti={0} novita={0} onResponsabile={() => {}} onDocumenti={() => {}} onModifica={() => {}} />);
     expect(senza).not.toContain("novità da vedere");
     expect(senza).toContain("nessuno: carica un file");
   });

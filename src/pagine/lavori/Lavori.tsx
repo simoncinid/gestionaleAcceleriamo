@@ -31,7 +31,7 @@ export function Lavori({ ora: oraFissa }: { ora?: number } = {}) {
       <div className="grid gap-6 @5xl:grid-cols-[1fr_auto] @5xl:items-end">
       <Intestazione titolo="Lavori" numero={task.length} coda="da fare" eyebrow={eyebrow} />
       <div className="flex items-center justify-between gap-3 @5xl:pb-1">
-        <span className="text-secondaria text-grigio">Di chi</span>
+        <span className="text-nota text-grigio">Di chi</span>
         <div className="flex gap-2" role="group" aria-label="Di chi">
           <Chip selezionato={chi === "mie"} onClick={() => setChi("mie")}>Mie</Chip>
           <Chip selezionato={chi === "tutte"} onClick={() => setChi("tutte")}>Tutte</Chip>
@@ -46,8 +46,8 @@ export function Lavori({ ora: oraFissa }: { ora?: number } = {}) {
         return (
           <section key={g.id} aria-label={g.titolo} className="flex flex-col gap-3">
             <header className="flex items-baseline justify-between gap-3">
-              <h2 className="font-display text-titolo-card">{g.titolo}</h2>
-              <span className="text-secondaria text-grigio tabular-nums">{righe.length}</span>
+              <h2 className="segno font-display text-sezione">{g.titolo}</h2>
+              <span className="text-nota text-grigio tabular-nums">{righe.length}</span>
             </header>
             <ul className="divide-y divide-sabbia overflow-hidden rounded-blocco border border-sabbia bg-avorio">
               {righe.map((t) => <RigaTask key={t.id} t={t} ora={ora} nomeResponsabile={nome(t)} />)}

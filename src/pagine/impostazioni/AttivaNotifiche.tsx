@@ -86,21 +86,21 @@ export function AttivaNotifiche({ ambiente }: { ambiente?: Ambiente }) {
   return (
     <div className="space-y-3">
       {stato === "serve-home" ? (
-        <ol className="list-decimal space-y-1 pl-5 text-corpo">
+        <ol className="list-decimal space-y-1 pl-5 text-testo">
           {PASSI_IPHONE.map((p) => <li key={p}>{p}</li>)}
         </ol>
       ) : stato === "negato" ? (
-        <p className="text-corpo">Le notifiche sono bloccate nelle impostazioni del browser per questo sito.</p>
+        <p className="text-testo">Le notifiche sono bloccate nelle impostazioni del browser per questo sito.</p>
       ) : stato === "non-supportato" ? (
-        <p className="text-corpo">Questo browser non riceve notifiche.</p>
+        <p className="text-testo">Questo browser non riceve notifiche.</p>
       ) : stato === "attivo" ? (
-        <p className="text-corpo">Le notifiche sono attive su questo dispositivo.</p>
+        <p className="text-testo">Le notifiche sono attive su questo dispositivo.</p>
       ) : (
         <>
           <Pulsante variante="secondario" inCorso={attiva.isPending} motivoSpento={motivoSpento} onClick={() => attiva.mutate()}>
             Attiva le notifiche su questo dispositivo
           </Pulsante>
-          {scollegato && <p className="text-secondaria text-grigio">Le notifiche non sono ancora collegate: si attivano appena il server ha le chiavi.</p>}
+          {scollegato && <p className="text-nota text-grigio">Le notifiche non sono ancora collegate: si attivano appena il server ha le chiavi.</p>}
         </>
       )}
       {(disp.data?.dispositivi.length ?? 0) > 0 && (

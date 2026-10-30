@@ -23,7 +23,7 @@ export function FoglioFase({ attuale, ordinate, scegli, onChiudi }: {
                 scegli(f.id);
                 if (!serveFoglio) onChiudi();
               }}
-              className="flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-[15px] hover:bg-crema focus-visible:bg-crema">
+              className="flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-testo hover:bg-crema focus-visible:bg-crema">
               <span className="flex min-w-0 flex-1"><EtichettaFase id={f.id} label={f.label} /></span>
               <span className="flex w-5 justify-end">{f.id === attuale && <Check size={18} weight="bold" aria-hidden />}</span>
             </button>

@@ -28,9 +28,9 @@ export function Registro() {
         <ul className="grid divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio">
           {voci.map((v) => (
             <li key={v.id} className="grid gap-0.5 px-4 py-3 @5xl:grid-cols-[minmax(0,1fr)_14rem_14rem] @5xl:items-baseline @5xl:gap-6">
-              <span className="text-secondaria text-ink">{`${ENTITA[v.entita] ?? v.entita}: ${v.azione}`}</span>
-              <span className="text-meta text-grigio">{v.chi}</span>
-              <span className="text-meta text-grigio tabular-nums">{momento(v.at)}</span>
+              <span className="text-nota text-ink">{`${ENTITA[v.entita] ?? v.entita}: ${v.azione}`}</span>
+              <span className="text-nota text-grigio">{v.chi}</span>
+              <span className="text-nota text-grigio tabular-nums">{momento(v.at)}</span>
             </li>
           ))}
         </ul>

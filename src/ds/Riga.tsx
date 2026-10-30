@@ -10,9 +10,9 @@ export function Riga({ titolo, secondaria, meta, href, onClick, destra, peso = "
   const corpo = (
     <>
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-corpo ${PESO[peso]}`}>{titolo}</p>
-        {secondaria && <p className="truncate text-secondaria text-grigio">{secondaria}</p>}
-        {meta && <p className="text-meta text-grigio tabular-nums">{meta}</p>}
+        <p className={`truncate text-testo ${PESO[peso]}`}>{titolo}</p>
+        {secondaria && <p className="truncate text-nota text-grigio">{secondaria}</p>}
+        {meta && <p className="text-nota text-grigio tabular-nums">{meta}</p>}
       </div>
       {destra}
     </>
@@ -38,21 +38,21 @@ export function CardLead({ lead, ora = Date.now(), spazioAzioni = false, fonteFa
   const scaduta = lead.nextActionAt != null && lead.nextActionAt < ora;
   const corpo = (
     <>
-      <p className={spazioAzioni ? "flex items-center gap-2 text-corpo font-semibold md:pr-10" : "flex items-center gap-2 text-corpo font-semibold"}>
+      <p className={spazioAzioni ? "flex items-center gap-2 text-testo font-semibold md:pr-10" : "flex items-center gap-2 text-testo font-semibold"}>
         {lead.score && <Punto colore={lead.score} etichetta={`Punteggio ${lead.score}`} />}
         <span className="truncate">{lead.company}</span>
       </p>
-      {lead.contactName && <p className="text-secondaria text-grigio">{lead.contactName}</p>}
+      {lead.contactName && <p className="text-nota text-grigio">{lead.contactName}</p>}
       {(fonteFase || assegnato) && (
-        <p className="flex items-center gap-2 text-meta text-grigio">
+        <p className="flex items-center gap-2 text-nota text-grigio">
           {assegnato && <><Avatar nome={assegnato} piccolo /><span className="sr-only">{`Segue ${assegnato}`}</span></>}
           {fonteFase && <span>{fonteFase}</span>}
         </p>
       )}
-      {lead.nextAction && <p className="text-secondaria">{lead.nextAction}</p>}
-      {lead.nextActionAt != null && <p className={scaduta ? "text-meta font-semibold text-errore tabular-nums" : "text-meta text-grigio tabular-nums"}>{quando(lead.nextActionAt, ora)}</p>}
-      {(lead.setupCents != null || lead.feeCents != null) && <p className="text-meta text-grigio tabular-nums">Setup {euro(lead.setupCents ?? 0)}, canone {euro(lead.feeCents ?? 0)}</p>}
-      {fermo && <p className="text-meta text-attenzione-testo">{fermo}</p>}
+      {lead.nextAction && <p className="text-nota">{lead.nextAction}</p>}
+      {lead.nextActionAt != null && <p className={scaduta ? "text-nota font-semibold text-errore tabular-nums" : "text-nota text-grigio tabular-nums"}>{quando(lead.nextActionAt, ora)}</p>}
+      {(lead.setupCents != null || lead.feeCents != null) && <p className="text-nota text-grigio tabular-nums">Setup {euro(lead.setupCents ?? 0)}, canone {euro(lead.feeCents ?? 0)}</p>}
+      {fermo && <p className="text-nota text-attenzione-testo">{fermo}</p>}
     </>
   );
   const href = `/commerciale/lead/${lead.id}`;

@@ -57,12 +57,12 @@ export function RigaDaFare({ l, ora, fase, primaria, onApri }: {
     <li data-lead={l.id} className="relative flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-4">
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex items-baseline gap-3">
-          <span className="min-w-0 flex-1 text-[15px] font-semibold leading-5">{p.azione}</span>
-          {p.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(p.stato, p.scadenza, ora))}>{scadenzaBreve(p.scadenza, ora, p.stato)}</span>}
+          <span className="min-w-0 flex-1 text-testo font-semibold leading-5">{p.azione}</span>
+          {p.scadenza != null && <span className={cx("shrink-0 text-nota tabular-nums", classeScadenza(p.stato, p.scadenza, ora))}>{scadenzaBreve(p.scadenza, ora, p.stato)}</span>}
         </span>
         <span className="flex min-w-0 items-center gap-2">
           {fase && <EtichettaFase {...fase} className="shrink-0" />}
-          <Link to={scheda} className="min-w-0 truncate text-[13px] text-grigio after:absolute after:inset-0 hover:text-ink hover:underline">{persona}</Link>
+          <Link to={scheda} className="min-w-0 truncate text-nota text-grigio after:absolute after:inset-0 hover:text-ink hover:underline">{persona}</Link>
         </span>
       </div>
       <div className="relative z-[1] flex items-center gap-2">

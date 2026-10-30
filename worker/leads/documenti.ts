@@ -1,7 +1,8 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { Db } from "../db/client";
-import { activities, documents, documentVersions, leads, users } from "../db/schema";
+import { activities, calls, documents, documentVersions, leads, tasks, users, CALL_KINDS, type DocumentKind } from "../db/schema";
+import { callPerData, dataDalTitolo, tipoAutomatico, tipoValido, vaSullaCall } from "./tipo-documento";
 import type { Env } from "../env";
 
 // Documenti caricati nella scheda del lead (spec 29/10/2026): file su R2, versioni con storico, pallino delle novità.
@@ -12,7 +13,8 @@ export const LIMITE_FILE = 100 * 1024 * 1024; // 100 MB
 // "apri": anteprima nel browser (PDF, audio, immagini che il browser mostra); gli altri si scaricano.
 const TIPI: Record<string, { mime: string; apri: boolean }> = {
   pdf: { mime: "application/pdf", apri: true },
-  txt: { mime: "text/plain; charset=utf-8", apri: false },
+  // Trascrizioni: il testo si legge nel browser (text/plain con nosniff, nessuno script).
+  txt: { mime: "text/plain; charset=utf-8", apri: true },
   csv: { mime: "text/csv; charset=utf-8", apri: false },
   xls: { mime: "application/vnd.ms-excel", apri: false },
   xlsx: { mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", apri: false },
@@ -59,9 +61,41 @@ export type Caricamento = {
   size: number;
   body: ReadableStream<Uint8Array>;
   userId: string;
-  via?: "claude" | null;
+  via?: "script" | null; // "script": caricato dal Mac di Tommaso; non si mostra mai, la voce è di Tommaso
   now: number;
+  tipo?: DocumentKind | null; // assente: dal nome (tipoAutomatico)
+  call?: string | null; // id della call, o il suo tipo (conoscenza, offerta...): l'ultima di quel tipo
+  data?: number | null; // data del file: sceglie la call quando "call" manca
+  task?: string | null; // id di una cosa da fare dello stesso lead: il documento sta sulla sua riga
 };
+
+// Tipo e call di un documento nuovo: quello che dice chi carica, altrimenti le regole automatiche.
+// Tipo e call letti dalla query di un caricamento: un tipo sconosciuto è un errore, non un "altro" silenzioso.
+export function tipoCallDaQuery(q: (k: string) => string | undefined) {
+  const t = q("tipo");
+  if (t && !tipoValido(t)) throw new HTTPException(400, { message: "Tipo non valido: registrazione, trascrizione, preventivo o altro" });
+  const d = q("data");
+  const data = d && /^\d{10,13}$/.test(d) ? Number(d) : null;
+  return { tipo: (t as DocumentKind | undefined) ?? null, call: q("call")?.trim() || null, data, task: q("task")?.trim() || null };
+}
+
+export async function sceltaTipoCall(db: Db, c: { leadId: string; fileName: string; titolo?: string | null; tipo?: DocumentKind | null; call?: string | null; data?: number | null; now: number }) {
+  const kind = c.tipo ?? tipoAutomatico(c.fileName, c.titolo);
+  if (!vaSullaCall(kind) && !c.call) return { kind, callId: null as string | null };
+  const elenco = await db.select({ id: calls.id, kind: calls.kind, scheduledAt: calls.scheduledAt, outcome: calls.outcome })
+    .from(calls).where(and(eq(calls.leadId, c.leadId), isNull(calls.deletedAt)));
+  if (c.call) {
+    const perTipo = (CALL_KINDS as readonly string[]).includes(c.call);
+    const trovata = perTipo
+      ? elenco.filter((k) => k.kind === c.call).sort((a, b) => b.scheduledAt - a.scheduledAt)[0]
+      : elenco.find((k) => k.id === c.call);
+    if (!trovata) throw new HTTPException(404, { message: perTipo ? `Nessuna call di ${c.call} su questo lead` : "Call non trovata su questo lead" });
+    return { kind, callId: trovata.id };
+  }
+  const dalTitolo = dataDalTitolo(`${c.titolo ?? ""} ${c.fileName}`, c.now);
+  const scelta = dalTitolo != null ? callPerData(elenco, dalTitolo, true) : callPerData(elenco, c.data ?? c.now);
+  return { kind, callId: scelta?.id ?? null };
+}
 
 // Carica il file su R2 in streaming (niente copia in memoria) e scrive documento, versione e storico.
 export async function caricaDocumento(env: Env, db: Db, c: Caricamento) {
@@ -83,6 +117,15 @@ export async function caricaDocumento(env: Env, db: Db, c: Caricamento) {
     if (!esistente.r2Key) throw new HTTPException(409, { message: "Un link non ha versioni: carica il file come documento nuovo" });
   }
 
+  // Una nuova versione tiene tipo e call del documento; un documento nuovo li sceglie prima di toccare R2.
+  const posto = esistente ? { kind: esistente.kind, callId: esistente.callId } : await sceltaTipoCall(db, { ...c, fileName });
+  // La task deve essere dello stesso lead; una nuova versione tiene la task del documento.
+  let taskId = esistente?.taskId ?? null;
+  if (!esistente && c.task) {
+    const t = await db.select({ id: tasks.id }).from(tasks).where(and(eq(tasks.id, c.task), eq(tasks.leadId, c.leadId), isNull(tasks.deletedAt))).get();
+    if (!t) throw new HTTPException(404, { message: "Cosa da fare non trovata su questo lead" });
+    taskId = t.id;
+  }
   const documentId = esistente?.id ?? crypto.randomUUID();
   const versione = (esistente?.version ?? 0) + 1;
   const versionId = crypto.randomUUID();
@@ -99,21 +142,20 @@ export async function caricaDocumento(env: Env, db: Db, c: Caricamento) {
   }
 
   const nome = (c.titolo?.trim() || fileName).slice(0, 200);
-  const dettaglio = c.via === "claude" ? " (caricato da Claude)" : "";
   const riga = { id: versionId, documentId, version: versione, r2Key, fileName, mime: tipo.mime, size: c.size, createdBy: c.userId, via: c.via ?? null, createdAt: c.now };
   try {
     if (esistente) {
       await db.batch([
         db.update(documents).set({ r2Key, mime: tipo.mime, size: c.size, version: versione, updatedAt: c.now }).where(eq(documents.id, documentId)),
         db.insert(documentVersions).values(riga),
-        db.insert(activities).values({ id: crypto.randomUUID(), leadId: c.leadId, type: "documento", body: `Nuova versione (${versione}) del documento "${esistente.name}"${dettaglio}`, authorId: c.userId, createdAt: c.now }),
+        db.insert(activities).values({ id: crypto.randomUUID(), leadId: c.leadId, type: "documento", body: `Nuova versione (${versione}) del documento "${esistente.name}"`, authorId: c.userId, createdAt: c.now }),
         db.update(leads).set({ updatedAt: c.now }).where(eq(leads.id, c.leadId)),
       ]);
     } else {
       await db.batch([
-        db.insert(documents).values({ id: documentId, leadId: c.leadId, name: nome, url: null, r2Key, createdBy: c.userId, createdAt: c.now, deletedAt: null, mime: tipo.mime, size: c.size, version: 1, via: c.via ?? null, updatedAt: c.now }),
+        db.insert(documents).values({ id: documentId, leadId: c.leadId, name: nome, url: null, r2Key, createdBy: c.userId, createdAt: c.now, deletedAt: null, mime: tipo.mime, size: c.size, version: 1, via: c.via ?? null, updatedAt: c.now, kind: posto.kind, callId: posto.callId, taskId }),
         db.insert(documentVersions).values(riga),
-        db.insert(activities).values({ id: crypto.randomUUID(), leadId: c.leadId, type: "documento", body: `Caricato il documento "${nome}"${dettaglio}`, authorId: c.userId, createdAt: c.now }),
+        db.insert(activities).values({ id: crypto.randomUUID(), leadId: c.leadId, type: "documento", body: `Caricato il documento "${nome}"`, authorId: c.userId, createdAt: c.now }),
         db.update(leads).set({ updatedAt: c.now }).where(eq(leads.id, c.leadId)),
       ]);
     }
@@ -122,7 +164,7 @@ export async function caricaDocumento(env: Env, db: Db, c: Caricamento) {
     await bucket.delete(r2Key).catch(() => undefined);
     throw err;
   }
-  return { id: documentId, version: versione, name: esistente?.name ?? nome };
+  return { id: documentId, version: versione, name: esistente?.name ?? nome, kind: posto.kind, callId: posto.callId, taskId };
 }
 
 // Documenti di un lead con il nome di chi li ha messi (per la scheda).
@@ -130,8 +172,8 @@ export async function documentiDelLead(db: Db, leadId: string) {
   return db
     .select({
       id: documents.id, leadId: documents.leadId, name: documents.name, url: documents.url, createdAt: documents.createdAt,
-      updatedAt: documents.updatedAt, mime: documents.mime, size: documents.size, version: documents.version, via: documents.via,
-      hasFile: documents.r2Key, authorName: users.name,
+      updatedAt: documents.updatedAt, mime: documents.mime, size: documents.size, version: documents.version,
+      hasFile: documents.r2Key, authorName: users.name, kind: documents.kind, callId: documents.callId, taskId: documents.taskId,
     })
     .from(documents)
     .leftJoin(users, eq(users.id, documents.createdBy))
@@ -143,7 +185,7 @@ export async function documentiDelLead(db: Db, leadId: string) {
 export async function versioniDi(db: Db, documentId: string) {
   await documentoVivo(db, documentId);
   return db
-    .select({ id: documentVersions.id, version: documentVersions.version, fileName: documentVersions.fileName, mime: documentVersions.mime, size: documentVersions.size, via: documentVersions.via, createdAt: documentVersions.createdAt, authorName: users.name })
+    .select({ id: documentVersions.id, version: documentVersions.version, fileName: documentVersions.fileName, mime: documentVersions.mime, size: documentVersions.size, createdAt: documentVersions.createdAt, authorName: users.name })
     .from(documentVersions)
     .leftJoin(users, eq(users.id, documentVersions.createdBy))
     .where(eq(documentVersions.documentId, documentId))

@@ -74,7 +74,7 @@ export function VoceTendina({ scelta, onClick, children, ruolo = "menuitemradio"
 }) {
   return (
     <button type="button" data-voce role={ruolo} aria-checked={ruolo === "menuitem" ? undefined : !!scelta} onClick={onClick}
-      className={cx("flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-secondaria hover:bg-crema focus-visible:bg-crema focus-visible:outline-none",
+      className={cx("flex min-h-11 w-full items-center gap-3 rounded-[8px] px-3 py-2 text-left text-nota hover:bg-crema focus-visible:bg-crema focus-visible:outline-none",
         distruttiva ? "text-[#B42318]" : "text-ink")}>
       <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
       {ruolo !== "menuitem" && <span className="flex w-4 justify-end">{scelta && <Check size={16} weight="bold" aria-hidden />}</span>}
@@ -99,7 +99,7 @@ export function Filtro<T extends string>({ etichetta, opzioni, valori, onCambia,
     <>
       <button ref={ancora} type="button" aria-expanded={aperta} aria-haspopup="dialog" aria-controls={aperta ? id : undefined} onClick={() => setAperta((a) => !a)}
         data-filtro={etichetta}
-        className={cx("flex h-11 min-w-0 items-center gap-2 rounded-controllo border-[1.5px] bg-avorio px-3 text-secondaria transition-colors duration-(--durata-veloce) hover:border-ink",
+        className={cx("flex h-11 min-w-0 items-center gap-2 rounded-controllo border-[1.5px] bg-avorio px-3 text-nota transition-colors duration-(--durata-veloce) hover:border-ink",
           scelte.length ? "border-ink" : "border-sabbia-2")}>
         <span className="shrink-0 font-medium">{etichetta}</span>
         {valore && <span className={cx("min-w-0 truncate", scelte.length ? "font-semibold text-ink" : "text-grigio")}>{valore}</span>}

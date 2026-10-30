@@ -33,8 +33,8 @@ function Gruppo({ titolo, n, children }: { titolo: string; n: number; children: 
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
       <header className="flex items-baseline justify-between gap-3">
-        <h2 id={id} className="font-display text-titolo-card first-letter:uppercase">{titolo}</h2>
-        <span className="text-secondaria text-grigio tabular-nums">{n}</span>
+        <h2 id={id} className="segno font-display text-sezione first-letter:uppercase">{titolo}</h2>
+        <span className="text-nota text-grigio tabular-nums">{n}</span>
       </header>
       <ul className="flex flex-col gap-2">{children}</ul>
     </section>
@@ -46,11 +46,11 @@ function Gruppo({ titolo, n, children }: { titolo: string; n: number; children: 
 function BloccoCall({ k, secondaria, meta, azione, onApri }: { k: CallAgenda; secondaria: string; meta?: string; azione: ReactNode; onApri: () => void }) {
   return (
     <li className="flex min-h-[72px] items-center gap-3 rounded-blocco border border-sabbia bg-avorio py-3 pl-4 pr-3">
-      <span className="w-14 shrink-0 font-display text-titolo-card text-accento-testo tabular-nums">{ore(k.scheduledAt)}</span>
+      <span className="w-14 shrink-0 font-display text-sezione text-accento-testo tabular-nums">{ore(k.scheduledAt)}</span>
       <button type="button" onClick={onApri} className="min-w-0 flex-1 text-left">
-        <p className="break-words text-corpo font-semibold">{k.company}</p>
-        <p className="break-words text-secondaria text-grigio">{secondaria}</p>
-        {meta && <p className="text-meta text-grigio">{meta}</p>}
+        <p className="break-words text-testo font-semibold">{k.company}</p>
+        <p className="break-words text-nota text-grigio">{secondaria}</p>
+        {meta && <p className="text-nota text-grigio">{meta}</p>}
       </button>
       <div className="flex shrink-0">{azione}</div>
     </li>
@@ -94,7 +94,7 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
       {settimana.length === 0 && daCompletare.length === 0 && (
         <StatoVuoto titolo="Nessuna call questa settimana" testo="Le call fissate dal foglio dell'esito o dalla scheda lead compaiono qui." />
       )}
-      {settimana.length > 0 && inAgenda.length === 0 && <p className="text-secondaria text-grigio">Nessun'altra call in programma questa settimana.</p>}
+      {settimana.length > 0 && inAgenda.length === 0 && <p className="text-nota text-grigio">Nessun'altra call in programma questa settimana.</p>}
       {/* Sullo schermo largo i giorni stanno affiancati come colonne di un'agenda. */}
       <div className="flex flex-col gap-6 empty:hidden @5xl:grid @5xl:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] @5xl:items-start @5xl:gap-x-8">
       {[...giorni.entries()].map(([g, ks]) => (
@@ -106,7 +106,7 @@ export function Call({ ora: oraFissa }: { ora?: number } = {}) {
                   ? <Contatto tipo="meet" lead={k} variante="primario" misura="md" intero />
                   // Le altre a icona sul telefono: "Apri Meet" per esteso schiacciava il nome a 78 px (QA Task 15).
                   : <Contatto tipo="meet" lead={k} variante="icona" misura="md" />)
-                : <span className="text-meta text-grigio">Senza link</span>} />
+                : <span className="text-nota text-grigio">Senza link</span>} />
           ))}
         </Gruppo>
       ))}

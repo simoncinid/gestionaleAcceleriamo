@@ -40,9 +40,9 @@ export function TestoMarkdown({ testo }: { testo: string }) {
     }
     chiudi();
     if (!t) return;
-    if (h) blocchi.push(<h3 key={k} className="mt-4 font-display text-riga">{inline(h[1], `h${k}`)}</h3>);
-    else blocchi.push(<p key={k} className="text-corpo">{inline(t, `p${k}`)}</p>);
+    if (h) blocchi.push(<h3 key={k} className="mt-4 font-display text-voce">{inline(h[1], `h${k}`)}</h3>);
+    else blocchi.push(<p key={k} className="text-testo">{inline(t, `p${k}`)}</p>);
   });
   chiudi();
-  return <div className="flex flex-col gap-2 text-corpo">{blocchi}</div>;
+  return <div className="flex flex-col gap-2 text-testo">{blocchi}</div>;
 }

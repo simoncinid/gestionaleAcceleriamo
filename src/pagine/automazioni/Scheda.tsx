@@ -65,29 +65,29 @@ export function SchedaAutomazione({ id }: { id: string }) {
   return (
     <div key={a.updatedAt} className="grid gap-6 p-4 pb-28 md:px-0">
       <Intestazione titolo={a.name} eyebrow="Automazione">
-        {anonimo ? <p className="text-corpo">{nomeCliente(a, true)}</p> : (
+        {anonimo ? <p className="text-testo">{nomeCliente(a, true)}</p> : (
           <div className="flex items-center gap-2">
             <LogoCliente logo={a.logo} nome={a.cliente} misura={32} />
             <ContattoDalCliente clienteId={a.clientId} azienda={a.cliente} />
           </div>
         )}
         {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
-        <p className="flex items-center gap-2 text-secondaria"><Punto colore={a.status === "attiva" ? "verde" : a.status === "in_costruzione" ? "giallo" : "grigio"} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
+        <p className="flex items-center gap-2 text-nota"><Punto colore={a.status === "attiva" ? "verde" : a.status === "in_costruzione" ? "giallo" : "grigio"} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
       </Intestazione>
       {/* Sul computer largo: stato e flusso a sinistra, i dati della scheda a destra (in due colonne quando c'è spazio). */}
       <div className="grid gap-6 @5xl:grid-cols-2 @5xl:items-start @7xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
       <div className="grid gap-6">
       {voce && (
         <Link to="/automazioni/stato" className="grid max-w-[720px] gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3 hover:bg-crema">
-          <span className="flex items-center gap-2 text-corpo font-semibold"><Punto colore={voce.colore} etichetta={ETICHETTE_COLORE[voce.colore]} />{`Stato: ${ETICHETTE_COLORE[voce.colore].toLowerCase()}`}</span>
-          {voce.colore === "rosso" && voce.ultimoErrore && <span className="text-secondaria text-errore">{voce.ultimoErrore}</span>}
-          {rotto && <span className="text-secondaria text-errore">{`Dove: ${rotto}`}</span>}
+          <span className="flex items-center gap-2 text-testo font-semibold"><Punto colore={voce.colore} etichetta={ETICHETTE_COLORE[voce.colore]} />{`Stato: ${ETICHETTE_COLORE[voce.colore].toLowerCase()}`}</span>
+          {voce.colore === "rosso" && voce.ultimoErrore && <span className="text-nota text-errore">{voce.ultimoErrore}</span>}
+          {rotto && <span className="text-nota text-errore">{`Dove: ${rotto}`}</span>}
         </Link>
       )}
       <Sezione titolo="Flusso" coda={passiQ.data?.length ? passiQ.data.length === 1 ? "1 passaggio" : `${passiQ.data.length} passaggi` : undefined}>
         {passiQ.data && passiQ.data.length > 0
           ? <Flusso passi={passiQ.data} onApri={setPasso} rotto={rotto} />
-          : <p className="text-secondaria text-grigio">Il flusso non è ancora descritto.</p>}
+          : <p className="text-nota text-grigio">Il flusso non è ancora descritto.</p>}
         <Pulsante variante="secondario" className="self-start" onClick={() => setModifica(true)}>Modifica passaggi</Pulsante>
       </Sezione>
       </div>

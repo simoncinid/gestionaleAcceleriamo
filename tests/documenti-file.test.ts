@@ -1,6 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { getDb } from "../worker/db/client";
+import { calls } from "../worker/db/schema";
 import { eliminaPerSempre } from "../worker/leads/cestino";
 import { authed, call, createUser, loginCookie } from "./helpers";
 
@@ -19,7 +20,7 @@ async function carica(path: string, contenuto: string, cookie?: string, extra: R
   return call(path, { method: "POST", body: corpo, headers: { "content-type": "application/octet-stream", "content-length": String(corpo.byteLength), ...extra } }, cookie);
 }
 
-type Doc = { id: string; name: string; file: boolean; version: number; via: string | null; authorName: string | null; mime: string | null };
+type Doc = { id: string; name: string; file: boolean; version: number; authorName: string | null; mime: string | null; kind: string; callId: string | null };
 const dettaglio = async (id: string, cookie: string) => (await (await call(`/api/leads/${id}`, {}, cookie)).json()) as { documents: Doc[]; activities: { body: string }[] };
 const novitaInLista = async (cookie: string, id: string) =>
   ((await (await call("/api/leads", {}, cookie)).json()) as { leads: { id: string; novita: number }[] }).leads.find((l) => l.id === id)?.novita;
@@ -104,8 +105,10 @@ describe("documenti caricati", () => {
     await carica(`/api/leads/${id}/documents?nome=nota.txt`, "<html>ciao</html>", cookie);
     const [doc] = (await dettaglio(id, cookie)).documents;
     const file = await call(`/api/documents/${doc.id}/file`, {}, cookie);
+    // Le trascrizioni si leggono nel browser (30/10/2026): sempre testo semplice, nosniff, mai HTML interpretato.
     expect(file.headers.get("content-type")).toBe("text/plain; charset=utf-8");
-    expect(file.headers.get("content-disposition")).toMatch(/^attachment;/);
+    expect(file.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(file.headers.get("content-disposition")).toMatch(/^inline;/);
     await file.arrayBuffer();
   });
 
@@ -187,8 +190,8 @@ describe("rotte dello script (CARICA_TOKEN)", () => {
     expect((await call("/api/leads", { headers: conToken() })).status).toBe(401);
   });
 
-  it("cerca il lead per nome e carica a nome di Tommaso con \"caricato da Claude\"", async () => {
-    // In produzione l'utente di Tommaso è "tommaso.rovini" (UTENTE_CLAUDE).
+  it("cerca il lead per nome e carica a nome di Tommaso, senza diciture in più", async () => {
+    // In produzione l'utente di Tommaso è "tommaso.rovini" (UTENTE_SCRIPT).
     await createUser("tommaso.rovini", "password-lunga-3", "Tommaso");
     const tommaso = await loginCookie("tommaso.rovini", "password-lunga-3");
     await createUser("diego", "password-lunga-2", "Diego");
@@ -205,8 +208,10 @@ describe("rotte dello script (CARICA_TOKEN)", () => {
     const r = await carica(`/api/carica/lead/${id}/documenti?nome=chiamata.m4a`, "audio", undefined, conToken());
     expect(r.status).toBe(201);
     const { documents, activities } = await dettaglio(id, tommaso);
-    expect(documents[0]).toMatchObject({ name: "chiamata.m4a", via: "claude", authorName: "Tommaso", mime: "audio/mp4" });
-    expect(activities[0].body).toBe('Caricato il documento "chiamata.m4a" (caricato da Claude)');
+    expect(documents[0]).toMatchObject({ name: "chiamata.m4a", authorName: "Tommaso", mime: "audio/mp4", kind: "registrazione" });
+    expect(documents[0]).not.toHaveProperty("via");
+    expect(activities[0].body).toBe('Caricato il documento "chiamata.m4a"');
+    expect(JSON.stringify(await dettaglio(id, diego))).not.toMatch(/claude/i);
     expect(await novitaInLista(diego, id)).toBe(1);
     expect(await novitaInLista(tommaso, id)).toBe(0);
 
@@ -216,5 +221,73 @@ describe("rotte dello script (CARICA_TOKEN)", () => {
     expect((await dettaglio(id, tommaso)).documents[0].version).toBe(2);
     expect((await carica(`/api/carica/lead/${id}/documenti?nome=altro.pdf&versione=1`, "x", undefined, conToken())).status).toBe(404);
     expect((await carica(`/api/carica/lead/inesistente/documenti?nome=a.pdf`, "x", undefined, conToken())).status).toBe(404);
+  });
+
+  it("tipo e call: regole automatiche, scelta esplicita, nuova versione che tiene il posto", async () => {
+    await createUser("tommaso.rovini", "password-lunga-3", "Tommaso");
+    const tommaso = await loginCookie("tommaso.rovini", "password-lunga-3");
+    const id = await nuovoLead(tommaso, "Officina Prova");
+    const db = getDb(env.DB);
+    const giorno = (g: number, h: number) => Date.UTC(2026, 9, g, h);
+    const ora = Date.now();
+    await db.insert(calls).values([
+      { id: `${id}-c1`, leadId: id, kind: "conoscenza", scheduledAt: giorno(20, 9), outcome: "fatta", createdAt: ora, updatedAt: ora },
+      { id: `${id}-c2`, leadId: id, kind: "offerta", scheduledAt: giorno(27, 14), outcome: "fatta", createdAt: ora, updatedAt: ora },
+      { id: `${id}-c3`, leadId: id, kind: "analisi", scheduledAt: giorno(28, 14), outcome: "saltata", createdAt: ora, updatedAt: ora },
+    ]);
+    const su = (q: string, corpo = "x") => carica(`/api/carica/lead/${id}/documenti?${q}`, corpo, undefined, conToken());
+
+    // Audio con la data nel titolo: la call di quel giorno (anche se la call è alle 14 e il titolo dice solo il giorno).
+    expect((await su(`nome=a.m4a&titolo=${encodeURIComponent("Registrazione consulenza 27/10")}`)).status).toBe(201);
+    // Trascrizione con la data del file: l'ultima call fatta prima (la saltata non conta).
+    expect((await su(`nome=${encodeURIComponent("Trascrizione consulenza.txt")}&data=${giorno(29, 10)}`)).status).toBe(201);
+    // PDF "preventivo": preventivo, senza call.
+    const prev = await su("nome=Preventivo-officina.pdf");
+    expect(((await prev.json()) as { document: { kind: string; call: unknown } }).document).toMatchObject({ kind: "preventivo", call: null });
+    // Tipo e call detti da chi carica: vince quello, la call si indica anche per tipo.
+    expect((await su("nome=note.pdf&tipo=trascrizione&call=conoscenza")).status).toBe(201);
+    // Foglio qualsiasi: altro.
+    expect((await su("nome=conti.xlsx")).status).toBe(201);
+    // Errori: tipo sconosciuto, call di un altro lead.
+    expect((await su("nome=a.pdf&tipo=boh")).status).toBe(400);
+    expect((await su("nome=a.pdf&call=non-esiste")).status).toBe(404);
+
+    const { documents } = await dettaglio(id, tommaso);
+    const per = (n: string) => documents.find((d) => d.name === n)!;
+    expect(per("Registrazione consulenza 27/10")).toMatchObject({ kind: "registrazione", callId: `${id}-c2` });
+    expect(per("Trascrizione consulenza.txt")).toMatchObject({ kind: "trascrizione", callId: `${id}-c2` });
+    expect(per("Preventivo-officina.pdf")).toMatchObject({ kind: "preventivo", callId: null });
+    expect(per("note.pdf")).toMatchObject({ kind: "trascrizione", callId: `${id}-c1` });
+    expect(per("conti.xlsx")).toMatchObject({ kind: "altro", callId: null });
+
+    // Dalla scheda: stesse regole; una nuova versione tiene tipo e call.
+    const r = await carica(`/api/leads/${id}/documents?nome=${encodeURIComponent("preventivo v1.pdf")}`, "p1", tommaso);
+    const docId = ((await r.json()) as { document: { id: string; kind: string } }).document.id;
+    await carica(`/api/documents/${docId}/versioni?nome=altro-nome.pdf`, "p2", tommaso);
+    expect((await dettaglio(id, tommaso)).documents.find((d) => d.id === docId)).toMatchObject({ kind: "preventivo", version: 2 });
+
+    // Trascrizione aperta nel browser, non scaricata.
+    const t = await call(`/api/documents/${per("Trascrizione consulenza.txt").id}/file`, {}, tommaso);
+    expect(t.headers.get("content-disposition")).toMatch(/^inline;/);
+    await t.arrayBuffer();
+  });
+
+  it("documento di una cosa da fare: legato alla task, la nuova versione la tiene, task di un altro lead rifiutata", async () => {
+    const cookie = await authed();
+    const id = await nuovoLead(cookie);
+    const altro = await nuovoLead(cookie, "Bianchi Srl");
+    const t = (await (await call("/api/tasks", { method: "POST", json: { title: "Mandare il listino", leadId: id } }, cookie)).json()) as { id: string };
+    const r = await carica(`/api/leads/${id}/documents?nome=listino.pdf&task=${t.id}`, "l1", cookie);
+    expect(r.status).toBe(201);
+    const doc = ((await dettaglio(id, cookie)).documents as (Doc & { taskId: string | null })[]).find((d) => d.name === "listino.pdf");
+    expect(doc?.taskId).toBe(t.id);
+    await carica(`/api/documents/${doc?.id}/versioni?nome=listino-2.pdf`, "l2", cookie);
+    const dopo = ((await dettaglio(id, cookie)).documents as (Doc & { taskId: string | null })[]).find((d) => d.id === doc?.id);
+    expect(dopo?.version).toBe(2);
+    expect(dopo?.taskId).toBe(t.id);
+    expect((await carica(`/api/leads/${altro}/documents?nome=a.pdf&task=${t.id}`, "x", cookie)).status).toBe(404);
+    // Task eliminata: il documento resta nella scheda.
+    await call(`/api/tasks/${t.id}`, { method: "DELETE" }, cookie);
+    expect((await dettaglio(id, cookie)).documents.some((d) => d.id === doc?.id)).toBe(true);
   });
 });

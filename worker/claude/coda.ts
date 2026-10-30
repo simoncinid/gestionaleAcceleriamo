@@ -176,13 +176,13 @@ export async function lavoraCoda(env: Env, now: number, limite: number, inizio =
     await avvisa(getDb(db), {
       evento: "claude_tetto",
       entityId: mese,
-      titolo: `Claude si è fermato: tetto di ${euroTondi(imp.tettoCents)} raggiunto`,
+      titolo: `L'assistente si è fermato: tetto di ${euroTondi(imp.tettoCents)} raggiunto`,
       testo: "I lavori ripartono il primo del mese, oppure alzando il tetto in Impostazioni.",
       href: "/impostazioni/integrazioni/claude",
     }, now);
     esito.fermi = fermi.length;
   }
-  if (esito.errori && !esito.fatti) await segnaErrore(getDb(db), "claude", "Lavori di Claude non riusciti", now);
+  if (esito.errori && !esito.fatti) await segnaErrore(getDb(db), "claude", "Lavori dell'assistente non riusciti", now);
   else if (esito.fatti) await segnaOk(getDb(db), "claude", now);
   return esito;
 }

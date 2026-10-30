@@ -37,8 +37,8 @@ function Blocco({ titolo, coda, children }: { titolo: string; coda?: ReactNode; 
   const id = useId();
   return (
     <section aria-labelledby={id} className={contenitore}>
-      <header className="flex min-h-12 items-center justify-between gap-3 border-b border-[#EFE9E1] px-4 py-2">
-        <h2 id={id} className="font-sans text-[17px] font-semibold leading-6">{titolo}</h2>
+      <header className="flex min-h-12 items-end justify-between gap-3 border-b border-[#EFE9E1] px-4 py-2">
+        <h2 id={id} className="segno font-sans text-sezione font-semibold leading-6">{titolo}</h2>
         {coda}
       </header>
       {children}
@@ -65,13 +65,13 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
   const testata = (n: number | null) => (
     <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <div className="flex flex-col gap-1">
-        <p className="text-[13px] text-grigio first-letter:uppercase">{DATA.format(ora)}</p>
-        <h1 className="font-sans text-[24px] font-semibold leading-[1.15] tracking-[-0.01em] tabular-nums md:text-[28px]">{n == null ? "Oggi" : titoloOggi(n)}</h1>
+        <p className="text-nota text-grigio first-letter:uppercase">{DATA.format(ora)}</p>
+        <h1 className="text-pagina tabular-nums">{n == null ? "Oggi" : titoloOggi(n)}</h1>
       </div>
       <div role="group" aria-label="Di chi" className="flex shrink-0 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio p-0.5 md:h-11">
         {SEGMENTI.map((s) => (
           <button key={s.id} type="button" aria-pressed={chi === s.id} onClick={() => setChi(s.id)}
-            className={cx("h-11 flex-1 rounded-[9px] px-5 md:h-auto text-secondaria font-medium transition-colors duration-(--durata-veloce) md:flex-none",
+            className={cx("h-11 flex-1 rounded-[9px] px-5 md:h-auto text-nota font-medium transition-colors duration-(--durata-veloce) md:flex-none",
               chi === s.id ? "bg-ink text-avorio" : "text-ink hover:bg-crema")}>
             {s.etichetta}
           </button>
@@ -95,7 +95,7 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
       {testata(d.totale)}
 
       <Blocco titolo="Da fare oggi" coda={
-        <Link to={tabella} className="-mr-2 inline-flex min-h-11 items-center gap-1.5 rounded-[8px] px-2 text-[13px] font-medium text-ink hover:bg-crema">
+        <Link to={tabella} className="-mr-2 inline-flex min-h-11 items-center gap-1.5 rounded-[8px] px-2 text-nota font-medium text-ink hover:bg-crema">
           Apri nella tabella <ArrowRight size={14} weight="bold" aria-hidden />
         </Link>
       }>
@@ -117,10 +117,10 @@ export function Oggi({ ora: oraFissa }: { ora?: number } = {}) {
               {d.call.map((k) => (
                 <li key={k.id}>
                   <Link to={`/commerciale/call/${k.id}`} className="flex min-h-14 items-center gap-4 px-4 py-2.5 hover:bg-crema">
-                    <span className="w-12 shrink-0 text-[15px] font-semibold tabular-nums">{orario(k.scheduledAt)}</span>
+                    <span className="w-12 shrink-0 text-testo font-semibold tabular-nums">{orario(k.scheduledAt)}</span>
                     <span className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-[15px]">{k.company}</span>
-                      <span className="truncate text-[13px] text-grigio">
+                      <span className="truncate text-testo">{k.company}</span>
+                      <span className="truncate text-nota text-grigio">
                         Call di {k.kind}{k.kind === "conoscenza" && k.scheda ? `, ${k.scheda === "pronta" ? "scheda azienda pronta" : "scheda in preparazione"}` : ""}
                       </span>
                     </span>

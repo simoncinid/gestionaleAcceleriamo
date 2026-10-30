@@ -2,7 +2,7 @@ import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, like, lte, ne, or,
 import type { BatchItem } from "drizzle-orm/batch";
 import { HTTPException } from "hono/http-exception";
 import { violaUnico, type Db } from "../db/client";
-import { activities, auditLog, clients, documents, fees, leads, stages, users, type Activity, type Lead, type LeadSource, type Stage } from "../db/schema";
+import { activities, auditLog, clients, documents, fees, leads, stages, tasks, users, type Activity, type Lead, type LeadSource, type Stage } from "../db/schema";
 import { audit } from "../lib/audit";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { aE164 } from "../lib/telefono";
@@ -353,6 +353,7 @@ export async function mergeLeads(db: Db, sourceId: string, targetId: string, act
 
   await db.update(activities).set({ leadId: targetId }).where(eq(activities.leadId, sourceId));
   await db.update(documents).set({ leadId: targetId }).where(eq(documents.leadId, sourceId));
+  await db.update(tasks).set({ leadId: targetId }).where(eq(tasks.leadId, sourceId));
   await db.update(leads).set(fill).where(eq(leads.id, targetId));
   await db.update(leads).set({ deletedAt: now, updatedAt: now, duplicateOfId: targetId }).where(eq(leads.id, sourceId));
   await addActivity(db, targetId, "unione", `Unito il lead "${source.company}"`, actorId, now);

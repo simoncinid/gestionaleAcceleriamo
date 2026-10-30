@@ -6,6 +6,7 @@ import { api } from "../../../api";
 import { ACCETTA, caricaFile, fileNonAmmesso, peso } from "../../../carica";
 import { Campo, Pulsante, Tag, classiPulsante, cx } from "../../../ds";
 import { momento } from "../../../format";
+import { dataTesto } from "../../../../worker/processo/processo";
 import { useRefreshLeads } from "../../../hooks";
 import type { DocumentRow, VersioneDocumento } from "../../../types";
 
@@ -39,8 +40,11 @@ export function Documents({ leadId, documents, ora, nuovi = [] }: { leadId: stri
       const { chiave } = righe[i];
       const path = doc ? `/documents/${doc.id}/versioni?nome=${encodeURIComponent(f.name)}` : `/leads/${leadId}/documents?nome=${encodeURIComponent(f.name)}`;
       try {
-        await caricaFile(path, f, (p) => setCoda((c) => c.map((r) => (r.chiave === chiave ? { ...r, avanzamento: p } : r))));
+        const r = (await caricaFile(path, f, (p) => setCoda((c) => c.map((x) => (x.chiave === chiave ? { ...x, avanzamento: p } : x))))) as { document?: { kind?: string; callId?: string | null } };
         fatti++;
+        // Le regole automatiche possono spostarlo fuori dal foglio: si dice dove è finito.
+        if (!doc && r.document?.kind === "preventivo") toast.info(`${f.name}: è nel blocco Preventivo, in cima alla scheda`);
+        else if (!doc && r.document?.callId) toast.info(`${f.name}: è accanto alla sua call, in Collegamenti`);
       } catch (e) {
         toast.error(`${f.name}: ${(e as Error).message}`);
       } finally {
@@ -78,7 +82,7 @@ export function Documents({ leadId, documents, ora, nuovi = [] }: { leadId: stri
         <Pulsante variante="primario" icona={<UploadSimple size={20} weight="bold" aria-hidden />} onClick={() => scegli.current?.click()}>
           Carica file
         </Pulsante>
-        <p className="text-secondaria text-grigio">O trascina qui i file. PDF, TXT, Excel, Word, audio e immagini, fino a 100 MB.</p>
+        <p className="text-nota text-grigio">O trascina qui i file. PDF, TXT, Excel, Word, audio e immagini, fino a 100 MB.</p>
         <input ref={scegli} type="file" multiple accept={ACCETTA} className="hidden" data-testid="scegli-file"
           onChange={(e) => { const f = [...(e.target.files ?? [])]; e.target.value = ""; void invia(f); }} />
         <input ref={scegliVersione} type="file" accept={ACCETTA} className="hidden" data-testid="scegli-versione"
@@ -89,9 +93,9 @@ export function Documents({ leadId, documents, ora, nuovi = [] }: { leadId: stri
         <ul className="flex flex-col gap-3" aria-label="Caricamenti in corso">
           {coda.map((r) => (
             <li key={r.chiave} className="flex flex-col gap-1.5">
-              <span className="flex items-baseline justify-between gap-3 text-corpo">
+              <span className="flex items-baseline justify-between gap-3 text-testo">
                 <span className="min-w-0 truncate">{r.nome}</span>
-                <span className="shrink-0 text-secondaria text-grigio tabular-nums">{r.avanzamento >= 1 ? "Salvataggio" : `${Math.round(r.avanzamento * 100)}%`}</span>
+                <span className="shrink-0 text-nota text-grigio tabular-nums">{r.avanzamento >= 1 ? "Salvataggio" : `${Math.round(r.avanzamento * 100)}%`}</span>
               </span>
               <span role="progressbar" aria-label={`Caricamento di ${r.nome}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(r.avanzamento * 100)}
                 className="block h-1.5 overflow-hidden rounded-full bg-sabbia">
@@ -102,7 +106,7 @@ export function Documents({ leadId, documents, ora, nuovi = [] }: { leadId: stri
         </ul>
       )}
 
-      {documents.length === 0 && coda.length === 0 ? <p className="text-secondaria text-grigio">Nessun documento.</p> : (
+      {documents.length === 0 && coda.length === 0 ? <p className="text-nota text-grigio">Nessun documento.</p> : (
         <ul className="flex flex-col divide-y divide-sabbia">
           {documents.map((d) => (
             <RigaDocumento key={d.id} d={d} ora={ora} nuovo={nuovi.includes(d.id)} chiede={chiede === d.id}
@@ -114,7 +118,7 @@ export function Documents({ leadId, documents, ora, nuovi = [] }: { leadId: stri
       )}
 
       {conLink ? <AggiungiLink leadId={leadId} onFatto={() => { setConLink(false); refresh(); }} /> : (
-        <button type="button" className="self-start text-secondaria font-semibold text-ink underline decoration-[#CFC6B9] underline-offset-4 hover:decoration-ink min-h-11"
+        <button type="button" className="self-start text-nota font-semibold text-ink underline decoration-[#CFC6B9] underline-offset-4 hover:decoration-ink min-h-11"
           onClick={() => setConLink(true)}>
           Aggiungi un link (Drive, Docs)
         </button>
@@ -133,7 +137,6 @@ function RigaDocumento({ d, ora, nuovo, chiede, togliendo, onTogli, onVersione }
     d.file ? peso(d.size) : "Link",
     d.authorName,
     momento(d.updatedAt ?? d.createdAt, ora),
-    d.via === "claude" ? "caricato da Claude" : null,
   ].filter(Boolean).join(" · ");
   return (
     <li className="flex flex-col gap-2 py-3" data-documento={d.id}>
@@ -141,11 +144,11 @@ function RigaDocumento({ d, ora, nuovo, chiede, togliendo, onTogli, onVersione }
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-center gap-2">
             {d.file || d.url
-              ? <a href={d.file ? file : (d.url ?? undefined)} target="_blank" rel="noopener noreferrer" className="truncate text-corpo font-semibold text-accento-testo underline-offset-4 hover:underline">{d.name}</a>
-              : <span className="truncate text-corpo">{d.name}</span>}
+              ? <a href={d.file ? file : (d.url ?? undefined)} target="_blank" rel="noopener noreferrer" className="truncate text-testo font-semibold text-accento-testo underline-offset-4 hover:underline">{d.name}</a>
+              : <span className="truncate text-testo">{d.name}</span>}
             {nuovo && <Tag>Nuovo</Tag>}
           </span>
-          <span className="text-secondaria text-grigio tabular-nums">{meta}</span>
+          <span className="text-nota text-grigio tabular-nums">{meta}</span>
         </div>
         <Pulsante variante={chiede ? "distruttivo" : "fantasma"} className="shrink-0" inCorso={togliendo} onClick={onTogli}>
           {chiede ? "Tocca di nuovo" : "Togli"}
@@ -169,21 +172,19 @@ function RigaDocumento({ d, ora, nuovo, chiede, togliendo, onTogli, onVersione }
   );
 }
 
-function Storico({ id, ora }: { id: string; ora: number }) {
+export function Storico({ id, ora }: { id: string; ora: number }) {
   const q = useQuery({ queryKey: ["documento", id, "versioni"], queryFn: () => api<{ versioni: VersioneDocumento[] }>(`/documents/${id}/versioni`).then((r) => r.versioni) });
-  if (q.isLoading) return <p className="pl-1 text-secondaria text-grigio">Carico lo storico…</p>;
-  if (q.error) return <p className="pl-1 text-secondaria text-errore">{q.error.message}</p>;
+  if (q.isLoading) return <p className="pl-1 text-nota text-grigio">Carico lo storico…</p>;
+  if (q.error) return <p className="pl-1 text-nota text-errore">{q.error.message}</p>;
   const [, ...vecchie] = q.data ?? [];
   return (
-    <ol className="flex flex-col gap-1 border-l-2 border-sabbia pl-3" aria-label="Versioni precedenti">
+    <ol className="flex flex-col" aria-label="Versioni precedenti">
       {vecchie.map((v) => (
-        <li key={v.id} className="flex flex-col">
-          <a href={`/api/documents/${id}/file?versione=${v.version}`} target="_blank" rel="noopener noreferrer" className="truncate text-corpo text-accento-testo underline-offset-4 hover:underline">
-            Versione {v.version}: {v.fileName}
+        <li key={v.id} className="flex flex-col py-1">
+          <a href={`/api/documents/${id}/file?versione=${v.version}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center self-start text-testo font-semibold text-ink underline decoration-[#CFC6B9] underline-offset-4 hover:decoration-ink">
+            {[`Versione ${v.version}`, dataTesto(v.createdAt).replace(/^\S+ /, ""), v.authorName].filter(Boolean).join(", ")}
           </a>
-          <span className="text-secondaria text-grigio tabular-nums">
-            {[peso(v.size), v.authorName, momento(v.createdAt, ora), v.via === "claude" ? "caricato da Claude" : null].filter(Boolean).join(" · ")}
-          </span>
+          <span className="text-nota text-grigio tabular-nums">{[v.fileName, peso(v.size), momento(v.createdAt, ora)].filter(Boolean).join(" · ")}</span>
         </li>
       ))}
     </ol>

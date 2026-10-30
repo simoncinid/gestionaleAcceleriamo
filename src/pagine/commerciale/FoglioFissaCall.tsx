@@ -48,7 +48,7 @@ export function FoglioFissaCall({ leadId, haEmail, onChiudi, fase, ritorno }: {
         {!fase && <Selettore etichetta="Tipo" opzioni={TIPI} valore={kind} onCambia={setKind} />}
         <CampoQuando etichetta="Giorno e ora" valore={quando} onCambia={(ms) => { setQuando(ms); setErroreData(null); }} errore={erroreData} />
         <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={meet} onChange={(e) => setMeet(e.target.value)} />
-        <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
+        <a className="self-start text-nota font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
         <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={!haEmail} inCoda={!resend} />
       </div>
     </Foglio>

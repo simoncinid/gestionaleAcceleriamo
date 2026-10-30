@@ -26,7 +26,7 @@ import {
 // se non ci sta la tabella scorre di lato dentro il suo contenitore.
 
 const cella = "h-11 px-2.5 align-middle";
-const secondaria = "block truncate text-[13px] leading-4 text-grigio";
+const secondaria = "block truncate text-nota leading-4 text-grigio";
 const manca = (testo = "Manca") => <span className="text-grigio">{testo}</span>;
 
 // Larghezza del contenitore della tabella, per decidere se scorre di lato.
@@ -90,7 +90,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
       case "dafare": return <>
         <span title={l.prossima?.azione ?? undefined} className={cx("block truncate", !l.prossima?.azione && "text-grigio")}>{l.prossima?.azione ?? "Nessuna azione"}</span>
         {l.prossima?.scadenza != null && (
-          <span className={cx("block truncate text-[13px] leading-4 tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>
+          <span className={cx("block truncate text-nota leading-4 tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>
         )}
       </>;
       case "contatto": return <span className={cx("block truncate", l.ultimoContatto == null && "text-grigio")}>{l.ultimoContatto != null ? trascorso(l.ultimoContatto, ora) : "Mai"}</span>;
@@ -125,7 +125,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
   return (
     <div className="flex flex-col gap-4 pb-8">
       <header className="flex items-start justify-between gap-3">
-        <h1 className="font-sans text-[24px] md:text-[28px] font-semibold leading-[1.15] tracking-[-0.01em] tabular-nums">{titoloLead(n)}</h1>
+        <h1 className="text-pagina tabular-nums">{titoloLead(n)}</h1>
         {/* Esporta le righe che si vedono (filtri e ordine compresi), con tutte le colonne. */}
         <MenuPunti etichetta="Altre azioni dei lead" larghezza={220} voci={[{
           testo: righe.length === 1 ? "Esporta CSV (1 lead)" : `Esporta CSV (${righe.length} lead)`,
@@ -147,7 +147,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
               stanno, la tabella scorre di lato: lì l'intestazione non resta ferma. */}
           <section ref={sezione} aria-label="Tabella dei lead" className="hidden overflow-clip rounded-[10px] border border-[#E5DED4] bg-avorio md:block">
             <div className={cx(largo && "overflow-x-auto")}>
-              <table className="table-fixed border-collapse text-left text-[14px] leading-5" style={largo ? { width: totale } : { width: "100%", minWidth: totale }}>
+              <table className="table-fixed border-collapse text-left text-nota" style={largo ? { width: totale } : { width: "100%", minWidth: totale }}>
                 <colgroup>
                   {colonne.map((c) => <col key={c.id} style={{ width: c.px }} />)}
                   <col style={{ width: PX_AZIONI }} />
@@ -156,7 +156,7 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                   <tr>
                     {colonne.map((c) => (
                       <th key={c.id} scope="col" aria-sort={c.ordine && filtri.ord === c.ordine ? (filtri.dir === "asc" ? "ascending" : "descending") : undefined}
-                        className={cx(cella, "h-10 whitespace-nowrap border-b border-[#E5DED4] text-[13px] font-medium text-grigio")}>
+                        className={cx(cella, "h-10 whitespace-nowrap border-b border-[#E5DED4] text-nota font-medium text-grigio")}>
                         {c.ordine ? (
                           <button type="button" onClick={() => ordinaPer(c.ordine!)}
                             className={cx("-mx-1.5 inline-flex h-8 cursor-pointer items-center gap-1 rounded-[6px] px-1.5 hover:bg-crema hover:text-ink", filtri.ord === c.ordine && "text-ink")}>
@@ -189,12 +189,12 @@ export function Lead({ ora: oraFissa }: { ora?: number } = {}) {
                 <Link to={`/commerciale/lead/${l.id}`} data-lead={l.id} className="flex min-h-[60px] flex-col justify-center gap-1 px-4 py-2.5 active:bg-crema">
                   <span className="flex items-baseline gap-3">
                     <span className="flex min-w-0 flex-1 items-center gap-2">
-                      <span className="min-w-0 truncate text-[15px] font-semibold">{l.company}</span>
+                      <span className="min-w-0 truncate text-testo font-semibold">{l.company}</span>
                       <PallinoDocumenti n={l.novita} />
                     </span>
-                    {l.prossima?.scadenza != null && <span className={cx("shrink-0 text-[13px] tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>}
+                    {l.prossima?.scadenza != null && <span className={cx("shrink-0 text-nota tabular-nums", classeScadenza(l.prossima.stato, l.prossima.scadenza, ora))}>{scadenzaBreve(l.prossima.scadenza, ora, l.prossima.stato)}</span>}
                   </span>
-                  <span className="flex min-w-0 items-center gap-2 text-[13px] text-grigio">
+                  <span className="flex min-w-0 items-center gap-2 text-nota text-grigio">
                     <EtichettaFase {...faseDi(fasi.data, l.stageId)} className="shrink-0" />
                     {l.prossima?.azione && <span className="min-w-0 truncate text-ink">{l.prossima.azione}</span>}
                   </span>

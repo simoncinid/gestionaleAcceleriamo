@@ -17,8 +17,8 @@ export const EVENTI_TELEGRAM: string[] = Object.values(TABELLA_EVENTI).filter((e
 export function AvvisiTelegram({ attenuato = false }: { attenuato?: boolean }) {
   return (
     <div className="grid gap-1">
-      <p className={attenuato ? "text-secondaria text-grigio" : "text-corpo"}>Su Telegram arrivano solo questi avvisi:</p>
-      <ul className="grid gap-0.5">{EVENTI_TELEGRAM.map((e) => <li key={e} className={attenuato ? "text-secondaria text-grigio" : "text-corpo"}>{e}</li>)}</ul>
+      <p className={attenuato ? "text-nota text-grigio" : "text-testo"}>Su Telegram arrivano solo questi avvisi:</p>
+      <ul className="grid gap-0.5">{EVENTI_TELEGRAM.map((e) => <li key={e} className={attenuato ? "text-nota text-grigio" : "text-testo"}>{e}</li>)}</ul>
     </div>
   );
 }
@@ -56,8 +56,8 @@ export function useTelegram() {
 export function LinkTelegram({ link }: { link: string }) {
   return (
     <div className="grid gap-1">
-      <a className="text-corpo font-semibold text-accento-testo underline underline-offset-4" href={link} target="_blank" rel="noopener noreferrer">Apri Telegram e premi Avvia</a>
-      <p className="text-meta text-grigio">Il codice vale 15 minuti. La chat risulta collegata entro qualche minuto.</p>
+      <a className="text-testo font-semibold text-accento-testo underline underline-offset-4" href={link} target="_blank" rel="noopener noreferrer">Apri Telegram e premi Avvia</a>
+      <p className="text-nota text-grigio">Il codice vale 15 minuti. La chat risulta collegata entro qualche minuto.</p>
     </div>
   );
 }
@@ -77,7 +77,7 @@ function FoglioPassword({ onChiudi }: { onChiudi: () => void }) {
       <Campo etichetta="Password attuale" type="password" autoComplete="current-password" value={attuale} onChange={(e) => setAttuale(e.target.value)} />
       <Campo etichetta="Password nuova" type="password" autoComplete="new-password" value={nuova} onChange={(e) => setNuova(e.target.value)} aiuto="Almeno 10 caratteri" />
       <Campo etichetta="Ripeti la password nuova" type="password" autoComplete="new-password" value={ripeti} onChange={(e) => setRipeti(e.target.value)} />
-      <p className="text-secondaria text-grigio">Gli altri dispositivi escono: si rientra con la password nuova.</p>
+      <p className="text-nota text-grigio">Gli altri dispositivi escono: si rientra con la password nuova.</p>
     </Foglio>
   );
 }
@@ -87,7 +87,7 @@ function FoglioAvvisi({ p, onChiudi }: { p: Profilo; onChiudi: () => void }) {
   const salva = useSalvaProfilo(onChiudi);
   return (
     <Foglio aperto titolo="Avvisi per evento" onChiudi={onChiudi} principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate({ notifyPrefs: prefs })}>Salva gli avvisi</Pulsante>}>
-      <p className="text-secondaria text-grigio">Spento vuol dire niente notifica e niente Telegram per quell'evento. Dentro l'app l'avviso resta.</p>
+      <p className="text-nota text-grigio">Spento vuol dire niente notifica e niente Telegram per quell'evento. Dentro l'app l'avviso resta.</p>
       <div className="flex flex-col gap-2">{EVENTI.map(([k, t]) => <Interruttore key={k} etichetta={t} acceso={prefs[k] ?? true} onCambia={(v) => setPrefs((x) => ({ ...x, [k]: v }))} />)}</div>
     </Foglio>
   );
@@ -127,17 +127,17 @@ function FoglioTelegram({ p, onChiudi }: { p: Profilo; onChiudi: () => void }) {
   return (
     <Foglio aperto titolo="Telegram" onChiudi={onChiudi} principale={principale}>
       {senzaBot && !p.telegram ? (
-        <p className="text-corpo">Telegram non è ancora attivo: manca il bot, lo collega chi gestisce il server. Gli avvisi restano dentro l'app.</p>
+        <p className="text-testo">Telegram non è ancora attivo: manca il bot, lo collega chi gestisce il server. Gli avvisi restano dentro l'app.</p>
       ) : p.telegram ? (
         <>
-          <p className="text-corpo">La tua chat è collegata.</p>
+          <p className="text-testo">La tua chat è collegata.</p>
           <AvvisiTelegram attenuato />
           <div><ScollegaTelegram scollega={scollega} testo="Scollega Telegram" /></div>
         </>
       ) : (
         <>
           <AvvisiTelegram />
-          {link ? <LinkTelegram link={link} /> : <p className="text-secondaria text-grigio">Premi Collega: si apre il bot con il tuo codice.</p>}
+          {link ? <LinkTelegram link={link} /> : <p className="text-nota text-grigio">Premi Collega: si apre il bot con il tuo codice.</p>}
         </>
       )}
     </Foglio>
@@ -166,9 +166,9 @@ export function IlMioProfilo() {
   const chiudi = () => setAperto(null);
   return (
     <section aria-label="Il mio profilo" className="grid gap-3">
-      <h2 className="font-display text-titolo-card">Il mio profilo</h2>
-      {q.isLoading ? <p className="text-secondaria text-grigio">Caricamento del profilo</p>
-        : !p ? <div className="grid gap-2"><p className="text-corpo">Il profilo non si è caricato.</p><div><Pulsante variante="secondario" onClick={() => void q.refetch()}>Riprova</Pulsante></div></div>
+      <h2 className="segno font-display text-sezione">Il mio profilo</h2>
+      {q.isLoading ? <p className="text-nota text-grigio">Caricamento del profilo</p>
+        : !p ? <div className="grid gap-2"><p className="text-testo">Il profilo non si è caricato.</p><div><Pulsante variante="secondario" onClick={() => void q.refetch()}>Riprova</Pulsante></div></div>
         : (
           <ul className="grid grid-cols-1 gap-2">
             <li><Riga titolo="Password" secondaria="Cambiala quando vuoi: gli altri dispositivi escono" onClick={() => setAperto("password")} /></li>

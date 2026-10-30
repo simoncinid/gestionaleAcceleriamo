@@ -47,13 +47,15 @@ describe("Da fare, fasi con la call (30 e 50)", () => {
     const html = scheda(lead({ stageId: "appuntamento-confermato", appointmentAt: call.scheduledAt, nextActionAt: call.scheduledAt }), { call });
     expect(html).toContain("al telefono");
     expect(html).toContain('href="/commerciale/call/c1"');
-    expect(html).toContain("Call: Venerdì 30 ottobre, 15:00");
+    expect(html).toContain("Al telefono, venerdì 30 ottobre, 15:00");
+    expect(html).toContain(">Apri la call<");
     expect(html).toContain("Aggiungi il link della call");
     expect(html).not.toMatch(/[Tt]entativo/);
   });
   it("50 con link: Google Meet, niente invito ad aggiungerlo", () => {
     const html = scheda(lead({ stageId: "presentazione-confermata", appointmentAt: call.scheduledAt, nextActionAt: call.scheduledAt, meetLink: "https://meet.google.com/abc" }), { call });
     expect(html).toContain("su Google Meet");
+    expect(html).toContain("Google Meet, venerdì 30 ottobre, 15:00");
     expect(html).not.toContain("Aggiungi il link della call");
     expect(contaPrimari(html)).toBeLessThanOrEqual(1);
   });
@@ -108,5 +110,37 @@ describe("passaggio da lead a cliente (modifica 15)", async () => {
     expect(l).toContain("Nato dal lead Officina Prova il 14\u00a0ottobre");
     expect(l).toContain('href="/commerciale/lead/L1"');
     expect(render(<PassaggioLead leadId="L1" azienda="X" il={null} />)).toContain("Nato dal lead X:");
+  });
+});
+
+describe("Da fare come lista (giro 2)", async () => {
+  const { orarioBreve, statoDi } = await import("../src/pagine/commerciale/lead/daFare");
+  const { Contatti } = await import("../src/pagine/commerciale/lead/Contatti");
+  it("orario corto: ieri, oggi, domani, giorno e data", () => {
+    expect(orarioBreve(ORA - 86_400_000 + 6 * ORA_MS, ORA)).toBe("ieri 16:00");
+    expect(orarioBreve(ORA + 6 * ORA_MS, ORA)).toBe("oggi 16:00");
+    expect(orarioBreve(ORA + 86_400_000, ORA)).toBe("domani 10:00");
+    expect(orarioBreve(ORA + 3 * 86_400_000 + 6 * ORA_MS, ORA)).toBe("sab 31, 16:00");
+    expect(statoDi(ORA - 86_400_000, ORA)).toBe("scaduto");
+    expect(statoDi(ORA + ORA_MS, ORA)).toBe("oggi");
+    expect(statoDi(ORA + 86_400_000, ORA)).toBe("futuro");
+  });
+  it("riga del passo: spunta che chiede com'è andata, orario a destra, aperta all'avvio", () => {
+    const html = scheda(lead({ nextActionAt: ORA + 6 * ORA_MS }));
+    expect(html).toContain('aria-label="Segna com&#x27;è andata"');
+    expect(html).toContain(">oggi 16:00<");
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain("Aggiungi una cosa da fare");
+    expect(html).not.toContain("Apri la videochiamata");
+  });
+  it("lead chiuso: niente spunta sul passo", () => {
+    expect(scheda(lead({ stageId: "non-chiuso", lostReason: "prezzo" }))).not.toContain("Segna com&#x27;è andata");
+  });
+  it("contatti: icone con etichetta accanto a numero ed email, niente pulsanti grandi", () => {
+    const html = render(<Contatti lead={{ id: "l1", contactName: "Luca Prova", phone: "+393330000001", email: "luca@esempio.it" }} onScrivi={() => undefined} onAggiungi={() => undefined} />);
+    for (const e of ["Chiama Luca", "Scrivi su WhatsApp", "Scrivi un&#x27;email"]) expect(html).toContain(`aria-label="${e}"`);
+    expect(html).not.toContain(">WhatsApp<");
+    expect(html).not.toContain(">Telefono<");
+    expect(html).toContain("size-11");
   });
 });

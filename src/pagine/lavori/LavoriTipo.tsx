@@ -75,7 +75,7 @@ function FoglioLavoroTipo({ iniziale, onChiudi }: { iniziale: Bozza; onChiudi: (
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Salva il lavoro tipo</Pulsante>}>
       <Campo etichetta="Nome" value={b.name} onChange={(e) => setB({ ...b, name: e.target.value })} />
       <Selettore etichetta="Tipo" opzioni={TIPI} valore={b.kind} onCambia={(v) => setB({ ...b, kind: v })} />
-      <p className="text-secondaria font-medium">Task standard</p>
+      <p className="text-nota font-medium">Task standard</p>
       <ul className="flex flex-col gap-2">
         {b.tasks.map((t, i) => (
           <li key={t.id ?? `n${i}`} className="flex items-center gap-1">

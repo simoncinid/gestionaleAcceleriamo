@@ -127,6 +127,7 @@ export const taskRoutes = new Hono<AppEnv>();
 const campiTask = {
   title: z.string().trim().min(1, "La task ha bisogno di un titolo").max(200),
   clientId: z.string().nullish(),
+  leadId: z.string().nullish(),
   jobId: z.string().nullish(),
   assigneeId: z.string().nullish(),
   dueAt: z.number().int().nullish(),
@@ -134,20 +135,21 @@ const campiTask = {
 };
 
 export type TaskRiga = {
-  id: string; title: string; clientId: string | null; cliente: string | null; jobId: string | null; lavoro: string | null;
+  id: string; title: string; clientId: string | null; leadId: string | null; cliente: string | null; jobId: string | null; lavoro: string | null;
   assigneeId: string | null; dueAt: number | null; doneAt: number | null; doneBy: string | null; doneByName: string | null; note: string | null; month: string | null;
 };
 
-async function elencoTask(db: ReturnType<typeof getDb>, filtro: { assigneeId?: string; clientId?: string; solo: "aperte" | "tutte" }): Promise<TaskRiga[]> {
+async function elencoTask(db: ReturnType<typeof getDb>, filtro: { assigneeId?: string; clientId?: string; leadId?: string; solo: "aperte" | "tutte" }): Promise<TaskRiga[]> {
   const righe = await db.select({ t: tasks, cliente: clients.name, lavoro: jobs.name }).from(tasks)
     .leftJoin(clients, eq(clients.id, tasks.clientId)).leftJoin(jobs, eq(jobs.id, tasks.jobId))
     .where(and(isNull(tasks.deletedAt), filtro.solo === "aperte" ? isNull(tasks.doneAt) : undefined,
-      filtro.assigneeId ? eq(tasks.assigneeId, filtro.assigneeId) : undefined, filtro.clientId ? eq(tasks.clientId, filtro.clientId) : undefined))
+      filtro.assigneeId ? eq(tasks.assigneeId, filtro.assigneeId) : undefined, filtro.clientId ? eq(tasks.clientId, filtro.clientId) : undefined,
+      filtro.leadId ? eq(tasks.leadId, filtro.leadId) : undefined))
     .orderBy(asc(tasks.dueAt));
   const chi = [...new Set(righe.map((r) => r.t.doneBy).filter((x): x is string => !!x))];
   const nomi = chi.length ? await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, chi)) : [];
   return righe.map(({ t, cliente, lavoro }) => ({
-    id: t.id, title: t.title, clientId: t.clientId, cliente, jobId: t.jobId, lavoro, assigneeId: t.assigneeId, dueAt: t.dueAt, doneAt: t.doneAt,
+    id: t.id, title: t.title, clientId: t.clientId, leadId: t.leadId, cliente, jobId: t.jobId, lavoro, assigneeId: t.assigneeId, dueAt: t.dueAt, doneAt: t.doneAt,
     doneBy: t.doneBy, doneByName: nomi.find((n) => n.id === t.doneBy)?.name ?? null, note: t.note, month: t.month,
   }));
 }
@@ -156,7 +158,7 @@ export { elencoTask };
 taskRoutes.get("/", async (c) => {
   const db = getDb(c.env.DB);
   const chi = c.req.query("chi") === "tutte" ? undefined : c.get("user").id;
-  return c.json({ task: await elencoTask(db, { assigneeId: chi, clientId: c.req.query("clientId"), solo: c.req.query("stato") === "tutte" ? "tutte" : "aperte" }) });
+  return c.json({ task: await elencoTask(db, { assigneeId: chi, clientId: c.req.query("clientId"), leadId: c.req.query("leadId"), solo: c.req.query("stato") === "tutte" ? "tutte" : "aperte" }) });
 });
 
 taskRoutes.post("/", async (c) => {

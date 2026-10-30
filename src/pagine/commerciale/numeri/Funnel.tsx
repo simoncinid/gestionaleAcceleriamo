@@ -71,7 +71,7 @@ export function Funnel({ ora = Date.now() }: { ora?: number }) {
               {f.motivi.map((m) => <Voce key={m.id} nome={m.etichetta} numero={m.numero} quota={(m.numero / Math.max(...f.motivi.map((x) => x.numero), 1)) * 100} />)}
             </Gruppo>
           )}
-          <p className="text-meta text-grigio">Le percentuali con meno di 5 lead non si calcolano: scrivono "n.d.". I doppioni non si contano.</p>
+          <p className="text-nota text-grigio">Le percentuali con meno di 5 lead non si calcolano: scrivono "n.d.". I doppioni non si contano.</p>
           </div>
           </div>
         </div>

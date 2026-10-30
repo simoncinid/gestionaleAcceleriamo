@@ -50,12 +50,12 @@ export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number 
     <div key={`${k.name}:${k.sector}:${k.city}`} className="grid gap-6 p-4 md:p-0 md:pb-8 @4xl:grid-cols-2 @4xl:items-start @4xl:gap-x-8 @7xl:grid-cols-3">
       <div className="@4xl:col-span-full">
       <Intestazione titolo={k.name} eyebrow="Cliente">
-        <div className="flex items-center gap-2"><LogoCliente logo={k.logo} nome={k.name} misura={32} /><p className="text-secondaria text-grigio">{ETICHETTE_CLIENTE[k.stato]}</p></div>
+        <div className="flex items-center gap-2"><LogoCliente logo={k.logo} nome={k.name} misura={32} /><p className="text-nota text-grigio">{ETICHETTE_CLIENTE[k.stato]}</p></div>
         {lead && <PassaggioLead leadId={lead.id} azienda={lead.company} il={leadOrigine.data?.lead.stageId === "chiuso" ? leadOrigine.data.lead.stageChangedAt : null} />}
       </Intestazione>
       </div>
       <Sezione titolo="Lavori">
-        {lavori.length === 0 ? <p className="text-secondaria text-grigio">Nessun lavoro</p> : (
+        {lavori.length === 0 ? <p className="text-nota text-grigio">Nessun lavoro</p> : (
           <ul className="grid gap-2">{lavori.map((l) => <li key={l.id}><Riga titolo={l.name} secondaria={`Avviato il ${giorno(l.startAt, ora)}${l.feeCents ? `, ${euro(l.feeCents)} al mese` : ""}`} meta={l.status === "concluso" ? "Concluso" : undefined} /></li>)}</ul>
         )}
         <Pulsante variante="secondario" className="justify-self-start" onClick={() => setAvvio(true)}>Assegna un lavoro</Pulsante>
@@ -72,18 +72,18 @@ export function SchedaCliente({ id, ora: oraFissa }: { id: string; ora?: number 
         <Selettore etichetta="Perimetro" opzioni={PERIMETRI} valore={k.scope} onCambia={(v) => patch.mutate({ scope: v })} />
       </Sezione>
       <Sezione titolo="Canoni">
-        {canoni.length === 0 ? <p className="text-secondaria text-grigio">Nessun canone</p> : (
+        {canoni.length === 0 ? <p className="text-nota text-grigio">Nessun canone</p> : (
           <ul className="grid grid-cols-1 gap-2">{canoni.map((c) => <li key={c.id}><Riga titolo={`${euro(c.amountCents)} al mese`} secondaria={ETICHETTE_CANONE[c.status]} meta={`Fatturazione il giorno ${c.billingDay}`} /></li>)}</ul>
         )}
       </Sezione>
       <Sezione titolo="Automazioni">
-        {automazioni.length === 0 ? <p className="text-secondaria text-grigio">Nessuna automazione</p> : (
+        {automazioni.length === 0 ? <p className="text-nota text-grigio">Nessuna automazione</p> : (
           <ul className="grid grid-cols-1 gap-2">{automazioni.map((a) => <li key={a.id}><Riga titolo={a.name} secondaria={ETICHETTE_AUTOMAZIONE[a.status]} href={`/automazioni/${a.id}`} /></li>)}</ul>
         )}
       </Sezione>
       {k.scope === "acceleriamo" && (
         <Sezione titolo="Ultime fatture">
-          {fatture.length === 0 ? <p className="text-secondaria text-grigio">Nessuna fattura</p> : (
+          {fatture.length === 0 ? <p className="text-nota text-grigio">Nessuna fattura</p> : (
             <ul className="grid grid-cols-1 gap-2">{fatture.map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} /></li>)}</ul>
           )}
         </Sezione>

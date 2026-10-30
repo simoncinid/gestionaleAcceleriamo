@@ -16,7 +16,7 @@ const MAPPA: [keyof Impostazioni["foglio"]["mappa"], string][] = [
 ];
 const presente = (si: boolean) => (si ? "presente" : "mancante");
 
-const Riquadro = ({ children }: { children: ReactNode }) => <div className="grid gap-1 text-corpo">{children}</div>;
+const Riquadro = ({ children }: { children: ReactNode }) => <div className="grid gap-1 text-testo">{children}</div>;
 
 export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Impostazioni["foglio"]; ora: number }) {
   const qc = useQueryClient();
@@ -62,10 +62,10 @@ export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Imp
     <>
       <Riquadro>
         <p>{`Account di servizio: ${presente(d.segreti.google)}`}</p>
-        {d.foglio.ultimaLettura == null ? <p className="text-meta text-grigio">Il foglio non è ancora stato letto</p> : (
+        {d.foglio.ultimaLettura == null ? <p className="text-nota text-grigio">Il foglio non è ancora stato letto</p> : (
           <>
             <p>{`Ultima riga letta: ${d.foglio.ultimaRiga}`}</p>
-            <p className="text-meta text-grigio">{`Ultima lettura ${momento(d.foglio.ultimaLettura, ora)}`}</p>
+            <p className="text-nota text-grigio">{`Ultima lettura ${momento(d.foglio.ultimaLettura, ora)}`}</p>
           </>
         )}
       </Riquadro>
@@ -75,14 +75,14 @@ export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Imp
           aria-invalid={erroreLink ? true : undefined}
           onChange={(e) => { setLink(e.target.value); setErroreLink(null); }}
           onBlur={() => { if (link.trim()) { const l = daLinkFoglio(link); setErroreLink("errore" in l ? l.errore : null); } }} />
-        {erroreLink && <p role="alert" className="text-secondaria text-errore">{erroreLink}</p>}
+        {erroreLink && <p role="alert" className="text-nota text-errore">{erroreLink}</p>}
       </div>
       {d.segreti.google && (
         <Campo etichetta="Nome della scheda" aiuto="Serve all'account di servizio: il nome scritto sulla linguetta in basso" value={f.scheda} onChange={(e) => setF({ ...f, scheda: e.target.value })} />
       )}
       <Interruttore etichetta="Lettura automatica ogni 15 minuti" acceso={f.attivo} onCambia={(v) => setF({ ...f, attivo: v })} />
       <details className="rounded-controllo border border-sabbia px-3">
-        <summary className="flex min-h-11 cursor-pointer items-center text-corpo font-semibold">Mappa delle colonne</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center text-testo font-semibold">Mappa delle colonne</summary>
         <div className="grid gap-3 pb-3">
           {MAPPA.map(([k, etichetta]) => <Campo key={k} etichetta={etichetta} value={f.mappa[k]} onChange={(e) => setF({ ...f, mappa: { ...f.mappa, [k]: e.target.value } })} />)}
         </div>
@@ -94,8 +94,8 @@ export function SezioneFoglio({ d, foglio, ora }: { d: StatoSistema; foglio: Imp
       </div>
       {anteprima && (
         <div className="grid gap-2">
-          {anteprima.colonneMancanti.map((c) => <p key={c} className="text-corpo text-errore">{`Colonna ${c} non trovata`}</p>)}
-          {anteprima.righe.length === 0 && <p className="text-secondaria text-grigio">Il foglio non ha ancora righe sotto l'intestazione</p>}
+          {anteprima.colonneMancanti.map((c) => <p key={c} className="text-testo text-errore">{`Colonna ${c} non trovata`}</p>)}
+          {anteprima.righe.length === 0 && <p className="text-nota text-grigio">Il foglio non ha ancora righe sotto l'intestazione</p>}
           <ul className="grid grid-cols-1 gap-2">
             {anteprima.righe.map((r) => (
               <li key={r.riga}>
@@ -129,8 +129,8 @@ export function SezioneAggancio({ d, ora }: { d: StatoSistema; ora: number }) {
         motivoSpento={d.segreti.aggancio ? undefined : "Manca la chiave dell'aggancio: la mette chi gestisce il server"} onClick={() => prova.mutate()}>
         Proposta di prova
       </Pulsante>
-      <h3 className="text-corpo font-semibold">Ultime 20 chiamate</h3>
-      {registro.data?.length === 0 && <p className="text-secondaria text-grigio">Ancora nessuna chiamata</p>}
+      <h3 className="text-testo font-semibold">Ultime 20 chiamate</h3>
+      {registro.data?.length === 0 && <p className="text-nota text-grigio">Ancora nessuna chiamata</p>}
       <ul className="grid grid-cols-1 gap-2">
         {registro.data?.map((v) => (
           <li key={v.id}><Riga titolo={v.number ?? "Senza numero"} secondaria={v.outcome ?? "senza esito"} meta={<><span className="block">{momento(v.at, ora)}</span><span className="block">{`Risposta ${v.status}`}</span></>} /></li>

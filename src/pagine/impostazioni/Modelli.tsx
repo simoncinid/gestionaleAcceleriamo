@@ -45,13 +45,13 @@ export function FoglioModello({ iniziale, fasi, onChiudi }: { iniziale: BozzaMod
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Salva il modello</Pulsante>}>
       <Campo etichetta="Titolo" value={b.title} onChange={(e) => setB({ ...b, title: e.target.value })} />
       {b.key ? (
-        <p className="text-corpo">{`Canale: ${b.channel === "email" ? "Email" : "WhatsApp"}`}<span className="block text-meta text-grigio">Modello di sistema: il canale non si cambia</span></p>
+        <p className="text-testo">{`Canale: ${b.channel === "email" ? "Email" : "WhatsApp"}`}<span className="block text-nota text-grigio">Modello di sistema: il canale non si cambia</span></p>
       ) : (
         <Selettore etichetta="Canale" opzioni={CANALI} valore={b.channel} onCambia={(v) => setB({ ...b, channel: v })} />
       )}
       {b.channel === "email" && <Campo etichetta="Oggetto" value={b.subject} onChange={(e) => setB({ ...b, subject: e.target.value })} />}
       <AreaTesto etichetta="Testo" rows={6} value={b.body} onChange={(e) => setB({ ...b, body: e.target.value })} />
-      <ul className="grid gap-1 text-meta text-grigio" aria-label="Variabili del testo">
+      <ul className="grid gap-1 text-nota text-grigio" aria-label="Variabili del testo">
         {VARIABILI.map(([v, spiega]) => <li key={v}><span className="font-semibold text-ink">{v}</span>{`: ${spiega}`}</li>)}
       </ul>
       <Selettore etichetta="Fase" opzioni={[{ valore: "nessuna", etichetta: "Nessuna fase" }, ...fasi.map((f) => ({ valore: f.id, etichetta: f.label }))]} valore={b.stageId} onCambia={(v) => setB({ ...b, stageId: v })} />

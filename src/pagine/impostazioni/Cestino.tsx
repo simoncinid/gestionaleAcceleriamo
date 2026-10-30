@@ -37,13 +37,13 @@ export function Cestino() {
             <li key={l.id}>
               <div className="flex flex-col gap-3 rounded-blocco border border-sabbia bg-avorio px-4 py-3 @xl:flex-row @xl:items-center">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-corpo font-semibold">{l.company}</p>
-                  {l.deletedAt && <p className="text-secondaria text-grigio">Messo nel cestino {trascorso(l.deletedAt)}</p>}
-                  <p className="text-meta text-grigio tabular-nums">{restano(l.giorniRimasti)}</p>
+                  <p className="truncate text-testo font-semibold">{l.company}</p>
+                  {l.deletedAt && <p className="text-nota text-grigio">Messo nel cestino {trascorso(l.deletedAt)}</p>}
+                  <p className="text-nota text-grigio tabular-nums">{restano(l.giorniRimasti)}</p>
                 </div>
                 {conferma === l.id ? (
                   <div role="group" aria-label={`Elimina per sempre ${l.company}`} className="flex flex-col gap-2 border-t border-sabbia pt-3 @xl:border-t-0 @xl:pt-0">
-                    <p className="text-secondaria text-errore">Va via anche lo storico. Non si torna indietro.</p>
+                    <p className="text-nota text-errore">Va via anche lo storico. Non si torna indietro.</p>
                     <div className="flex flex-wrap gap-2">
                       <Pulsante variante="distruttivo" inCorso={elimina.isPending} onClick={() => elimina.mutate(l.id)}>Elimina per sempre</Pulsante>
                       <Pulsante variante="fantasma" disabled={elimina.isPending} onClick={() => setConferma(null)}>Annulla</Pulsante>

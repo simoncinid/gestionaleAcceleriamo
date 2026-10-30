@@ -46,9 +46,9 @@ export function Stato({ ora = Date.now(), onEsci }: { ora?: number; onEsci: () =
       </Sezione>
       <Sezione titolo="Ultimi 7 giorni">
         <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio px-4 py-3">
-          <p className="text-corpo"><strong className="tabular-nums">{d.settimana.meta}</strong> lead dal webhook Meta</p>
-          <p className="text-corpo"><strong className="tabular-nums">{d.settimana.foglio}</strong> lead dal Foglio Andrea</p>
-          <p className="text-corpo"><strong className="tabular-nums">{d.settimana.aggancio}</strong> proposte dall'aggancio</p>
+          <p className="text-testo"><strong className="tabular-nums">{d.settimana.meta}</strong> lead dal webhook Meta</p>
+          <p className="text-testo"><strong className="tabular-nums">{d.settimana.foglio}</strong> lead dal Foglio Andrea</p>
+          <p className="text-testo"><strong className="tabular-nums">{d.settimana.aggancio}</strong> proposte dall'aggancio</p>
         </div>
       </Sezione>
       {d.errori.length > 0 && (

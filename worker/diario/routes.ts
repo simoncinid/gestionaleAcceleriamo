@@ -9,7 +9,7 @@ export type VoceDiario = { id: string; at: number; chi: string; testo: string; d
 const ETICHETTA_ATTIVITA: Record<string, string> = {
   creazione: "Lead creato", nota: "Nota", chiamata: "Chiamata", email: "Email", cambio_fase: "Cambio di fase", meta: "Lead nuovo da Meta",
   documento: "Documento", cestino: "Lead nel cestino", ripristino: "Lead ripristinato", unione: "Lead uniti", migrazione: "Migrazione",
-  esito: "Esito", call: "Call", proposta: "Proposta", foglio: "Lead nuovo dal foglio", ia: "Claude", email_auto: "Email automatica", contatto: "Contatto",
+  esito: "Esito", call: "Call", proposta: "Proposta", foglio: "Lead nuovo dal foglio", ia: "Assistente", email_auto: "Email automatica", contatto: "Contatto",
 };
 // Solo le modifiche che non hanno già un'attività del lead: soldi, automazioni, clienti, spesa delle campagne.
 const ENTITA: Record<string, { nome: string; area: VoceDiario["area"]; href: string }> = {
@@ -64,7 +64,7 @@ diarioRoutes.get("/", async (c) => {
   const voci: VoceDiario[] = [
     ...att.results.map((a): VoceDiario => ({
       id: a.id, at: a.at, area: "commerciale", href: `/commerciale/lead/${a.leadId}`,
-      chi: a.type === "ia" ? "Claude" : a.autore ? nome.get(a.autore) ?? a.autore : "Sistema",
+      chi: a.type === "ia" ? "Assistente" : a.autore ? nome.get(a.autore) ?? a.autore : "Sistema",
       testo: `${ETICHETTA_ATTIVITA[a.type] ?? a.type}: ${a.company}`,
       dettaglio: a.body ? accorcia(a.body, 140) : null,
     })),

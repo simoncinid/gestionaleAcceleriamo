@@ -135,7 +135,7 @@ function FoglioResponsabile({ lead, utenti, onChiudi }: { lead: RigaLead; utenti
         </Pulsante>
       }>
       <div className="flex flex-col gap-3">
-        <p className="text-[15px]">{lead.company}</p>
+        <p className="text-testo">{lead.company}</p>
         <Selettore etichetta="Responsabile" valore={scelto} onCambia={setScelto}
           opzioni={[...(scelto ? [] : [{ valore: "", etichetta: "Scegli" }]), ...utenti.map((u) => ({ valore: u.id, etichetta: u.name }))]} />
       </div>

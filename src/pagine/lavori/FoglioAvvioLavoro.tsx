@@ -62,7 +62,7 @@ export function FoglioAvvioLavoro({ leadId, clientId, nomeCliente, canoneInizial
   return (
     <Foglio aperto titolo={leadId ? "Passa a cliente" : "Assegna un lavoro"} onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={salva.isPending} motivoSpento={manca} onClick={() => salva.mutate()}>Avvia il lavoro</Pulsante>}>
-      <p className="text-corpo font-semibold">{nomeCliente}</p>
+      <p className="text-testo font-semibold">{nomeCliente}</p>
       {leadId && (
         <>
           <ScegliDocumento etichetta="Contratto" documenti={documenti} valore={contratto} onCambia={setContratto} link={linkContratto} onLink={setLinkContratto} />

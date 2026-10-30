@@ -36,10 +36,10 @@ export function Cruscotto({ ora: oraFissa }: { ora?: number } = {}) {
         <Sezione titolo="Da fare" coda={daFare.length > 1 ? `${daFare.length} da incassare` : undefined}>
           <Carta tinta>
             <p className="text-etichetta uppercase text-grigio">{prima.stato === "in_ritardo" ? "Da incassare, in ritardo" : "Da incassare oggi"}</p>
-            <p className="text-corpo font-semibold">{prima.cliente}</p>
-            <p className="text-secondaria tabular-nums">{euro(prima.amountCents)}</p>
-            {prima.number && <p className="text-secondaria text-grigio">{`Fattura n. ${prima.number}`}</p>}
-            <p className={`text-meta font-semibold ${prima.stato === "in_ritardo" ? "text-errore" : "text-ink"}`}>{maiuscola(scadenzaFattura(prima.dueAt!, ora))}</p>
+            <p className="text-testo font-semibold">{prima.cliente}</p>
+            <p className="text-nota tabular-nums">{euro(prima.amountCents)}</p>
+            {prima.number && <p className="text-nota text-grigio">{`Fattura n. ${prima.number}`}</p>}
+            <p className={`text-nota font-semibold ${prima.stato === "in_ritardo" ? "text-errore" : "text-ink"}`}>{maiuscola(scadenzaFattura(prima.dueAt!, ora))}</p>
             <Pulsante variante="primario" misura="lg" className="mt-3 w-full sm:w-auto sm:justify-self-start" onClick={() => setAperta(prima)}>Segna incassata</Pulsante>
           </Carta>
           {altre.length > 0 && (
@@ -53,19 +53,19 @@ export function Cruscotto({ ora: oraFissa }: { ora?: number } = {}) {
       )}
       <Sezione titolo="Ricorrente">
         <Carta>
-          <p className="font-display text-titolo-blocco tabular-nums">{euro(d.ricorrenteCents)}</p>
+          <p className="font-display text-sezione tabular-nums">{euro(d.ricorrenteCents)}</p>
           <div className="mt-2 h-3 overflow-hidden rounded-full bg-sabbia" role="progressbar" aria-label="Ricorrente contro l'obiettivo" aria-valuemin={0} aria-valuemax={100} aria-valuenow={quota}>
             <div className="h-full rounded-full bg-accento" style={{ width: `${quota}%` }} />
           </div>
-          <p className="mt-2 text-secondaria text-grigio tabular-nums">{`${euro(d.ricorrenteCents)} di ${euro(d.obiettivoCents)}`}</p>
-          <p className="text-secondaria text-grigio tabular-nums">{mancano > 0 ? `Mancano ${euro(mancano)} all'obiettivo` : "Obiettivo raggiunto"}</p>
+          <p className="mt-2 text-nota text-grigio tabular-nums">{`${euro(d.ricorrenteCents)} di ${euro(d.obiettivoCents)}`}</p>
+          <p className="text-nota text-grigio tabular-nums">{mancano > 0 ? `Mancano ${euro(mancano)} all'obiettivo` : "Obiettivo raggiunto"}</p>
         </Carta>
       </Sezione>
       <div className={`grid items-start gap-6 @5xl:col-span-full @5xl:grid-cols-3`}>
       <Sezione titolo="Setup incassati">
         <Carta>
-          <p className="text-corpo tabular-nums">{`Nel mese: ${euro(d.setupMeseCents)}`}</p>
-          <p className="text-corpo tabular-nums">{`Nell'anno: ${euro(d.setupAnnoCents)}`}</p>
+          <p className="text-testo tabular-nums">{`Nel mese: ${euro(d.setupMeseCents)}`}</p>
+          <p className="text-testo tabular-nums">{`Nell'anno: ${euro(d.setupAnnoCents)}`}</p>
         </Carta>
       </Sezione>
       <Sezione titolo="Da incassare">

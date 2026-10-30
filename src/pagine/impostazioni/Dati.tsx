@@ -26,11 +26,11 @@ export function Dati() {
       </ul>
       <Foglio aperto={esporta} titolo="Esporta in CSV" onChiudi={() => setEsporta(false)}><CorpoEsporta /></Foglio>
       <Foglio aperto={demo} titolo="Spazio demo" onChiudi={() => setDemo(false)}>
-        <p className="text-corpo">È una copia dell'app con dati finti, per le presentazioni ai clienti. Non tocca mai i lead veri e non manda email, notifiche o messaggi.</p>
+        <p className="text-testo">È una copia dell'app con dati finti, per le presentazioni ai clienti. Non tocca mai i lead veri e non manda email, notifiche o messaggi.</p>
         {r?.demoUrl
-          ? <a className="text-corpo font-semibold underline underline-offset-4" href={r.demoUrl} target="_blank" rel="noopener noreferrer">Apri lo spazio demo</a>
-          : <p className="text-secondaria text-grigio">L'indirizzo arriva quando lo spazio demo è pubblicato.</p>}
-        <p className="text-secondaria text-grigio">Si entra con l'utente demo. I dati tornano come all'inizio ogni volta che chi gestisce il server rilancia il ripristino.</p>
+          ? <a className="text-testo font-semibold underline underline-offset-4" href={r.demoUrl} target="_blank" rel="noopener noreferrer">Apri lo spazio demo</a>
+          : <p className="text-nota text-grigio">L'indirizzo arriva quando lo spazio demo è pubblicato.</p>}
+        <p className="text-nota text-grigio">Si entra con l'utente demo. I dati tornano come all'inizio ogni volta che chi gestisce il server rilancia il ripristino.</p>
       </Foglio>
     </div>
   );
@@ -41,10 +41,10 @@ export function CorpoEsporta() {
   return (
     <>
       <ul className="grid grid-cols-1 gap-1">
-        {ESPORTAZIONI.map(([k, t]) => <li key={k}><a className="flex min-h-11 items-center text-corpo font-semibold underline-offset-4 hover:underline" href={`/api/export/${k}`} download>{t}</a></li>)}
+        {ESPORTAZIONI.map(([k, t]) => <li key={k}><a className="flex min-h-11 items-center text-testo font-semibold underline-offset-4 hover:underline" href={`/api/export/${k}`} download>{t}</a></li>)}
       </ul>
-      <p className="text-secondaria text-grigio">Il file si apre con Excel o Google Fogli. Ogni scaricamento finisce nel registro.</p>
-      <p className="text-secondaria text-grigio">Davanti ai telefoni come +39 trovi un apostrofo: protegge il foglio dalle formule, il numero resta giusto.</p>
+      <p className="text-nota text-grigio">Il file si apre con Excel o Google Fogli. Ogni scaricamento finisce nel registro.</p>
+      <p className="text-nota text-grigio">Davanti ai telefoni come +39 trovi un apostrofo: protegge il foglio dalle formule, il numero resta giusto.</p>
     </>
   );
 }

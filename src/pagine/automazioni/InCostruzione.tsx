@@ -25,10 +25,10 @@ export function InCostruzione({ ora: oraFissa }: { ora?: number } = {}) {
         {lista.map((a) => (
           <li key={a.id}>
             <Link to={`/automazioni/${a.id}`} className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5 hover:bg-crema">
-              <p className="font-display text-titolo-card">{a.name}</p>
-              <p className="text-corpo">{nomeCliente(a, anonimo)}</p>
-              <p className="text-secondaria text-grigio tabular-nums">{a.promisedAt != null ? `Promessa per ${ilGiorno(a.promisedAt, ora)}` : "Senza data promessa"}</p>
-              <p className="text-secondaria text-grigio">{`Responsabile tecnico: ${tecnico(a.techOwnerId)}`}</p>
+              <p className="font-display text-sezione">{a.name}</p>
+              <p className="text-testo">{nomeCliente(a, anonimo)}</p>
+              <p className="text-nota text-grigio tabular-nums">{a.promisedAt != null ? `Promessa per ${ilGiorno(a.promisedAt, ora)}` : "Senza data promessa"}</p>
+              <p className="text-nota text-grigio">{`Responsabile tecnico: ${tecnico(a.techOwnerId)}`}</p>
             </Link>
           </li>
         ))}

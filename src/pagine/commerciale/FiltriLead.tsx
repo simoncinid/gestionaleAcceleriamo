@@ -17,7 +17,7 @@ export function Segmenti({ valore, onCambia }: { valore: Segmento; onCambia: (s:
     <div role="group" aria-label="Quali lead" className="flex shrink-0 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio p-0.5 md:h-11">
       {SEGMENTI.map((s) => (
         <button key={s.id} type="button" aria-pressed={valore === s.id} onClick={() => onCambia(s.id)}
-          className={cx("h-11 min-w-0 flex-1 rounded-[9px] px-4 md:h-auto text-secondaria font-medium transition-colors duration-(--durata-veloce) md:flex-none",
+          className={cx("h-11 min-w-0 flex-1 rounded-[9px] px-4 md:h-auto text-nota font-medium transition-colors duration-(--durata-veloce) md:flex-none",
             valore === s.id ? "bg-ink text-avorio" : "text-ink hover:bg-crema")}>
           {s.etichetta}
         </button>
@@ -37,7 +37,7 @@ export function Ricerca({ valore, onCambia, className }: { valore: string; onCam
       <MagnifyingGlass size={18} weight="bold" aria-hidden className="shrink-0 text-grigio" />
       <input type="search" value={valore} onChange={(e) => onCambia(e.target.value)} placeholder="Cerca nome, telefono o email" aria-label="Cerca nei lead"
         onKeyDown={(e) => { if (e.key === "Escape" && valore) { e.preventDefault(); onCambia(""); } }}
-        className="h-full min-w-0 flex-1 bg-transparent text-secondaria outline-none placeholder:text-grigio [&::-webkit-search-cancel-button]:hidden" />
+        className="h-full min-w-0 flex-1 bg-transparent text-nota outline-none placeholder:text-grigio [&::-webkit-search-cancel-button]:hidden" />
       {valore && (
         <button type="button" aria-label="Cancella la ricerca" onClick={() => onCambia("")} className="-mr-2 inline-flex size-9 shrink-0 items-center justify-center rounded-[8px] text-grigio hover:bg-crema hover:text-ink">
           <X size={16} weight="bold" aria-hidden />
@@ -60,7 +60,7 @@ export function FiltroArrivi({ filtri, onCambia }: { filtri: Filtri; onCambia: (
   return (
     <>
       <button ref={ancora} type="button" aria-expanded={aperta} aria-haspopup="dialog" onClick={() => setAperta((a) => !a)} data-filtro="Arrivati"
-        className={cx("flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-controllo border-[1.5px] bg-avorio px-3 text-secondaria transition-colors duration-(--durata-veloce) hover:border-ink",
+        className={cx("flex h-11 min-w-0 shrink-0 items-center gap-2 rounded-controllo border-[1.5px] bg-avorio px-3 text-nota transition-colors duration-(--durata-veloce) hover:border-ink",
           attivo ? "border-ink" : "border-sabbia-2")}>
         <span className="shrink-0 font-medium">Arrivati</span>
         <span className={cx("min-w-0 truncate", attivo ? "font-semibold text-ink" : "text-grigio")}>{etichettaArrivo(filtri)}</span>
@@ -80,8 +80,8 @@ export function FiltroArrivi({ filtri, onCambia }: { filtri: Filtri; onCambia: (
 function CampiPeriodo({ filtri, onCambia, className }: { filtri: Filtri; onCambia: (p: Partial<Filtri>) => void; className?: string }) {
   return (
     <div className={cx("grid grid-cols-2 gap-2", className)}>
-      <Campo etichetta="Dal" type="date" value={filtri.dal} max={filtri.al || undefined} onChange={(e) => onCambia({ dal: e.target.value })} className="px-2 text-secondaria" />
-      <Campo etichetta="Al" type="date" value={filtri.al} min={filtri.dal || undefined} onChange={(e) => onCambia({ al: e.target.value })} className="px-2 text-secondaria" />
+      <Campo etichetta="Dal" type="date" value={filtri.dal} max={filtri.al || undefined} onChange={(e) => onCambia({ dal: e.target.value })} className="px-2 text-nota" />
+      <Campo etichetta="Al" type="date" value={filtri.al} min={filtri.dal || undefined} onChange={(e) => onCambia({ al: e.target.value })} className="px-2 text-nota" />
     </div>
   );
 }
@@ -173,7 +173,7 @@ export function SceltaColonne({ visibili, onCambia }: { visibili: IdColonna[]; o
   return (
     <>
       <button ref={ancora} type="button" aria-expanded={aperta} aria-haspopup="menu" onClick={() => setAperta((a) => !a)} data-filtro="Colonne"
-        className="ml-auto flex h-11 shrink-0 items-center gap-2 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio px-3 text-secondaria transition-colors duration-(--durata-veloce) hover:border-ink">
+        className="ml-auto flex h-11 shrink-0 items-center gap-2 rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio px-3 text-nota transition-colors duration-(--durata-veloce) hover:border-ink">
         <span className="font-medium">Colonne</span>
         <span className="tabular-nums text-grigio">{visibili.length} di {COLONNE.length}</span>
         <CaretDown size={14} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperta && "rotate-180")} />
@@ -186,7 +186,7 @@ export function SceltaColonne({ visibili, onCambia }: { visibili: IdColonna[]; o
               <VoceTendina key={c.id} ruolo="menuitemcheckbox" scelta={scelta}
                 onClick={() => { if (!c.fissa) onCambia(scelta ? visibili.filter((v) => v !== c.id) : [...visibili, c.id]); }}>
                 <span className={cx("min-w-0 flex-1 truncate", c.fissa && "text-grigio")}>{c.titolo}</span>
-                {c.fissa && <span className="shrink-0 text-[12px] text-grigio">sempre</span>}
+                {c.fissa && <span className="shrink-0 text-nota text-grigio">sempre</span>}
               </VoceTendina>
             );
           })}

@@ -19,7 +19,7 @@ export const VOCI_GIRO: Record<Lavoro, { nome: string; intervalloMin: number; sp
   cestino: { nome: "Cestino dei lead oltre 30 giorni", intervalloMin: 1440 },
   documenti: { nome: "Documenti tolti oltre 30 giorni", intervalloMin: 1440, spento: (e) => !e.DOCUMENTI },
   lunedi: { nome: "Revisione del lunedì", intervalloMin: 10_080 },
-  claude: { nome: "Lavori di Claude", intervalloMin: 5, spento: (e) => !e.ANTHROPIC_API_KEY },
+  claude: { nome: "Lavori dell'assistente", intervalloMin: 5, spento: (e) => !e.ANTHROPIC_API_KEY },
   proposte_scadute: { nome: "Preventivi scaduti", intervalloMin: 1440 },
   stato: { nome: "Controllo dello stato delle automazioni", intervalloMin: 15 },
 };

@@ -51,22 +51,22 @@ export function ImportaCsv() {
       <div className="@5xl:col-span-full"><Intestazione eyebrow="Dati" titolo="Importa lead da CSV" /></div>
       <div className="contents @5xl:grid @5xl:gap-6">
         <div className="grid gap-2">
-          <p className="text-corpo">Serve una riga di intestazione con la colonna Azienda (va bene anche Ragione sociale).</p>
-          <p className="text-secondaria text-grigio">Colonne riconosciute: Referente, Email, Telefono, Sito, Note.</p>
-          <p className="text-secondaria text-grigio">I lead importati non ricevono l'email di conferma.</p>
+          <p className="text-testo">Serve una riga di intestazione con la colonna Azienda (va bene anche Ragione sociale).</p>
+          <p className="text-nota text-grigio">Colonne riconosciute: Referente, Email, Telefono, Sito, Note.</p>
+          <p className="text-nota text-grigio">I lead importati non ricevono l'email di conferma.</p>
         </div>
-        <label className="grid gap-2 text-corpo">
+        <label className="grid gap-2 text-testo">
           <span className="font-medium">File CSV</span>
           <input type="file" accept=".csv,text/csv" disabled={leggi.isPending || importa.isPending}
-            className="text-secondaria file:mr-3 file:min-h-11 file:rounded-controllo file:border file:border-sabbia file:bg-avorio file:px-4 file:font-semibold"
+            className="text-nota file:mr-3 file:min-h-11 file:rounded-controllo file:border file:border-sabbia file:bg-avorio file:px-4 file:font-semibold"
             onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) leggi.mutate(f); }} />
         </label>
-        {leggi.isPending && <p className="text-secondaria text-grigio">Lettura del file</p>}
+        {leggi.isPending && <p className="text-nota text-grigio">Lettura del file</p>}
         {anteprima && (
           <div className="grid gap-1">
-            <p className="text-corpo">{`${anteprima.nuovi} nuovi, ${anteprima.giaPresenti} già presenti, ${anteprima.senzaContatti} senza contatti${anteprima.errori ? `, ${anteprima.errori} con errori` : ""}`}</p>
-            <p className="text-secondaria text-grigio">I già presenti non diventano lead nuovi: sul lead che c'è già compare "Arrivato di nuovo".</p>
-            <p className="text-secondaria text-grigio">Quelli senza telefono né email entrano in Non profilato, con una nota.</p>
+            <p className="text-testo">{`${anteprima.nuovi} nuovi, ${anteprima.giaPresenti} già presenti, ${anteprima.senzaContatti} senza contatti${anteprima.errori ? `, ${anteprima.errori} con errori` : ""}`}</p>
+            <p className="text-nota text-grigio">I già presenti non diventano lead nuovi: sul lead che c'è già compare "Arrivato di nuovo".</p>
+            <p className="text-nota text-grigio">Quelli senza telefono né email entrano in Non profilato, con una nota.</p>
           </div>
         )}
       </div>
@@ -78,7 +78,7 @@ export function ImportaCsv() {
               <li key={r.riga}><Riga peso="normale" titolo={r.company || `Riga ${r.riga}`} secondaria={ESITO[r.esito]} meta={r.motivo ?? undefined} /></li>
             ))}
           </ul>
-          {anteprima.righe.length > MOSTRATE && <p className="text-secondaria text-grigio">{`Mostrate le prime ${MOSTRATE} righe di ${anteprima.righe.length}.`}</p>}
+          {anteprima.righe.length > MOSTRATE && <p className="text-nota text-grigio">{`Mostrate le prime ${MOSTRATE} righe di ${anteprima.righe.length}.`}</p>}
           <div>
             <Pulsante variante="primario" inCorso={importa.isPending} motivoSpento={daImportare + anteprima.giaPresenti === 0 ? "Nessuna riga da importare nel file" : undefined} onClick={() => importa.mutate()}>
               {importa.isPending ? `Importati ${fatti} di ${daImportare}` : daImportare ? `Importa ${daImportare} lead` : `Segna ${anteprima.giaPresenti} già presenti`}

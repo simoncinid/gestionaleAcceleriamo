@@ -5,7 +5,7 @@ export function Dato({ etichetta, children }: { etichetta: string; children: Rea
   return (
     <div className="flex min-h-12 items-center justify-between gap-4 py-2">
       <dt className="text-etichetta uppercase text-grigio">{etichetta}</dt>
-      <dd className="min-w-0 truncate text-right text-corpo tabular-nums">{children}</dd>
+      <dd className="min-w-0 truncate text-right text-testo tabular-nums">{children}</dd>
     </div>
   );
 }

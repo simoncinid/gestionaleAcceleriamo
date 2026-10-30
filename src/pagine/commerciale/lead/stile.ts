@@ -4,11 +4,11 @@ import type { StatoScadenza } from "../../../types";
 // Stanno qui finché la passata UI (modifica 23) non li porta nei token di src/styles.css: allora si sostituiscono.
 
 // Contenitore bianco con bordo e raggio 10, spazio interno 20, 12 tra le righe. Mai uno dentro l'altro.
-export const SEZIONE = "flex min-w-0 flex-col gap-3 rounded-[10px] border border-[#E5DED4] bg-white p-5";
-// Titolo di sezione 17/600 in Inter (gli h2 del progetto partono in Degular: qui no).
-export const TITOLO_SEZIONE = "font-sans text-[17px] font-semibold leading-6 tracking-normal text-ink";
-// Dati secondari 13/400 grigio.
-export const SECONDARIO = "text-[13px] leading-5 text-[#6B645C]";
+export const SEZIONE = "flex min-w-0 flex-col gap-3 rounded-[10px] border border-sabbia bg-white p-5";
+// Titolo di sezione: livello "sezione" della scala (Degular 20/24), col segno arancione sopra (giro 3).
+export const TITOLO_SEZIONE = "segno font-display text-sezione text-ink";
+// Dati secondari: livello "nota" (13/18, grigio).
+export const SECONDARIO = "text-nota text-grigio tabular-nums";
 // Righe di elenco dentro una sezione: separatori, mai riquadri.
 export const ELENCO = "flex flex-col divide-y divide-[#E5DED4]";
 // Link a testo (azioni terziarie): bersaglio da 44 px.

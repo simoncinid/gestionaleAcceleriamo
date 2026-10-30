@@ -70,6 +70,8 @@ describe("scheda lead, pagina (struttura B2, modifica 10)", () => {
     expect(contaPrimari(html)).toBe(1);
     expect(html).toContain("Chiama Luca");
     expect(html).toContain('aria-label="Fase: Da richiamare. Cambia fase"');
+    // Giro 2: la fase sta solo nel badge in alto, niente secondo selettore nei dati.
+    expect(html).not.toContain('data-selettore="Fase"');
   });
   it("vista operativa con dettagli nei fogli e storico senza modulo sempre aperto", () => {
     for (const titolo of ["Da fare", "Contatti", "Storico"]) expect(html).toContain(`>${titolo}</h2>`);

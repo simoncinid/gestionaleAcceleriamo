@@ -89,7 +89,7 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
       }
     >
       <div className="flex flex-col gap-3">
-        <div className="text-secondaria text-grigio">
+        <div className="text-nota text-grigio">
           <p>{lead.company}</p>
           {/* I tentativi contano solo prima della conoscenza. */}
           {["da-chiamare-prima-volta", "da-richiamare"].includes(lead.stageId) && <p className="tabular-nums">{testoTentativo(lead.attemptCount)}</p>}
@@ -97,11 +97,11 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
         <Selettore etichetta="Esito" apertoAllInizio opzioni={esitiPerFase(lead.stageId).map((e) => ({ valore: e, etichetta: etichettaScelta(e, lead.stageId) }))} valore={s.esito as SceltaEsito | null} onCambia={scegliVoce} />
         {kindCall && s.esito && (
           <div className="flex flex-col gap-3 pt-1">
-            <p className="text-secondaria font-medium">{AZIONE_CALL[kindCall]}{s.esito === "offerta_presentata" ? ", se è già fissata" : ""}</p>
+            <p className="text-nota font-medium">{AZIONE_CALL[kindCall]}{s.esito === "offerta_presentata" ? ", se è già fissata" : ""}</p>
             <CampoQuando etichetta="Data della call" valore={s.callAt}
               onCambia={(ms) => { setErroreData(null); setS((p) => ({ ...p, callAt: ms })); if (ms != null && s.esito) void scegli(s.esito, ms); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={s.meetLink} onChange={(e) => setS((p) => ({ ...p, meetLink: e.target.value }))} />
-            <a className="self-start text-secondaria font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
+            <a className="self-start text-nota font-semibold text-accento-testo underline-offset-4 hover:underline" href="https://meet.new" target="_blank" rel="noreferrer">Crea su meet.new</a>
             <CasellaInvito attiva={invito} onCambia={setInvito} senzaEmail={senzaEmail} inCoda={!resend} />
           </div>
         )}
@@ -110,10 +110,10 @@ export function FoglioEsito({ lead, onChiudi, iniziale }: { lead: LeadEsito; onC
         )}
         {motivoObbligatorio && <CampiMotivo valore={s} onCambia={(m) => setS((p) => ({ ...p, ...m }))} />}
         {s.esito && (verso || s.nextAction) && (
-          <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-[#E5DED4] pt-3 text-[15px]">
-            {verso && verso.id !== lead.stageId && <><dt className="text-[13px] text-[#6B645C]">Va in</dt><dd>{verso.label}</dd></>}
+          <dl className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3 gap-y-1 border-t border-[#E5DED4] pt-3 text-testo">
+            {verso && verso.id !== lead.stageId && <><dt className="text-nota text-[#6B645C]">Va in</dt><dd>{verso.label}</dd></>}
             {s.nextAction && !(s.esito === "richiamare" && s.data != null) && (
-              <><dt className="text-[13px] text-[#6B645C]">Poi</dt><dd>{s.nextAction}{s.nextActionAt != null && <span className="tabular-nums">, {dataEOra(s.nextActionAt).toLowerCase()}</span>}</dd></>
+              <><dt className="text-nota text-[#6B645C]">Poi</dt><dd>{s.nextAction}{s.nextActionAt != null && <span className="tabular-nums">, {dataEOra(s.nextActionAt).toLowerCase()}</span>}</dd></>
             )}
           </dl>
         )}

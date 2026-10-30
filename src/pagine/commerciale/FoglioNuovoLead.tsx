@@ -67,11 +67,11 @@ export function FoglioNuovoLead({ onChiudi }: { onChiudi: () => void }) {
         <Campo etichetta="Telefono" type="tel" inputMode="tel" placeholder="+39" {...campo("phone")} />
         <Selettore etichetta="Provenienza" opzioni={[...FONTI_A_MANO]} valore={fonte} onCambia={setFonte} />
         {esistente ? (
-          <p role="alert" className="text-secondaria">
+          <p role="alert" className="text-nota">
             Esiste già: <Link to={`/commerciale/lead/${esistente.id}`} onClick={onChiudi} className="font-medium underline underline-offset-2">apri {esistente.company}</Link>
           </p>
         ) : (
-          <p className="text-secondaria text-grigio">Parte in Da chiamare prima volta, con la prima chiamata entro 30 minuti in orario di lavoro.</p>
+          <p className="text-nota text-grigio">Parte in Da chiamare prima volta, con la prima chiamata entro 30 minuti in orario di lavoro.</p>
         )}
       </div>
     </Foglio>

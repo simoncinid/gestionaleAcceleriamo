@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 // Carica un file nella scheda di un lead di Acceleriamo OS (spec documenti 29/10/2026, punto 6).
-// Le voci risultano di Tommaso con "caricato da Claude" e accendono il pallino a Diego.
+// Le voci risultano di Tommaso, come se le avesse caricate lui, e accendono il pallino a Diego.
 //
 // Uso:
 //   node scripts/carica-documento.mjs --lead "Pizzeria Da Mario" percorso/file.m4a
 //   node scripts/carica-documento.mjs --lead-id <id> preventivo.pdf --versione       (nuova versione del documento con lo stesso nome)
 //   opzioni: --titolo "Nome mostrato"   --base http://localhost:5173   (default https://risorse.acceleriamo.it)
+//            --tipo registrazione|trascrizione|preventivo|altro   (senza: audio = registrazione, "trascrizione" = trascrizione,
+//                                                                  PDF "preventivo" = preventivo, il resto altro)
+//            --call <id o tipo: conoscenza, offerta, analisi, progetto>   (senza: per registrazioni e trascrizioni
+//                                                                  l'ultima call prima della data del file)
+//            --data AAAA-MM-GG   (senza: la data "GG/MM" nel titolo o nel nome, altrimenti la data di modifica del file)
 // Token: portachiavi del Mac (servizio acceleriamo-carica-token); per le prove in locale ACCELERIAMO_CARICA_TOKEN.
 // Esce con 0 se caricato, 2 se il lead non si trova o non è unico, 1 per gli altri errori.
 import { execFileSync } from "node:child_process";
@@ -13,20 +18,27 @@ import { readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 
 const LIMITE = 100 * 1024 * 1024;
+const TIPI = ["registrazione", "trascrizione", "preventivo", "altro"];
+const TIPO_TESTO = { registrazione: "registrazione", trascrizione: "trascrizione", preventivo: "preventivo", altro: "altro documento" };
 
 function argomenti(argv) {
-  const a = { file: null, lead: null, leadId: null, titolo: null, versione: false, base: process.env.ACCELERIAMO_OS_URL || "https://risorse.acceleriamo.it" };
+  const a = { file: null, lead: null, leadId: null, titolo: null, tipo: null, call: null, data: null, versione: false, base: process.env.ACCELERIAMO_OS_URL || "https://risorse.acceleriamo.it" };
   for (let i = 0; i < argv.length; i++) {
     const x = argv[i];
     if (x === "--lead") a.lead = argv[++i];
     else if (x === "--lead-id") a.leadId = argv[++i];
     else if (x === "--titolo") a.titolo = argv[++i];
     else if (x === "--base") a.base = argv[++i];
+    else if (x === "--tipo") a.tipo = argv[++i];
+    else if (x === "--call") a.call = argv[++i];
+    else if (x === "--data") a.data = argv[++i];
     else if (x === "--versione") a.versione = true;
     else if (x.startsWith("--")) esci(1, `Opzione sconosciuta: ${x}`);
     else a.file = x;
   }
   if (!a.file || (!a.lead && !a.leadId)) esci(1, 'Uso: carica-documento.mjs --lead "<nome>" | --lead-id <id> <file> [--titolo "..."] [--versione] [--base <indirizzo>]');
+  if (a.tipo && !TIPI.includes(a.tipo)) esci(1, `Tipo non valido: ${a.tipo}. Vanno bene: ${TIPI.join(", ")}`);
+  if (a.data && !/^\d{4}-\d{2}-\d{2}$/.test(a.data)) esci(1, "Data non valida: scrivila AAAA-MM-GG");
   a.base = a.base.replace(/\/+$/, "");
   // Il token non viaggia mai in chiaro: http solo verso questo Mac.
   let u;
@@ -57,8 +69,8 @@ async function risposta(res) {
 
 const a = argomenti(process.argv.slice(2));
 const auth = { authorization: `Bearer ${token()}` };
-let dim;
-try { dim = statSync(a.file).size; } catch { esci(1, `File non trovato: ${a.file}`); }
+let dim, modificato;
+try { const st = statSync(a.file); dim = st.size; modificato = st.mtimeMs; } catch { esci(1, `File non trovato: ${a.file}`); }
 if (dim === 0) esci(1, "Il file è vuoto");
 if (dim > LIMITE) esci(1, "Il file supera i 100 MB");
 
@@ -75,10 +87,17 @@ if (!lead) {
 const q = new URLSearchParams({ nome: basename(a.file) });
 if (a.titolo) q.set("titolo", a.titolo);
 if (a.versione) q.set("versione", "1");
+if (a.tipo) q.set("tipo", a.tipo);
+if (a.call) q.set("call", a.call);
+// Con --data vale quella (fine giornata di Roma la decide il server dal titolo); senza, il server guarda prima "GG/MM" nel nome.
+q.set("data", String(a.data ? Date.parse(`${a.data}T20:00:00Z`) : Math.round(modificato)));
 const res = await fetch(`${a.base}/api/carica/lead/${encodeURIComponent(lead.id)}/documenti?${q}`, {
   method: "POST",
   headers: { ...auth, "content-type": "application/octet-stream" },
   body: readFileSync(a.file),
 });
 const { document } = await risposta(res);
-esci(0, `Caricato "${document.name}" su ${lead.company} (versione ${document.version})`);
+const dove = document.call
+  ? `, accanto alla call di ${document.call.kind} del ${new Date(document.call.scheduledAt).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" })}`
+  : document.kind === "registrazione" || document.kind === "trascrizione" ? ", nessuna call trovata: resta in Documenti" : "";
+esci(0, `Caricato "${document.name}" su ${lead.company} (versione ${document.version}, ${TIPO_TESTO[document.kind] ?? document.kind}${dove})`);

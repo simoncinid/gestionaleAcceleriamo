@@ -9,7 +9,7 @@ export type Misura = "lg" | "md" | "sm";
 // Una sola funzione di classi: la usano Pulsante e Contatto (che è un link).
 export function classiPulsante(variante: Variante, misura: Misura) {
   return cx(
-    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-controllo text-corpo font-semibold transition-[background-color,transform] duration-(--durata-veloce) ease-uscita active:translate-y-px",
+    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-controllo text-testo font-semibold transition-[background-color,transform] duration-(--durata-veloce) ease-uscita active:translate-y-px",
     "disabled:bg-sabbia disabled:text-grigio disabled:border-0 disabled:active:translate-y-0 aria-disabled:bg-sabbia aria-disabled:text-grigio aria-disabled:border-0",
     misura === "lg" ? "h-12 px-5" : misura === "md" ? "h-11 px-4" : "h-10 w-10 p-0",
     variante === "primario" && "bg-accento text-accento-inchiostro hover:bg-accento-premuto focus-visible:outline-accento-inchiostro",

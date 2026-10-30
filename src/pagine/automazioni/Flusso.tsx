@@ -56,9 +56,9 @@ function Blocco({ p, sigla, ramo, rotto, onApri }: { p: AutomationStep; sigla: s
         <span className={cx("inline-flex h-7 min-w-7 items-center justify-center rounded-full px-1.5 text-etichetta font-semibold tabular-nums", ramo ? "border-[1.5px] border-ink text-ink" : "bg-ink text-avorio")}>{sigla}</span>
         <Icona size={22} weight="regular" aria-hidden />
       </span>
-      <span className="text-corpo font-semibold">{p.title}</span>
-      <span className="text-secondaria text-grigio">{p.summary}</span>
-      {qui && <span className="text-secondaria font-medium text-errore">Si è fermata qui</span>}
+      <span className="text-testo font-semibold">{p.title}</span>
+      <span className="text-nota text-grigio">{p.summary}</span>
+      {qui && <span className="text-nota font-medium text-errore">Si è fermata qui</span>}
     </button>
   );
 }
@@ -81,10 +81,10 @@ export function Flusso({ passi, onApri, rotto }: { passi: AutomationStep[]; onAp
             <div key={r.id} className="ml-[26px] flex flex-col sm:ml-12">
               <div aria-hidden className="flex h-9 items-center gap-3">
                 <span className="h-full w-0 border-l-2 border-dashed border-ink/60" />
-                <span className="text-meta text-ink">{r.branch}</span>
+                <span className="text-nota text-ink">{r.branch}</span>
               </div>
               <Blocco p={r} sigla={sigla} ramo rotto={rotto} onApri={onApri} />
-              <p className="pt-2 text-meta text-grigio">{i + 1 < principali.length ? `Poi si torna al passaggio ${n + 1}` : "Il flusso finisce qui"}</p>
+              <p className="pt-2 text-nota text-grigio">{i + 1 < principali.length ? `Poi si torna al passaggio ${n + 1}` : "Il flusso finisce qui"}</p>
             </div>
           ))}
         </li>
@@ -98,7 +98,7 @@ function Voce({ etichetta, children }: { etichetta: string; children?: string | 
   return (
     <div className="flex flex-col gap-0.5 border-b border-sabbia py-3 last:border-0">
       <dt className="text-etichetta uppercase text-grigio">{etichetta}</dt>
-      <dd className="text-corpo break-words">{children}</dd>
+      <dd className="text-testo break-words">{children}</dd>
     </div>
   );
 }
@@ -107,7 +107,7 @@ function Voce({ etichetta, children }: { etichetta: string; children?: string | 
 export function FoglioPasso({ passo, numero, onChiudi }: { passo: AutomationStep; numero: string; onChiudi: () => void }) {
   return (
     <Foglio aperto lato titolo={`${numero}. ${passo.title}`} onChiudi={onChiudi}>
-      <p className="text-corpo">{passo.summary}</p>
+      <p className="text-testo">{passo.summary}</p>
       <dl>
         <Voce etichetta="Strumento o servizio">{passo.tool}</Voce>
         <Voce etichetta="Quando parte">{passo.trigger}</Voce>

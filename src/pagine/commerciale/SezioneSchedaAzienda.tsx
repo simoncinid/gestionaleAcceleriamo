@@ -7,12 +7,12 @@ import { momento } from "../../format";
 
 const RIGA_STATO: Record<SchedaApi["stato"], string> = {
   nessuna: "Nessuna ricerca",
-  in_coda: "In coda: Claude la prepara entro qualche minuto",
-  in_corso: "Claude la sta preparando",
+  in_coda: "In coda: pronta entro qualche minuto",
+  in_corso: "In preparazione",
   pronta: "Pronta",
   errore: "Non riuscita",
   privato: "Scheda non preparata: sembra un privato",
-  fermo_tetto: "Ferma: Claude ha raggiunto il tetto del mese",
+  fermo_tetto: "Ferma: raggiunto il tetto di spesa del mese",
 };
 
 // Con una versione pronta già visibile, la riga parla della versione nuova.
@@ -20,7 +20,7 @@ const RIGA_NUOVA: Partial<Record<SchedaApi["stato"], string>> = {
   in_coda: "Nuova versione in preparazione",
   in_corso: "Nuova versione in preparazione",
   errore: "Nuova versione non riuscita",
-  fermo_tetto: "Nuova versione ferma: Claude ha raggiunto il tetto del mese",
+  fermo_tetto: "Nuova versione ferma: raggiunto il tetto di spesa del mese",
 };
 
 const http = (u: string) => /^https?:\/\//.test(u);
@@ -56,16 +56,16 @@ export function SezioneSchedaAzienda({ leadId, manuale, incorporata = false }: {
   const prepara = useMutation(azioni.prepara);
   const riprova = useMutation(azioni.riprova);
   if (q.isPending) return <Skeleton righe={2} />;
-  if (q.isError) return <p className="text-secondaria text-grigio">La scheda azienda non si è caricata.</p>;
+  if (q.isError) return <p className="text-nota text-grigio">La scheda azienda non si è caricata.</p>;
   const s = q.data;
   const fonti = s.fonti.filter((f) => http(f.url));
   return (
     <section aria-labelledby="titolo-scheda-azienda" className="flex flex-col gap-2">
-      <h2 id="titolo-scheda-azienda" className={incorporata ? "sr-only" : "font-sans text-[17px] font-semibold"}>Ricerca sull'azienda</h2>
-      <p className="text-secondaria text-grigio">{(s.contenuto && RIGA_NUOVA[s.stato]) || RIGA_STATO[s.stato]}</p>
-      {s.stato === "nessuna" && manuale && <p className="text-secondaria text-grigio">Per i lead scritti a mano si prepara su richiesta.</p>}
-      {s.motivo && <p className="text-secondaria text-grigio">{s.motivo}</p>}
-      {s.errore && <p className="text-secondaria text-grigio">{s.errore}</p>}
+      <h2 id="titolo-scheda-azienda" className={incorporata ? "sr-only" : "font-sans text-sezione font-semibold"}>Ricerca sull'azienda</h2>
+      <p className="text-nota text-grigio">{(s.contenuto && RIGA_NUOVA[s.stato]) || RIGA_STATO[s.stato]}</p>
+      {s.stato === "nessuna" && manuale && <p className="text-nota text-grigio">Per i lead scritti a mano si prepara su richiesta.</p>}
+      {s.motivo && <p className="text-nota text-grigio">{s.motivo}</p>}
+      {s.errore && <p className="text-nota text-grigio">{s.errore}</p>}
       {s.stato === "nessuna" && (
         <div><Pulsante variante="secondario" inCorso={prepara.isPending} onClick={() => prepara.mutate(false)}>Genera la ricerca</Pulsante></div>
       )}
@@ -83,12 +83,12 @@ export function SezioneSchedaAzienda({ leadId, manuale, incorporata = false }: {
       )}
       {s.contenuto && (
         <>
-          <p className="text-secondaria text-grigio">Versione {s.versione}</p>
-          {s.aggiornata != null && <p className="text-secondaria text-grigio">Aggiornata {momento(s.aggiornata)}</p>}
+          <p className="text-nota text-grigio">Versione {s.versione}</p>
+          {s.aggiornata != null && <p className="text-nota text-grigio">Aggiornata {momento(s.aggiornata)}</p>}
           <TestoMarkdown testo={s.contenuto} />
           {fonti.length > 0 && (
             <>
-              <h3 className="mt-4 font-display text-riga">Fonti</h3>
+              <h3 className="mt-4 font-display text-voce">Fonti</h3>
               <ul className="flex flex-col gap-1">
                 {fonti.map((f) => <li key={f.url}><a className="underline" href={f.url} target="_blank" rel="noopener noreferrer">{f.titolo}</a></li>)}
               </ul>

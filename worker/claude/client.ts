@@ -78,7 +78,7 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
     } catch (e) {
       if (e instanceof Anthropic.APIError && e.status) {
         const ritentabile = e.status === 429 || e.status === 529 || e.status >= 500;
-        throw new ErroreClaude(`Claude ha risposto ${e.status}`, uso, modello, ritentabile);
+        throw new ErroreClaude(`L'assistente ha risposto ${e.status}`, uso, modello, ritentabile);
       }
       // Tempo scaduto o rete caduta: non sappiamo quanto è costato, la coda conta il massimo.
       throw new ErroreClaude("Chiamata interrotta", uso, modello, true, true);
@@ -92,7 +92,7 @@ export async function chiamaClaude(env: Env, r: RichiestaClaude): Promise<Rispos
       messages.push({ role: "assistant", content: res.content as unknown as Anthropic.ContentBlockParam[] });
       continue;
     }
-    if (res.stop_reason === "refusal") throw new ErroreClaude("Claude ha rifiutato la richiesta", uso, modello, false);
+    if (res.stop_reason === "refusal") throw new ErroreClaude("L'assistente ha rifiutato la richiesta", uso, modello, false);
     if (res.stop_reason === "max_tokens") throw new ErroreClaude("Risposta troncata", uso, modello, false);
     const testo = testi.map((b) => b.text).join("");
     const fonti = new Map<string, Fonte>();

@@ -27,7 +27,7 @@ describe("CoachCall", () => {
     expect(coda).toContain("Il coach legge le note");
     expect(coda).not.toContain("Chiedi al coach");
     const tetto = render(<CoachCall callId="C1" leadId="L1" lead={lead} />, opzioni({ id: "A1", stato: "fermo_tetto", risultato: null, errore: null, jobId: "J" }));
-    expect(tetto).toContain("tetto del mese");
+    expect(tetto).toContain("tetto di spesa del mese");
     const errore = render(<CoachCall callId="C1" leadId="L1" lead={lead} />, opzioni({ id: "A1", stato: "errore", risultato: null, errore: "Suggerimenti fuori formato", jobId: "J" }));
     expect(errore).toContain("Suggerimenti fuori formato");
     expect(errore).toContain("Chiedi di nuovo al coach");

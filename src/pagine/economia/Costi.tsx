@@ -30,7 +30,7 @@ export function Costi({ ora: oraFissa }: { ora?: number } = {}) {
       {corrente.costi.length === 0 ? <StatoVuoto titolo="Nessun costo questo mese" testo="Il costo nuovo nasce dal +." /> : <ListaCosti costi={corrente.costi} ora={ora} />}
       {prima.filter((m) => m.costi.length > 0).map((m) => (
         <details key={m.mese}>
-          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold tabular-nums">{`${nomeMese(m.mese)}: ${euro(m.totaleCents)}`}</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-testo font-semibold tabular-nums">{`${nomeMese(m.mese)}: ${euro(m.totaleCents)}`}</summary>
           <ListaCosti costi={m.costi} ora={ora} />
         </details>
       ))}

@@ -6,13 +6,14 @@ import { toast } from "sonner";
 import { api } from "../../api";
 import { Errore, Foglio, Pulsante, Riga, Skeleton } from "../../ds";
 import { useOra, useStages, useUsers } from "../../hooks";
-import type { LeadDetail, Stage } from "../../types";
+import type { CallAgenda, LeadDetail, Stage } from "../../types";
 import type { CollegamentiScheda } from "../../../worker/leads/collegamenti";
 import { FoglioNuovaAutomazione } from "../automazioni/FoglioAutomazione";
 import { FoglioNuovoCanone } from "../economia/Fogli";
 import { AZIONE_CALL, CALL_DEL_CODICE, callPerFase } from "../../../worker/regole/fasi-call";
 import type { CallKind } from "../../../worker/db/schema";
 import { FoglioAvvioLavoro } from "../lavori/FoglioAvvioLavoro";
+import { FoglioCall } from "./FoglioCall";
 import { FoglioChiusura } from "./FoglioChiusura";
 import { FoglioNuovoCliente } from "./FoglioCliente";
 import { FoglioEsito } from "./FoglioEsito";
@@ -26,10 +27,14 @@ import { PassaggioCliente } from "./lead/Passaggio";
 import { Contatti } from "./lead/Contatti";
 import { DatiLead } from "./lead/DatiLead";
 import { Documents } from "./lead/Documents";
+import { useCaricaUno } from "./lead/CaricaUno";
+import { useTaskDelLead } from "./lead/taskLead";
+import { smista } from "./lead/documentiScheda";
+import { Preventivo } from "./lead/Preventivo";
 import { FoglioFase } from "./lead/FoglioFase";
 import { LeadForm } from "./lead/LeadForm";
 import { FoglioSpostaCall } from "./lead/FoglioSpostaCall";
-import { NextActionCard, type ComandoScheda } from "./lead/NextActionCard";
+import { NextActionCard, type ComandoScheda, type ModoCall } from "./lead/NextActionCard";
 import { poiSeRiesce } from "./lead/salvataggi";
 import { Sezione } from "./lead/Sezione";
 import { LINK } from "./lead/stile";
@@ -40,11 +45,11 @@ import { useCambioFase } from "./StepperFasi";
 import { useNonPresentato } from "./nonPresentato";
 
 type QualeFoglio = null | "menu" | "esito" | "fissa" | "whatsapp" | "email" | "avvio" | "dati" | "documenti" | "responsabile" | "fase" | "dettagli" | "collegamenti" | "assistente" | "storico"
-  | "sposta" | "link" | "rimanda" | "proposta" | "automazione" | "canone" | { fase: Stage } | { fissa: CallKind };
+  | "sposta" | "link" | "rimanda" | "proposta" | "automazione" | "canone" | { fase: Stage } | { fissa: CallKind } | { call: CallAgenda; modo: ModoCall };
 
 // Avviso in riga in cima alla scheda: una frase, al massimo un link. Mai finestre del browser.
 function Avviso({ children }: { children: ReactNode }) {
-  return <div role="status" className="flex flex-wrap items-center gap-x-3 rounded-[10px] border border-[#E5DED4] bg-white px-5 py-2 text-[15px]">{children}</div>;
+  return <div role="status" className="flex flex-wrap items-center gap-x-3 rounded-[10px] border border-[#E5DED4] bg-white px-5 py-2 text-testo">{children}</div>;
 }
 
 export function SchedaLeadRotta() {
@@ -108,6 +113,8 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
     onError: (e) => toast.error(e.message),
   });
   const nonPresentato = useNonPresentato();
+  const caricaUno = useCaricaUno();
+  const taskLead = useTaskDelLead(id);
   const unisci = useMutation({
     mutationFn: (intoId: string) => api<{ lead: { id: string } }>(`/leads/${id}/merge`, { method: "POST", json: { intoId } }),
     onSuccess: ({ lead }) => { esci(); toast.success("Lead uniti"); vai(`/commerciale/lead/${lead.id}`); },
@@ -118,6 +125,13 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
   if (d.error || !d.data) return <div className="pb-8"><Errore errore={d.error ?? new Error("Lead non trovato")} onRiprova={() => void d.refetch()} /></div>;
   const { lead, activities, documents, duplicateOf } = d.data;
   const chiudi = () => { setFoglio(null); setChiede(null); };
+  // Ogni documento in un posto solo: registrazioni sotto la call, preventivi nel loro blocco, il resto nel foglio.
+  // Task aperte: finché la lista non è arrivata, i documenti delle task restano fuori da Documenti (niente lampi di doppioni).
+  const aperteTask = taskLead.data ? taskLead.data.task.filter((t) => t.doneAt == null).map((t) => t.id) : documents.map((x) => x.taskId).filter((x): x is string => !!x);
+  const { perCall, perTask, preventivi, altri } = smista(documents, (coll.data?.call ?? []).map((k) => k.id), aperteTask);
+  const nuovi = visto.data?.nuovi ?? [];
+  const novitaAltri = altri.filter((x) => nuovi.includes(x.id)).length;
+  const enc = encodeURIComponent;
   // La call in programma (la prima non ancora fatta) e l'ultima proposta: link in linea nel Da fare.
   // Prima quella all'ora dell'appuntamento del lead (è la stessa della riga Da fare), poi la prima ancora da fare.
   const aperte = (coll.data?.call ?? []).filter((c) => c.outcome == null).sort((a, b) => a.scheduledAt - b.scheduledAt);
@@ -179,15 +193,23 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
 
       <nav aria-label="Dettagli del lead" className="lead-tools grid shrink-0 grid-cols-4 gap-2">
         <button type="button" onClick={() => setFoglio("dettagli")}>Dati e note</button>
-        <button type="button" onClick={() => setFoglio("documenti")}>Documenti <span>{documents.length}{(visto.data?.novita ?? 0) > 0 ? " •" : ""}</span></button>
+        <button type="button" onClick={() => setFoglio("documenti")}>Documenti <span>{altri.length}{novitaAltri > 0 ? " •" : ""}</span></button>
         <button type="button" onClick={() => setFoglio("collegamenti")}>Collegamenti <span>{coll.data ? coll.data.call.length + coll.data.proposte.length + coll.data.automazioni.length + coll.data.canoni.length + Number(!!coll.data.cliente) : "…"}</span></button>
         <button type="button" onClick={() => setFoglio("assistente")}>Assistente</button>
       </nav>
 
       <div className="lead-overview grid shrink-0 gap-3 @3xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
           <div className="min-w-0">
-            <NextActionCard lead={lead} kind={fase?.kind} ora={ora} onComando={comando}
+            <NextActionCard lead={lead} kind={fase?.kind} ora={ora} onComando={comando} onCall={(k, modo) => setFoglio({ call: k, modo })}
+              documentiTask={perTask} nuovi={nuovi} caricando={caricaUno.inCorso === "Documento della cosa da fare caricato"}
+              onCaricaTask={(taskId, doc) => caricaUno.avvia((n) => (doc ? `/documents/${doc}/versioni?nome=${enc(n)}` : `/leads/${lead.id}/documents?nome=${enc(n)}&task=${enc(taskId)}`), "Documento della cosa da fare caricato")}
               inLinea={{ call: prossimaCall, proposta: ultimaProposta, cliente: d.data.cliente ? { id: d.data.cliente.id, name: d.data.cliente.name } : null }} />
+            {/* Preventivo sotto il Da fare (giro 1, approvato da Tommaso): si vede solo se c'è un preventivo o una proposta. */}
+            <div className="mt-3 empty:hidden">
+              <Preventivo preventivi={preventivi} proposta={ultimaProposta} nuovi={nuovi} ora={ora} inCorso={caricaUno.inCorso != null}
+                onCarica={() => caricaUno.avvia((n) => `/leads/${lead.id}/documents?nome=${enc(n)}&tipo=preventivo`, "Preventivo caricato")}
+                onNuovaVersione={(p) => caricaUno.avvia((n) => `/documents/${p.id}/versioni?nome=${enc(n)}`, "Nuova versione del preventivo caricata")} />
+            </div>
           </div>
           <div className="min-w-0">
             <Contatti lead={lead} onScrivi={setFoglio} onAggiungi={() => setFoglio("dati")} />
@@ -203,16 +225,19 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
       {foglio === "storico" && <Foglio aperto lato titolo="Storico e attività" onChiudi={chiudi}><Timeline leadId={lead.id} activities={activities} ora={ora} /></Foglio>}
       {foglio === "collegamenti" && <Foglio aperto lato titolo="Collegamenti" onChiudi={chiudi}>
         <Collegamenti dati={coll.data} ora={ora} perso={fase?.kind === "lost"}
-          onCrea={(a) => setFoglio(a === "call" ? "fissa" : a)} />
+          onCrea={(a) => setFoglio(a === "call" ? "fissa" : a)}
+          documentiCall={perCall} nuovi={nuovi} caricando={caricaUno.inCorso === "Registrazione caricata"}
+          onCaricaRegistrazione={(callId) => caricaUno.avvia((n) => `/leads/${lead.id}/documents?nome=${enc(n)}&tipo=registrazione&call=${enc(callId)}`, "Registrazione caricata")} />
       </Foglio>}
       {foglio === "assistente" && <Foglio aperto lato titolo="Assistente" onChiudi={chiudi}><Assistente lead={leadEsito} manuale={lead.source === "manuale"} /></Foglio>}
       {foglio === "dettagli" && <Foglio aperto lato titolo="Dati e note" onChiudi={chiudi}>
         <Pulsante variante="secondario" onClick={() => setFoglio("dati")}>Modifica dati</Pulsante>
-        <DatiLead lead={lead} fasi={fasi.data ?? []} utenti={utenti.data ?? []} documenti={documents.length} novita={visto.data?.novita ?? 0}
-          onServeFoglio={(f) => setFoglio({ fase: f })} onResponsabile={(ownerId) => patch.mutate({ ownerId })}
+        <DatiLead lead={lead} utenti={utenti.data ?? []} documenti={altri.length} novita={novitaAltri}
+          onResponsabile={(ownerId) => patch.mutate({ ownerId })}
           onDocumenti={() => setFoglio("documenti")} onModifica={() => setFoglio("dati")} />
       </Foglio>}
 
+      {caricaUno.campo}
       {foglio === "esito" && <FoglioEsito lead={leadEsito} onChiudi={chiudi} />}
       {foglio === "avvio" && d.data.cliente && <FoglioAvvioLavoro leadId={lead.id} clientId={d.data.cliente.id} nomeCliente={d.data.cliente.name} canoneIniziale={lead.feeCents} documenti={d.data.documents} onChiudi={chiudi} />}
       {foglio === "fissa" && <FoglioFissaCall leadId={lead.id} haEmail={Boolean(lead.email)} onChiudi={chiudi} ritorno={menu} />}
@@ -222,6 +247,9 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         <FoglioFissaCall leadId={lead.id} haEmail={!!lead.email} fase={{ label: AZIONE_CALL[foglio.fissa], kind: foglio.fissa }} onChiudi={chiudi} />
       )}
       {(foglio === "sposta" || foglio === "link") && prossimaCall && <FoglioSpostaCall leadId={lead.id} call={prossimaCall} soloLink={foglio === "link"} onChiudi={chiudi} />}
+      {foglio && typeof foglio === "object" && "call" in foglio && (foglio.modo === "esito"
+        ? <FoglioCall k={foglio.call} onChiudi={chiudi} />
+        : <FoglioSpostaCall leadId={lead.id} call={foglio.call} soloLink={foglio.modo === "link"} onChiudi={chiudi} />)}
       {foglio === "rimanda" && <FoglioRimanda leadId={lead.id} onChiudi={() => { chiudi(); void qc.invalidateQueries({ queryKey: ["lead", id] }); }} />}
       {foglio === "automazione" && <FoglioNuovaAutomazione onChiudi={() => { chiudi(); void coll.refetch(); }} />}
       {foglio === "canone" && <FoglioNuovoCanone onChiudi={() => { chiudi(); void coll.refetch(); }} />}
@@ -238,7 +266,7 @@ export function SchedaLead({ id, ora: oraFissa }: { id: string; ora?: number }) 
         </Foglio>
       )}
       {foglio === "documenti" && (
-        <Foglio aperto lato titolo="Documenti" onChiudi={chiudi}><Documents leadId={lead.id} documents={documents} ora={ora} nuovi={visto.data?.nuovi} /></Foglio>
+        <Foglio aperto lato titolo="Documenti" onChiudi={chiudi}><Documents leadId={lead.id} documents={altri} ora={ora} nuovi={nuovi} /></Foglio>
       )}
       {foglio === "responsabile" && (
         <Foglio aperto lato titolo="Cambia responsabile" onChiudi={chiudi}>

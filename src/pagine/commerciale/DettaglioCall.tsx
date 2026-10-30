@@ -48,7 +48,7 @@ export function DettaglioCall({ ora: oraFissa }: { ora?: number } = {}) {
         <Pulsante variante="icona" aria-label="Torna indietro" title="Torna indietro" className="w-11 shrink-0 px-0!" icona={<ArrowLeft size={22} weight="bold" aria-hidden />}
           onClick={() => (key === "default" ? vai("/commerciale/call") : vai(-1))} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h1 className="break-words font-sans text-[28px] font-semibold leading-[1.15] tracking-[-0.01em]">{TIPO[call.kind]}</h1>
+          <h1 className="break-words text-pagina">{TIPO[call.kind]}</h1>
           <RigaContatto contatto={contatto} />
         </div>
       </header>

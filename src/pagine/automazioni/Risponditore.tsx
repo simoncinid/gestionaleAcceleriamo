@@ -48,17 +48,17 @@ function Account({ account, ora, onCollega }: { account: DatiRisponditore["accou
       <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
         {account ? (
           <>
-            <p className="flex items-center gap-2 text-corpo font-semibold">
+            <p className="flex items-center gap-2 text-testo font-semibold">
               <Punto colore={account.ultimoErrore || account.scadeIl <= ora ? "rosso" : "verde"} etichetta={account.ultimoErrore ? "Con errore" : account.scadeIl <= ora ? "Token scaduto" : "Collegato"} />
               {account.scadeIl <= ora ? `Token scaduto per @${account.username}` : `Collegato come @${account.username}`}
             </p>
-            <p className="text-secondaria text-grigio tabular-nums">{account.scadeIl <= ora ? "Token scaduto: collegalo di nuovo" : giorniAlRinnovo(account.scadeIl, ora)}</p>
-            {account.ultimoErrore && <p className="text-secondaria text-errore">{`Ultimo errore: ${account.ultimoErrore}`}</p>}
+            <p className="text-nota text-grigio tabular-nums">{account.scadeIl <= ora ? "Token scaduto: collegalo di nuovo" : giorniAlRinnovo(account.scadeIl, ora)}</p>
+            {account.ultimoErrore && <p className="text-nota text-errore">{`Ultimo errore: ${account.ultimoErrore}`}</p>}
           </>
         ) : (
           <>
-            <p className="text-corpo font-semibold">Nessun account collegato</p>
-            <p className="text-secondaria text-grigio">Senza account i commenti non ricevono risposta.</p>
+            <p className="text-testo font-semibold">Nessun account collegato</p>
+            <p className="text-nota text-grigio">Senza account i commenti non ricevono risposta.</p>
           </>
         )}
         <Pulsante variante="secondario" className="mt-3 justify-self-start" onClick={onCollega}>{account ? "Cambia il token" : "Collega l'account"}</Pulsante>
@@ -78,7 +78,7 @@ function FoglioAccount({ onChiudi }: { onChiudi: () => void }) {
   return (
     <Foglio aperto titolo="Account Instagram" onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={collega.isPending} motivoSpento={token.trim() ? undefined : "Incolla il token"} onClick={() => collega.mutate()}>Collega l'account</Pulsante>}>
-      <p className="text-corpo">Incolla il token dell'account Instagram professionale. Lo controllo con Instagram e lo salvo cifrato: dopo non si legge più.</p>
+      <p className="text-testo">Incolla il token dell'account Instagram professionale. Lo controllo con Instagram e lo salvo cifrato: dopo non si legge più.</p>
       <Campo etichetta="Token di Instagram" type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
     </Foglio>
   );
@@ -97,7 +97,7 @@ function Campagne({ campagne, onApri, onNuova }: { campagne: CampagnaRisponditor
                 <Riga titolo={c.nome} onClick={() => onApri(c)}
                   secondaria={`Parola: ${c.parola}`}
                   meta={c.mediaId ? `Post ${c.mediaId}` : "Tutti i post"}
-                  destra={<span className="flex shrink-0 items-center gap-2 text-secondaria"><Punto colore={c.attiva ? "verde" : "grigio"} etichetta={c.attiva ? "Attiva" : "Spenta"} />{c.attiva ? "Attiva" : "Spenta"}</span>} />
+                  destra={<span className="flex shrink-0 items-center gap-2 text-nota"><Punto colore={c.attiva ? "verde" : "grigio"} etichetta={c.attiva ? "Attiva" : "Spenta"} />{c.attiva ? "Attiva" : "Spenta"}</span>} />
               </li>
             ))}
           </ul>
@@ -116,11 +116,11 @@ function Richieste({ richieste, ora }: { richieste: RichiestaChiamata[]; ora: nu
           <ul className="grid gap-2">
             {richieste.map((r) => (
               <li key={r.id} className="grid gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3">
-                <p className="text-corpo font-semibold">{r.nome}</p>
-                <p className="text-secondaria">{r.azienda}</p>
-                <p className="text-secondaria tabular-nums"><a href={`tel:${r.telefono.replace(/[^\d+]/g, "")}`} className="underline-offset-4 hover:underline">{telefonoMostrato(r.telefono)}</a></p>
-                <p className="text-meta text-grigio">{`Dalla risorsa: ${r.risorsa ?? r.slug}`}</p>
-                <p className="text-meta text-grigio tabular-nums">{momento(r.creataIl, ora)}</p>
+                <p className="text-testo font-semibold">{r.nome}</p>
+                <p className="text-nota">{r.azienda}</p>
+                <p className="text-nota tabular-nums"><a href={`tel:${r.telefono.replace(/[^\d+]/g, "")}`} className="underline-offset-4 hover:underline">{telefonoMostrato(r.telefono)}</a></p>
+                <p className="text-nota text-grigio">{`Dalla risorsa: ${r.risorsa ?? r.slug}`}</p>
+                <p className="text-nota text-grigio tabular-nums">{momento(r.creataIl, ora)}</p>
               </li>
             ))}
           </ul>
@@ -144,12 +144,12 @@ function Registro({ eventi, ora }: { eventi: EventoRisponditore[]; ora: number }
                 const s = STATI_EVENTO[e.stato];
                 return (
                   <li key={e.commentoId} className="grid gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3">
-                    <p className="text-corpo font-semibold">{e.autoreNome ? (e.piattaforma === "fb" ? e.autoreNome : `@${e.autoreNome}`) : "Autore senza nome"}</p>
-                    <p className="line-clamp-2 text-secondaria">{e.testo}</p>
-                    <p className="text-meta text-grigio">{`${e.piattaforma === "fb" ? "Facebook" : "Instagram"} · ${e.parola ? `Parola: ${e.parola}` : "Nessuna campagna"}`}</p>
-                    <p className="flex items-center gap-2 text-secondaria font-medium"><Punto colore={s.colore} etichetta={s.etichetta} />{s.etichetta}</p>
-                    {e.motivo && <p className="text-meta text-grigio">{e.motivo}</p>}
-                    <p className="text-meta text-grigio tabular-nums">{momento(e.creatoIl, ora)}</p>
+                    <p className="text-testo font-semibold">{e.autoreNome ? (e.piattaforma === "fb" ? e.autoreNome : `@${e.autoreNome}`) : "Autore senza nome"}</p>
+                    <p className="line-clamp-2 text-nota">{e.testo}</p>
+                    <p className="text-nota text-grigio">{`${e.piattaforma === "fb" ? "Facebook" : "Instagram"} · ${e.parola ? `Parola: ${e.parola}` : "Nessuna campagna"}`}</p>
+                    <p className="flex items-center gap-2 text-nota font-medium"><Punto colore={s.colore} etichetta={s.etichetta} />{s.etichetta}</p>
+                    {e.motivo && <p className="text-nota text-grigio">{e.motivo}</p>}
+                    <p className="text-nota text-grigio tabular-nums">{momento(e.creatoIl, ora)}</p>
                   </li>
                 );
               })}

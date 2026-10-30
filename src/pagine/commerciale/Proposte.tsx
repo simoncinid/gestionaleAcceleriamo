@@ -30,8 +30,8 @@ function Gruppo({ titolo, righe, children }: { titolo: string; righe: number; ch
   return (
     <section aria-labelledby={id} className="flex flex-col gap-3">
       <header className="flex items-baseline justify-between gap-3">
-        <h2 id={id} className="font-display text-titolo-card">{titolo}</h2>
-        <span className="text-secondaria text-grigio tabular-nums">{righe}</span>
+        <h2 id={id} className="segno font-display text-sezione">{titolo}</h2>
+        <span className="text-nota text-grigio tabular-nums">{righe}</span>
       </header>
       <ul className="flex flex-col gap-2">{children}</ul>
     </section>
@@ -68,10 +68,10 @@ export function Proposte({ ora: oraFissa }: { ora?: number } = {}) {
             // Una informazione per riga: numero, azienda, prezzo, stato; il pulsante sotto, a testo intero.
             <li key={p.id} className="flex flex-col items-start gap-3 rounded-blocco bg-sabbia px-4 py-3">
               <div className="flex w-full min-w-0 flex-col gap-0.5">
-                <p className="text-corpo font-semibold tabular-nums [overflow-wrap:anywhere]">{p.number}</p>
-                {p.company && <p className="text-secondaria [overflow-wrap:anywhere]">{p.company}</p>}
-                <p className="text-secondaria text-grigio tabular-nums">{prezzo(p)}</p>
-                <p className="text-meta text-grigio">Lead non riconosciuto</p>
+                <p className="text-testo font-semibold tabular-nums [overflow-wrap:anywhere]">{p.number}</p>
+                {p.company && <p className="text-nota [overflow-wrap:anywhere]">{p.company}</p>}
+                <p className="text-nota text-grigio tabular-nums">{prezzo(p)}</p>
+                <p className="text-nota text-grigio">Lead non riconosciuto</p>
               </div>
               <Pulsante variante="secondario" className="shrink-0" onClick={() => setAbbina(p)}>Abbina a un lead</Pulsante>
             </li>
@@ -86,7 +86,7 @@ export function Proposte({ ora: oraFissa }: { ora?: number } = {}) {
 
       {chiuse.length > 0 && (
         <details className="group border-t border-sabbia pt-3">
-          <summary className="flex cursor-pointer items-baseline justify-between gap-3 py-2 font-display text-titolo-card">Chiuse <span className="font-sans text-secondaria text-grigio tabular-nums">{chiuse.length}</span></summary>
+          <summary className="flex cursor-pointer items-baseline justify-between gap-3 py-2 font-display text-sezione">Chiuse <span className="font-sans text-nota text-grigio tabular-nums">{chiuse.length}</span></summary>
           <ul className="flex flex-col gap-2 pt-2 @5xl:grid @5xl:grid-cols-[repeat(auto-fill,minmax(300px,1fr))] @5xl:gap-x-8">{chiuse.map(riga)}</ul>
         </details>
       )}

@@ -42,7 +42,7 @@ export function Clienti() {
       <Gruppo titolo="Fuori perimetro" clienti={fuori} />
       {cessati.length > 0 && (
         <details>
-          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold">{`Cessati, ${cessati.length}`}</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-testo font-semibold">{`Cessati, ${cessati.length}`}</summary>
           <ul className="grid gap-2 pb-2 @3xl:grid-cols-[repeat(auto-fill,minmax(320px,1fr))]">{cessati.map((c) => <li key={c.id}><RigaCliente c={c} /></li>)}</ul>
         </details>
       )}

@@ -37,7 +37,7 @@ export function Previsione() {
             quota={(f.setupPesatoCents / Math.max(...p.fasi.map((x) => x.setupPesatoCents), 1)) * 100} />)}
         </Gruppo>
       )}
-      <p className="text-meta text-grigio">La probabilità è quella della fase, impostata in Fasi e regole. Vale la proposta aperta più recente; la proprietà del codice conta solo il setup.</p>
+      <p className="text-nota text-grigio">La probabilità è quella della fase, impostata in Fasi e regole. Vale la proposta aperta più recente; la proprietà del codice conta solo il setup.</p>
       </div>
     </div>
   );

@@ -42,7 +42,7 @@ export function Fatture({ ora: oraFissa }: { ora?: number } = {}) {
     // Ogni gruppo (in ritardo, emesse, da emettere, incassate) è una colonna: sul largo si leggono affiancati.
     <div className="grid items-start gap-6 p-4 md:px-0 md:pt-0 md:pb-8 @5xl:grid-cols-2 @7xl:grid-cols-3">
       <div className="@5xl:col-span-full"><Intestazione titolo="Fatture" numero={euro(somma([...ritardo, ...di("emessa")]))} coda="da incassare" eyebrow={eyebrow}>
-        {ritardo.length > 0 && <p className="text-corpo text-errore">{ritardo.length === 1 ? "1 in ritardo" : `${ritardo.length} in ritardo`}</p>}
+        {ritardo.length > 0 && <p className="text-testo text-errore">{ritardo.length === 1 ? "1 in ritardo" : `${ritardo.length} in ritardo`}</p>}
       </Intestazione></div>
       {fatture.length === 0 && <div className="@5xl:col-span-full"><StatoVuoto titolo="Nessuna fattura" testo="La prima nasce dal +." /></div>}
       {APERTI.map((s) => di(s).length > 0 && (
@@ -55,7 +55,7 @@ export function Fatture({ ora: oraFissa }: { ora?: number } = {}) {
         <Sezione titolo={ETICHETTE_FATTURA.incassata}>
           {[...perMese.entries()].map(([mese, xs]) => (
             <details key={mese}>
-              <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold tabular-nums">{`${nomeMese(mese)}: ${euro(somma(xs))}`}</summary>
+              <summary className="flex min-h-11 cursor-pointer items-center py-2 text-testo font-semibold tabular-nums">{`${nomeMese(mese)}: ${euro(somma(xs))}`}</summary>
               <ul className="grid gap-2 pb-2">{xs.map((f) => <li key={f.id}><RigaFattura f={f} ora={ora} onClick={() => setAperta(f)} /></li>)}</ul>
             </details>
           ))}

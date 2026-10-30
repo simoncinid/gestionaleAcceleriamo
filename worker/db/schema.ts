@@ -135,6 +135,9 @@ export const activities = sqliteTable(
   (t) => [index("idx_activities_lead").on(t.leadId, t.createdAt), uniqueIndex("uq_activities_request").on(t.requestId), index("idx_activities_created").on(t.createdAt, t.id)],
 );
 
+export const DOCUMENT_KINDS = ["registrazione", "trascrizione", "preventivo", "altro"] as const;
+export type DocumentKind = (typeof DOCUMENT_KINDS)[number];
+
 export const documents = sqliteTable(
   "documents",
   {
@@ -152,6 +155,12 @@ export const documents = sqliteTable(
     version: integer("version").notNull().default(1),
     via: text("via"), // "claude" quando l'ha caricato lo script di Tommaso
     updatedAt: integer("updated_at"),
+    // Organizzazione nella scheda (30/10/2026): registrazioni e trascrizioni stanno accanto alla loro call,
+    // il preventivo ha il suo blocco; "altro" resta nel foglio Documenti.
+    kind: text("kind", { enum: DOCUMENT_KINDS }).notNull().default("altro"),
+    callId: text("call_id"),
+    // Documento di una cosa da fare del lead (30/10/2026): sta sulla riga della task finché è aperta, poi in Documenti.
+    taskId: text("task_id"),
   },
   (t) => [index("idx_documents_lead").on(t.leadId)],
 );
@@ -574,6 +583,8 @@ export const tasks = sqliteTable("tasks", {
   id: text("id").primaryKey(),
   title: text("title").notNull(),
   clientId: text("client_id"),
+  // Cose da fare aggiunte a mano nella scheda di un lead (giro 2, 30/10/2026): compaiono nel suo "Da fare".
+  leadId: text("lead_id"),
   jobId: text("job_id"),
   templateTaskId: text("template_task_id"),
   month: text("month"),
@@ -588,6 +599,7 @@ export const tasks = sqliteTable("tasks", {
   uniqueIndex("uq_tasks_ricorrente").on(t.jobId, t.templateTaskId, t.month),
   index("idx_tasks_aperte").on(t.doneAt, t.dueAt),
   index("idx_tasks_client").on(t.clientId),
+  index("idx_tasks_lead").on(t.leadId),
 ]);
 
 export const automationSteps = sqliteTable("automation_steps", {

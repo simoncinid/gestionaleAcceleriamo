@@ -36,13 +36,13 @@ function RigaVoce({ v, ora, onApri }: { v: VoceStato; ora: number; onApri: () =>
   const errore = v.colore === "rosso";
   return (
     <button type="button" onClick={onApri} className="grid w-full gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3 text-left hover:bg-crema">
-      <span className="text-corpo font-semibold">{v.nome}</span>
-      <span className="text-secondaria text-grigio">{v.proprietario}</span>
-      <span className="flex items-center gap-2 text-secondaria font-medium"><Punto colore={v.colore} etichetta={ETICHETTE_COLORE[v.colore]} />{v.ultimoGiroAt == null && v.colore === "grigio" && v.ultimoEsito !== "spento" ? "Mai partita" : ETICHETTE_COLORE[v.colore]}</span>
-      <span className="text-meta text-grigio tabular-nums">{v.ultimoOkAt ? `Ultimo giro riuscito ${momento(v.ultimoOkAt, ora)}` : "Nessun giro riuscito"}</span>
-      {errore && v.ultimoErrore && <span className="text-secondaria text-errore">{v.ultimoErrore}</span>}
-      {errore && v.ultimoPasso && <span className="text-secondaria text-errore">{`Dove: ${v.ultimoPasso}`}</span>}
-      {v.prossimoAt != null && <span className="text-meta text-grigio tabular-nums">{`Prossimo giro ${quandoProssimo(v.prossimoAt, ora)}`}</span>}
+      <span className="text-testo font-semibold">{v.nome}</span>
+      <span className="text-nota text-grigio">{v.proprietario}</span>
+      <span className="flex items-center gap-2 text-nota font-medium"><Punto colore={v.colore} etichetta={ETICHETTE_COLORE[v.colore]} />{v.ultimoGiroAt == null && v.colore === "grigio" && v.ultimoEsito !== "spento" ? "Mai partita" : ETICHETTE_COLORE[v.colore]}</span>
+      <span className="text-nota text-grigio tabular-nums">{v.ultimoOkAt ? `Ultimo giro riuscito ${momento(v.ultimoOkAt, ora)}` : "Nessun giro riuscito"}</span>
+      {errore && v.ultimoErrore && <span className="text-nota text-errore">{v.ultimoErrore}</span>}
+      {errore && v.ultimoPasso && <span className="text-nota text-errore">{`Dove: ${v.ultimoPasso}`}</span>}
+      {v.prossimoAt != null && <span className="text-nota text-grigio tabular-nums">{`Prossimo giro ${quandoProssimo(v.prossimoAt, ora)}`}</span>}
     </button>
   );
 }
@@ -59,12 +59,12 @@ function Chiave({ chiave }: { chiave: string }) {
   const copia = (testo: string) => void navigator.clipboard.writeText(testo).then(() => toast.success("Copiato"), () => toast.error("Non riesco a copiare: seleziona il testo a mano"));
   return (
     <div className="grid gap-3">
-      <p className="text-corpo font-semibold">La chiave si vede solo adesso</p>
-      <p className="text-secondaria">Copiala nell'automazione. Se si perde se ne fa una nuova.</p>
-      <code className="break-all rounded-controllo border border-sabbia bg-crema p-3 text-secondaria">{chiave}</code>
+      <p className="text-testo font-semibold">La chiave si vede solo adesso</p>
+      <p className="text-nota">Copiala nell'automazione. Se si perde se ne fa una nuova.</p>
+      <code className="break-all rounded-controllo border border-sabbia bg-crema p-3 text-nota">{chiave}</code>
       <Pulsante variante="secondario" className="justify-self-start" onClick={() => copia(chiave)}>Copia la chiave</Pulsante>
-      <p className="text-secondaria">A ogni giro l'automazione manda "ok", oppure "errore" con il messaggio e il passo dove si è fermata.</p>
-      <pre className="overflow-x-auto rounded-controllo border border-sabbia bg-crema p-3 text-meta">{esempio(chiave)}</pre>
+      <p className="text-nota">A ogni giro l'automazione manda "ok", oppure "errore" con il messaggio e il passo dove si è fermata.</p>
+      <pre className="overflow-x-auto rounded-controllo border border-sabbia bg-crema p-3 text-nota">{esempio(chiave)}</pre>
       <Pulsante variante="fantasma" className="justify-self-start" onClick={() => copia(esempio(chiave))}>Copia l'esempio</Pulsante>
     </div>
   );
@@ -97,7 +97,7 @@ function FoglioNuova({ onChiudi }: { onChiudi: () => void }) {
   return (
     <Foglio aperto titolo="Automazione da seguire" onChiudi={onChiudi}
       principale={<Pulsante variante="primario" misura="lg" className="w-full" inCorso={crea.isPending} motivoSpento={nome.trim() ? undefined : "Dai un nome all'automazione"} onClick={() => crea.mutate()}>Aggiungi e crea la chiave</Pulsante>}>
-      <p className="text-corpo">Un'automazione che gira fuori dal gestionale (sul server, da un cliente) e manda un battito a ogni giro.</p>
+      <p className="text-testo">Un'automazione che gira fuori dal gestionale (sul server, da un cliente) e manda un battito a ogni giro.</p>
       <Campo etichetta="Nome in parole semplici" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Schede lead sul server" />
       <Selettore etichetta="Di chi è" valore={cliente} onCambia={(v) => { setCliente(v); setScheda("nessuna"); }}
         opzioni={[{ valore: "acceleriamo", etichetta: "Acceleriamo" }, ...(clienti.data ?? []).map((c) => ({ valore: c.id, etichetta: c.name }))]} />
@@ -131,13 +131,13 @@ function FoglioVoce({ v, ora, onChiudi }: { v: VoceStato; ora: number; onChiudi:
   return (
     <Foglio aperto titolo={v.nome} onChiudi={onChiudi} lato>
       <div className="grid gap-1">
-        <p className="text-secondaria text-grigio">{v.proprietario}</p>
-        {v.automazione && <p className="text-secondaria text-grigio">{`Scheda: ${v.automazione}`}</p>}
-        <p className="flex items-center gap-2 text-corpo font-semibold"><Punto colore={v.colore} etichetta={ETICHETTE_COLORE[v.colore]} />{ETICHETTE_COLORE[v.colore]}</p>
-        <p className="text-secondaria text-grigio">{intervalloInParole(v.intervalloMin)}</p>
-        {v.ultimoErrore && <p className="text-secondaria">{`Ultimo errore: ${v.ultimoErrore}`}</p>}
-        {v.ultimoPasso && <p className="text-secondaria">{`Dove: ${v.ultimoPasso}`}</p>}
-        {v.ultimoErroreAt && <p className="text-meta text-grigio tabular-nums">{momento(v.ultimoErroreAt, ora)}</p>}
+        <p className="text-nota text-grigio">{v.proprietario}</p>
+        {v.automazione && <p className="text-nota text-grigio">{`Scheda: ${v.automazione}`}</p>}
+        <p className="flex items-center gap-2 text-testo font-semibold"><Punto colore={v.colore} etichetta={ETICHETTE_COLORE[v.colore]} />{ETICHETTE_COLORE[v.colore]}</p>
+        <p className="text-nota text-grigio">{intervalloInParole(v.intervalloMin)}</p>
+        {v.ultimoErrore && <p className="text-nota">{`Ultimo errore: ${v.ultimoErrore}`}</p>}
+        {v.ultimoPasso && <p className="text-nota">{`Dove: ${v.ultimoPasso}`}</p>}
+        {v.ultimoErroreAt && <p className="text-nota text-grigio tabular-nums">{momento(v.ultimoErroreAt, ora)}</p>}
       </div>
       <Sezione titolo="Ultimi giri" coda={giri.data?.length ? String(giri.data.length) : undefined}>
         {giri.isLoading ? <Skeleton righe={4} /> : giri.error ? <Errore errore={giri.error} onRiprova={() => void giri.refetch()} /> : !giri.data?.length
@@ -146,10 +146,10 @@ function FoglioVoce({ v, ora, onChiudi }: { v: VoceStato; ora: number; onChiudi:
             <ul className="grid gap-2">
               {giri.data.map((g) => (
                 <li key={g.id} className="grid gap-0.5 rounded-blocco border border-sabbia bg-avorio px-4 py-3">
-                  <p className="flex items-center gap-2 text-secondaria font-medium"><Punto colore={ESITO[g.esito].colore} etichetta={ESITO[g.esito].etichetta} />{ESITO[g.esito].etichetta}</p>
-                  {g.messaggio && <p className="text-secondaria">{g.messaggio}</p>}
-                  {g.passo && v.tipo === "esterno" && <p className="text-secondaria">{`Dove: ${g.passo}`}</p>}
-                  <p className="text-meta text-grigio tabular-nums">{momento(g.at, ora)}</p>
+                  <p className="flex items-center gap-2 text-nota font-medium"><Punto colore={ESITO[g.esito].colore} etichetta={ESITO[g.esito].etichetta} />{ESITO[g.esito].etichetta}</p>
+                  {g.messaggio && <p className="text-nota">{g.messaggio}</p>}
+                  {g.passo && v.tipo === "esterno" && <p className="text-nota">{`Dove: ${g.passo}`}</p>}
+                  <p className="text-nota text-grigio tabular-nums">{momento(g.at, ora)}</p>
                 </li>
               ))}
             </ul>
@@ -188,10 +188,10 @@ export function StatoAutomazioni({ ora: oraFissa }: { ora?: number } = {}) {
       {/* Sul computer largo: riepilogo in una colonna stretta a sinistra, le sezioni a destra (affiancate quando c'è spazio). */}
       <div className="grid gap-8 @5xl:grid-cols-[minmax(260px,340px)_minmax(0,1fr)] @5xl:items-start">
       <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
-        <p className="text-corpo tabular-nums">{per(["rosso"]).length === 1 ? "1 in errore" : `${per(["rosso"]).length} in errore`}</p>
-        <p className="text-corpo tabular-nums">{`${per(["giallo"]).length} in ritardo`}</p>
-        <p className="text-corpo tabular-nums">{vanno.length === 1 ? "1 funziona" : `${vanno.length} funzionano`}</p>
-        <p className="text-corpo tabular-nums">{spente.length === 1 ? "1 spenta o mai partita" : `${spente.length} spente o mai partite`}</p>
+        <p className="text-testo tabular-nums">{per(["rosso"]).length === 1 ? "1 in errore" : `${per(["rosso"]).length} in errore`}</p>
+        <p className="text-testo tabular-nums">{`${per(["giallo"]).length} in ritardo`}</p>
+        <p className="text-testo tabular-nums">{vanno.length === 1 ? "1 funziona" : `${vanno.length} funzionano`}</p>
+        <p className="text-testo tabular-nums">{spente.length === 1 ? "1 spenta o mai partita" : `${spente.length} spente o mai partite`}</p>
       </div>
       <div className="grid gap-8 @7xl:grid-cols-2 @7xl:items-start">
       <Sezione titolo="Da guardare" coda={guardare.length ? String(guardare.length) : undefined}>
@@ -202,7 +202,7 @@ export function StatoAutomazioni({ ora: oraFissa }: { ora?: number } = {}) {
       </Sezione>
       {spente.length > 0 && (
         <details>
-          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold">{`Spente o mai partite, ${spente.length}`}</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-testo font-semibold">{`Spente o mai partite, ${spente.length}`}</summary>
           <Elenco voci={spente} ora={ora} onApri={setAperto} />
         </details>
       )}

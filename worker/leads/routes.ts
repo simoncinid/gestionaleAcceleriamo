@@ -22,7 +22,7 @@ import { eliminaPerSempre, leggiCestino } from "./cestino";
 import { normalizeEmail, normalizePhone } from "../lib/normalize";
 import { collegamentiDelLead } from "./collegamenti";
 import { conUltimoContatto } from "./ultimo-contatto";
-import { apriFile, caricaDocumento, conNovita, documentiDelLead, segnaVisto, versioniDi } from "./documenti";
+import { apriFile, caricaDocumento, conNovita, documentiDelLead, segnaVisto, tipoCallDaQuery, versioniDi } from "./documenti";
 import type { Context } from "hono";
 
 // Corpo grezzo di un caricamento: il file è tutto il corpo, la lunghezza viene da Content-Length.
@@ -239,12 +239,13 @@ leadRoutes.post("/:id/visto", async (c) => {
   return c.json(await segnaVisto(c.env.DB, c.get("user").id, lead.id, Date.now()));
 });
 
-// Un link (corpo JSON) o un file (corpo grezzo, nome in ?nome=, titolo facoltativo in ?titolo=).
+// Un link (corpo JSON) o un file (corpo grezzo, nome in ?nome=, titolo facoltativo in ?titolo=,
+// ?tipo= e ?call= facoltativi: senza, li decidono le regole di worker/leads/tipo-documento.ts).
 leadRoutes.post("/:id/documents", async (c) => {
   const db = getDb(c.env.DB);
   if (!(c.req.header("content-type") ?? "").startsWith("application/json")) {
     const { size, body } = corpoFile(c);
-    const document = await caricaDocumento(c.env, db, { leadId: c.req.param("id"), fileName: c.req.query("nome") ?? "", titolo: c.req.query("titolo"), size, body, userId: c.get("user").id, now: Date.now() });
+    const document = await caricaDocumento(c.env, db, { leadId: c.req.param("id"), fileName: c.req.query("nome") ?? "", titolo: c.req.query("titolo"), size, body, userId: c.get("user").id, now: Date.now(), ...tipoCallDaQuery((k) => c.req.query(k)) });
     return c.json({ document }, 201);
   }
   const lead = await getLead(db, c.req.param("id"));

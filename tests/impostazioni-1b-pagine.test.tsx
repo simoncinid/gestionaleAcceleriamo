@@ -14,7 +14,7 @@ const stato = {
   integrazioni: [
     { key: "meta", etichetta: "Meta", stato: "ok", ultimaOk: ORA - 25 * 60_000, nota: null },
     { key: "push", etichetta: "Push", stato: "spento", ultimaOk: null, nota: "Mancano le chiavi VAPID" },
-    { key: "claude", etichetta: "Claude", stato: "ok", ultimaOk: ORA, nota: null, extra: { spesoCents: 1_100, tettoCents: 2_000 } },
+    { key: "claude", etichetta: "Assistente", stato: "ok", ultimaOk: ORA, nota: null, extra: { spesoCents: 1_100, tettoCents: 2_000 } },
     { key: "giro", etichetta: "Giro programmato", stato: "ok", ultimaOk: ORA, nota: null },
   ],
   settimana: { meta: 5, foglio: 2, aggancio: 3 }, errori: [], segreti: { meta: true, resend: false, google: false, aggancio: true }, foglio: { ultimaRiga: 0, ultimaLettura: null },
@@ -72,7 +72,7 @@ describe("Impostazioni della 1B", () => {
   it("dettaglio di Telegram: gli eventi con Telegram, la chat collegata, scollega", () => {
     const conTelegram = { ...stato, integrazioni: [...stato.integrazioni, { key: "telegram", etichetta: "Telegram", stato: "ok", ultimaOk: ORA, nota: null }] };
     const html = render(<IntegrazioneDettaglio ora={ORA} />, { percorso: "/impostazioni/integrazioni/telegram", rotta: "/impostazioni/integrazioni/:key", dati: [[["integrazioni"], conTelegram], [["settings"], {}], [["me", "profilo"], profilo]] });
-    for (const e of ["Lead nuovo", "Prima chiamata scaduta", "Claude al tetto del mese", "Risponditore: messaggio non partito", "Richiesta di chiamata da una risorsa"]) expect(html).toContain(`<li class="text-corpo">${e}</li>`);
+    for (const e of ["Lead nuovo", "Prima chiamata scaduta", "Assistente al tetto del mese", "Risponditore: messaggio non partito", "Richiesta di chiamata da una risorsa"]) expect(html).toContain(`<li class="text-testo">${e}</li>`);
     expect(html).not.toContain("tre avvisi");
     expect(html).toContain("La tua chat è collegata");
     expect(html).toContain("Scollega la tua chat");

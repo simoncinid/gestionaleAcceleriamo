@@ -7,7 +7,7 @@ export const EVENTI: Record<EventoAvviso, { etichetta: string; chi: "tutti" | "r
   sla_scaduto: { etichetta: "Prima chiamata scaduta", chi: "tutti", push: true, telegram: true },
   proposta_oggi: { etichetta: "Proposta da seguire oggi", chi: "responsabile", push: false, telegram: false },
   fine_pausa: { etichetta: "Fine della pausa", chi: "responsabile", push: false, telegram: false },
-  claude_tetto: { etichetta: "Claude al tetto del mese", chi: "tutti", push: true, telegram: true },
+  claude_tetto: { etichetta: "Assistente al tetto del mese", chi: "tutti", push: true, telegram: true },
   meta_48h: { etichetta: "Meta senza lead da 48 ore", chi: "tutti", push: true, telegram: false },
   integrazione_rotta: { etichetta: "Integrazione rotta", chi: "tutti", push: false, telegram: false },
   risponditore_errore: { etichetta: "Risponditore: messaggio non partito", chi: "tutti", push: true, telegram: true },

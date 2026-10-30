@@ -2,24 +2,14 @@
 @import "./temi/acceleriamo.css"; /* i colori del brand, uguali in ogni app, vedi 4.9 */
 
 /* Scheda lead: l'altezza disponibile viene dal guscio, incluso il banner demo.
-   Solo cronologia e fogli scorrono; su finestre basse anche il riepilogo resta raggiungibile. */
+   Solo cronologia e fogli scorrono; su finestre basse anche il riepilogo resta raggiungibile.
+   Giro 3: tolte le regole sul vecchio Da fare e sui vecchi Contatti (ora lista con righe da 60 e icone da 44)
+   e quella che rimpiccioliva i titoli: Da fare e Contatti seguono la scala unica e il segno di sezione. */
 .lead-main { padding-bottom: calc(var(--barra-altezza) + var(--safe-bottom) + 12px); }
 .lead-workspace > [role="status"] { flex-shrink: 0; padding: 6px 12px; font-size: 12px; }
 .lead-overview { min-height: 0; max-height: 65%; overflow-y: auto; overscroll-behavior: contain; }
 .lead-workspace [data-sezione] { padding: 12px 14px; gap: 8px; background: var(--color-avorio); }
-.lead-overview [data-sezione] { height: 100%; }
-.lead-workspace [data-sezione] h2 { font-size: 13px; line-height: 20px; }
-.lead-overview [data-sezione="da-fare"] > div:first-of-type > p:first-child { font-size: 18px; line-height: 22px; }
-.lead-overview [data-sezione="da-fare"] p { font-size: 13px; line-height: 19px; }
-.lead-overview [data-sezione="da-fare"] .border-t { padding-top: 6px; }
-.lead-overview [data-sezione="da-fare"] a,
-.lead-overview [data-sezione="da-fare"] button { min-height: 32px; font-size: 13px; }
-.lead-overview [data-sezione="da-fare"] [data-variante="primario"] { height: auto; min-height: 36px; padding: 7px 12px; }
-.lead-overview [data-sezione="contatti"] dl > div { min-height: 28px; padding-block: 2px; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; }
-.lead-overview [data-sezione="contatti"] dd,
-.lead-overview [data-sezione="contatti"] a,
-.lead-overview [data-sezione="contatti"] button { min-height: 28px; font-size: 13px; line-height: 20px; }
-.lead-overview [role="group"] > * { height: 36px; min-height: 36px; padding-block: 6px; }
+.lead-overview > div > [data-sezione]:only-child { height: 100%; }
 .lead-tools > button { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 40px; padding: 6px; border: 1px solid var(--color-sabbia); border-radius: 8px; background: var(--color-avorio); font-size: 12px; font-weight: 600; }
 .lead-tools > button:hover { background: var(--color-tinta); border-color: var(--color-sabbia-2); }
 .lead-tools > button span { color: var(--color-grigio); font-variant-numeric: tabular-nums; }
@@ -32,9 +22,6 @@
   .lead-workspace { gap: 8px; }
   .lead-workspace [data-sezione] { padding: 10px 12px; gap: 6px; }
   .lead-overview { gap: 8px; max-height: 75%; }
-  .lead-overview [data-sezione="da-fare"] > div.border-t { flex-direction: row; flex-wrap: wrap; gap: 4px; }
-  .lead-overview [data-sezione="da-fare"] > div.border-t > * { width: auto; }
-  .lead-overview [data-sezione="da-fare"] button { height: 36px; padding: 6px 8px; }
   .lead-tools { gap: 4px; }
   .lead-tools > button { font-size: 11px; gap: 3px; padding-inline: 3px; }
 }
@@ -99,16 +86,18 @@
   --font-display: "Degular Display", "Inter", system-ui, sans-serif;
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
 
-  --text-titolo-pagina: 2.5rem;   --text-titolo-pagina--line-height: 0.95; --text-titolo-pagina--letter-spacing: -0.02em; --text-titolo-pagina--font-weight: 600;
-  --text-titolo-blocco: 1.75rem;  --text-titolo-blocco--line-height: 1.07; --text-titolo-blocco--letter-spacing: -0.015em; --text-titolo-blocco--font-weight: 600;
-  --text-titolo-card: 1.375rem;   --text-titolo-card--line-height: 1.09;   --text-titolo-card--letter-spacing: -0.01em;  --text-titolo-card--font-weight: 600;
-  --text-numero: 1.25rem;         --text-numero--line-height: 1.1;         --text-numero--font-weight: 600;
-  --text-eyebrow: 0.75rem;        --text-eyebrow--line-height: 1.33;       --text-eyebrow--letter-spacing: 0.09em;      --text-eyebrow--font-weight: 600;
-  --text-corpo: 1rem;             --text-corpo--line-height: 1.5;
-  --text-riga: 0.9375rem;         --text-riga--line-height: 1.33;          --text-riga--letter-spacing: -0.005em;       --text-riga--font-weight: 600;
-  --text-secondaria: 0.875rem;    --text-secondaria--line-height: 1.43;
-  --text-meta: 0.8125rem;         --text-meta--line-height: 1.38;
-  --text-etichetta: 0.6875rem;    --text-etichetta--line-height: 1.27;     --text-etichetta--letter-spacing: 0.06em;    --text-etichetta--font-weight: 600;
+  /* Scala tipografica unica (giro 2, 30/10/2026): cinque livelli più l'etichetta. Un livello, un ruolo.
+     pagina = titolo della pagina (Degular); sezione = titolo di un contenitore (Degular); voce = la cosa in una riga,
+     pulsanti compresi; testo = il contenuto; nota = date, autori, dati secondari (grigio); etichetta = gruppi in maiuscolo,
+     solo dove servono. campo = testo dentro i campi: 16, sotto l'iPhone ingrandisce. numero = cifre dei riquadri dei numeri. */
+  --text-pagina: 1.75rem;     --text-pagina--line-height: 1.143;   --text-pagina--letter-spacing: -0.015em;  --text-pagina--font-weight: 600;
+  --text-sezione: 1.25rem;    --text-sezione--line-height: 1.2;    --text-sezione--letter-spacing: -0.005em; --text-sezione--font-weight: 600;
+  --text-voce: 0.9375rem;     --text-voce--line-height: 1.333;     --text-voce--font-weight: 600;
+  --text-testo: 0.9375rem;    --text-testo--line-height: 1.467;
+  --text-nota: 0.8125rem;     --text-nota--line-height: 1.385;
+  --text-etichetta: 0.6875rem; --text-etichetta--line-height: 1.273; --text-etichetta--letter-spacing: 0.06em; --text-etichetta--font-weight: 600;
+  --text-campo: 1rem;         --text-campo--line-height: 1.5;
+  --text-numero: 1.25rem;     --text-numero--line-height: 1.1;     --text-numero--font-weight: 600;
 
   --radius-tag: 8px;
   --radius-controllo: 12px;
@@ -286,3 +275,10 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* Ingresso della testata: una sola volta all'apertura, salgono di poco, uno dopo l'altro. */
 @keyframes risorsa-entra { from { opacity: 0; transform: translateY(10px); } }
 .risorsa-entra { animation: risorsa-entra 420ms var(--ease-foglio) both; animation-delay: calc(var(--i, 0) * 60ms); }
+
+/* Segno di sezione (giro 3, Damiano): trattino arancione 20 x 2 sopra il titolo dei contenitori di primo livello.
+   Va sul titolo, mai sul contenitore; dentro i fogli non si vede (bastano maniglia e titolo del foglio). */
+@utility segno {
+  &::before { content: ""; display: block; width: 20px; height: 2px; margin-bottom: 10px; border-radius: 1px; background: var(--color-accento); }
+}
+dialog .segno::before { display: none; }

@@ -43,9 +43,9 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
       {opzioni.map((o) => (
         <li key={o.valore} role="none">
           <button type="button" role="option" aria-selected={o.valore === valore} onClick={() => { onCambia(o.valore); chiudi(); }}
-            className="flex min-h-11 w-full items-center gap-3 rounded-controllo px-3 py-2 text-left text-corpo hover:bg-crema focus-visible:bg-crema">
+            className="flex min-h-11 w-full items-center gap-3 rounded-controllo px-3 py-2 text-left text-testo hover:bg-crema focus-visible:bg-crema">
             <span className="min-w-0 flex-1 break-words">{o.etichetta}</span>
-            {o.meta && <span className="text-meta text-grigio tabular-nums">{o.meta}</span>}
+            {o.meta && <span className="text-nota text-grigio tabular-nums">{o.meta}</span>}
             <span className="flex w-5 justify-end">{o.valore === valore && <Check data-spunta size={18} weight="bold" aria-hidden className="text-ink" />}</span>
           </button>
         </li>
@@ -56,9 +56,9 @@ export function Selettore<T extends string>({ etichetta, opzioni, valore, onCamb
     <div ref={contenitore} data-selettore={etichetta} onKeyDown={tasti} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
       <button ref={trigger} type="button" aria-expanded={aperto} aria-controls={id} onClick={() => setAperto((a) => !a)}
         className="flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left">
-        <span className="shrink-0 text-secondaria font-medium">{etichetta}</span>
+        <span className="shrink-0 text-nota font-medium">{etichetta}</span>
         {/* Niente puntini: un valore lungo va a capo e la riga cresce (QA 11, testi tagliati). */}
-        <span className={cx("min-w-0 flex-1 break-words text-right text-corpo", !mostrato && "text-grigio")}>{mostrato ?? segnaposto}</span>
+        <span className={cx("min-w-0 flex-1 break-words text-right text-testo", !mostrato && "text-grigio")}>{mostrato ?? segnaposto}</span>
         <CaretDown size={18} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperto && !nelFoglio && "rotate-180")} />
       </button>
       {nelFoglio
@@ -80,8 +80,8 @@ export function SelettoreMultiplo<T extends string>({ etichetta, opzioni, valori
     <div data-selettore={etichetta} className="rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio">
       <button type="button" aria-expanded={aperto} aria-controls={id} onClick={() => setAperto((a) => !a)}
         className="flex min-h-12 w-full items-center gap-3 px-3 py-2 text-left">
-        <span className="shrink-0 text-secondaria font-medium">{etichetta}</span>
-        <span className={cx("min-w-0 flex-1 break-words text-right text-corpo", !mostrato && "text-grigio")}>{mostrato || segnaposto}</span>
+        <span className="shrink-0 text-nota font-medium">{etichetta}</span>
+        <span className={cx("min-w-0 flex-1 break-words text-right text-testo", !mostrato && "text-grigio")}>{mostrato || segnaposto}</span>
         <CaretDown size={18} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperto && "rotate-180")} />
       </button>
       {aperto && (
@@ -93,7 +93,7 @@ export function SelettoreMultiplo<T extends string>({ etichetta, opzioni, valori
                 <li key={o.valore} role="none">
                   <button type="button" role="option" aria-selected={scelto}
                     onClick={() => onCambia(scelto ? valori.filter((v) => v !== o.valore) : [...valori, o.valore])}
-                    className="flex min-h-11 w-full items-center gap-3 rounded-controllo px-3 py-2 text-left text-corpo hover:bg-crema focus-visible:bg-crema">
+                    className="flex min-h-11 w-full items-center gap-3 rounded-controllo px-3 py-2 text-left text-testo hover:bg-crema focus-visible:bg-crema">
                     <span className="min-w-0 flex-1 break-words">{o.etichetta}</span>
                     <span className="flex w-5 justify-end">{scelto && <Check data-spunta size={18} weight="bold" aria-hidden className="text-ink" />}</span>
                   </button>

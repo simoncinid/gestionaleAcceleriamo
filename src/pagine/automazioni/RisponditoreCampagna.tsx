@@ -58,7 +58,7 @@ export function FoglioCampagna({ campagna, risorse, onChiudi }: { campagna: Camp
       <Selettore<DovePost> etichetta="Su quali post" opzioni={DOVE} valore={dove} onCambia={setDove} />
       {dove === "uno" && <Campo etichetta="Id del post" aiuto="Il numero del post su Instagram" inputMode="numeric" value={mediaId} onChange={(e) => setMediaId(e.target.value)} />}
       <AreaTesto etichetta="Risposte pubbliche, una per riga" cresce value={risposte} onChange={(e) => setRisposte(e.target.value)} />
-      <p className="-mt-2 text-meta text-grigio">Sotto il commento ne parte una a caso.</p>
+      <p className="-mt-2 text-nota text-grigio">Sotto il commento ne parte una a caso.</p>
       <AreaTesto etichetta="Messaggio privato" cresce value={privato} onChange={(e) => setPrivato(e.target.value)} />
       <Campo etichetta="Testo del pulsante" aiuto="Al massimo 20 caratteri" maxLength={20} value={pulsante} onChange={(e) => setPulsante(e.target.value)} />
       <Selettore etichetta="Risorsa da mandare" opzioni={opzioniRisorse} valore={risorsa} onCambia={setRisorsa} segnaposto={opzioniRisorse.length ? "Scegli" : "Nessuna risorsa"} />

@@ -43,10 +43,10 @@ function ListaFasi({ fasi, chi }: { fasi: Stage[]; chi: (r: RegolaFase["chi"]) =
     <ul className="divide-y divide-sabbia overflow-hidden rounded-blocco border border-sabbia bg-avorio">
       {REGOLE_FASI.map((r) => (
         <li key={r.id} data-fase={r.id} className="grid gap-0.5 px-4 py-3">
-          <span className="break-words text-corpo font-semibold">{fasi.find((f) => f.id === r.id)?.label ?? r.nome}</span>
-          <span className="break-words text-secondaria text-grigio">{`Azione: ${r.azione}`}</span>
-          <span className="break-words text-secondaria text-grigio">{`Scadenza: ${r.scadenza}`}</span>
-          <span className="break-words text-secondaria text-grigio">{`Chi: ${chi(r.chi)}`}</span>
+          <span className="break-words text-testo font-semibold">{fasi.find((f) => f.id === r.id)?.label ?? r.nome}</span>
+          <span className="break-words text-nota text-grigio">{`Azione: ${r.azione}`}</span>
+          <span className="break-words text-nota text-grigio">{`Scadenza: ${r.scadenza}`}</span>
+          <span className="break-words text-nota text-grigio">{`Chi: ${chi(r.chi)}`}</span>
         </li>
       ))}
     </ul>
@@ -98,7 +98,7 @@ function ModuloRegole({ fasi, imp, utenti }: { fasi: Stage[]; imp: Impostazioni;
       <Intestazione eyebrow="Impostazioni" titolo="Fasi e regole" />
       <div className="contents @5xl:block @5xl:columns-2 @5xl:gap-8 @5xl:*:mb-8 @5xl:*:break-inside-avoid">
       <Sezione titolo="Fasi">
-        <p className="text-secondaria text-grigio">Le regole delle fasi sono fisse: azione, scadenza e chi le decide il processo di vendita.</p>
+        <p className="text-nota text-grigio">Le regole delle fasi sono fisse: azione, scadenza e chi le decide il processo di vendita.</p>
         <ListaFasi fasi={fasi} chi={chi} />
       </Sezione>
 
@@ -131,7 +131,7 @@ function ModuloRegole({ fasi, imp, utenti }: { fasi: Stage[]; imp: Impostazioni;
       </Sezione>
 
       <Sezione titolo="Motivi di scarto">
-        <p className="text-secondaria text-grigio">L'elenco è fisso, così i Numeri li contano; puoi cambiare solo i nomi.</p>
+        <p className="text-nota text-grigio">L'elenco è fisso, così i Numeri li contano; puoi cambiare solo i nomi.</p>
         <ul className="grid grid-cols-1 gap-2">
           {b.motivi.map((m, i) => (
             <li key={m.id}>

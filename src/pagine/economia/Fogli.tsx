@@ -124,13 +124,13 @@ export function FoglioFattura({ f, ora = Date.now(), onChiudi }: { f: FatturaRig
   const principale = f.stato === "incassata" ? undefined : <Principale testo={daEmettere ? "Segna emessa" : "Segna incassata"} manca={manca} inCorso={azione.isPending} onClick={() => azione.mutate()} />;
   return (
     <Foglio aperto titolo={`${ETICHETTE_TIPO_FATTURA[f.kind]} di ${f.cliente}`} onChiudi={onChiudi} principale={principale}>
-      <p className="font-display text-titolo-card tabular-nums">{euro(f.amountCents)}</p>
-      {f.number && <p className="text-corpo">{`Numero ${f.number}`}</p>}
-      {f.period && <p className="text-corpo">{`Periodo: ${f.period}`}</p>}
-      {f.issuedAt != null && <p className="text-corpo">{`Emessa ${ilGiorno(f.issuedAt, ora)}`}</p>}
-      {f.dueAt != null && <p className={f.stato === "in_ritardo" ? "text-corpo text-errore" : "text-corpo"}>{`${f.stato === "in_ritardo" ? "Scaduta" : "Scade"} ${ilGiorno(f.dueAt, ora)}`}</p>}
-      {f.paidAt != null && <p className="text-corpo">{`Incassata ${ilGiorno(f.paidAt, ora)}`}</p>}
-      {f.pdfUrl && <a href={f.pdfUrl} target="_blank" rel="noreferrer" className="min-h-11 text-corpo font-semibold text-accento underline-offset-4 hover:underline">Apri il PDF</a>}
+      <p className="font-display text-sezione tabular-nums">{euro(f.amountCents)}</p>
+      {f.number && <p className="text-testo">{`Numero ${f.number}`}</p>}
+      {f.period && <p className="text-testo">{`Periodo: ${f.period}`}</p>}
+      {f.issuedAt != null && <p className="text-testo">{`Emessa ${ilGiorno(f.issuedAt, ora)}`}</p>}
+      {f.dueAt != null && <p className={f.stato === "in_ritardo" ? "text-testo text-errore" : "text-testo"}>{`${f.stato === "in_ritardo" ? "Scaduta" : "Scade"} ${ilGiorno(f.dueAt, ora)}`}</p>}
+      {f.paidAt != null && <p className="text-testo">{`Incassata ${ilGiorno(f.paidAt, ora)}`}</p>}
+      {f.pdfUrl && <a href={f.pdfUrl} target="_blank" rel="noreferrer" className="min-h-11 text-testo font-semibold text-accento underline-offset-4 hover:underline">Apri il PDF</a>}
       {daEmettere && <Campo etichetta="Numero della fattura" aiuto="Quello del programma di fatturazione" value={numero} onChange={(e) => setNumero(e.target.value)} />}
       {f.stato !== "incassata" && (
         <CampoGiorno etichetta={daEmettere ? "Emessa il" : "Incassata il"} ora={ora} scorciatoie={presetPassato}
@@ -161,9 +161,9 @@ export function FoglioCanone({ c, ora = Date.now(), onChiudi }: { c: CanoneRiga;
     return (
       <Foglio aperto titolo={scelta.etichetta} onChiudi={onChiudi}
         principale={<Pulsante variante={scelta.azione === "cessa" ? "distruttivo" : "primario"} misura="lg" className="w-full" inCorso={salva.isPending} onClick={() => salva.mutate()}>{scelta.etichetta}</Pulsante>}>
-        <p className="text-corpo font-semibold">{c.cliente}</p>
-        <p className="text-corpo tabular-nums">{`${euro(c.amountCents)} al mese`}</p>
-        <p className="text-secondaria text-grigio">{CONSEGUENZA[scelta.azione]}</p>
+        <p className="text-testo font-semibold">{c.cliente}</p>
+        <p className="text-testo tabular-nums">{`${euro(c.amountCents)} al mese`}</p>
+        <p className="text-nota text-grigio">{CONSEGUENZA[scelta.azione]}</p>
         <Pulsante variante="fantasma" className="self-start" onClick={() => setScelta(null)}>Torna al canone</Pulsante>
       </Foglio>
     );
@@ -171,12 +171,12 @@ export function FoglioCanone({ c, ora = Date.now(), onChiudi }: { c: CanoneRiga;
   return (
     <Foglio aperto titolo={`Canone di ${c.cliente}`} onChiudi={onChiudi}>
       <ContattoDalCliente clienteId={c.clientId} azienda={c.cliente} />
-      <p className="font-display text-titolo-card tabular-nums">{`${euro(c.amountCents)} al mese`}</p>
-      <p className="text-corpo">{`Fatturazione il giorno ${c.billingDay}`}</p>
-      <p className="text-corpo">{`Stato: ${ETICHETTE_CANONE[c.status]}`}</p>
-      {c.startAt != null && <p className="text-meta text-grigio">{`Attivo ${ilGiorno(c.startAt, ora, "dal")}`}</p>}
-      {c.pausedAt != null && <p className="text-meta text-grigio">{`In pausa ${ilGiorno(c.pausedAt, ora, "dal")}`}</p>}
-      {c.endAt != null && <p className="text-meta text-grigio">{`Cessato ${ilGiorno(c.endAt, ora)}`}</p>}
+      <p className="font-display text-sezione tabular-nums">{`${euro(c.amountCents)} al mese`}</p>
+      <p className="text-testo">{`Fatturazione il giorno ${c.billingDay}`}</p>
+      <p className="text-testo">{`Stato: ${ETICHETTE_CANONE[c.status]}`}</p>
+      {c.startAt != null && <p className="text-nota text-grigio">{`Attivo ${ilGiorno(c.startAt, ora, "dal")}`}</p>}
+      {c.pausedAt != null && <p className="text-nota text-grigio">{`In pausa ${ilGiorno(c.pausedAt, ora, "dal")}`}</p>}
+      {c.endAt != null && <p className="text-nota text-grigio">{`Cessato ${ilGiorno(c.endAt, ora)}`}</p>}
       <div className="flex flex-wrap gap-2">
         {AZIONI[c.status].map((a) => (
           <Pulsante key={a.azione} variante={a.azione === "cessa" ? "fantasma" : "secondario"} onClick={() => setScelta(a)}>{a.etichetta}</Pulsante>

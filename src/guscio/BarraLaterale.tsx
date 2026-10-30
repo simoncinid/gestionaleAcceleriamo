@@ -64,7 +64,7 @@ function Piena({ nome, badge, onCrea, onEsci, onCerca, interruttore }: Interni) 
       {/* La stessa ricerca della lente in Testata e di Cmd K: una sola ricerca per tutta l'app. */}
       {onCerca && (
         <button type="button" onClick={onCerca} className="mx-4 mb-2 flex h-11 items-center gap-2 rounded-controllo px-3 text-chrome-testo/80 transition-colors duration-(--durata-veloce) hover:bg-chrome-2 hover:text-chrome-testo">
-          <MagnifyingGlass size={18} weight="bold" aria-hidden /><span className="flex-1 text-left">Cerca</span><kbd className="font-sans text-meta text-chrome-testo/60">/</kbd>
+          <MagnifyingGlass size={18} weight="bold" aria-hidden /><span className="flex-1 text-left">Cerca</span><kbd className="font-sans text-nota text-chrome-testo/60">/</kbd>
         </button>
       )}
       <nav aria-label="Aree" className="flex-1 overflow-y-auto px-2">
@@ -82,7 +82,7 @@ function Piena({ nome, badge, onCrea, onEsci, onCerca, interruttore }: Interni) 
               </button>
               {aperta && SOTTOMENU[a.id].map((s) => (
                 <NavLink key={s.percorso} to={s.percorso} end={s.percorso === "/economia" || s.percorso === "/automazioni"}
-                  className={({ isActive }) => cx("ml-9 flex h-10 items-center rounded-controllo px-3 text-secondaria transition-colors duration-(--durata-veloce)", isActive ? "bg-chrome-2 font-medium text-chrome-testo" : "text-chrome-testo-2 hover:bg-chrome-2")}>
+                  className={({ isActive }) => cx("ml-9 flex h-10 items-center rounded-controllo px-3 text-nota transition-colors duration-(--durata-veloce)", isActive ? "bg-chrome-2 font-medium text-chrome-testo" : "text-chrome-testo-2 hover:bg-chrome-2")}>
                   {s.etichetta}
                 </NavLink>
               ))}
@@ -96,7 +96,7 @@ function Piena({ nome, badge, onCrea, onEsci, onCerca, interruttore }: Interni) 
           <Avatar nome={nome} />
           {badge?.avatar && <span className="absolute -top-0.5 -right-0.5"><Punto colore="accento" etichetta={avvisi > 0 ? "Avvisi da leggere" : "Un'integrazione chiede attenzione"} /></span>}
         </Link>
-        <span className="flex-1 truncate text-secondaria">{nome}</span>
+        <span className="flex-1 truncate text-nota">{nome}</span>
         <Link to="/impostazioni" aria-label="Impostazioni" className="flex size-10 items-center justify-center rounded-controllo hover:bg-chrome-2"><GearSix size={20} weight="bold" aria-hidden /></Link>
         <button type="button" aria-label="Esci" onClick={onEsci} className="flex size-10 items-center justify-center rounded-controllo hover:bg-chrome-2"><SignOut size={20} weight="bold" aria-hidden /></button>
       </div>
@@ -169,7 +169,7 @@ function Colonna({ nome, badge, onCrea, onEsci, onCerca, interruttore, punta }: 
             const attiva = voceAttiva(pathname, s.percorso);
             return (
               <Link key={s.percorso} to={s.percorso} role="menuitem" aria-current={attiva ? "page" : undefined} onClick={menu.chiudi}
-                className={cx("flex h-10 items-center rounded-controllo px-3 text-secondaria transition-colors duration-(--durata-veloce) focus-visible:bg-chrome-2",
+                className={cx("flex h-10 items-center rounded-controllo px-3 text-nota transition-colors duration-(--durata-veloce) focus-visible:bg-chrome-2",
                   attiva ? "bg-chrome-2 font-medium text-chrome-testo shadow-[inset_3px_0_0_var(--accento)]" : "text-chrome-testo-2 hover:bg-chrome-2 hover:text-chrome-testo")}>
                 {s.etichetta}
               </Link>
@@ -277,8 +277,8 @@ function useSuggerimento() {
   const [testo, scorciatoia] = vista ? vista.testo.split("  ") : [];
   const nuvola = vista && createPortal(
     <span role="tooltip" aria-hidden style={{ top: vista.y, left: vista.x }}
-      className="pointer-events-none fixed z-50 flex -translate-y-1/2 items-center gap-2 rounded-controllo bg-chrome-2 px-2.5 py-1.5 text-secondaria font-medium whitespace-nowrap text-chrome-testo shadow-[0_4px_12px_rgb(0_0_0/0.25)]">
-      {testo}{scorciatoia && <kbd className="font-sans text-meta text-chrome-testo/60">{scorciatoia}</kbd>}
+      className="pointer-events-none fixed z-50 flex -translate-y-1/2 items-center gap-2 rounded-controllo bg-chrome-2 px-2.5 py-1.5 text-nota font-medium whitespace-nowrap text-chrome-testo shadow-[0_4px_12px_rgb(0_0_0/0.25)]">
+      {testo}{scorciatoia && <kbd className="font-sans text-nota text-chrome-testo/60">{scorciatoia}</kbd>}
     </span>,
     document.body,
   );

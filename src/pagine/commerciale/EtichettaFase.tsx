@@ -17,7 +17,7 @@ export function EtichettaFase({ id, label, freccia = false, className }: { id: s
   const c = coloreFase(id);
   return (
     <span title={label} style={{ backgroundColor: c.sfondo, borderColor: c.pieno, color: c.testo }}
-      className={cx("inline-flex h-6 max-w-full min-w-0 items-center gap-1 rounded-[6px] border px-2 text-[13px] font-medium leading-4", className)}>
+      className={cx("inline-flex h-6 max-w-full min-w-0 items-center gap-1 rounded-[6px] border px-2 text-nota font-medium leading-4", className)}>
       <span className="min-w-0 truncate">{label}</span>
       {freccia && <CaretDown size={11} weight="bold" aria-hidden className="shrink-0 opacity-70" />}
     </span>

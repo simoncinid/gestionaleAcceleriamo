@@ -10,7 +10,7 @@ export function SezioneProposta({ leadId }: { leadId: string }) {
   if (!q.data?.length) return null;
   return (
     <section aria-label="Proposta" className="flex flex-col gap-2">
-      <h2 className="font-display text-titolo-card">{q.data.length > 1 ? "Proposte" : "Proposta"}</h2>
+      <h2 className="segno font-display text-sezione">{q.data.length > 1 ? "Proposte" : "Proposta"}</h2>
       <ul className="flex flex-col gap-2">
         {q.data.map((p) => (
           <li key={p.id}>

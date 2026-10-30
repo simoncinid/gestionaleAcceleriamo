@@ -48,8 +48,8 @@ export function Timeline({ leadId, activities, ora, compatta = false }: { leadId
             const auto = automatica(a);
             return (
               <li key={a.id} className="flex min-w-0 flex-col gap-0.5 py-3">
-                <p className={cx("whitespace-pre-wrap break-words text-[15px] leading-6", auto && "text-[#6B645C]")}>
-                  <span className="pr-2 text-[13px] font-semibold text-[#6B645C]">{NOME_TIPO[a.type] ?? a.type}</span>{a.body}
+                <p className={cx("whitespace-pre-wrap break-words text-testo leading-6", auto && "text-[#6B645C]")}>
+                  <span className="pr-2 text-nota font-semibold text-[#6B645C]">{NOME_TIPO[a.type] ?? a.type}</span>{a.body}
                 </p>
                 <p className={`${SECONDARIO} tabular-nums`}>{a.authorName}, {momento(a.createdAt, ora)}</p>
               </li>

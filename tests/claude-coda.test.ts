@@ -103,7 +103,7 @@ describe("coda di Claude", () => {
     await lavoraCoda(env, ott + 300_000, 3);
     const righe = await env.DB.prepare("SELECT user_id, titolo FROM notifications WHERE evento = 'claude_tetto' ORDER BY user_id").all<{ user_id: string; titolo: string }>();
     expect(righe.results.map((r) => r.user_id)).toEqual(["diego", "tommaso"]);
-    expect(righe.results[0].titolo).toBe("Claude si è fermato: tetto di € 20 raggiunto");
+    expect(righe.results[0].titolo).toBe("L'assistente si è fermato: tetto di € 20 raggiunto");
   });
 
   it("primo del mese a Roma: i fermi tornano in coda e ripartono", async () => {

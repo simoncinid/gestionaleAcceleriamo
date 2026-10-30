@@ -31,7 +31,7 @@ export type VoceRegistro = { id: string; at: number; status: number; number: str
 
 const ETICHETTE: Record<string, string> = {
   meta: "Meta", foglio: "Foglio Andrea", aggancio: "Aggancio proposte", posta: "Posta di Tommaso", resend: "Resend",
-  push: "Push", telegram: "Telegram", claude: "Claude", giro: "Giro programmato",
+  push: "Push", telegram: "Telegram", claude: "Assistente", giro: "Giro programmato",
 };
 const SETTIMANA = 7 * 86_400_000;
 export const SENZA_CHIAVE_RESEND = "Non collegato: manca la chiave di Resend";
@@ -104,7 +104,7 @@ integrazioniRoutes.get("/status", async (c) => {
   // Claude: senza chiave "Non collegato"; con la chiave lo stato dei lavori (integration_status) e lo speso del mese.
   const claude: Integrazione = c.env.ANTHROPIC_API_KEY
     ? { ...daRiga("claude", null), extra: { spesoCents: centsDaMicros(spesoClaude), tettoCents: imp.claude.tettoCents } }
-    : { key: "claude", etichetta: "Claude", stato: "spento", ultimaOk: null, nota: SENZA_CHIAVE_CLAUDE };
+    : { key: "claude", etichetta: "Assistente", stato: "spento", ultimaOk: null, nota: SENZA_CHIAVE_CLAUDE };
   const foglioSpento = !imp.foglio.spreadsheetId.trim() ? SENZA_LINK_FOGLIO : !imp.foglio.attivo ? "Lettura spenta" : null;
   const out: StatoSistema = {
     integrazioni: [

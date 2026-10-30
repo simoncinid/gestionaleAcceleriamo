@@ -10,7 +10,7 @@ const data = (ms: number) => dataTesto(ms).replace(/^\S+ /, "").replace(" ", "\u
 
 export function PassaggioCliente({ clienteId, dal }: { clienteId: string; dal: number }) {
   return (
-    <p data-passaggio className="text-[15px] leading-[1.6]">
+    <p data-passaggio className="text-testo leading-[1.6]">
       È cliente dal {data(dal)}:{" "}
       <Link className={LINK} to={`/commerciale/clienti/${clienteId}`}>Apri il cliente</Link>
     </p>
@@ -19,7 +19,7 @@ export function PassaggioCliente({ clienteId, dal }: { clienteId: string; dal: n
 
 export function PassaggioLead({ leadId, azienda, il }: { leadId: string; azienda: string; il: number | null }) {
   return (
-    <p data-passaggio className="text-[15px] leading-[1.6]">
+    <p data-passaggio className="text-testo leading-[1.6]">
       Nato dal lead {azienda}{il != null ? ` il ${data(il)}` : ""}:{" "}
       <Link className={LINK} to={`/commerciale/lead/${leadId}`}>Apri il lead</Link>
     </p>

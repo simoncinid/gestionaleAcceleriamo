@@ -16,8 +16,8 @@ type UsoClaude = { collegato: boolean; spesoCents: number; tettoCents: number; a
 type Dispositivo = { id: string; etichetta: string; lastOkAt: number | null; rotta: boolean };
 const NOMI_LAVORI: Record<string, string> = { classificazione: "Classificazione", scheda: "Scheda azienda", coach: "Coach della call", commento: "Commento del lunedì" };
 
-const Testo = ({ children }: { children: ReactNode }) => <p className="text-corpo">{children}</p>;
-const Nota = ({ children }: { children: ReactNode }) => <p className="text-secondaria text-grigio">{children}</p>;
+const Testo = ({ children }: { children: ReactNode }) => <p className="text-testo">{children}</p>;
+const Nota = ({ children }: { children: ReactNode }) => <p className="text-nota text-grigio">{children}</p>;
 
 // Le prove sono secondarie (come nella 1A): nel dettaglio nessun pulsante pieno.
 function Prova({ percorso, testo, fatto }: { percorso: string; testo: string; fatto: string }) {
@@ -46,13 +46,13 @@ function Push({ i }: { i: Integrazione }) {
   if (i.stato === "spento") return <Testo>Mancano le chiavi per le notifiche: le mette chi gestisce il server. Finché mancano, gli avvisi restano dentro l'app.</Testo>;
   return (
     <>
-      <h3 className="text-corpo font-semibold">I tuoi dispositivi</h3>
+      <h3 className="text-testo font-semibold">I tuoi dispositivi</h3>
       {disp.isLoading ? <Skeleton righe={2} /> : disp.data?.dispositivi.length ? (
         <ul className="grid grid-cols-1 gap-1">
           {disp.data.dispositivi.map((x) => (
             <li key={x.id} className="grid">
-              <span className="text-corpo">{x.etichetta}</span>
-              <span className="text-meta text-grigio">{x.rotta ? "Non raggiungibile" : x.lastOkAt ? `Ultima notifica ${momento(x.lastOkAt)}` : "Nessuna notifica ancora"}</span>
+              <span className="text-testo">{x.etichetta}</span>
+              <span className="text-nota text-grigio">{x.rotta ? "Non raggiungibile" : x.lastOkAt ? `Ultima notifica ${momento(x.lastOkAt)}` : "Nessuna notifica ancora"}</span>
             </li>
           ))}
         </ul>
@@ -88,7 +88,7 @@ function Telegram({ i }: { i: Integrazione }) {
 
 function Claude({ i }: { i: Integrazione }) {
   const u = useQuery({ queryKey: ["claude", "uso"], queryFn: () => api<UsoClaude>("/claude/usage"), enabled: i.stato !== "spento" });
-  if (i.stato === "spento") return <Testo>Manca la chiave di Anthropic: la mette chi gestisce il server. Finché manca, i lavori di Claude restano in coda e non si spende niente.</Testo>;
+  if (i.stato === "spento") return <Testo>Manca la chiave di Anthropic: la mette chi gestisce il server. Finché manca, i lavori dell'assistente restano in coda e non si spende niente.</Testo>;
   if (u.isLoading) return <Skeleton righe={4} />;
   if (u.error || !u.data) return <Errore errore={u.error} onRiprova={() => void u.refetch()} />;
   const d = u.data;
@@ -102,8 +102,8 @@ function Claude({ i }: { i: Integrazione }) {
           const t = d.perTipo.find((x) => x.tipo === k);
           return (
             <li key={k} className="grid">
-              <span className="text-corpo">{NOMI_LAVORI[k] ?? k}</span>
-              <span className="text-meta text-grigio">{`${m}, ${t?.lavori ?? 0} lavori, ${euroCentesimi(t?.costoCents ?? 0)}`}</span>
+              <span className="text-testo">{NOMI_LAVORI[k] ?? k}</span>
+              <span className="text-nota text-grigio">{`${m}, ${t?.lavori ?? 0} lavori, ${euroCentesimi(t?.costoCents ?? 0)}`}</span>
             </li>
           );
         })}
@@ -129,9 +129,9 @@ export function IntegrazioneDettaglio({ ora = Date.now() }: { ora?: number } = {
     <div className="grid items-start gap-6 p-4 pb-28 md:px-0 md:pt-0 @5xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] @5xl:gap-x-8">
       <div className="@5xl:col-span-full"><Intestazione eyebrow="Integrazioni" titolo={i.etichetta} /></div>
       <div className="grid gap-1">
-        <p className="flex items-center gap-2 text-corpo"><Punto colore={COLORE[i.stato]} etichetta={ETICHETTA_STATO[i.stato]} />{ETICHETTA_STATO[i.stato]}</p>
-        <p className="text-secondaria text-grigio">{rigaStato(i, ora)}</p>
-        {i.stato === "errore" && i.ultimaOk != null && <p className="text-meta text-grigio">{`Ultima volta riuscita ${momento(i.ultimaOk, ora)}`}</p>}
+        <p className="flex items-center gap-2 text-testo"><Punto colore={COLORE[i.stato]} etichetta={ETICHETTA_STATO[i.stato]} />{ETICHETTA_STATO[i.stato]}</p>
+        <p className="text-nota text-grigio">{rigaStato(i, ora)}</p>
+        {i.stato === "errore" && i.ultimaOk != null && <p className="text-nota text-grigio">{`Ultima volta riuscita ${momento(i.ultimaOk, ora)}`}</p>}
       </div>
       <div className="grid gap-3 rounded-blocco border border-sabbia bg-avorio p-4 @5xl:max-w-[48rem]">
         {key === "meta" && <Meta d={d} i={i} />}

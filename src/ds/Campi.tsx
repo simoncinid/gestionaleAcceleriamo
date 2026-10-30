@@ -4,15 +4,15 @@ import { daRoma } from "../../worker/lib/roma";
 import { cx } from "./cx";
 import { Selettore } from "./Selettore";
 
-export const campo = "h-12 w-full rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio px-3 text-corpo text-ink focus-visible:border-ink";
+export const campo = "h-12 w-full rounded-controllo border-[1.5px] border-sabbia-2 bg-avorio px-3 text-campo text-ink focus-visible:border-ink";
 
 export function Campo({ etichetta, aiuto, className, ...p }: InputHTMLAttributes<HTMLInputElement> & { etichetta: string; aiuto?: string }) {
   const id = useId();
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <label htmlFor={id} className="text-secondaria font-medium">{etichetta}</label>
+      <label htmlFor={id} className="text-nota font-medium">{etichetta}</label>
       <input id={id} {...p} className={cx(campo, className)} />
-      {aiuto && <p className="text-meta text-grigio">{aiuto}</p>}
+      {aiuto && <p className="text-nota text-grigio">{aiuto}</p>}
     </div>
   );
 }
@@ -25,7 +25,7 @@ export function AreaTesto({ etichetta, className, cresce = false, ...p }: Textar
   useLayoutEffect(adatta);
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-secondaria font-medium">{etichetta}</label>
+      <label htmlFor={id} className="text-nota font-medium">{etichetta}</label>
       <textarea id={id} ref={ref} rows={3} {...p} onInput={(e) => { adatta(); p.onInput?.(e); }} className={cx(campo, "h-auto py-2", cresce && "resize-none overflow-hidden", className)} />
     </div>
   );
@@ -58,7 +58,7 @@ export function CampoQuando({ etichetta, valore, onCambia, ora, apertoAllInizio 
           onChange={(e) => onCambia(e.target.value ? new Date(e.target.value).getTime() : null)} />
       )}
       {/* Minore 3 della review: il 422 della call nel passato si legge accanto alla data, non in un toast. */}
-      {errore && <p role="alert" className="text-secondaria text-errore">{errore}</p>}
+      {errore && <p role="alert" className="text-nota text-errore">{errore}</p>}
     </div>
   );
 }

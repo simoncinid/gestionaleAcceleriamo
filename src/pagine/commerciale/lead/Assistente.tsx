@@ -16,14 +16,14 @@ export function Assistente({ lead, manuale }: { lead: LeadEsito; manuale: boolea
     <Sezione titolo="Assistente" nome="assistente">
       <details className="group border-t border-[#E5DED4]">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 pt-3 [&::-webkit-details-marker]:hidden">
-          <span className="flex-1 text-[15px] font-semibold">Ricerca sull'azienda</span>
+          <span className="flex-1 text-testo font-semibold">Ricerca sull'azienda</span>
           <CaretDown size={18} weight="bold" aria-hidden className="shrink-0 motion-safe:transition-transform group-open:rotate-180" />
         </summary>
         <div className="pt-2"><SezioneSchedaAzienda leadId={lead.id} manuale={manuale} incorporata /></div>
       </details>
       {fatta && (
         <div className="flex flex-col gap-1 border-t border-[#E5DED4] pt-3">
-          <p className="text-[15px] font-semibold">Coach della call</p>
+          <p className="text-testo font-semibold">Coach della call</p>
           <CoachCall callId={fatta.id} leadId={lead.id} lead={lead} />
         </div>
       )}

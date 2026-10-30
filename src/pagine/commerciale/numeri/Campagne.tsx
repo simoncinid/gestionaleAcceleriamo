@@ -68,9 +68,9 @@ function RigaChiusa({ c, aperta, onTocca, idDettaglio }: { c: RigaCampagna; aper
     <button type="button" data-campagna={c.campagna} aria-expanded={aperta} aria-controls={idDettaglio} onClick={onTocca}
       className="flex min-h-14 w-full items-center gap-3 rounded-blocco border border-sabbia bg-avorio px-4 py-3 text-left">
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="font-display text-titolo-blocco [overflow-wrap:anywhere]">{c.campagna}</span>
-        <span className="text-secondaria text-grigio tabular-nums">{c.lead} lead</span>
-        <span className="flex items-center gap-2 text-secondaria text-grigio tabular-nums">{punto && <Punto colore={punto} etichetta={LIVELLO[c.livello]} />}{costo}</span>
+        <span className="font-display text-sezione [overflow-wrap:anywhere]">{c.campagna}</span>
+        <span className="text-nota text-grigio tabular-nums">{c.lead} lead</span>
+        <span className="flex items-center gap-2 text-nota text-grigio tabular-nums">{punto && <Punto colore={punto} etichetta={LIVELLO[c.livello]} />}{costo}</span>
       </span>
       <CaretDown size={18} weight="bold" aria-hidden className={cx("shrink-0 motion-safe:transition-transform", aperta && "rotate-180")} />
     </button>
@@ -133,7 +133,7 @@ export function Campagne({ ora = Date.now() }: { ora?: number }) {
               </section>
             ))}
           </div>
-          <p className="text-meta text-grigio">I lead doppi tra Meta e foglio si contano una volta. La spesa si scrive a mano finché Meta non verifica l'azienda.</p>
+          <p className="text-nota text-grigio">I lead doppi tra Meta e foglio si contano una volta. La spesa si scrive a mano finché Meta non verifica l'azienda.</p>
         </>
       )}
       {spesaAperta && d && <FoglioSpesa mese={mese} campagne={d.campagne} onChiudi={() => setSpesaAperta(false)} />}

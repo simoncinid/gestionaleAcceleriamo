@@ -14,7 +14,7 @@ import { FoglioCanone } from "./Fogli";
 const RigaCanone = ({ c, onClick }: { c: CanoneRiga; onClick: () => void }) => (
   <div className="flex flex-col">
     <Riga titolo={c.cliente} secondaria={`${euro(c.amountCents)} al mese`} meta={`Fatturazione il giorno ${c.billingDay}`} destra={<Tag>{ETICHETTE_CANONE[c.status]}</Tag>} onClick={onClick} />
-    {c.automationId && <Link className={`${LINK} self-start px-4 text-[15px]`} to={`/automazioni/${c.automationId}`}>Apri l'automazione</Link>}
+    {c.automationId && <Link className={`${LINK} self-start px-4 text-testo`} to={`/automazioni/${c.automationId}`}>Apri l'automazione</Link>}
   </div>
 );
 
@@ -35,7 +35,7 @@ export function Canoni({ ora: oraFissa }: { ora?: number } = {}) {
       <ul className="grid grid-cols-1 gap-2 @5xl:grid-cols-2 @7xl:grid-cols-3">{vivi.map((c) => <li key={c.id}><RigaCanone c={c} onClick={() => setAperto(c)} /></li>)}</ul>
       {cessati.length > 0 && (
         <details>
-          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold">{`Cessati, ${cessati.length}`}</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-testo font-semibold">{`Cessati, ${cessati.length}`}</summary>
           <ul className="grid gap-2 pb-2 @5xl:grid-cols-2 @7xl:grid-cols-3">{cessati.map((c) => <li key={c.id}><RigaCanone c={c} onClick={() => setAperto(c)} /></li>)}</ul>
         </details>
       )}

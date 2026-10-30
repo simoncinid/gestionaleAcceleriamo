@@ -33,7 +33,7 @@ describe("Lunedì e Diario", () => {
   });
   it("Lunedì: commento in coda, niente pulsante del commento; commento pronto come testo", () => {
     const coda = render(<Lunedi />, { percorso: "/commerciale/oggi/lunedi", dati: [[["lunedi", "corrente"], { ...revisione, commentoStato: "in_coda" }]] });
-    expect(coda).toContain("Claude scrive il commento");
+    expect(coda).toContain("Sto scrivendo il commento");
     expect(coda).not.toContain("Scrivi il commento");
     const pronto = render(<Lunedi />, { percorso: "/commerciale/oggi/lunedi", dati: [[["lunedi", "corrente"], { ...revisione, commento: "<b>Bene</b>", commentoStato: "pronto" }]] });
     expect(pronto).toContain("&lt;b&gt;Bene&lt;/b&gt;");
@@ -70,7 +70,7 @@ describe("Lunedì: voci 23, 25 e 26", () => {
   });
   it("25: al tetto niente pulsante del commento, lo stato lo dice", () => {
     const html = pagina({ commentoStato: "fermo_tetto" });
-    expect(html).toContain("Claude è al tetto del mese");
+    expect(html).toContain("Assistente al tetto del mese");
     expect(html).not.toContain("Scrivi il commento");
   });
   it("26: la fila fa partire la chiusura solo dopo il salvataggio in volo", async () => {

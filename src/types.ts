@@ -28,12 +28,14 @@ export type Lead = LeadListItem & {
 };
 
 export type Activity = { id: string; type: string; body: string; createdAt: number; authorId: string | null; authorName: string };
-// Documento della scheda: link (url) o file caricato (file, versione, peso). "via" vale "claude" per lo script di Tommaso.
+// Documento della scheda: link (url) o file caricato (file, versione, peso); tipo e call dicono dove sta nella scheda.
 export type DocumentRow = {
   id: string; leadId: string; name: string; url: string | null; createdAt: number;
-  file?: boolean; version?: number; mime?: string | null; size?: number | null; via?: string | null; authorName?: string | null; updatedAt?: number | null;
+  file?: boolean; version?: number; mime?: string | null; size?: number | null; authorName?: string | null; updatedAt?: number | null;
+  kind?: DocumentKind; callId?: string | null; taskId?: string | null;
 };
-export type VersioneDocumento = { id: string; version: number; fileName: string; size: number; via: string | null; createdAt: number; authorName: string | null };
+export type VersioneDocumento = { id: string; version: number; fileName: string; size: number; createdAt: number; authorName: string | null };
+import type { DocumentKind } from "../worker/db/schema";
 export type LeadDetail = { lead: Lead; activities: Activity[]; documents: DocumentRow[]; duplicateOf: { id: string; company: string } | null; cliente?: { id: string; name: string; haLavori?: boolean } | null };
 
 export type Stats = {

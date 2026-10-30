@@ -6,11 +6,11 @@ export function Gruppo({ titolo, meta, nota, children }: { titolo: string; meta?
   return (
     <section className="flex flex-col gap-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="min-w-0 break-words font-display text-titolo-blocco">{titolo}</h2>
-        {meta && <span className="text-meta text-grigio tabular-nums">{meta}</span>}
+        <h2 className="segno min-w-0 break-words font-display text-sezione">{titolo}</h2>
+        {meta && <span className="text-nota text-grigio tabular-nums">{meta}</span>}
       </div>
       <ul className="flex flex-col divide-y divide-sabbia rounded-blocco border border-sabbia bg-avorio">{children}</ul>
-      {nota && <p className="text-meta text-grigio">{nota}</p>}
+      {nota && <p className="text-nota text-grigio">{nota}</p>}
     </section>
   );
 }
@@ -41,10 +41,10 @@ export function Voce({ nome, numero, dettaglio, punto, etichettaPunto, quota, ev
     <li className="flex min-h-14 flex-col justify-center gap-0.5 px-4 py-3">
       <div className="flex items-center gap-4">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-center gap-2 text-corpo">{punto && <Punto colore={punto} etichetta={etichettaPunto ?? nome} />}<span className="min-w-0 [overflow-wrap:anywhere]">{nome}</span></span>
-          {dettaglio && <span className="text-secondaria text-grigio tabular-nums">{dettaglio}</span>}
+          <span className="flex items-center gap-2 text-testo">{punto && <Punto colore={punto} etichetta={etichettaPunto ?? nome} />}<span className="min-w-0 [overflow-wrap:anywhere]">{nome}</span></span>
+          {dettaglio && <span className="text-nota text-grigio tabular-nums">{dettaglio}</span>}
         </div>
-        {numero !== "" && <span className="shrink-0 whitespace-nowrap text-corpo font-semibold tabular-nums">{numero}</span>}
+        {numero !== "" && <span className="shrink-0 whitespace-nowrap text-testo font-semibold tabular-nums">{numero}</span>}
       </div>
       {quota != null && <Barra quota={quota} evidenza={evidenza} />}
     </li>
@@ -53,5 +53,5 @@ export function Voce({ nome, numero, dettaglio, punto, etichettaPunto, quota, ev
 
 // Una riga di intestazione dentro un gruppo ("Per inserzione").
 export function Sottotitolo({ children }: { children: ReactNode }) {
-  return <li className="px-4 pb-1 pt-3 text-meta text-grigio">{children}</li>;
+  return <li className="px-4 pb-1 pt-3 text-nota text-grigio">{children}</li>;
 }

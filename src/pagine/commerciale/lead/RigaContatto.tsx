@@ -10,7 +10,7 @@ export function RigaContatto({ contatto }: { contatto: Dati }) {
     contatto.clienteId ? { to: `/commerciale/clienti/${contatto.clienteId}`, testo: "Cliente" } : null,
   ].filter((x): x is { to: string; testo: string } => x != null);
   return (
-    <p data-riga-contatto className="flex flex-wrap items-center gap-x-1 text-[15px]">
+    <p data-riga-contatto className="flex flex-wrap items-center gap-x-1 text-testo">
       <span className="font-semibold">{contatto.azienda}{link.length > 0 && ":"}</span>
       {link.map((l, i) => (
         <span key={l.to} className="inline-flex items-center">

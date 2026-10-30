@@ -20,8 +20,8 @@ export function SezioneCall({ leadId, ora, lead }: { leadId: string; ora?: numbe
   return (
     <section aria-label="Call" className="flex flex-col gap-3">
       <header className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-titolo-card">Call</h2>
-        <span className="text-secondaria text-grigio tabular-nums">{q.data.length}</span>
+        <h2 className="segno font-display text-sezione">Call</h2>
+        <span className="text-nota text-grigio tabular-nums">{q.data.length}</span>
       </header>
       <ul className="flex flex-col gap-2">
         {q.data.map((k) => {

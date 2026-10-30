@@ -5,10 +5,10 @@ export function Errore({ errore, onRiprova }: { errore: unknown; onRiprova: () =
   const id = errore instanceof ApiError ? (errore.body as { errorId?: string } | undefined)?.errorId : undefined;
   return (
     <div role="alert" className="flex flex-col items-start gap-2 rounded-blocco bg-errore-fondo p-6">
-      <p className="font-display text-titolo-card">Non riesco a caricare questa pagina</p>
-      <p className="text-secondaria">{errore instanceof Error ? errore.message : "Errore sconosciuto"}</p>
+      <p className="font-display text-sezione">Non riesco a caricare questa pagina</p>
+      <p className="text-nota">{errore instanceof Error ? errore.message : "Errore sconosciuto"}</p>
       {/* api() mette già il codice nel messaggio: qui solo se manca. */}
-      {id && !(errore instanceof Error && errore.message.includes(id)) && <p className="text-meta">Codice {id}</p>}
+      {id && !(errore instanceof Error && errore.message.includes(id)) && <p className="text-nota">Codice {id}</p>}
       <Pulsante onClick={onRiprova}>Riprova</Pulsante>
     </div>
   );

@@ -21,16 +21,16 @@ function CardAutomazione({ a, anonimo }: { a: AutomazioneRiga; anonimo: boolean 
   const passaggi = a.passaggi ?? 0;
   return (
     <div className="relative grid h-full gap-2 rounded-blocco border border-sabbia bg-avorio p-5 hover:bg-crema">
-      <Link to={`/automazioni/${a.id}`} className="font-display text-titolo-card after:absolute after:inset-0">{a.name}</Link>
-      {anonimo ? <p className="text-secondaria text-grigio">{nomeCliente(a, true)}</p> : (
-        <Link to={`/commerciale/clienti/${a.clientId}`} className="relative z-10 flex min-h-11 w-fit items-center gap-2 text-secondaria hover:underline">
+      <Link to={`/automazioni/${a.id}`} className="font-display text-sezione after:absolute after:inset-0">{a.name}</Link>
+      {anonimo ? <p className="text-nota text-grigio">{nomeCliente(a, true)}</p> : (
+        <Link to={`/commerciale/clienti/${a.clientId}`} className="relative z-10 flex min-h-11 w-fit items-center gap-2 text-nota hover:underline">
           <LogoCliente logo={a.logo} nome={a.cliente} />
           <span>{a.cliente}</span>
         </Link>
       )}
-      <p className="flex items-center gap-2 text-secondaria"><Punto colore={COLORE_STATO[a.status]} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
-      <p className="text-secondaria text-grigio tabular-nums">{passaggi === 0 ? "Flusso da descrivere" : passaggi === 1 ? "1 passaggio" : `${passaggi} passaggi`}</p>
-      <p className="text-meta text-grigio tabular-nums">{a.monthlyCostCents != null ? `${euro(a.monthlyCostCents)} al mese di costi vivi` : "Costo vivo da segnare"}</p>
+      <p className="flex items-center gap-2 text-nota"><Punto colore={COLORE_STATO[a.status]} etichetta={ETICHETTE_AUTOMAZIONE[a.status]} />{ETICHETTE_AUTOMAZIONE[a.status]}</p>
+      <p className="text-nota text-grigio tabular-nums">{passaggi === 0 ? "Flusso da descrivere" : passaggi === 1 ? "1 passaggio" : `${passaggi} passaggi`}</p>
+      <p className="text-nota text-grigio tabular-nums">{a.monthlyCostCents != null ? `${euro(a.monthlyCostCents)} al mese di costi vivi` : "Costo vivo da segnare"}</p>
       {!anonimo && a.scope === "fuori_perimetro" && <span><Tag>Fuori perimetro</Tag></span>}
     </div>
   );
@@ -54,16 +54,16 @@ export function Pannello({ ora: oraFissa }: { ora?: number } = {}) {
       <div className="grid gap-6 @5xl:grid-cols-2 @5xl:items-start">
         {interruttore}
         <div className="grid gap-1 rounded-blocco border border-sabbia bg-avorio p-5">
-          <p className="text-corpo tabular-nums">{totali.attive === 1 ? "1 attiva" : `${totali.attive} attive`}</p>
-          <p className="text-corpo tabular-nums">{`${totali.inCostruzione} in costruzione`}</p>
-          <p className="text-corpo tabular-nums">{`${euro(totali.costiViviCents)} di costi vivi al mese`}</p>
+          <p className="text-testo tabular-nums">{totali.attive === 1 ? "1 attiva" : `${totali.attive} attive`}</p>
+          <p className="text-testo tabular-nums">{`${totali.inCostruzione} in costruzione`}</p>
+          <p className="text-testo tabular-nums">{`${euro(totali.costiViviCents)} di costi vivi al mese`}</p>
         </div>
       </div>
       {vive.length === 0 && <StatoVuoto titolo="Nessuna automazione" testo="La prima nasce dal +." />}
       <ul className="grid gap-3 sm:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4">{vive.map((a) => <li key={a.id}><CardAutomazione a={a} anonimo={anonimo} /></li>)}</ul>
       {dismesse.length > 0 && (
         <details>
-          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-corpo font-semibold">{`Dismesse, ${dismesse.length}`}</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center py-2 text-testo font-semibold">{`Dismesse, ${dismesse.length}`}</summary>
           <ul className="grid gap-3 sm:grid-cols-2 @5xl:grid-cols-3 @7xl:grid-cols-4">{dismesse.map((a) => <li key={a.id}><CardAutomazione a={a} anonimo={anonimo} /></li>)}</ul>
         </details>
       )}

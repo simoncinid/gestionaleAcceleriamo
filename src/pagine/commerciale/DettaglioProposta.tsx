@@ -61,30 +61,30 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
       <div className="flex flex-col gap-5 @4xl:grid @4xl:grid-cols-2 @4xl:items-start @4xl:gap-x-8">
       <div className="flex flex-col gap-5">
       <Blocco titolo="Prezzo">
-        <p className="text-corpo tabular-nums">{prezzo(p)}</p>
-        {p.forbiceDaCents != null && p.forbiceACents != null && <p className="text-corpo tabular-nums">Forbice: da {euro(p.forbiceDaCents)} a {euro(p.forbiceACents)}</p>}
-        {p.hoursEstimate != null && <p className="text-secondaria text-grigio tabular-nums">{p.hoursEstimate} ore stimate</p>}
-        {p.option === "standard" && p.alternativeCents != null && <p className="text-secondaria text-grigio tabular-nums">Con la proprietà del codice: {euro(p.alternativeCents)}</p>}
-        {p.validUntil != null && <p className="text-secondaria text-grigio tabular-nums">Valida fino a {quando(p.validUntil, ora)}</p>}
+        <p className="text-testo tabular-nums">{prezzo(p)}</p>
+        {p.forbiceDaCents != null && p.forbiceACents != null && <p className="text-testo tabular-nums">Forbice: da {euro(p.forbiceDaCents)} a {euro(p.forbiceACents)}</p>}
+        {p.hoursEstimate != null && <p className="text-nota text-grigio tabular-nums">{p.hoursEstimate} ore stimate</p>}
+        {p.option === "standard" && p.alternativeCents != null && <p className="text-nota text-grigio tabular-nums">Con la proprietà del codice: {euro(p.alternativeCents)}</p>}
+        {p.validUntil != null && <p className="text-nota text-grigio tabular-nums">Valida fino a {quando(p.validUntil, ora)}</p>}
       </Blocco>
 
       {(p.status === "registrata" || p.status === "presentata") && ricontatti.length > 0 && (
         <Blocco titolo="Ricontatti">
-          {ricontatti.map((r, i) => <p key={r} className="text-secondaria tabular-nums">{i + 1}° ricontatto {quando(r, ora)}</p>)}
+          {ricontatti.map((r, i) => <p key={r} className="text-nota tabular-nums">{i + 1}° ricontatto {quando(r, ora)}</p>)}
         </Blocco>
       )}
 
       {p.objections && (
-        <Blocco titolo="Obiezioni"><p className="text-secondaria">{p.objections}</p></Blocco>
+        <Blocco titolo="Obiezioni"><p className="text-nota">{p.objections}</p></Blocco>
       )}
 
       <Blocco titolo="PDF">
         {p.pdfUrl ? (
-          <a className="self-start text-corpo font-semibold text-accento-testo underline underline-offset-4" href={p.pdfUrl} target="_blank" rel="noreferrer">Apri il PDF</a>
+          <a className="self-start text-testo font-semibold text-accento-testo underline underline-offset-4" href={p.pdfUrl} target="_blank" rel="noreferrer">Apri il PDF</a>
         ) : (
           <>
-            <p className="text-secondaria">Nel wiki</p>
-            {p.sourcePath && <p className="break-all text-meta text-grigio">{p.sourcePath}</p>}
+            <p className="text-nota">Nel wiki</p>
+            {p.sourcePath && <p className="break-all text-nota text-grigio">{p.sourcePath}</p>}
           </>
         )}
         <Pulsante variante="fantasma" className="self-start px-0!" onClick={() => setFoglio("pdf")}>{p.pdfUrl ? "Cambia il link al PDF" : "Aggiungi il link al PDF"}</Pulsante>
@@ -118,12 +118,12 @@ export function DettaglioProposta({ ora: oraFissa }: { ora?: number } = {}) {
 
       </div>
       <Blocco titolo="Storico">
-        {storico.length === 0 ? <p className="text-secondaria text-grigio">Nessuna voce.</p> : (
+        {storico.length === 0 ? <p className="text-nota text-grigio">Nessuna voce.</p> : (
           <ul className="flex flex-col gap-3">
             {storico.map((a) => (
               <li key={a.id} className="flex flex-col">
-                <span className="text-secondaria">{a.body}</span>
-                <span className="text-meta text-grigio tabular-nums">{momento(a.createdAt, ora)}{a.authorName ? `, ${a.authorName}` : ""}</span>
+                <span className="text-nota">{a.body}</span>
+                <span className="text-nota text-grigio tabular-nums">{momento(a.createdAt, ora)}{a.authorName ? `, ${a.authorName}` : ""}</span>
               </li>
             ))}
           </ul>

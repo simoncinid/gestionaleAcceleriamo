@@ -44,14 +44,14 @@ export function FoglioCerca({ aperto, onChiudi, onCrea }: { aperto: boolean; onC
   return (
     <Foglio aperto={aperto} titolo="Cerca" onChiudi={chiudi}>
       <Campo etichetta="Cerca lead, proposte, automazioni, fatture" type="search" autoFocus autoComplete="off" value={q} onChange={(e) => setQ(e.target.value)} />
-      {attivo && r.isLoading && <p className="text-secondaria text-grigio" aria-live="polite">Ricerca in corso</p>}
+      {attivo && r.isLoading && <p className="text-nota text-grigio" aria-live="polite">Ricerca in corso</p>}
       {attivo && r.error && (
         <div role="alert" className="grid gap-2">
-          <p className="text-corpo">La ricerca non ha risposto.</p>
+          <p className="text-testo">La ricerca non ha risposto.</p>
           <div><Pulsante variante="secondario" onClick={() => void r.refetch()}>Riprova</Pulsante></div>
         </div>
       )}
-      {attivo && r.data && trovati === 0 && <p className="text-secondaria text-grigio" aria-live="polite">{`Nessun risultato per "${cerca}"`}</p>}
+      {attivo && r.data && trovati === 0 && <p className="text-nota text-grigio" aria-live="polite">{`Nessun risultato per "${cerca}"`}</p>}
       {r.data && GRUPPI.map(([k, t]) => r.data[k].length > 0 && (
         <Gruppo key={k} titolo={t}>
           {r.data[k].map((x) => <li key={x.id}><Riga peso="medio" titolo={x.titolo} secondaria={x.meta ?? undefined} onClick={() => apri(x.href)} /></li>)}

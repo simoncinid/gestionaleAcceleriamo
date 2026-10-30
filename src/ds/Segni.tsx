@@ -26,7 +26,7 @@ export const Tag = ({ children }: { children: ReactNode }) => (
 
 // piccolo: dentro una card (chi segue il lead), alto come una riga di meta.
 export const Avatar = ({ nome, piccolo = false }: { nome: string; piccolo?: boolean }) => (
-  <span className={cx("inline-flex shrink-0 items-center justify-center rounded-full bg-accento font-display font-semibold text-accento-inchiostro", piccolo ? "size-6 text-meta" : "size-9 text-corpo")} aria-hidden>
+  <span className={cx("inline-flex shrink-0 items-center justify-center rounded-full bg-accento font-display font-semibold text-accento-inchiostro", piccolo ? "size-6 text-nota" : "size-9 text-testo")} aria-hidden>
     {nome.trim().charAt(0).toUpperCase()}
   </span>
 );

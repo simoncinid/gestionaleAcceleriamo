@@ -16,15 +16,15 @@ export function CasellaInvito({ attiva, onCambia, senzaEmail = false, inCoda = f
   if (senzaEmail) {
     return (
       <div className="flex min-h-14 flex-col justify-center rounded-blocco border border-sabbia bg-avorio px-4 py-2">
-        <span className="text-corpo font-semibold">Niente invito</span>
-        <span className="text-meta text-grigio">Manca l'email del referente</span>
+        <span className="text-testo font-semibold">Niente invito</span>
+        <span className="text-nota text-grigio">Manca l'email del referente</span>
       </div>
     );
   }
   return (
     <div className="flex flex-col gap-1">
       <Interruttore etichetta="Manda l'invito" aiuto="Email con il file del calendario (.ics)" acceso={attiva} onCambia={onCambia} />
-      {attiva && inCoda && <p className="text-meta text-grigio">{TESTO_IN_CODA}</p>}
+      {attiva && inCoda && <p className="text-nota text-grigio">{TESTO_IN_CODA}</p>}
     </div>
   );
 }

@@ -9,7 +9,7 @@ export function Sezione({ titolo, destra, children, className, nome }: {
   const id = useId();
   return (
     <section aria-labelledby={id} data-sezione={nome} className={cx(SEZIONE, className)}>
-      <header className="flex min-h-6 items-center justify-between gap-3">
+      <header className="flex min-h-6 items-end justify-between gap-3">
         <h2 id={id} className={TITOLO_SEZIONE}>{titolo}</h2>
         {destra}
       </header>
@@ -23,7 +23,7 @@ export function Voce({ etichetta, children }: { etichetta: string; children: Rea
   return (
     <div className="grid min-h-11 grid-cols-[minmax(96px,128px)_minmax(0,1fr)] items-center gap-3 py-2">
       <dt className={SECONDARIO}>{etichetta}</dt>
-      <dd className="min-w-0 break-words text-[15px] leading-6 tabular-nums">{children}</dd>
+      <dd className="min-w-0 break-words text-testo leading-6 tabular-nums">{children}</dd>
     </div>
   );
 }

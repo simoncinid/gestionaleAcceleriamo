@@ -67,7 +67,7 @@ export function FoglioChiusura({ lead, fase, onChiudi }: { lead: LeadChiusura; f
             <CampoGiorno etichetta="Data di inizio" valore={inizio} onCambia={setInizio} />
           </>
         ) : (
-          chiedeMotivo ? <CampiMotivo apertoAllInizio valore={motivo} onCambia={setMotivo} /> : <p className="text-[15px]">Il lead esce dal giro delle chiamate: lo ritrovi nella tabella, filtro {fase.label}.</p>
+          chiedeMotivo ? <CampiMotivo apertoAllInizio valore={motivo} onCambia={setMotivo} /> : <p className="text-testo">Il lead esce dal giro delle chiamate: lo ritrovi nella tabella, filtro {fase.label}.</p>
         )}
       </div>
     </Foglio>

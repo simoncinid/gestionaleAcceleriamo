@@ -61,18 +61,18 @@ export function FoglioCall({ k, onChiudi }: { k: CallAgenda; onChiudi: () => voi
       <div className="flex flex-col gap-3">
         <div className="flex flex-col">
           <ContattoDalLead leadId={k.leadId} azienda={k.company} />
-          <p className="text-secondaria text-grigio tabular-nums">{momento(k.scheduledAt)}</p>
+          <p className="text-nota text-grigio tabular-nums">{momento(k.scheduledAt)}</p>
         </div>
         <Selettore etichetta="Esito" opzioni={ESITI} valore={esito} onCambia={setEsito} />
         {esito === "rimandata" && <CampoQuando etichetta="Nuova data" valore={nuovaData} onCambia={(ms) => { setNuovaData(ms); setErroreData(null); }} errore={erroreData} />}
         {seguente && (
           <section className="flex flex-col gap-3 pt-1" aria-label={`Fissa la ${AZIONE_CALL[seguente].toLowerCase()}`}>
-            <p className="text-secondaria font-medium">{AZIONE_CALL[seguente]}, se è già fissata</p>
+            <p className="text-nota font-medium">{AZIONE_CALL[seguente]}, se è già fissata</p>
             <CampoQuando etichetta="Giorno e ora" valore={pres} onCambia={(ms) => { setPres(ms); setErroreData(null); }} errore={erroreData} />
             <Campo etichetta="Link Meet" type="url" inputMode="url" placeholder="https://meet.google.com/..." value={meet} onChange={(e) => setMeet(e.target.value)} />
           </section>
         )}
-        <p className="pt-1 text-secondaria font-medium">Note</p>
+        <p className="pt-1 text-nota font-medium">Note</p>
         {NOTE_CALL[k.kind].map((c) => (
           <AreaTesto key={c.chiave} etichetta={c.etichetta} rows={2} value={note[c.chiave] ?? ""} onChange={(e) => setNote((n) => ({ ...n, [c.chiave]: e.target.value }))} />
         ))}

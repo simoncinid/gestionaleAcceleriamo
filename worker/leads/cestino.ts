@@ -1,7 +1,7 @@
 import { and, desc, eq, exists, inArray, isNotNull, lt } from "drizzle-orm";
 import { HTTPException } from "hono/http-exception";
 import type { Db } from "../db/client";
-import { activities, aiJobs, callAnalyses, calls, clients, companyProfiles, documents, documentVersions, leads, leadVisti, mailLette, proposals } from "../db/schema";
+import { activities, aiJobs, callAnalyses, calls, clients, companyProfiles, documents, documentVersions, leads, leadVisti, mailLette, proposals, tasks } from "../db/schema";
 import { chiaviDelLead } from "./documenti";
 import { audit } from "../lib/audit";
 
@@ -47,6 +47,7 @@ export async function eliminaPerSempre(db: Db, id: string, actorId: string | nul
     db.delete(documents).where(eq(documents.leadId, id)),
     db.delete(callAnalyses).where(eq(callAnalyses.leadId, id)),
     db.delete(calls).where(eq(calls.leadId, id)),
+    db.delete(tasks).where(eq(tasks.leadId, id)),
     db.delete(companyProfiles).where(eq(companyProfiles.leadId, id)),
     db.delete(aiJobs).where(eq(aiJobs.leadId, id)),
     db.update(proposals).set({ leadId: null }).where(eq(proposals.leadId, id)),

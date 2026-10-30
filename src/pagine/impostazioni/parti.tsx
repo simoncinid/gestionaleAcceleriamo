@@ -42,8 +42,8 @@ export function Sezione({ titolo, id, coda, children }: { titolo: string; id?: s
   return (
     <section id={id} aria-label={titolo} className="grid scroll-mt-20 gap-3">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-titolo-card">{titolo}</h2>
-        {coda && <p className="text-secondaria text-grigio">{coda}</p>}
+        <h2 className="segno font-display text-sezione">{titolo}</h2>
+        {coda && <p className="text-nota text-grigio">{coda}</p>}
       </div>
       {children}
     </section>
@@ -53,7 +53,7 @@ export function Sezione({ titolo, id, coda, children }: { titolo: string; id?: s
 // Le voci di configurazione si aggiungono con un link in fondo alla lista (spec 11.3), mai con il "+".
 export function Aggiungi({ children, onClick }: { children: string; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className="min-h-11 justify-self-start text-corpo font-semibold text-accento-testo underline-offset-4 hover:underline">
+    <button type="button" onClick={onClick} className="min-h-11 justify-self-start text-testo font-semibold text-accento-testo underline-offset-4 hover:underline">
       {children}
     </button>
   );

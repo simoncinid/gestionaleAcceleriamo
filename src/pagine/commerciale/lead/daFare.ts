@@ -33,3 +33,20 @@ export function distanza(scadenza: number, stato: StatoScadenza, ora: number): s
 export const FASI_CON_CALL = Object.keys(FASI_CALL_WORKER);
 // Fasi in cui contano i tentativi di chiamata.
 export const FASI_TENTATIVI = ["da-chiamare-prima-volta", "da-richiamare"];
+
+// Orario corto della riga del Da fare (giro 2): "ieri 16:00", "oggi 16:00", "domani 9:30", "sab 31, 16:00".
+const SETTIMANA = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
+export function orarioBreve(ms: number, ora: number): string {
+  const diff = numeroGiorno(ms) - numeroGiorno(ora);
+  if (diff === 0) return `oggi ${ore(ms)}`;
+  if (diff === -1) return `ieri ${ore(ms)}`;
+  if (diff === 1) return `domani ${ore(ms)}`;
+  const p = partiRoma(ms);
+  return `${SETTIMANA[p.settimana]} ${p.giorno}, ${ore(ms)}`;
+}
+
+// Stato di una scadenza scritta a mano (le task del lead): stessa regola del server, rosso solo dai giorni prima.
+export function statoDi(ms: number, ora: number): StatoScadenza {
+  const diff = numeroGiorno(ms) - numeroGiorno(ora);
+  return diff < 0 ? "scaduto" : diff === 0 ? "oggi" : "futuro";
+}

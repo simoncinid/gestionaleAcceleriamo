@@ -38,12 +38,12 @@ export function Login() {
       <form onSubmit={entra} className="grid w-full max-w-sm gap-5 rounded-blocco border border-sabbia bg-avorio p-8">
         <div className="grid gap-3">
           <img src="/brand/logo.svg" alt="Acceleriamo" className="h-10 justify-self-start" />
-          <h1 className="font-display text-titolo-card">Entra in Acceleriamo</h1>
+          <h1 className="font-display text-sezione">Entra in Acceleriamo</h1>
         </div>
-        {motivo && <p className="rounded-controllo border border-sabbia bg-crema p-3 text-secondaria">{motivo}</p>}
+        {motivo && <p className="rounded-controllo border border-sabbia bg-crema p-3 text-nota">{motivo}</p>}
         <Campo etichetta="Utente" name="username" autoComplete="username" required autoFocus />
         <Campo etichetta="Password" name="password" type="password" autoComplete="current-password" required />
-        {errore && <p role="alert" className="text-secondaria text-ink">{errore}</p>}
+        {errore && <p role="alert" className="text-nota text-ink">{errore}</p>}
         <Pulsante variante="primario" misura="lg" type="submit" inCorso={inCorso} className="w-full justify-center">Entra</Pulsante>
       </form>
     </main>

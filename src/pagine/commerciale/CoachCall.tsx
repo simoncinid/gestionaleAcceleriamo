@@ -15,7 +15,7 @@ const STATO: Record<CoachApi["stato"], string> = {
   in_corso: "Il coach sta scrivendo",
   pronto: "Suggerimenti del coach pronti",
   errore: "Il coach non è riuscito a rispondere",
-  fermo_tetto: "Coach fermo: Claude ha raggiunto il tetto del mese",
+  fermo_tetto: "Coach fermo: raggiunto il tetto di spesa del mese",
 };
 
 // Opzioni delle due azioni, fuori dal componente per provarle: un errore (404, 409, rete) arriva sempre in un toast.
@@ -50,14 +50,14 @@ export function CoachCall({ callId, lead }: { callId: string; leadId: string; le
   const chiedi = useMutation(azioni.chiedi);
   const applica = useMutation(azioni.applica);
   if (q.isPending) return <Skeleton righe={1} />;
-  if (q.isError) return <p className="text-secondaria text-grigio">Il coach non si è caricato.</p>;
+  if (q.isError) return <p className="text-nota text-grigio">Il coach non si è caricato.</p>;
   const s = q.data;
   const r = s.risultato;
   const etichettaFase = (id: string | null) => (id ? fasi.data?.find((f) => f.id === id)?.label ?? id : "Nessuna fase suggerita");
   return (
     <div className="flex flex-col gap-2 pt-2">
-      {s.stato !== "nessuno" && <p className="text-secondaria text-grigio">{STATO[s.stato]}</p>}
-      {s.stato === "errore" && s.errore && <p className="text-secondaria text-grigio">{s.errore}</p>}
+      {s.stato !== "nessuno" && <p className="text-nota text-grigio">{STATO[s.stato]}</p>}
+      {s.stato === "errore" && s.errore && <p className="text-nota text-grigio">{s.errore}</p>}
       {(s.stato === "nessuno" || s.stato === "errore") && (
         <div>
           <Pulsante variante="secondario" inCorso={chiedi.isPending} onClick={() => chiedi.mutate()}>
@@ -79,32 +79,32 @@ export function CoachCall({ callId, lead }: { callId: string; leadId: string; le
         >
           <div className="flex flex-col gap-4">
             <section className="flex flex-col gap-1">
-              <h3 className="font-display text-riga">Riassunto</h3>
-              <p className="text-corpo whitespace-pre-line">{r.riassunto}</p>
+              <h3 className="font-display text-voce">Riassunto</h3>
+              <p className="text-testo whitespace-pre-line">{r.riassunto}</p>
             </section>
             <section className="flex flex-col gap-1">
-              <h3 className="font-display text-riga">Fase suggerita</h3>
-              <p className="text-corpo">{etichettaFase(r.faseSuggerita)}</p>
+              <h3 className="font-display text-voce">Fase suggerita</h3>
+              <p className="text-testo">{etichettaFase(r.faseSuggerita)}</p>
             </section>
             <section className="flex flex-col gap-1">
-              <h3 className="font-display text-riga">Prossima azione</h3>
-              <p className="text-corpo">{r.prossimaAzione.testo}</p>
-              <p className="text-secondaria text-grigio">{quando(r.prossimaAzioneAt)}</p>
+              <h3 className="font-display text-voce">Prossima azione</h3>
+              <p className="text-testo">{r.prossimaAzione.testo}</p>
+              <p className="text-nota text-grigio">{quando(r.prossimaAzioneAt)}</p>
             </section>
             {r.bozzaFollowUp && (
               <section className="flex flex-col gap-1">
-                <h3 className="font-display text-riga">Bozza di follow-up</h3>
-                <p className="text-corpo whitespace-pre-line">{r.bozzaFollowUp}</p>
+                <h3 className="font-display text-voce">Bozza di follow-up</h3>
+                <p className="text-testo whitespace-pre-line">{r.bozzaFollowUp}</p>
               </section>
             )}
             {r.risposteObiezioni.length > 0 && (
               <section className="flex flex-col gap-1">
-                <h3 className="font-display text-riga">Risposte alle obiezioni</h3>
+                <h3 className="font-display text-voce">Risposte alle obiezioni</h3>
                 <ul className="flex flex-col gap-3">
                   {r.risposteObiezioni.map((o, i) => (
                     <li key={i}>
-                      <p className="text-corpo font-medium">{o.obiezione}</p>
-                      <p className="text-corpo">{o.risposta}</p>
+                      <p className="text-testo font-medium">{o.obiezione}</p>
+                      <p className="text-testo">{o.risposta}</p>
                     </li>
                   ))}
                 </ul>
@@ -112,11 +112,11 @@ export function CoachCall({ callId, lead }: { callId: string; leadId: string; le
             )}
             {r.controlli.length > 0 && (
               <section className="flex flex-col gap-1">
-                <h3 className="font-display text-riga">Da sistemare</h3>
-                <ul className="flex flex-col gap-1">{r.controlli.map((x, i) => <li key={i} className="text-corpo">{x}</li>)}</ul>
+                <h3 className="font-display text-voce">Da sistemare</h3>
+                <ul className="flex flex-col gap-1">{r.controlli.map((x, i) => <li key={i} className="text-testo">{x}</li>)}</ul>
               </section>
             )}
-            <p className="text-secondaria text-grigio">Applica apre "Com'è andata?" già compilato: il lead cambia solo con Salva esito.</p>
+            <p className="text-nota text-grigio">Applica apre "Com'è andata?" già compilato: il lead cambia solo con Salva esito.</p>
           </div>
         </Foglio>
       )}

@@ -36,8 +36,8 @@ export function FoglioRimanda({ leadId, onChiudi }: { leadId: string; onChiudi: 
       <button type="button" role="checkbox" aria-checked={aspetta} onClick={() => setAspetta((a) => !a)}
         className={cx("flex min-h-14 w-full items-center gap-3 rounded-controllo border-[1.5px] bg-avorio px-4 py-2.5 text-left transition-colors duration-(--durata-veloce)", aspetta ? "border-ink" : "border-sabbia-2 hover:border-ink")}>
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-[15px] font-semibold">Si farà vivo lui</span>
-          <span className="text-[13px] text-grigio">Se non si fa sentire, richiamo fra 7 giorni</span>
+          <span className="text-testo font-semibold">Si farà vivo lui</span>
+          <span className="text-nota text-grigio">Se non si fa sentire, richiamo fra 7 giorni</span>
         </span>
         <span className="flex w-5 justify-end">{aspetta && <Check size={18} weight="bold" aria-hidden />}</span>
       </button>

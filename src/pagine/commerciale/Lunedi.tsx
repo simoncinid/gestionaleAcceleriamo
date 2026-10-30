@@ -12,13 +12,13 @@ import { Gruppo, Voce } from "./numeri/righe";
 type Decisioni = [string, string, string];
 const GIORNO_MESE = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "long" });
 const COMMENTO: Record<RevisioneApi["commentoStato"], string> = {
-  nessuno: "", in_coda: "Claude scrive il commento: qualche minuto", in_corso: "Claude sta scrivendo il commento", pronto: "",
-  errore: "Il commento non è arrivato: riprova", fermo_tetto: "Claude è al tetto del mese: il commento riparte il mese prossimo",
+  nessuno: "", in_coda: "Sto scrivendo il commento: qualche minuto", in_corso: "Sto scrivendo il commento", pronto: "",
+  errore: "Il commento non è arrivato: riprova", fermo_tetto: "Assistente al tetto del mese: il commento riparte il mese prossimo",
 };
 // Con "Riscrivi" il commento di prima resta (voce 23): lo stato parla del nuovo, il vecchio si legge sotto.
 const COMMENTO_NUOVO: Partial<Record<RevisioneApi["commentoStato"], string>> = {
   in_coda: "Nuovo commento in preparazione", in_corso: "Nuovo commento in preparazione",
-  errore: "Il nuovo commento non è arrivato: riprova", fermo_tetto: "Nuovo commento fermo: Claude è al tetto del mese",
+  errore: "Il nuovo commento non è arrivato: riprova", fermo_tetto: "Nuovo commento fermo: assistente al tetto del mese",
 };
 
 // Voce 26: le richieste partono una dopo l'altra, così la chiusura non supera il salvataggio delle decisioni al blur.
@@ -90,10 +90,10 @@ export function Lunedi() {
       </div>
       <section className="flex flex-col gap-2 @5xl:col-start-2 @5xl:row-span-5 @5xl:row-start-1">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-display text-titolo-blocco">Cosa è fermo</h2>
-          <span className="text-meta text-grigio tabular-nums">{fermi}</span>
+          <h2 className="segno font-display text-sezione">Cosa è fermo</h2>
+          <span className="text-nota text-grigio tabular-nums">{fermi}</span>
         </div>
-        {fermi === 0 ? <p className="text-secondaria text-grigio">Niente di fermo.</p> : (
+        {fermi === 0 ? <p className="text-nota text-grigio">Niente di fermo.</p> : (
           <div className="flex flex-col gap-2">
             {n.fermi.map((f) => <Riga key={f.id} titolo={f.company} meta={`fermo da ${f.giorni} giorni`} href={`/commerciale/lead/${f.id}`} />)}
             {n.proposteFerme.map((p) => <Riga key={p.id} titolo={p.company} meta={`proposta senza risposta da ${p.giorni} giorni`} href={p.leadId ? `/commerciale/lead/${p.leadId}` : "/commerciale/proposte"} />)}
@@ -107,7 +107,7 @@ export function Lunedi() {
       </Gruppo>
       </div>
       <section className="flex flex-col gap-3 @5xl:col-start-1">
-        <h2 className="font-display text-titolo-blocco">Tre decisioni</h2>
+        <h2 className="segno font-display text-sezione">Tre decisioni</h2>
         {decisioni.map((d, i) => (
           <AreaTesto
             key={i}
@@ -122,18 +122,18 @@ export function Lunedi() {
         ))}
       </section>
       <section className="flex flex-col gap-2 @5xl:col-start-1">
-        <h2 className="font-display text-titolo-blocco">Commento di Claude</h2>
-        {statoCommento && <p className="text-secondaria text-grigio">{statoCommento}</p>}
-        {precedente && <p className="text-meta text-grigio">Commento precedente</p>}
-        {r.commento && <p className="whitespace-pre-line text-corpo">{r.commento}</p>}
-        {!r.commento && !statoCommento && <p className="text-secondaria text-grigio">Facoltativo: Claude legge solo i numeri e le decisioni.</p>}
+        <h2 className="segno font-display text-sezione">Commento dell'assistente</h2>
+        {statoCommento && <p className="text-nota text-grigio">{statoCommento}</p>}
+        {precedente && <p className="text-nota text-grigio">Commento precedente</p>}
+        {r.commento && <p className="whitespace-pre-line text-testo">{r.commento}</p>}
+        {!r.commento && !statoCommento && <p className="text-nota text-grigio">Facoltativo: l'assistente legge solo i numeri e le decisioni.</p>}
         {!chiusa && !scrivendo && r.commentoStato !== "fermo_tetto" && (
           <div><Pulsante variante="secondario" inCorso={commento.isPending} onClick={() => commento.mutate()}>{r.commento ? "Riscrivi il commento" : "Scrivi il commento"}</Pulsante></div>
         )}
       </section>
       </div>
       {chiusa ? (
-        <p className="text-meta text-grigio">Chiusa da {nomeDi(r.chiusaDa)} {momento(r.chiusaAt!)}</p>
+        <p className="text-nota text-grigio">Chiusa da {nomeDi(r.chiusaDa)} {momento(r.chiusaAt!)}</p>
       ) : (
         <div className="sticky bottom-20 -mx-4 bg-crema px-4 py-3 md:bottom-4">
           <Pulsante variante="primario" misura="lg" className="w-full md:w-auto" inCorso={salva.isPending && salva.variables?.chiudi === true}
